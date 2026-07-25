@@ -318,8 +318,15 @@ def _bumpers(
     # *center* sits half a diameter inboard of it. Subtracting a round 30 mm
     # instead — which is what this did first — left the kart 39 mm short of its
     # own parameter, and issue #21 checks that number in Godot.
+    #
+    # Each end uses the diameter of the tube *that end is actually swept with*.
+    # The rear used `tube_bumper` while the rear bumper is swept at
+    # `tube_secondary`, 22 mm against 20, so the tube's outer surface landed
+    # 1 mm past the CIK maximum and the kart measured 1.831 m in Godot against a
+    # parameter of 1.830. That 1 mm sat in every turntable caption for two
+    # milestones, close enough to right to read as rounding.
     nose_y = p.length_overall * 0.5 - p.tube_bumper * 0.5
-    rear_y = -p.length_overall * 0.5 + p.tube_bumper * 0.5
+    rear_y = -p.length_overall * 0.5 + p.tube_secondary * 0.5
 
     # Nose hoop: two tiers, which is what a kart actually carries.
     for label, height, half_width in (("lower", z + 0.010, 0.300), ("upper", z + 0.105, 0.255)):

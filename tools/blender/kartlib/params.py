@@ -204,12 +204,28 @@ class KartParams:
     engine_width: float = 0.230
     engine_length: float = 0.260
     engine_height: float = 0.300
+    """Overall envelope of the engine cluster: `width` across the kart, `length`
+    fore-and-aft, `height` measured up from the **crankcase underside**, not from
+    the ground and not from `engine_z`.
+
+    Spelled out because it was ambiguous and a module had to guess. Read as a
+    bounding-box half-height about `engine_z`, the crankcase underside lands at
+    z = 0.000 — 35 mm below the frame rails, i.e. dragging on the asphalt."""
+
     engine_x: float = 0.240
     """Engine center, to the kart's right. A KZ carries its engine on the
-    driver's right, and the resulting mass asymmetry is real — issue #15."""
+    driver's right, and the resulting mass asymmetry is real — issue #15.
+
+    **Measured as too far inboard for `engine_width`.** Centered here the
+    crankcase's inboard face is at x = 0.125, which is 39 mm inside the seat
+    shell's outer edge and through both right-hand seat struts. Issue #107."""
 
     engine_y: float = -0.190
     engine_z: float = 0.150
+    """Height of the **crankshaft axis**, not of the engine's bounding-box
+    center. This is the datum the chain line is built from: the engine's output
+    sprocket and the rear axle sprocket have to be coplanar and at compatible
+    heights, and that is a statement about shaft centers."""
 
     exhaust_length: float = 0.620
     exhaust_max_diameter: float = 0.130
@@ -221,8 +237,18 @@ class KartParams:
     exhaust_segments_high: int = 32
 
     radiator_width: float = 0.260
+    """Core width measured **fore-and-aft along Y**, because a kart's radiator is
+    side-mounted and faces across the kart rather than forwards.
+
+    Which axis this spans was not stated and two modules read it differently.
+    Taken laterally it puts the core across x 0.200..0.460, straight through the
+    shifter lever, and leaves 0.7 mm to the sidepod — geometrically impossible.
+    Taken fore-and-aft it clears the shifter knob by 17 mm and the sidepod by
+    10.5 mm, and matches a real KZ. So `radiator_thickness` is the lateral one."""
+
     radiator_height: float = 0.180
     radiator_thickness: float = 0.045
+    """Core depth **across the kart along X** — see `radiator_width`."""
     radiator_x: float = 0.330
     radiator_y: float = 0.090
     radiator_z: float = 0.290

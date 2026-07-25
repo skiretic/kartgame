@@ -591,14 +591,18 @@ def lathe(
         upper_is_point = isinstance(upper, bmesh.types.BMVert)
         if lower_is_point and upper_is_point:
             continue
+        # Both fans were wound inward while the barrel quads between them were
+        # correct, so a capped cylinder came out with a signed volume of 0.260
+        # against a true 0.785 — the shortfall is exactly the two cones counted
+        # negative. Same root cause and same invisibility as `box` above.
         if lower_is_point:
             for step in range(segments):
                 following = (step + 1) % segments
-                bm.faces.new((lower, upper[step], upper[following]))
+                bm.faces.new((lower, upper[following], upper[step]))
         elif upper_is_point:
             for step in range(segments):
                 following = (step + 1) % segments
-                bm.faces.new((lower[following], lower[step], upper))
+                bm.faces.new((lower[step], lower[following], upper))
         else:
             for step in range(segments):
                 following = (step + 1) % segments
@@ -641,13 +645,26 @@ def box(
                 corners.append(bm.verts.new(origin + local))
 
     # Indices follow the emission order above: bit 0 is x, bit 1 is y, bit 2 z.
+    #
+    # **Every one of these was wound inward.** Measured: a unit cube built here
+    # had a signed volume of -1.0, which is the exact volume with every face
+    # facing in. It went unnoticed because Blender materials default to
+    # `use_backface_culling = False`, so the exporter writes `doubleSided: true`
+    # into the glTF and Godot renders the backfaces with the shading normal
+    # flipped — the kart looked right in every render this project has taken.
+    # What it would have broken is issue #19's tangent-space normal bake, which
+    # reads the low-poly's normals rather than its silhouette, and anything that
+    # ever turns culling on.
+    #
+    # The check that catches this is signed volume, not a render: sum
+    # `a . (b x c) / 6` over the faces and require it positive.
     faces = (
-        (0, 1, 3, 2),  # -Z
-        (4, 6, 7, 5),  # +Z
-        (0, 4, 5, 1),  # -Y
-        (2, 3, 7, 6),  # +Y
-        (0, 2, 6, 4),  # -X
-        (1, 5, 7, 3),  # +X
+        (0, 2, 3, 1),  # -Z
+        (4, 5, 7, 6),  # +Z
+        (0, 1, 5, 4),  # -Y
+        (2, 6, 7, 3),  # +Y
+        (0, 4, 6, 2),  # -X
+        (1, 3, 7, 5),  # +X
     )
     for face in faces:
         bm.faces.new(tuple(corners[index] for index in face))

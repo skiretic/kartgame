@@ -64,7 +64,7 @@ MODULES: tuple[tuple[str, str], ...] = (
     ("wheels", "#14 wheels, tires and rear axle"),
     ("powertrain", "#15 engine, exhaust and radiator"),
     ("cockpit", "#13 seat, steering wheel and pedals"),
-    ("bodywork", "#15/#16 nose, sidepods and floor"),
+    ("bodywork", "#105 nose fairing, sidepods and rear plastics"),
     ("interior", "#16 cockpit interior"),
     ("driver", "#17 driver with IK-ready arms"),
 )
@@ -203,6 +203,83 @@ def build_kart(
         print("    built %-11s %s" % (module_name, description))
 
     return context
+
+
+def check_face_winding(context: build.BuildContext) -> None:
+    """Fail the build if any watertight part is wound inside out.
+
+    This exists because `build.box` wound all six of its faces inward and
+    `build.lathe` wound both of its axis fans inward, and **every render this
+    project has taken looked correct anyway**. Blender materials default to
+    `use_backface_culling = False`, so the exporter writes `doubleSided: true`
+    and Godot renders the backfaces with the shading normal flipped. The bug was
+    found by a subagent measuring signed volumes, not by looking at a kart.
+
+    So the invariant is asserted here rather than trusted: for a closed surface,
+    `sum(a . (b x c)) / 6` over its triangles is the enclosed volume, and it is
+    positive exactly when every face is wound outward. Meshes that are not
+    watertight are skipped rather than guessed at — an open shell has no
+    enclosed volume and the sum means nothing. That is a real gap, and it is
+    stated rather than papered over: a hollow-backed sidepod is exactly the kind
+    of part this cannot check.
+
+    Fatal rather than a warning. The failure mode it guards is a mesh that looks
+    right in every viewport and quietly corrupts issue #19's tangent-space bake,
+    which is precisely the class of thing a warning gets scrolled past.
+    """
+    inverted: list[tuple[str, float]] = []
+    open_parts: list[str] = []
+    for obj in exportable(context):
+        if obj.type != "MESH":
+            continue
+        mesh = obj.data
+        # Watertight means every edge is shared by exactly two faces. Cheaper
+        # than a full manifold test and sufficient: an open edge is the only way
+        # the divergence theorem stops applying here.
+        faces_per_edge: dict[int, int] = {}
+        for polygon in mesh.polygons:
+            for loop_index in polygon.loop_indices:
+                edge_index = mesh.loops[loop_index].edge_index
+                faces_per_edge[edge_index] = faces_per_edge.get(edge_index, 0) + 1
+        if not faces_per_edge or any(count != 2 for count in faces_per_edge.values()):
+            open_parts.append(obj.name)
+            continue
+
+        volume = 0.0
+        for polygon in mesh.polygons:
+            corners = [mesh.vertices[index].co for index in polygon.vertices]
+            for index in range(1, len(corners) - 1):
+                a, b, c = corners[0], corners[index], corners[index + 1]
+                volume += a.dot(b.cross(c)) / 6.0
+        if volume < 0.0:
+            inverted.append((obj.name, volume))
+
+    if inverted:
+        listing = "\n".join(
+            "      %-28s %+.6f m3" % (name, volume) for name, volume in inverted
+        )
+        raise SystemExit(
+            "error: %d part(s) are wound inside out:\n%s\n"
+            "       A closed mesh must enclose a positive volume. Check the face\n"
+            "       tuples in whatever built these -- and note that a render will\n"
+            "       not show it, because the materials export doubleSided."
+            % (len(inverted), listing)
+        )
+    meshes = sum(1 for obj in exportable(context) if obj.type == "MESH")
+    # The open parts are named rather than counted. A part that is not watertight
+    # is not necessarily wrong -- a hollow shell genuinely is not -- but it is
+    # unchecked, and an unchecked part appearing in this list without a reason is
+    # itself the finding. Silently reporting "n skipped" would hide exactly that.
+    print(
+        "    winding  %d/%d watertight part(s) enclose positive volume%s"
+        % (
+            meshes - len(open_parts),
+            meshes,
+            ("; not watertight, unchecked: " + ", ".join(open_parts))
+            if open_parts
+            else "",
+        )
+    )
 
 
 def suffix_pass(context: build.BuildContext, suffix: str) -> None:
@@ -464,6 +541,7 @@ def main() -> None:
 
     print("==> geometry (%s detail)" % detail.name)
     context = build_kart(parameters, detail, scene, materials, out_directory)
+    check_face_winding(context)
     if high_context is not None:
         context.high_poly = pair_high_poly(context, high_context, high_suffix)
 

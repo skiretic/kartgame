@@ -79,6 +79,16 @@ var _margin := DEFAULT_MARGIN
 var _manifest: Dictionary = {}
 var _measured := ""
 
+## The view last asked for, held so a request that arrives before `_ready` is not
+## lost. `tools/shots/shoot.gd` calls `set_turntable_view(0, N)` from
+## `_initialize`, which runs before this node's `_ready` — the camera does not
+## exist yet, so that call returns early and `_ready` used to overwrite the count
+## with 1. The first cell of every contact sheet was captioned "view 1/1" as a
+## result, which is a small lie in the one place a still is supposed to describe
+## itself completely.
+var _requested_index := 0
+var _requested_count := 1
+
 
 func _ready() -> void:
 	_args = Cmdline.parse()
@@ -94,7 +104,7 @@ func _ready() -> void:
 	_build_probe()
 	_build_camera()
 	_build_caption()
-	set_turntable_view(0, 1)
+	set_turntable_view(_requested_index, _requested_count)
 
 
 # --- construction ----------------------------------------------------------
@@ -344,6 +354,10 @@ func _build_caption() -> void:
 ## previous one, so a cell's content depends only on its index — which is what
 ## makes a sheet comparable with the sheet before it.
 func set_turntable_view(index: int, count: int) -> void:
+	# Recorded before the guard, so a call that arrives ahead of `_ready` is
+	# replayed rather than dropped. See `_requested_index`.
+	_requested_index = index
+	_requested_count = count
 	if _camera == null:
 		return
 
@@ -402,17 +416,40 @@ func _place_orbit(target: Vector3, yaw: float, pitch: float, scale: float) -> vo
 
 ## The driver's eye, looking forward.
 ##
-## Positioned from the manifest's `driver_eye_z`, the same number
-## `scripts/look/lookdev.gd` uses for its look-dev camera height, so the cockpit
-## view here and the M4 cockpit rig cannot disagree about where the head is. The
-## eye sits slightly forward of the seat center because a driver's head is not
-## against the seat back.
+## The eye is *derived from the seat*, not offset from it by a chosen number. The
+## first version of this put the eye 0.10 m forward of the hip point, which put
+## the camera inside the steering wheel — a kart seat is reclined hard, so the
+## head ends up behind the hip, not ahead of it.
+##
+## The derivation, entirely from the parameter block:
+##
+##   * the hip is at (`seat_y`, `seat_z`), which is what `cockpit.py` builds the
+##     seat's spine around;
+##   * the torso lies along the seat back, reclined `seat_back_angle` from
+##     vertical, so the shoulder at `driver_shoulder_z` is that much *rearward*
+##     of the hip;
+##   * the head is carried upright above the shoulder — the neck is what
+##     un-reclines it — so the eye at `driver_eye_z` sits a little forward of the
+##     shoulder rather than continuing along the torso line.
+##
+## Every term is a manifest parameter except `NECK_CARRY`, and that one is here
+## rather than in `params.py` because it describes a pose, not a dimension of the
+## kart. M4's real cockpit rig replaces all of this; what it must not do is
+## disagree with it about where the head is, which is why the numbers come from
+## the same block the seat was built from.
+const NECK_CARRY := 0.045
+
 func _place_cockpit() -> void:
 	var eye_height := _parameter("driver_eye_z", 0.62)
+	var shoulder_height := _parameter("driver_shoulder_z", 0.47)
 	var seat_y := _parameter("seat_y", -0.06)
+	var seat_z := _parameter("seat_z", 0.075)
+	var back_angle := _parameter("seat_back_angle", 0.61)
+
+	var shoulder_y := seat_y - (shoulder_height - seat_z) * tan(back_angle)
+	var eye_y := shoulder_y + NECK_CARRY
 	# Blender +Y forward maps to Godot -Z, so a Blender y becomes a Godot -z.
-	var forward_of_seat := 0.10
-	_camera.position = Vector3(0.0, eye_height, -(seat_y + forward_of_seat))
+	_camera.position = Vector3(0.0, eye_height, -eye_y)
 	# Aimed down at the nose rather than level. A level cockpit camera at this
 	# height sees only horizon and sky, because everything a kart driver looks at
 	# on their own kart — the nose, the tray, their own hands — is below the eye
@@ -436,6 +473,52 @@ func _mesh_line() -> String:
 	if totals is Dictionary:
 		vertices = int(totals.get("vertices", 0))
 		triangles = int(totals.get("triangles", 0))
-	return "mesh %s   %s verts  %s tris   blender %s" % [
+	var line := "mesh %s   %s verts  %s tris   blender %s" % [
 		digest, vertices, triangles, _manifest.get("blender", "?"),
 	]
+
+	# The caption is only worth having if it describes the mesh actually on
+	# screen, and it can silently stop doing that. `shoot.sh SKIP_IMPORT=1` skips
+	# Godot's import step, so a regenerated `.glb` renders from the *previous*
+	# import while this line reads the *new* manifest straight off disk — a fresh
+	# hash printed over a stale kart. That happened, and it was only caught
+	# because a deliberate geometry change produced a pixel-identical render,
+	# which is not a signal anything should have to rely on.
+	var built := _triangles_in_scene()
+	if built > 0 and triangles > 0 and built != triangles:
+		line += "\nSTALE IMPORT — %d tris on screen, manifest says %d. Re-run without SKIP_IMPORT=1." % [
+			built, triangles,
+		]
+	return line
+
+
+## Triangles actually in the loaded scene, as the renderer has them.
+##
+## Compared against the manifest's triangle count rather than its vertex count,
+## because the two vertex counts are not the same quantity and never will be:
+## Blender reports merged mesh vertices, and the glTF buffer splits them again at
+## every UV and normal seam. Triangles survive the round trip exactly — the
+## exporter triangulates, and Godot's importer neither adds nor removes any at
+## LOD 0 — so it is the one number that must agree, which is what makes a
+## disagreement unambiguous rather than a tolerance question.
+func _triangles_in_scene() -> int:
+	if _kart == null:
+		return 0
+	var total := 0
+	for node in _walk(_kart):
+		var instance := node as MeshInstance3D
+		if instance == null or instance.mesh == null:
+			continue
+		var mesh := instance.mesh
+		for surface in mesh.get_surface_count():
+			if mesh.surface_get_primitive_type(surface) != Mesh.PRIMITIVE_TRIANGLES:
+				continue
+			var indices := 0
+			var array_mesh := mesh as ArrayMesh
+			if array_mesh != null:
+				indices = array_mesh.surface_get_array_index_len(surface)
+			if indices > 0:
+				total += indices / 3
+			else:
+				total += mesh.surface_get_array_len(surface) / 3
+	return total

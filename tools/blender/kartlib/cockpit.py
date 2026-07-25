@@ -21,6 +21,10 @@ order of how much each one costs to get wrong:
 3.  **The wheel is a flat-bottomed butterfly, not a car wheel.** Three spokes, a
     visible dished boss, and a chord across the bottom so the driver's thighs
     clear it. A circular rim makes a kart look like a toy car immediately.
+    Measured on the built rim: 319.7 mm wide, 243.7 mm tall, a 39.8 mm dip
+    between the horns and a 135.6 mm flat across the bottom. The dip is the
+    feature that has to survive being looked at from 0.55 m, and the first
+    version's 13.3 mm did not — see `WHEEL_OUTLINE`.
 4.  **The shifter and the clutch lever are the whole KZ silhouette.** §6.3: hand
     shifter on the driver's right, clutch lever on the wheel. Issue #15's
     silhouette test is "reads as a shifter kart rather than a single-speed", and
@@ -29,16 +33,30 @@ order of how much each one costs to get wrong:
     from a cross tube ahead of the front cross member. Their reach relative to
     the seat is one of the strongest scale cues on the whole kart.
 
+    **They are not, and this module cannot fix it.** Measured hip point to pedal
+    pad face: 618.5 mm. A 50th-percentile adult leg is 432 mm of thigh plus
+    450 mm from the knee to the ball of the foot, so 618.5 mm folds the knee to
+    89 degrees. "Nearly straight" is 850-870 mm. The same seat-to-wheel arithmetic
+    puts the rim 4 mm beyond a fully extended arm. Both distances come from
+    `seat_y`, `pedal_y` and `wheel_center_y` in params.py, which this module does
+    not own — the numbers and the proposed replacements are in the issue #13
+    report, and criterion 1 fails until they change. Nothing here is worth
+    retuning around them, because every part in this file is placed *from* those
+    parameters and would only have to move back again.
+
 Coordinates: +X right, +Y forward, +Z up. Nothing here is mirrored wholesale —
 the seat is symmetric but is built in one pass because it is a single lofted
 surface, and the shifter is deliberately right-hand only.
 
-Interfaces published for later milestones:
+Interfaces published for later milestones. The axes are measured on the built
+scene and on the exported `.glb`, not inferred from this file — see `_steering`
+for the evidence:
 
-    steering_pivot         rotate about its own local **Z** (see `_steering`)
-    seat_root              the hip point; the physics center of mass reference
-    pedal_throttle_pivot   rotate about its own local **X**
-    pedal_brake_pivot      rotate about its own local **X**
+    name                   Blender local   Godot local   what it does
+    steering_pivot         +Z              +Y            positive steers left
+    pedal_throttle_pivot   +X              +X            positive presses
+    pedal_brake_pivot      +X              +X            positive presses
+    seat_root              --              --            hip point, CoM reference
 """
 
 from __future__ import annotations
@@ -113,24 +131,38 @@ SEAT_SECTION: tuple[tuple[float, float], ...] = (
     (1.000, 1.000),
 )
 
-#: Steering wheel rim centerline, as (fraction of radius across, fraction up),
-#: for the right half from the top center round to the bottom center. Normalized
-#: in `_wheel_outline` so the extreme point lands exactly on `wheel_diameter`.
-#: The dip at the top and the chord across the bottom are the butterfly shape.
+#: Steering wheel rim centerline, in units of half the wheel's width, for the
+#: right half from the top center round to the bottom center. `_wheel_outline`
+#: scales it so the built rim's overall width is exactly `wheel_diameter`, which
+#: makes the widest control point 1.000 by definition.
+#:
+#: The two features that have to read from the cockpit camera are the dip at the
+#: top between the horns and the chord across the bottom. **The dip was measured
+#: and it was too shallow to see**: 13.3 mm on a 293 mm rim, 4.5% of the width,
+#: which subtends 1.4 degrees at the ~0.55 m the driver's eye sits from the rim
+#: and is why the M2 turntable read as a plain three-spoke wheel. It is 39.8 mm
+#: here, 12.5% of the width, which is what a real KZ butterfly rim runs and what
+#: separates it from a round wheel at a glance.
+#:
+#: The horn tips reach 169.8 mm from the wheel center against a half-width of
+#: 159.8, so a butterfly rim is *not* contained by a circle of `wheel_diameter`.
+#: That is the shape being what it is rather than a mistake, and it is written
+#: down because "diameter" invites the opposite assumption.
 WHEEL_OUTLINE: tuple[tuple[float, float], ...] = (
-    (0.000, 0.905),
-    (0.230, 0.985),
-    (0.430, 1.000),
-    (0.640, 0.895),
-    (0.820, 0.700),
-    (0.945, 0.430),
+    (0.000, 0.610),
+    (0.150, 0.672),
+    (0.320, 0.820),
+    (0.470, 0.880),
+    (0.640, 0.836),
+    (0.820, 0.688),
+    (0.940, 0.440),
     (1.000, 0.150),
-    (0.985, -0.130),
-    (0.900, -0.375),
-    (0.740, -0.530),
-    (0.500, -0.595),
-    (0.250, -0.615),
-    (0.000, -0.620),
+    (0.985, -0.140),
+    (0.880, -0.390),
+    (0.700, -0.525),
+    (0.460, -0.588),
+    (0.220, -0.606),
+    (0.000, -0.610),
 )
 
 #: Where the three spokes meet the rim, as an angle in the wheel plane measured
@@ -201,6 +233,27 @@ PEDAL_MOUNT_X = 0.125
 #: Clearance held between a cockpit part and the surface of any frame tube it
 #: bolts to. Small but non-zero: the real bolted joint touches, and issue #13's
 #: third acceptance criterion is that nothing intersects the frame.
+#:
+#: **Verified, at triangle level rather than by bounding box.** A BVH overlap of
+#: every `interior` mesh against every `chassis` and `wheels` mesh returns zero
+#: overlapping triangle pairs, so criterion 3 holds. The gaps that matter, in
+#: millimeters: pedal mounts to the front cross member 5.39 (this constant plus
+#: the bevel), pedal pads to the same member 6.94, seat shell to the floor tray
+#: 6.00, shifter base to the floor tray 1.00, seat shell to the seat struts it
+#: bolts to 17.5, steering column to the steering hoop 19.4.
+#:
+#: Two of those are worth knowing rather than fixing here. The 1.00 mm under the
+#: shifter base is this constant measured against the *rail top*, which is where
+#: a shifter clamps; the floor tray happens to lie 4 mm above that rail top and
+#: gets in between. And the 17.5 mm at the seat struts is the frame reaching for
+#: a seat 360 mm wide while `seat_width` builds one 330 mm wide — a parameter
+#: disagreement, not a clearance choice. Both are in the report for issue #13.
+#:
+#: Worth recording for whoever measures next: `BVHTree.FromObject(obj, depsgraph)`
+#: builds its tree in the object's **local** space in Blender 5.2, not world
+#: space. Overlapping two of them directly compares two parts as if both sat at
+#: the origin, which reports the seat as intersecting all four tires. Build from
+#: world-space triangles with `BVHTree.FromPolygons` instead.
 FRAME_CLEARANCE = 0.005
 
 #: Hand shifter, on the driver's right. §6.3: the lever is what says KZ.
@@ -470,7 +523,13 @@ def _sweep_closed_planar(
     rings: list[list[bmesh.types.BMVert]] = []
     for index in range(count):
         tangent = (path[(index + 1) % count] - path[(index - 1) % count]).normalized()
-        across = plane_normal.cross(tangent).normalized()
+        # `tangent x plane_normal`, not the other way round. The ring's two basis
+        # vectors and the sweep direction have to form a right-handed frame, the
+        # same way `build.sweep_tube` pairs its normal with `tangent.cross(normal)`
+        # — otherwise the face loop below, which is copied from that function,
+        # winds the whole rim inward. It did, and `genkart.check_face_winding`
+        # is what caught it: the rim enclosed -0.000385 m3.
+        across = tangent.cross(plane_normal).normalized()
         ring: list[bmesh.types.BMVert] = []
         for step in range(segments):
             angle = 2.0 * math.pi * step / segments
@@ -617,20 +676,45 @@ def _column_frame(p: P.KartParams) -> tuple[Vector, Vector, Vector, Vector, Vect
 def _wheel_outline(p: P.KartParams, detail: build.Detail) -> list[Vector]:
     """The rim centerline, closed, in the wheel's own 2D plane.
 
-    Authored as a half and mirrored, then normalized so that its extreme point
-    plus half the rim's own thickness lands exactly on `wheel_diameter * 0.5`.
-    Scaling to fit rather than authoring absolute numbers means the shape and the
-    regulated size are two separate decisions, and changing one does not silently
-    change the other.
+    Authored as a half and mirrored, then scaled so that the finished rim's
+    overall **width** — the sampled outline plus the rim's own thickness — lands
+    exactly on `wheel_diameter`. Scaling to fit rather than authoring absolute
+    numbers means the shape and the regulated size are two separate decisions,
+    and changing one does not silently change the other.
+
+    **Width, not radius, and that distinction was worth 27 mm.** This normalized
+    on the longest control *vector* first, which on a butterfly outline is a horn
+    at about 60 degrees, not the horizontal extreme. The rim it produced measured
+    293.3 mm across against a `wheel_diameter` of 320 — the parameter was landing
+    on a dimension nothing on the finished wheel could be measured at. A kart
+    wheel is sold and quoted by its width, so the width is what the parameter has
+    to mean.
+
+    The scale is measured off a fixed dense sampling rather than off the control
+    points, because a Catmull-Rom segment can bulge outside the hull of its own
+    control points and the control polygon therefore understates the width. It is
+    deliberately *not* `detail`'s sampling: a detail-dependent scale would make
+    the low-poly and the high-poly wheel slightly different shapes, and issue
+    #19's normal bake needs them to be the same kart at two densities — see
+    `build.Detail`. Sampling is an affine combination of the control points, so
+    scaling before sampling and scaling after are the same curve.
+
+    The consequence of measuring on a denser sampling than the one built is that
+    the low-poly rim lands 0.3 mm *inside* `wheel_diameter` rather than exactly
+    on it, and the high-poly a little less. That is the right direction to err
+    and it is two orders of magnitude below the 27 mm this replaced.
     """
     half = [Vector(point) for point in WHEEL_OUTLINE]
-    extreme = max(point.length for point in half)
-    scale = (p.wheel_diameter * 0.5 - p.wheel_rim_thickness * 0.5) / extreme
-
     # Top center and bottom center are on the centerline and must not be doubled.
-    loop = [point * scale for point in half]
-    loop.extend(Vector((-point.x, point.y)) * scale for point in reversed(half[1:-1]))
-    return _catmull_rom(loop, 4 if detail.is_high else 2, closed=True)
+    loop = list(half)
+    loop.extend(Vector((-point.x, point.y)) for point in reversed(half[1:-1]))
+
+    widest = max(abs(point.x) for point in _catmull_rom(loop, 16, closed=True))
+    scale = (p.wheel_diameter - p.wheel_rim_thickness) * 0.5 / widest
+
+    return _catmull_rom(
+        [point * scale for point in loop], 4 if detail.is_high else 2, closed=True
+    )
 
 
 def _steering(
@@ -640,17 +724,37 @@ def _steering(
 ) -> None:
     """Rim, spokes, boss, column, bearing collar and clutch lever.
 
-    **The interface M4 depends on.** `steering_pivot` is an empty at the wheel
-    center whose local Z *is* the column axis, so turning the wheel is one
-    rotation about the pivot's own local Z. The rim, spokes, boss and clutch
-    lever are parented under it; nothing else is.
+    **The interface M4 depends on, and it is measured rather than asserted.**
+    `steering_pivot` is an empty at the wheel center whose local Z *is* the
+    column axis, so turning the wheel is one rotation about the pivot's own local
+    Z. The rim, spokes, boss and clutch lever are parented under it; nothing else
+    is, so everything that rotates is everything a viewer expects to rotate.
 
-    After the glTF y-up conversion in `genkart.export_gltf`, which maps Blender
-    (x, y, z) to (x, z, -y), a node's Blender local Z becomes its **local +Y** in
-    Godot — so in the runtime the axis is `Vector3.UP` in object space. The
-    conversion preserves handedness, so the sign carries over unchanged: a
-    positive rotation turns the wheel counter-clockwise as the driver sees it,
-    which is steering left.
+    What was checked headless, because "the code says local Z" is not evidence:
+
+    *   `steering_pivot.matrix_world`'s third column is (0, -0.452886, 0.891568),
+        which is the column axis `(center - base).normalized()` to 1e-8, and its
+        basis has determinant +1 and unit scale.
+    *   Rotating the rim's world-space points 30 deg about the pivot's local Z
+        keeps them in a 24.00 mm slab — the rim's own thickness, so the wheel
+        stays in its plane. The same rotation about local X or local Y swells
+        that slab to 133.8 mm and 171.8 mm, which is the wheel tumbling out of
+        its plane rather than turning in it.
+    *   A rim point 169.80 mm from the axis sweeps a chord of 14.813 mm at 5 deg
+        and 240.128 mm at 90 deg, matching `2 r sin(theta / 2)` to six decimals.
+
+    In the exported `.glb`, `steering_pivot` is a node under `cockpit_root`
+    carrying a 26.929 deg rotation about +X — `wheel_angle` exactly — with the
+    rim, spokes, boss and lever as its children. Applying `export_yup`'s
+    (x, y, z) -> (x, z, -y) to each Blender local axis reproduces that node's
+    basis exactly: local X stays +X, local Y becomes **-Z**, and local Z becomes
+    **+Y**. So the runtime axis is `Vector3.UP` in the node's own space, and it
+    is the exported file saying so rather than this comment.
+
+    **Sign.** The map is a proper rotation, so handedness and therefore the sign
+    carry over. Measured on the built scene: a positive rotation moves the rim
+    point at the driver's right up and inboard, which is counter-clockwise as the
+    driver sees it. **Positive steers left.**
     """
     p = context.params
     detail = context.detail
@@ -813,7 +917,10 @@ def _clutch_lever(
         axis,
         0.009,
     )
-    # Perch: the clamp that holds the blade to the rim.
+    # Perch: the clamp that holds the blade. It sits at 62 mm radius on the
+    # 155 deg spoke, not on the rim — measured, because the comment here said
+    # "rim" and the rim is at 148 mm. A lever clamped to a spoke is what a kart
+    # actually carries, so the geometry is right and the sentence was wrong.
     build.box(
         bm,
         (0.022, 0.030, CLUTCH_OFFSET + 0.010),

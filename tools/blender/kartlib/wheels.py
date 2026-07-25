@@ -145,9 +145,21 @@ SPROCKET_THICKNESS: float = 0.008
 SPROCKET_HUB_RADIUS: float = 0.042
 SPROCKET_HUB_HALF: float = 0.014
 SPROCKET_X: float = 0.115
-"""Sprocket center, on the kart's LEFT. A KZ drives the left rear, and the
-sprocket sits between the center and left axle bearings — frame.py puts hangers
-at 0 and -0.185 on this side, so this lands cleanly between them."""
+"""Sprocket center, on the kart's RIGHT, between the center and right bearings —
+frame.py puts hangers at 0 and 0.185, so this lands cleanly between them.
+
+**It was on the left, and the reason given was wrong.** The comment here said "a
+KZ drives the left rear", which cannot be a reason for anything: the rear axle is
+one solid shaft with both wheels locked to it (ARCHITECTURE.md §6), so it drives
+neither wheel preferentially and the sprocket's side is a packaging question, not
+a drivetrain one. The packaging answer is that the engine sits on the driver's
+right (`params.engine_x`), so the chain has to reach a sprocket on the right —
+a chain crossing under the seat to the far side is not a thing any kart does. The
+rear brake disc is what goes on the left, to balance it.
+
+Caught by `powertrain.py` building its chain line from the engine and finding the
+two sprockets 230 mm apart in a plane they both have to lie in. The magnitude was
+right all along; only the sign was mirrored."""
 
 
 # --- corners ---------------------------------------------------------------
@@ -471,8 +483,6 @@ def _rear_axle(context: build.BuildContext, collection: bpy.types.Collection) ->
     axle_y = P.rear_axle_y(p)
     axle_z = P.rear_axle_z(p)
     center = (0.0, axle_y, axle_z)
-    # The placeholder material set has no plain steel that is not the exhaust's
-    # polish, so the driveline takes the engine's alloy until M3 textures land.
     material = context.material("axle_steel")
 
     pivot = build.empty("rear_axle", center, collection, size=0.08)
@@ -517,7 +527,7 @@ def _rear_axle(context: build.BuildContext, collection: bpy.types.Collection) ->
     # No teeth either. They cannot come out of a revolution, and 100-odd of them
     # modeled would cost more triangles than the rest of the kart — they belong
     # to the normal bake in issue #19 or to an alpha-cut ring later.
-    sprocket.location = (-SPROCKET_X, axle_y, axle_z)
+    sprocket.location = (SPROCKET_X, axle_y, axle_z)
     build.set_parent(sprocket, pivot)
 
 
