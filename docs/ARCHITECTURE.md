@@ -116,8 +116,9 @@ Realism is not an asset problem. In rough order of impact per hour spent:
 7. **Surface history.** Skid decals, marbles off the racing line, dirt at track edges, curb paint scuffed where cars actually clip it.
 8. **Triplanar detail textures** on the track for close-up asphalt grain under the cockpit camera.
 9. **Real kart reference data.** Mass 175 kg with driver, real torque curve, real tire compound behavior. §6. The figures live in `src/core/kz_reference.h` so the solver, the validation suite, and the tuning UI cannot each keep a different copy.
+10. **Photographic reference for generated geometry, before it is modeled.** Item 3 says measured reality beats hand-authoring, and that applies to shape as much as to albedo. A generated part is modeled from photographs of the real one and the photographs are recorded in [`REFERENCES.md`](REFERENCES.md) — which is a numbered list precisely so a shape can be argued about against a source rather than against a recollection. Prose is not a substitute: issue #116 built a whole powertrain from accurate written sources and none of it looked like an engine, and the radiator was built wrong twice from a correctly-quoted "55° to the horizontal" because that sentence never named an axis. See ADR-0028 and ADR-0029.
 
-Note items 1, 2, 4, 6, and 9 cost almost nothing and outrank every asset decision.
+Note items 1, 2, 4, 6, 9, and 10 cost almost nothing and outrank every asset decision. Item 10 is the cheapest of the lot and was the last one learned.
 
 ---
 

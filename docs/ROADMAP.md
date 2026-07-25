@@ -86,7 +86,7 @@ Proves the content path before anything depends on it.
 - [x] Frame tubes and floor tray (#12)
 - [x] Wheels, tires and rear axle (#14)
 - [x] Seat, steering wheel and pedals (#13). Verified numerically, not just built: zero triangle-level intersections with the frame, and `steering_pivot`'s rotation axis proven against the exported `.glb` rather than asserted in a comment. Its third criterion — a plausible seating position — **fails and is deferred to #107**, because the seat is the datum for #16 and #17
-- [x] Engine, exhaust and radiator (#15)
+- [x] Engine, exhaust and radiator (#15). Its two criteria — silhouette and implied mass distribution — both genuinely pass. **They turned out to be a much weaker standard than "the engine looks like an engine"**, and the parts read as a stack of primitives up close, which is #116. Rebuilt from photographs in d5dccfb; the radiator still wants a refinement pass. The generalized lesson is §5 item 10 of `ARCHITECTURE.md`, and it is the reason `docs/REFERENCES.md` exists
 - [x] **Bodywork** — nose fairing, sidepods, rear plastics (#105). Not in this list originally, which is the gap the issue was filed for: a KZ without plastics reads as a bare rolling chassis. It is also 22.6% of the kart's surface area, so it carries most of the livery and most of the texel budget
 - [ ] Cockpit interior (#16), driver (#17)
 - [x] UV unwrap at the §5 texel density (#18). **No lightmap UV2** — a kart moves, so it is lit by lightmap probes and no channel reads it. [ADR-0025](DECISIONS.md#adr-0025--the-kart-carries-no-lightmap-uv2-because-a-kart-moves) corrects this line as it was originally written
