@@ -54,16 +54,19 @@ Effort: S
 
 Deliberately before the vehicle. The look target is the largest open question in the plan, and fighting art direction while also fighting tire curves is how projects stall.
 
-- Test scene: flat asphalt plane at correct real-world scale, reference cube of known dimensions
-- CC0 photoscan materials from Poly Haven / ambientCG at the fixed texel density
-- AgX tonemapping, physical sun angle, PhysicalSkyMaterial, HDRI environment
-- LightmapGI bake path end to end; SDFGI as the iteration fallback
-- Reflection probes, SSAO, SSIL, subtle volumetric fog
-- TAA, FSR2 configured
-- **Motion blur compositor effect prototyped** — the one genuinely uncertain piece of §4, surfaced now rather than at M10
-- `ATTRIBUTION.md` populated as assets land
+- [x] **Motion blur compositor effect prototyped** — the one genuinely uncertain piece of §4, surfaced now rather than at M10. Works; four limits recorded in [ADR-0019](DECISIONS.md#adr-0019--motion-blur-is-a-gather-along-godots-velocity-buffer-with-four-limits-stated), two of which become work at M7 and M10
+- [x] Still-capture harness — `tools/shots/shoot.sh` renders a scene to a PNG at fixed parameters. Look development needs the same frame under the same settings every time, or a comparison between two renders means nothing
+- [x] Test scene: flat plane at correct real-world scale, 1 m reference cube and a kart-sized box beside it
+- [ ] CC0 photoscan materials from Poly Haven / ambientCG at the fixed texel density
+- [ ] AgX tonemapping, physical sun angle, PhysicalSkyMaterial, HDRI environment
+- [ ] LightmapGI bake path end to end; SDFGI as the iteration fallback
+- [ ] Reflection probes, SSAO, SSIL, subtle volumetric fog
+- [ ] TAA, FSR2 configured
+- [ ] `ATTRIBUTION.md` populated as assets land
 
 **Accept:** a still of an empty asphalt plane under a physical sun reads as photographic. A test object at 80 km/h has motion blur that sells the speed. Scale verified against the reference cube.
+
+**Note on the sky.** §4 asks for `PhysicalSkyMaterial` with a real sun angle, and this milestone also asks for an HDRI environment. Those are alternatives, not a stack: a `Sky` resource holds one material, and it supplies both the visible dome and the ambient radiance. The decision is which one leads — an HDRI wins on fidelity for a fixed time of day, `PhysicalSkyMaterial` wins the moment time of day becomes a lever (§17, M10). Settled with a side-by-side still under issue #5.
 
 Effort: M
 

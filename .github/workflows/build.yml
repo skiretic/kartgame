@@ -162,11 +162,12 @@ jobs:
           mv "godot-bin/${name}" godot-bin/godot
           chmod +x godot-bin/godot
 
-      # A cold project has no .godot/ directory. Importing first separates
-      # "resources failed to import" from "the extension failed to load", which
-      # otherwise arrive as the same wall of errors.
-      - name: Import resources
-        run: ./godot-bin/godot --headless --path . --import
-
+      # Run the same script a developer runs, rather than a second copy of the
+      # same steps. This job previously imported once and then verified, and it
+      # failed here with `Aborted (core dumped)` on the import — the Linux
+      # manifestation of the cold-import defect in ADR-0018, which until this
+      # run had only been seen on macOS. verify.sh already handles it by
+      # importing twice and letting the warm pass speak, so the fix is to stop
+      # duplicating its logic in YAML where it can drift out of sync.
       - name: Run M0 verification
-        run: ./godot-bin/godot --headless --path . --script tools/verify/verify_extension.gd
+        run: tools/verify/verify.sh ./godot-bin/godot

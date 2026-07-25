@@ -44,3 +44,6 @@ __pycache__/
 .vscode/
 .idea/
 *.swp
+
+# Look-dev stills — render output, reproducible from tools/shots/shoot.sh
+shots/

@@ -51,7 +51,7 @@ Renderer, GI, shadows, post-processing, particles, UI toolkit, audio engine, sav
 | Gap | Response |
 |---|---|
 | Weak `VehicleBody3D` | Replaced entirely by the custom model in §6. Never used. |
-| No built-in motion blur | Compositor effect (custom render pass, 4.3+). Non-optional — motion blur is a primary speed cue at realistic art direction. §5. |
+| No built-in motion blur | Compositor effect (custom render pass, 4.3+). Non-optional — motion blur is a primary speed cue at realistic art direction. §5. Built in M1; the velocity buffer a compositor effect needs is available on Godot's Metal backend, which was the open question. |
 | Mediocre SSR | Reflection probes carry the load; SSR is a supplement on the track surface only. |
 | No hardware ray tracing | Bake static GI instead. A fixed racetrack is the ideal case for baked lighting. |
 | No adaptive-trigger or gamepad-gyro API | Small HID GDExtension if wanted. §9 — real cost, clearly bounded. |
@@ -94,10 +94,10 @@ Forward+ renderer. Not Mobile, not Compatibility.
 | Shadows | Directional, 4 PSSM splits, tight split 0 | Split 0 tightness is set by cockpit self-shadowing (§7). |
 | AA | TAA, plus FSR2 upscaling on weaker targets | TAA also stabilizes thin kart frame tubes. |
 | SSAO + SSIL | On, subtle | SSIL adds contact bounce cheaply. |
-| SSR | On, track surface only | Weak in Godot. Reflection probes do the real work. |
+| SSR | On, tuned so only the track contributes | Weak in Godot, and **not maskable** — `Environment.ssr_enabled` is the only switch, with no per-material or per-instance opt-in. "Track surface only" is therefore a tuning outcome, not a setting: roughness and fade values chosen so a near-horizontal glossy surface is the only thing that returns a visible reflection. Probes do the real work. |
 | Volumetric fog | On, low density | Aerial perspective is a strong realism cue and nearly free. |
 | Sky | PhysicalSkyMaterial, real sun angle | Time of day is a lever, not a decoration. |
-| Motion blur | **Compositor effect, custom** | Godot has none built in. Required. |
+| Motion blur | **Compositor effect, custom** | Godot has none built in. Required. Built and measured in M1 — [ADR-0019](DECISIONS.md#adr-0019--motion-blur-is-a-gather-along-godots-velocity-buffer-with-four-limits-stated) has the working version, its cost, and the four things it does not do. |
 | DOF | Cockpit only, very subtle | Overdone DOF reads as fake immediately. |
 | Decals | Skid marks, track grime | Godot decals are cheap and sell surface history. |
 
@@ -386,6 +386,10 @@ kartgame/
     track/                  track instances
     ui/                     HUD, menus, settings
   scripts/                  GDScript game flow
+    render/                 compositor effects and their compute shaders —
+                            ADR-0020
+    look/                   look-development scenes, built from parameters
+    util/
   assets/
     materials/              CC0 photoscans (Git LFS)
     hdri/                   CC0 environments (Git LFS)
@@ -395,6 +399,11 @@ kartgame/
   tools/
     blender/                genkart.py, gentrack.py (bpy, headless)
     bake/                   lightmap and asset bake entry points
+    assets/                 CC0 downloaders — third-party binaries arrive by
+                            script with pinned checksums, never by hand
+    shots/                  renders a scene to a PNG at fixed parameters, so a
+                            still is reproducible from the command that made it
+    verify/
   tests/
   docs/
 ```
@@ -487,7 +496,7 @@ Cockpit view makes several of these load-bearing rather than optional:
 | Determinism drift | State-hash harness at M6, in CI from that point. |
 | Repo bloat from photoscans | Git LFS from commit one. Generated content gitignored. |
 | Asset license contamination | `ATTRIBUTION.md` updated at import time. Prefer CC0 sources over marginally better restricted ones. |
-| Motion blur compositor effect proves hard | Prototype it in M1, not M8 — it is a load-bearing realism cue, and finding out late is expensive. |
+| ~~Motion blur compositor effect proves hard~~ | **Closed at M1.** It was not hard; the surprises were elsewhere and are recorded in [ADR-0019](DECISIONS.md#adr-0019--motion-blur-is-a-gather-along-godots-velocity-buffer-with-four-limits-stated). Two of its four stated limits become real work later — sky rotation blur, and object silhouettes at M7. |
 
 ---
 

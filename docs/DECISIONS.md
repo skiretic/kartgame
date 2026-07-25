@@ -346,3 +346,163 @@ and prints nonsense frames — `SDL_GetPerformanceFrequency + 4158164`,
 was dismissed as noise for most of the session. macOS writes an honest report to
 `~/Library/Logs/DiagnosticReports/*.ips`; read that instead. `lldb` is no help here,
 because it cannot parse the stripped official binary.
+
+---
+
+The entries below date from the M1 look-development session on **2026-07-25**.
+
+---
+
+## ADR-0019 — Motion blur is a gather along Godot's velocity buffer, with four limits stated
+
+**Status:** Accepted. Resolves the `ARCHITECTURE.md` §19 risk "motion blur compositor
+effect proves hard".
+
+**Context.** §4 lists motion blur as non-optional and §19 says to prototype it in M1
+rather than M10, because it is load-bearing for the realism target and finding out
+late is expensive. Godot ships no motion blur at all, so the whole thing is a custom
+render pass.
+
+**Decision.** A `CompositorEffect` (`scripts/render/motion_blur.gd`) running a compute
+shader (`motion_blur.glsl`) at `EFFECT_CALLBACK_TYPE_POST_TRANSPARENT`. It sets
+`needs_motion_vectors`, reads the engine's velocity buffer, and integrates colour
+along each pixel's velocity vector, scaled by a shutter angle.
+
+**It works, and the uncertain parts turned out fine.** The velocity buffer is
+populated and readable from a compositor effect on Godot's Metal backend on Apple
+Silicon — which was the actual risk, given that the same host has an unrelated Metal
+defect in ADR-0018. Velocity is `RG16F`, holding a screen-space UV displacement since
+the previous frame, and it carries both camera and object motion.
+
+**Four things the design did not anticipate.** Each is recorded because each changes
+either the code or a later milestone.
+
+### 1. The colour buffer cannot be copied, so one effect is two dispatches
+
+A gather blur reads neighbouring pixels while writing this one, so it cannot run in
+place, and the obvious fix is to copy the colour buffer aside first. Godot's colour
+buffer is created with `SAMPLING | COLOR_ATTACHMENT | STORAGE | INPUT_ATTACHMENT` and
+*neither* copy bit, so `texture_copy()` refuses it in both directions:
+
+    Source texture requires the `RenderingDevice.TEXTURE_USAGE_CAN_COPY_FROM_BIT`
+    to be set to be retrieved.
+
+What the buffer can do is be sampled and be written as a storage image, which is
+enough: pass one samples colour and writes the blurred result to a scratch texture the
+effect owns, pass two samples the scratch texture and writes it back. Same bandwidth a
+copy would have cost, one extra dispatch, and no dependency on usage bits the engine
+does not promise.
+
+### 2. Compositor effects run *before* the TAA resolve — and that is an advantage
+
+Compositor effects sit inside the 3D pass, so the last available callback is still
+earlier than Godot's post-processing. That means the blur is applied to a pre-TAA
+image, which is the opposite of the textbook order.
+
+Established rather than assumed: a debug mode writes uncorrelated noise every frame,
+and the standard deviation of a flat region of the result is measured. If nothing
+temporal ran afterwards the noise would survive intact.
+
+| Configuration | Std. deviation of a flat region |
+|---|---|
+| TAA off | 45.15 |
+| TAA on | 16.44 |
+
+TAA averages the effect's output, so it demonstrably runs after it.
+
+The expectation was that this would be a problem. It is the reverse. A fixed tap
+pattern leaves visible discrete ghosts along a high-contrast trailing edge, and TAA —
+integrating over frames with different jitter — cleans them up for free. The blur
+looks *better* with TAA on than off.
+
+**The consequence that matters:** shutter angle must be tuned with TAA in its final
+state, because TAA's history accumulation lengthens the effective blur beyond what the
+shutter setting alone would give.
+
+### 3. Nothing without motion vectors blurs, and that includes the sky
+
+The sky writes no motion vectors, so it is untouched. Under pure translation that is
+correct — the sky genuinely does not move. Under **rotation it is wrong**, and a kart
+corners constantly: at 45 deg/s and 60 fps the sky should smear about 7 px at 1080p
+and instead stays perfectly sharp.
+
+Not fixed here. The fix is known and bounded — cache the previous frame's
+view-projection, and for pixels at the far plane derive velocity by reprojecting the
+view ray through it rather than reading the velocity buffer. It needs
+`access_resolved_depth` and one more sampler. Scheduled against M10 polish, or earlier
+if cornering stills show it reading as a defect rather than as an absence.
+
+### 4. A gather blur cannot smear an object past its own silhouette
+
+This is inherent, not a bug: the pass can only collect colour already on screen at
+this pixel, so a fast object against a still background blurs *inside* its outline and
+stops dead at the edge. A real exposure bleeds the object out over the background.
+
+Demonstrated with a box crossing the view at 300 km/h: its shaded side face smears
+convincingly into its lit face, and its silhouette stays sharp.
+
+It does not matter yet. Camera motion gives every pixel on screen a velocity, so the
+ego-motion case — which is nearly all of what a racing game shows — has no such
+problem. It starts to matter at **M7**, when there are opponents to be passed at a
+closing speed. The fix is the standard tile-max / neighbour-max reconstruction filter
+(McGuire et al.): dilate the velocity field so pixels *near* a fast object also gather
+along its velocity. That is three extra passes and is deliberately not being tuned
+against a yellow cube in M1.
+
+**Cost.** Measured by A/B on the same scene at 3840x2160, where the pass is large
+enough to rise above frame-time noise; the 1920x1080 figure is that divided by the
+pixel ratio, not an independent measurement.
+
+| Configuration | Frame time at 4K | Delta |
+|---|---|---|
+| No blur | 7.5 ms | — |
+| Adaptive taps, capped at 32 | 9.6 ms | +2.1 ms |
+| Fixed 16 taps | 9.8 ms | +2.3 ms |
+| Fixed 64 taps | 13.9 ms | +6.4 ms |
+
+Roughly **0.5 ms at 1080p**, against the 10 ms rendering budget in §15.
+
+Tap count follows blur length at about one tap per two pixels rather than being fixed.
+That is both cheaper and better than a fixed count: a 3 px blur with 32 taps samples
+the same texel repeatedly, and a 60 px blur with 16 taps leaves 4 px between taps,
+which a hard edge turns into sixteen ghosts.
+
+**Rejected.** Doing the blur after tonemapping in a full-screen shader, which would run
+after TAA but would blur display-referred colour — highlights would smear grey instead
+of staying bright, which is the single most recognizable tell of a cheap motion blur.
+Also rejected: implementing the full reconstruction filter now, for the scheduling
+reason in point 4.
+
+---
+
+## ADR-0020 — Rendering effects are GDScript, not C++
+
+**Status:** Accepted. Extends `ARCHITECTURE.md` §3, which does not cover rendering.
+
+**Context.** §3 splits the project between C++ for the simulation and GDScript for game
+flow, and ADR-0015 records the reasoning. Neither mentions render passes, because at
+design time there were none. The motion blur effect forced the question.
+
+**Decision.** Compositor effects and any future render passes are GDScript.
+
+**Reasoning.** The split in ADR-0015 is about where the work happens. For a compositor
+effect essentially all of it happens on the GPU: the CPU side is fetching a few RIDs,
+building two uniform sets, and issuing two dispatches — call it twenty engine calls per
+frame. Moving that to C++ would save microseconds of a budget measured in milliseconds.
+What it would cost is the reason the rule exists at all: a shader parameter that can be
+changed and seen in one run is worth far more here than execution speed, and look
+development is nothing but that loop.
+
+The `.glsl` compute shader is where the actual work is, and it is the same file either
+way.
+
+**Consequence.** `src/` stays what §13 says it is — vehicle, track, AI, audio — and
+does not accumulate a rendering directory. If a future effect does enough CPU-side work
+per frame to show up in a profile, moving that one effect is a contained change,
+because the shader does not move with it.
+
+**Also worth recording.** `Viewport.set_measure_render_time(true)` hangs the process
+before the first frame on Godot's Metal backend on this host — no output, no crash.
+`tools/shots/shoot.sh` therefore reports wall-clock frame time with vsync disabled by
+default and puts GPU timestamps behind `--timing=true`. Same class of thing as
+ADR-0018: an upstream macOS-specific defect worked around rather than diagnosed.

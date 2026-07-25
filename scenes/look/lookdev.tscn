@@ -1,0 +1,10 @@
+[gd_scene load_steps=2 format=3]
+
+; Intentionally almost empty. Everything in the look-dev scene is built by
+; scripts/look/lookdev.gd from command-line parameters, so that a still is
+; reproducible from the command that made it rather than from editor state.
+
+[ext_resource type="Script" path="res://scripts/look/lookdev.gd" id="1_lookdev"]
+
+[node name="LookDev" type="Node3D"]
+script = ExtResource("1_lookdev")
