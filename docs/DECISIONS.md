@@ -918,3 +918,86 @@ a hard reference to it and it could not be cheaply reproduced. Here the product 
 ignored and only its *configuration* is committed. The rule §16 states — generated output
 stays out of version control — keeps needing a qualifier, and the qualifier is always
 whether something other than the generator depends on the artifact existing.
+
+
+## ADR-0028 — A KZ engine has no cooling fins, and issue #116 asked for some
+
+**Status.** Accepted. Supersedes the reasoning in `powertrain.py`'s deleted `RIB_COUNT`.
+
+**Context.** Issue #116 found that the M2 powertrain read as a stack of primitives rather
+than as castings, and listed what was wrong. Its first item asked for cylinder fins that
+"taper, wrap the barrel's curve, and vary in depth front to back", against the four flat
+uniform plates the module built.
+
+Both are wrong, in opposite directions. The class this project models is KZ — ADR-0011 —
+and a KZ 125 is **water-cooled through the cylinder, the head and the crankcase**. It has
+no cooling fins at all. What the module had was four full-perimeter plates standing 10 mm
+proud on every side of a box barrel, which in a render reads as exactly the thing the
+issue then asked for more of: an air-cooled 100 cc barrel. The reference photographs make
+the contrast plain — an installed Vortex KZ cylinder is a smooth sand casting, round in
+plan, on a square base flange, and a Kosmic TS28 next to it is a fin stack.
+
+The module's own docstring had this right and its geometry did not. It said "deliberately
+*ribs*, not cooling fins ... a KZ engine is water-cooled ... so it has no fins", and then
+built four objects that were fins in everything but name. Prose asserting a constraint is
+not the same as geometry honoring it, and nothing in the pipeline compares the two.
+
+**Decision.** The cylinder is a **round water jacket on a square base flange**, with no
+fins and no ribs. Casting character comes from the shapes that are actually there: the
+flange step and its four stud nuts, the draft on the jacket, the exhaust port flange, and
+the diameter step where the head sits down inside the barrel's crown. Surface-level casting
+texture is issue #19's normal bake, not geometry.
+
+**Consequence.** #116's cylinder bullet is not implementable as written and the issue is
+amended rather than followed. The acceptance evidence for that item is the reference, not
+the issue text — which is ARCHITECTURE.md §5 item 3 doing the job it exists for.
+
+**What this does not settle.** Nothing here checks that a module's commentary matches its
+output. The winding gate catches inverted faces because signed volume is computable; there
+is no equivalent for "this docstring says no fins". Four fins survived two milestones
+behind a docstring saying there were none.
+
+
+## ADR-0029 — The radiator core sits in the plane of a second seat's back
+
+**Status.** Accepted.
+
+**Context.** Kart practice states the radiator's mounting angle as **55° to the
+horizontal** — 45° below 20 °C ambient, up to 60° above 30 °C, adjusted in 5° steps and
+checked by holding a phone against the core. That figure is well sourced and, on its own,
+it is not enough to build from: it names an angle without naming an axis, and three
+different axes are consistent with it. Two versions of the radiator were built from it and
+both were wrong, one leaning the core sideways out over the sidepod with the fin face
+pointing outboard, and one doing the same with the two core dimensions swapped.
+
+The correction, from photographs the project owner supplied (R4 and R5 in
+`docs/REFERENCES.md`): the rake is about the kart's **lateral** axis, not its fore-and-aft
+axis. The big fin face points **forward**, the way the driver does, reclined backwards.
+
+Which makes the angle recognizable. `seat_back_angle` is 0.610 rad — 35° from vertical,
+i.e. 55° from horizontal. **It is the same angle.** The radiator core occupies the plane a
+second seat's back would occupy, immediately outboard of the driver's, and everything about
+its orientation follows from that one sentence.
+
+**Decision.** The radiator's rake is derived: `seat_back_angle + radiator_rake_delta`, with
+the delta defaulting to zero. `radiator_lean` and `radiator_yaw` are deleted. The core is
+built in a frame of its own — local +x the face normal, +y inboard, +z up the slant — and
+transformed into the world once; the basis is right-handed so the transform cannot invert
+the winding.
+
+**Consequence.** The 55° is stated once, in a parameter that already existed for the seat,
+so the two cannot drift. Ambient-temperature tuning is one `--set` on the delta. The three
+radiator extents stop meaning axis-aligned things and their docstrings say so explicitly,
+because the ambiguity in `radiator_width` alone has now produced three wrong builds.
+
+**What this costs.** Correctly placed, the core needs volume that `bodywork_sidepod_r` and
+`cockpit.py`'s shifter lever currently occupy — 10 and 3 intersecting part pairs. Neither
+is fixed by moving the radiator: pushing it outboard far enough to clear the lever leaves
+it hanging past the side bar on 245 mm of bracket. The sidepod is issue #110 and two of its
+intersections with the engine predate this work entirely.
+
+**The general lesson, which is the reason this is an ADR and not a comment.** A sourced
+scalar is not a sourced geometry. "55° to the horizontal" was quoted accurately from a good
+source, recorded in `REFERENCES.md`, and still produced two wrong parts, because the axis
+it applies to was never written down. Any angle in this project that does not name its axis
+and its sign should be treated as unbuilt.

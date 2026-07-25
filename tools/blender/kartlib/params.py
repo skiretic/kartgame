@@ -212,13 +212,16 @@ class KartParams:
     bounding-box half-height about `engine_z`, the crankcase underside lands at
     z = 0.000 — 35 mm below the frame rails, i.e. dragging on the asphalt."""
 
-    engine_x: float = 0.240
+    engine_x: float = 0.319
     """Engine center, to the kart's right. A KZ carries its engine on the
     driver's right, and the resulting mass asymmetry is real — issue #15.
 
-    **Measured as too far inboard for `engine_width`.** Centered here the
-    crankcase's inboard face is at x = 0.125, which is 39 mm inside the seat
-    shell's outer edge and through both right-hand seat struts. Issue #107."""
+    Was 0.240, which put the crankcase's inboard face at x = 0.125 — 39 mm
+    inside the seat shell's outer edge and through both right-hand seat struts.
+    `powertrain.py` never honored it; it built the cases against the clearances
+    they actually have and reported the disagreement, which is issue #111. 0.319
+    is the midpoint of the faces it builds, so the parameter now describes the
+    engine rather than contradicting it."""
 
     engine_y: float = -0.190
     engine_z: float = 0.150
@@ -236,22 +239,66 @@ class KartParams:
     exhaust_segments: int = 16
     exhaust_segments_high: int = 32
 
-    radiator_width: float = 0.260
-    """Core width measured **fore-and-aft along Y**, because a kart's radiator is
-    side-mounted and faces across the kart rather than forwards.
+    radiator_width: float = 0.265
+    """Core width **across the kart**, laterally.
 
-    Which axis this spans was not stated and two modules read it differently.
-    Taken laterally it puts the core across x 0.200..0.460, straight through the
-    shifter lever, and leaves 0.7 mm to the sidepod — geometrically impossible.
-    Taken fore-and-aft it clears the shifter knob by 17 mm and the sidepod by
-    10.5 mm, and matches a real KZ. So `radiator_thickness` is the lateral one."""
+    Read the three radiator dimensions against `radiator_rake_delta`'s picture of
+    a second seat's back, because none of them is an axis-aligned extent and
+    every earlier attempt at this block got one of them wrong:
 
-    radiator_height: float = 0.180
-    radiator_thickness: float = 0.045
-    """Core depth **across the kart along X** — see `radiator_width`."""
-    radiator_x: float = 0.330
-    radiator_y: float = 0.090
-    radiator_z: float = 0.290
+        width       across the kart, from the seat shell outward
+        height      up the **slant**, low edge forward, high edge rearward
+        thickness   through the core, along the face's own normal
+
+    A New-Line core is 17 in by 9.5–11.4 in, so 432 mm by 241–290 mm. 265 mm is
+    the short dimension and it is the lateral one. It fits the gap it has to fit
+    almost exactly: the seat shell's right edge is at x 0.165 and the right side
+    bar's inner face at x 0.432, which is 267 mm."""
+
+    radiator_height: float = 0.432
+    """Core length **up the slant**, tanks included — 17 in.
+
+    Not a vertical height: raked back with the seat, 432 mm along the slant is
+    354 mm of rise and 248 mm of fore-and-aft run. The tanks are at the two ends
+    of it, low-forward and high-rearward, with the tubes running between them,
+    which is why this is the tube direction and `radiator_width` is the one the
+    fins repeat along."""
+
+    radiator_thickness: float = 0.040
+    """Core depth through the face — see `radiator_width`."""
+
+    radiator_x: float = 0.308
+    """Lateral center. Puts the core's inboard edge just outside the seat shell
+    at x 0.165 and its outboard edge just inside the right side bar at 0.432."""
+
+    radiator_y: float = 0.000
+    radiator_z: float = 0.320
+    """Center of the core, in the plane it is raked into. Chosen so the low edge
+    clears the floor tray's top at z 0.069 and the high edge stays forward of the
+    engine's front face at y -0.145 — the radiator goes **beside the driver and
+    ahead of the engine**, which is the constraint that actually places it."""
+
+    radiator_rake_delta: float = 0.0
+    """Radians **added to `seat_back_angle`** to give the radiator's rake.
+
+    The radiator core sits in the plane a second seat's back would occupy,
+    immediately outboard of the driver's. That is not an analogy used to explain
+    the number — it *is* the number. A kart radiator's reference mounting angle
+    is 55 degrees to the horizontal, and `seat_back_angle` is 35 degrees from
+    vertical, and those are the same angle. Two parameters holding one figure is
+    exactly the drift this block exists to prevent, so the rake is derived and
+    this holds only the difference.
+
+    Kart practice tunes the angle with ambient temperature — 45 degrees to
+    horizontal below 20 °C, 55 at 20–30, up to 60 above — in 5-degree steps. A
+    step is 0.087 rad, so `--set=radiator_rake_delta=-0.087` is one step nearer
+    vertical. See `docs/REFERENCES.md`.
+
+    **This replaced a `radiator_lean` and a `radiator_yaw` that rotated about the
+    wrong axes.** Both were built from the same sourced 55 degrees, and both
+    tipped the core sideways over the sidepod instead of reclining it. The tell
+    was that the big fin face ended up pointing outboard; it points forward, the
+    way the driver does."""
 
     # --- bodywork ----------------------------------------------------------
 

@@ -375,13 +375,34 @@ func set_turntable_view(index: int, count: int) -> void:
 		yaw = 360.0 * float(index) / float(maxi(count, 1))
 		pitch = Cmdline.as_float(_args, "view_elevation", 16.0)
 	else:
-		var view: Array = CANONICAL_VIEWS[index % CANONICAL_VIEWS.size()]
+		var view: Array = CANONICAL_VIEWS[_canonical_index(index)]
 		name = view[0]
 		yaw = view[1]
 		pitch = view[2]
 		scale = view[3]
 
-	if name == "cockpit":
+	# `--yaw` / `--pitch` / `--scale` override whichever view was selected, so a
+	# part can be looked at from an angle no canonical view covers without
+	# editing this file. Issue #116 needed the engine at 0.2 of the kart's
+	# framing distance and no canonical view is closer than 0.48; the rule that a
+	# still is reproducible from its command means the answer is an argument.
+	yaw = Cmdline.as_float(_args, "yaw", yaw)
+	pitch = Cmdline.as_float(_args, "pitch", pitch)
+	scale = Cmdline.as_float(_args, "scale", scale)
+
+	# And `--at=x,y,z` aims the orbit somewhere other than the kart's center, in
+	# the kart's own coordinates. Judging a casting means filling the frame with
+	# it, and the engine is 0.32 m off the centerline.
+	var aim := Cmdline.as_string(_args, "at", "")
+	if aim != "":
+		var parts := aim.split(",")
+		if parts.size() == 3:
+			target = Vector3(
+				float(parts[0]), float(parts[1]), float(parts[2]))
+		else:
+			push_warning("--at wants three comma-separated numbers, got: " + aim)
+
+	if name == "cockpit" and not _args.has("yaw"):
 		_place_cockpit()
 	else:
 		_place_orbit(target, yaw, pitch, scale)
@@ -392,6 +413,25 @@ func set_turntable_view(index: int, count: int) -> void:
 		_mesh_line(),
 		LookEnv.exposure_caption(_args),
 	])
+
+
+## Which canonical view a turntable cell shows.
+##
+## `--view=<name or index>` pins every cell to one view, which is what makes a
+## single close-up renderable: `--turntable=1 --view="frame detail"` is one cell
+## rather than the first of nine. Without it the only way to a chosen angle was
+## to render all nine and crop, which throws away eight ninths of the pixels.
+func _canonical_index(index: int) -> int:
+	var pinned := Cmdline.as_string(_args, "view", "")
+	if pinned == "":
+		return index % CANONICAL_VIEWS.size()
+	if pinned.is_valid_int():
+		return clampi(pinned.to_int(), 0, CANONICAL_VIEWS.size() - 1)
+	for candidate in range(CANONICAL_VIEWS.size()):
+		if String(CANONICAL_VIEWS[candidate][0]) == pinned:
+			return candidate
+	push_warning("--view names no canonical view: " + pinned)
+	return index % CANONICAL_VIEWS.size()
 
 
 func _place_orbit(target: Vector3, yaw: float, pitch: float, scale: float) -> void:

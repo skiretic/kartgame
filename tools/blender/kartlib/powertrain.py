@@ -83,7 +83,7 @@ import math
 
 import bmesh
 import bpy
-from mathutils import Vector
+from mathutils import Matrix, Vector
 
 from . import build
 from . import params as P
@@ -152,33 +152,144 @@ a dimension of its own:
     rear      leaves room for the carburetor and the reed block behind it.
 """
 
-CLUTCH_COVER_RADIUS: float = 0.052
-CLUTCH_COVER_INBOARD_X: float = 0.205
-"""The clutch is inside the cases on a KZ — a hand-operated multi-plate, not the
-external centrifugal drum a TaG kart carries — so what is visible is the round
-cover over it on the engine's inboard face."""
+CASE_SPLIT_Z: float = 0.150
+CASE_LOWER_INSET: float = 0.005
+"""The crankcase's horizontal parting line, and how far the lower half is inset.
+
+A kart crankcase is two sand castings bolted together on a plane through the
+crankshaft axis, so the split is at `engine_z` by definition rather than by
+choice. The lower half is drawn narrower than the upper so the upper's bolting
+flange overhangs it: that ledge and the shadow under it are the whole reason to
+build two boxes instead of one, and it is what a plain box could never show.
+"""
+
+BELL_RADIUS: float = 0.060
+BELL_CENTER_Y: float = -0.228
+BELL_CENTER_Z: float = 0.172
+BELL_PROUD: float = 0.014
+"""The clutch bell housing on the inboard face.
+
+The clutch is inside the cases on a KZ — a hand-operated multi-plate, not the
+external centrifugal drum a TaG kart carries — and R2 shows the housing over it
+standing well proud of the case as a round boss the height of the case itself.
+It sits above and ahead of the gearbox output boss, which is why the sprocket
+carrier at `SPROCKET_Y`/`SPROCKET_Z` emerges from under its rear lower edge
+rather than from a flat wall.
+"""
+
+CLUTCH_COVER_RADIUS: float = 0.056
+CLUTCH_COVER_INBOARD_X: float = 0.196
+CLUTCH_COVER_HUB_RADIUS: float = 0.018
+CLUTCH_BOLT_CIRCLE: float = 0.046
+CLUTCH_BOLT_COUNT: int = 6
+"""The cover bolted onto the bell.
+
+R2's is an **openwork casting** — a lattice of webs with the clutch's pressure
+plate and its eight spring bolts visible through the windows. The lattice itself
+is not affordable here and is not what the eye reads at any distance the game
+uses; what it reads is that the cover is a separate part with its own rim, a
+raised center hub and a ring of fasteners. So: a rim, a dished face, a hub, and
+six bolts. The windows are left to issue #19's normal bake.
+"""
 
 IGNITION_COVER_RADIUS: float = 0.052
 IGNITION_COVER_OUTBOARD_X: float = 0.430
 IGNITION_COVER_Z: float = 0.185
+IGNITION_BOLT_CIRCLE: float = 0.042
+IGNITION_BOLT_COUNT: int = 5
 """Ignition/flywheel cover on the outboard face. Held 16 mm clear of the right
-side bar, which passes at x 0.432..0.452, z 0.096..0.117 alongside it."""
+side bar, which passes at x 0.432..0.452, z 0.096..0.117 alongside it — which is
+also why this one is not on the crankshaft axis the way the clutch is. On the
+axis at z = 0.150 its lower edge would be at 0.098, inside the bar's height
+band, and it clears only because it stops 2 mm short of the bar in x. That is
+not a clearance to rely on."""
 
-CYLINDER_INSET: float = 0.017
-CYLINDER_TOP_Z: float = 0.330
-"""Top of the barrel, i.e. the head's parting face. The barrel is inset from the
-crankcase on both sides, which is what makes the two read as separate castings
-rather than as one extruded lump."""
+CYLINDER_AXIS_X: float = 0.319
+CYLINDER_AXIS_Y: float = -0.250
+"""The bore's axis. x is the crankcase's own center, because the barrel sits over
+the crank; y is 5 mm ahead of the case's fore-and-aft center, because the case
+extends rearward past the crank to carry the gearbox and the reed block."""
 
-RIB_COUNT: int = 4
-RIB_THICKNESS: float = 0.010
-RIB_PROUD: float = 0.010
-"""Casting ribs on the barrel, and two more on the head.
+CYLINDER_BASE_TOP_Z: float = 0.258
+CYLINDER_BASE_HALF: tuple[float, float] = (0.070, 0.076)
+CYLINDER_TOP_Z: float = 0.348
+CYLINDER_RADIUS: float = 0.064
+"""The cylinder, which is **a round water jacket on a square base flange** —
+not a box, and with no cooling fins on it at all.
 
-Deliberately *ribs*, not cooling fins. A KZ engine is water-cooled — that is what
-the radiator is for — so it has no fins; what it has is a ribbed cast water
-jacket, and four ribs read as an engine at a fraction of the cost of the thirty a
-finned air-cooled barrel would need."""
+This is the single largest correction in issue #116 and it is the one the issue
+itself got wrong: #116 asks for fins that "taper, wrap the barrel's curve, and
+vary in depth front to back". That describes an air-cooled 100 cc barrel — R3 is
+one, and it is what the previous four flat plates were unintentionally imitating.
+A KZ is water-cooled through the cylinder, head *and* crankcase, so a real one
+has **no fins**; R2's Vortex is a smooth sand casting, round in plan, sitting on
+a square flange that is bolted to the case by four studs. See ADR-0028.
+
+The base flange is wider than the barrel on all four sides, which is what makes
+the two read as one casting with a machined joint rather than as a taper.
+"""
+
+HEAD_RADIUS: float = 0.053
+HEAD_BOLT_CIRCLE: float = 0.038
+HEAD_BOLT_COUNT: int = 6
+HEAD_NUT_FLATS: float = 0.013
+"""The head: a disc a little smaller than the barrel, with six nuts on a bolt
+circle round a spark plug boss at its center. R2 shows exactly six, each in its
+own spotfaced counterbore, and the step where the head's diameter falls inside
+the barrel's is clearly visible all the way round.
+
+**The step has to be big enough to see.** At 60 mm against the barrel's 64 the
+two read in a render as one drum with a lid on it, which is what the first
+attempt at this produced — measured off a 1100 px close-up, the step was under
+two pixels. 53 mm puts 11 mm of barrel crown on show all the way round, and
+moving `CYLINDER_TOP_Z` up to 0.348 at the same time makes the head a squat
+52 mm disc rather than a 70 mm drum, which is the proportion R2 has."""
+
+PLUG_BOSS_RADIUS: float = 0.021
+PLUG_BOSS_HEIGHT: float = 0.009
+PLUG_HEX_FLATS: float = 0.021
+PLUG_INSULATOR_RADIUS: float = 0.0080
+PLUG_CAP_DIAMETER: float = 0.026
+PLUG_LEAD_DIAMETER: float = 0.007
+"""The spark plug, standing proud of the head on its boss, and its cap and lead.
+
+#116 calls it "one of the most recognizable things on a two-stroke" and it is:
+in R2 the white insulator and the black cap are the highest-contrast objects in
+the whole engine bay. 21 mm across the flats is a B-series plug's spanner size.
+The lead is included because the plug cap alone reads as a stub — what says
+ignition is the lead arcing away from it down to the coil.
+"""
+
+EXHAUST_FLANGE_HALF: tuple[float, float] = (0.038, 0.030)
+EXHAUST_FLANGE_THICKNESS: float = 0.014
+EXHAUST_FLANGE_NUT_FLATS: float = 0.011
+"""The exhaust port flange on the barrel's front face, and its two nuts.
+
+The chamber is not welded to the engine: an elbow bolts to the port through this
+flange and the pipe slips onto the elbow and is held by springs. #116 lists the
+flange and the springs as the missing joint hardware, and they are the two parts
+that make the pipe look bolted on rather than grown out of the cylinder.
+"""
+
+EXHAUST_SPRING_TURNS: int = 6
+EXHAUST_SPRING_COIL_RADIUS: float = 0.0055
+EXHAUST_SPRING_WIRE_RADIUS: float = 0.0011
+EXHAUST_SPRING_SAMPLES: int = 8
+"""Two tension springs from lugs on the flange to lugs on the header. 11 mm coil
+diameter and 2.2 mm wire is a standard exhaust spring; six turns over the ~55 mm
+they span is what a stretched one looks like. `EXHAUST_SPRING_SAMPLES` is the
+polyline resolution per turn and is fixed at both detail levels, because the
+number of turns is the spring's *shape*."""
+
+REED_BLOCK_LO: tuple[float, float, float] = (0.272, -0.368, 0.155)
+REED_BLOCK_HI: tuple[float, float, float] = (0.352, -0.345, 0.222)
+REED_FRAME_INSET: float = 0.009
+"""The reed cage on the crankcase's rear face, between the case and the carb.
+
+A case-reed KZ breathes through here, and R2 shows it as a ribbed grey block
+with a raised bolting frame round a recessed center. It is built as the frame
+plus a recessed face, which is two boxes and reads correctly; the three reed
+windows themselves are normal-map detail."""
 
 STARTER_RADIUS: float = 0.034
 STARTER_X: float = 0.283
@@ -187,27 +298,49 @@ STARTER_Z: float = 0.172
 carry one — CIK requires an onboard starter for the class — and its bulk plus the
 battery is a real part of the silhouette."""
 
-BATTERY_SIZE: tuple[float, float, float] = (0.110, 0.085, 0.070)
-BATTERY_CENTER: tuple[float, float, float] = (0.230, -0.397, 0.195)
+BATTERY_SIZE: tuple[float, float, float] = (0.085, 0.110, 0.070)
+BATTERY_CENTER: tuple[float, float, float] = (0.222, -0.400, 0.195)
 """The starter's battery, on a bracket behind the engine. Sits above the rear
-seat strut, which passes below it at z 0.120..0.148."""
+seat strut, which passes below it at z 0.120..0.148.
 
-CARB_LO: tuple[float, float, float] = (0.290, -0.424, 0.168)
-CARB_HI: tuple[float, float, float] = (0.362, -0.352, 0.250)
-CARB_BOWL_RADIUS: float = 0.026
-CARB_BOWL_BOTTOM: float = 0.132
-"""Dell'Orto VHSH 30 — a 30 mm flat-slide, which is what the class runs. Body
-roughly 72 x 72 x 82 mm with the float bowl hanging below it, mounted to the reed
-block on the rear of the crankcase and pointing rearward at the airbox."""
+Turned to run **fore-and-aft** rather than across the kart, and moved 8 mm
+inboard. Laid across, its outboard end reached x 0.285 and the carburetor's body
+— now a 60 mm cylinder about x 0.312 rather than a 72 mm box — occupies from
+0.282. The two overlapped by 3 mm. Along the kart it ends at 0.265 and clears
+both the carburetor by 17 mm and the seat shell's edge at 0.164 by 15 mm."""
 
-AIRBOX_LO: tuple[float, float, float] = (0.250, -0.545, 0.280)
-AIRBOX_HI: tuple[float, float, float] = (0.420, -0.430, 0.400)
+CARB_AXIS_X: float = 0.312
+CARB_AXIS_Z: float = 0.205
+CARB_BODY_RADIUS: float = 0.030
+CARB_FRONT_Y: float = -0.368
+CARB_REAR_Y: float = -0.440
+CARB_SPIGOT_ENGINE_RADIUS: float = 0.0175
+CARB_SPIGOT_AIR_RADIUS: float = 0.032
+CARB_TOP_CAP_RADIUS: float = 0.024
+CARB_TOP_CAP_TOP_Z: float = 0.262
+CARB_BOWL_LO: tuple[float, float, float] = (0.290, -0.434, 0.152)
+CARB_BOWL_HI: tuple[float, float, float] = (0.334, -0.388, 0.184)
+"""Dell'Orto VHSH 30 — the 30 mm flat-slide the class runs, on the crankcase's
+rear face pointing back at the airbox.
+
+**A round body with a rectangular float bowl**, which is the opposite of how
+this module had it: it was a box with a turned bowl under it, and R2 shows a
+turned body with a box bowl. The two spigot radii are the carburetor's own
+published sizes rather than invented ones — 35 mm to the engine and 64 mm to the
+air filter, so 17.5 mm and 32 mm in radius — and the top cap is a separate
+cylinder standing straight up out of the body with the throttle cable entering
+through it, which is the detail that stops the whole part reading as a lump.
+"""
+
+AIRBOX_LO: tuple[float, float, float] = (0.250, -0.567, 0.280)
+AIRBOX_HI: tuple[float, float, float] = (0.420, -0.452, 0.400)
 """The airbox sits high and rearward, over the right rear tire — inboard of it at
 x <= 0.420 against the tire's inner face at 0.485, and above its crown at 0.295.
 It is the highest thing on the kart apart from the steering wheel and it is a
 large part of what says "shifter" from behind."""
 
-INTAKE_BOOT_DIAMETER: float = 0.056
+INTAKE_BOOT_DIAMETER: float = 0.068
+"""Rubber over the carburetor's 64 mm air-filter spigot."""
 
 EXHAUST_PATH: tuple[tuple[float, float, float], ...] = (
     (0.320, -0.190, 0.288),
@@ -270,47 +403,92 @@ SILENCER_PROFILE: tuple[tuple[float, float], ...] = (
 slips over the stinger and the two are coaxial and interpenetrate, which is what
 the real assembly does."""
 
-RADIATOR_TANK_HEIGHT: float = 0.025
-RADIATOR_TANK_PROUD: float = 0.005
-"""Top and bottom tanks, standing a little proud of the core so the core reads as
-a core. `radiator_height` covers the tanks *and* the core, so the core's own
-height is `radiator_height - 2 * RADIATOR_TANK_HEIGHT`."""
+RADIATOR_TANK_HEIGHT: float = 0.030
+RADIATOR_TANK_PROUD: float = 0.007
+"""Top and bottom tanks. `radiator_height` covers the tanks *and* the core, so
+the core's own height is `radiator_height - 2 * RADIATOR_TANK_HEIGHT`.
 
-RADIATOR_CORE_FINS: int = 5
+They stand proud of the core on **both** faces, which is what R2's does and what
+makes the core read as a core rather than as a painted panel: the tank is a
+folded box welded across the ends of the tubes, so it is necessarily thicker than
+the fin pack between them."""
+
+RADIATOR_END_PLATE: float = 0.012
+"""Side channels closing the fin pack at each end of the core."""
+
+RADIATOR_FIN_PITCH: float = 0.012
+RADIATOR_FIN_THICKNESS: float = 0.005
+RADIATOR_FIN_PROUD: float = 0.0015
+"""The fin pack.
+
+A real core's fins are at about 1.5 mm pitch and there is no honest way to build
+them: 288 of them across a 432 mm core would cost more than the rest of the kart,
+and at the distance the chase camera works from they would alias into noise. Five
+fat ribs at 52 mm — what was here — went the other way and read as a garden gate.
+
+12 mm is the pitch at which the pattern still resolves as a pattern at cockpit
+range without shimmering at chase range, and issue #19's normal bake is the
+designed answer for the frequency above it. The count follows from the core's
+length, so it is not a free number, but it does not vary with detail level: a fin
+is part of the radiator's shape, not of its resolution.
+"""
+
+RADIATOR_CAP_RADIUS: float = 0.019
+RADIATOR_CAP_HEIGHT: float = 0.041
+RADIATOR_CAP_ALONG: float = -0.62
+"""The filler **neck** and its cap, on the high tank, `RADIATOR_CAP_ALONG` of
+the way along the core's width from its center. Negative is **outboard**, which
+is where the reference photographs put it — see `_radiator_frame` for why the
+local lateral axis points inboard.
+
+#116 lists it, and it earns its place: it is the one thing on a radiator that is
+unmistakably a radiator. A flat disc was the first attempt and it is not what
+this is — a kart radiator's filler stands up on a welded neck tall enough to
+pour a bottle into, so the shape is a base weld, a narrow neck and a wider cap
+skirt over it, 41 mm in all."""
+
+RADIATOR_DIVIDER_ALONG: float = -0.44
+RADIATOR_DIVIDER_THICKNESS: float = 0.011
+RADIATOR_DIVIDER_PROUD: float = 0.005
+"""The dual-pass divider. Negative is outboard, as for the filler neck.
+
+A New-Line kart radiator is double-pass: a baffle welded inside the high tank
+sends water down the inboard tubes and back up an outer set, and from outside
+it shows as a raised welded rib splitting the core into a wide forward section
+and a narrow rear one. It is the single most recognizable thing about the face
+of one of these — the photographs read as a kart radiator rather than as a
+generic core largely because of it."""
 HOSE_DIAMETER: float = 0.028
 BRACKET_DIAMETER: float = 0.016
 """Radiator brackets. On a KZ the radiator is carried off the seat's right wing
 rather than off the frame, and here it has to be: the exhaust belly occupies the
 whole volume between the radiator's underside and the main rail."""
 
-RADIATOR_BRACKET_LOWER: tuple[tuple[float, float, float], ...] = (
-    (0.310, -0.030, 0.220),
-    (0.230, -0.045, 0.200),
-    (0.180, -0.055, 0.190),
-)
-RADIATOR_BRACKET_UPPER: tuple[tuple[float, float, float], ...] = (
-    (0.310, -0.030, 0.352),
-    (0.250, -0.100, 0.320),
-    (0.176, -0.170, 0.285),
-)
-"""Both run rearward as well as inboard, which is not decoration: the shifter
-lever sweeps the volume x 0.247..0.269, y 0.033..0.105 up to z 0.378, so a
-bracket leaving the radiator's inboard face anywhere ahead of y = 0 goes through
-the driver's gear lever."""
+BRACKET_LOWER_LOCAL: tuple[float, float, float] = (-1.0, 0.34, -0.52)
+BRACKET_UPPER_LOCAL: tuple[float, float, float] = (-1.0, 0.34, 0.44)
+BRACKET_LOWER_SEAT: tuple[float, float, float] = (0.180, -0.150, 0.135)
+BRACKET_UPPER_SEAT: tuple[float, float, float] = (0.180, -0.235, 0.330)
+"""Where the two brackets meet the radiator and where they meet the seat's right
+wing. The radiator ends are **fractions of the radiator's own half-extents in
+its own frame** rather than world points, so they stay on the back of the core
+when the rake or the size changes — which is the whole reason the radiator is
+built in a frame at all.
 
-HOSE_LOWER: tuple[tuple[float, float, float], ...] = (
-    (0.313, -0.035, 0.208),
-    (0.280, -0.100, 0.200),
-    (0.244, -0.160, 0.190),
-)
-HOSE_UPPER: tuple[tuple[float, float, float], ...] = (
-    (0.313, -0.035, 0.352),
-    (0.290, -0.100, 0.360),
-    (0.264, -0.190, 0.368),
-)
-"""Bottom hose to the water pump on the crankcase, top hose from the head's
-outlet. Both pass inboard of the exhaust and outboard of the seat, which is the
-only gap there is."""
+Lower and upper, because that is what they are once the core is raked into the
+seat's plane: both leave the core's **back** face and run rearward and inboard
+to the seat's right wing, one low and one high. They were front and rear while
+the core was wrongly modeled as a long panel lying fore-and-aft."""
+
+HOSE_UPPER_LOCAL: tuple[float, float, float] = (0.0, 0.85, 0.95)
+HOSE_LOWER_LOCAL: tuple[float, float, float] = (0.0, 0.85, -0.95)
+HOSE_UPPER_ENGINE: tuple[float, float, float] = (0.299, -0.182, 0.376)
+HOSE_LOWER_ENGINE: tuple[float, float, float] = (0.216, -0.168, 0.194)
+"""Top hose from the head's water outlet, bottom hose to the water pump on the
+crankcase. Both leave the tanks on their **inboard** side, which is the side the
+engine is on once the core is raked into the seat's plane.
+
+The engine ends are the two fittings' own mouths, so a hose cannot end in mid
+air — that was the state before the water pump boss existed."""
 
 EXHAUST_HANGER_Y: float = 0.300
 """Where the silencer is strapped to the right side bar. A real pipe hangs on
@@ -561,16 +739,115 @@ def _lathe_object(
     material: bpy.types.Material,
     *,
     axis: str = "X",
+    segments: int | None = None,
+    shade_smooth: bool = True,
 ) -> bpy.types.Object:
+    """A revolution about a world axis, parented to `root`.
+
+    `segments` defaults to the detail level's, which is what a part that is meant
+    to be round wants. A part whose facet count is part of its *shape* rather
+    than its resolution passes an explicit number and must pass the same one at
+    both detail levels — a hexagon nut with 16 sides at high detail is not the
+    same object built more finely, it is a different object, and issue #19's cage
+    would have to bridge the two.
+    """
     bm = bmesh.new()
     build.lathe(
-        bm, profile, context.detail.exhaust_segments, axis=axis, center=center
+        bm,
+        profile,
+        context.detail.exhaust_segments if segments is None else segments,
+        axis=axis,
+        center=center,
     )
     obj = build.object_from_bmesh(
-        name, bm, collection, material=material, shade_smooth=True
+        name, bm, collection, material=material, shade_smooth=shade_smooth
     )
     build.set_parent(obj, root)
     return obj
+
+
+def _hex_nut(
+    name: str,
+    center: tuple[float, float, float],
+    across_flats: float,
+    height: float,
+    context: build.BuildContext,
+    collection: bpy.types.Collection,
+    root: bpy.types.Object,
+    material: bpy.types.Material,
+    *,
+    axis: str = "Z",
+) -> bpy.types.Object:
+    """A hex fastener head, as a six-sided revolution.
+
+    Fasteners are what tells the eye that a casting is an assembly of parts
+    rather than one lump, and R2 shows them everywhere on a KZ: six on the head,
+    four on the cylinder base, more round the covers. Six segments and flat
+    shading, at both detail levels, for the reason `_lathe_object` gives.
+
+    `across_flats` is the spanner size, so the circumscribed radius the lathe
+    needs is `across_flats / sqrt(3)` — quoting the number a fastener is actually
+    specified by rather than a radius nobody would recognize.
+    """
+    radius = across_flats / math.sqrt(3.0)
+    return _lathe_object(
+        name,
+        [(0.0, 0.0), (radius, 0.0), (radius, height), (0.0, height)],
+        center,
+        context,
+        collection,
+        root,
+        material,
+        axis=axis,
+        segments=6,
+        shade_smooth=False,
+    )
+
+
+def _helix(
+    start: Vector,
+    end: Vector,
+    coil_radius: float,
+    turns: int,
+    samples_per_turn: int,
+) -> list[Vector]:
+    """A helical polyline from `start` to `end`, for a coil spring.
+
+    Exhaust springs are small — 50 mm long and 10 mm across — and they are one of
+    the loudest "this is a two-stroke" signals there is, which is why #116 names
+    them by hand. A helix is the only shape here that cannot be faked with a
+    box: at a glance the eye reads the pitch, and a plain cylinder does not have
+    one.
+
+    The frame is built once from the axis rather than per sample, so the coil
+    does not wander, and the seed axis is chosen the same way `build._frames`
+    chooses its own — by least alignment — so it is deterministic.
+    """
+    axis = end - start
+    length = axis.length
+    if length < 1e-9 or turns < 1:
+        return [start.copy(), end.copy()]
+    axis = axis / length
+
+    seed = min(
+        (Vector((1.0, 0.0, 0.0)), Vector((0.0, 1.0, 0.0)), Vector((0.0, 0.0, 1.0))),
+        key=lambda candidate: abs(candidate.dot(axis)),
+    )
+    normal = (seed - axis * seed.dot(axis)).normalized()
+    binormal = axis.cross(normal).normalized()
+
+    count = turns * samples_per_turn
+    points: list[Vector] = []
+    for index in range(count + 1):
+        fraction = index / count
+        angle = 2.0 * math.pi * turns * fraction
+        points.append(
+            start
+            + axis * (length * fraction)
+            + normal * (math.cos(angle) * coil_radius)
+            + binormal * (math.sin(angle) * coil_radius)
+        )
+    return points
 
 
 def _tube_object(
@@ -707,100 +984,9 @@ def _engine(
     context.publish("engine_root", pivot)
     build.set_parent(pivot, root)
 
-    _block(
-        "engine_crankcase",
-        (CRANKCASE_INBOARD_X, CRANKCASE_REAR_Y, crank_bottom),
-        (CRANKCASE_OUTBOARD_X, CRANKCASE_FRONT_Y, crank_top),
-        context,
-        collection,
-        root,
-        material,
-    )
-
-    # Clutch cover, inboard. The clutch itself is inside the cases on a KZ.
-    _lathe_object(
-        "engine_clutch_cover",
-        _disc_profile(CLUTCH_COVER_RADIUS, (CRANKCASE_INBOARD_X - CLUTCH_COVER_INBOARD_X) * 0.5),
-        (
-            (CRANKCASE_INBOARD_X + CLUTCH_COVER_INBOARD_X) * 0.5,
-            CRANKCASE_FRONT_Y - 0.065,
-            p.engine_z + 0.020,
-        ),
-        context,
-        collection,
-        root,
-        material,
-    )
-
-    # Ignition / flywheel cover, outboard.
-    _lathe_object(
-        "engine_ignition_cover",
-        _disc_profile(
-            IGNITION_COVER_RADIUS,
-            (IGNITION_COVER_OUTBOARD_X - CRANKCASE_OUTBOARD_X) * 0.5,
-        ),
-        (
-            (IGNITION_COVER_OUTBOARD_X + CRANKCASE_OUTBOARD_X) * 0.5,
-            center_y,
-            IGNITION_COVER_Z,
-        ),
-        context,
-        collection,
-        root,
-        material,
-    )
-
-    # Barrel, inset from the crankcase on every side so the two castings read
-    # apart, and its casting ribs.
-    barrel_low = (
-        CRANKCASE_INBOARD_X + CYLINDER_INSET + 0.005,
-        CRANKCASE_REAR_Y + CYLINDER_INSET,
-        crank_top,
-    )
-    barrel_high = (
-        CRANKCASE_OUTBOARD_X - CYLINDER_INSET,
-        CRANKCASE_FRONT_Y - CYLINDER_INSET - 0.028,
-        CYLINDER_TOP_Z,
-    )
-    _block(
-        "engine_cylinder", barrel_low, barrel_high, context, collection, root, material
-    )
-    _ribs(
-        context,
-        collection,
-        root,
-        material,
-        "engine_cylinder_rib_%d",
-        barrel_low,
-        barrel_high,
-        RIB_COUNT,
-    )
-
-    head_low = (barrel_low[0] - 0.006, barrel_low[1] - 0.004, CYLINDER_TOP_Z)
-    head_high = (barrel_high[0] + 0.006, barrel_high[1] + 0.004, head_top)
-    _block("engine_head", head_low, head_high, context, collection, root, material)
-    _ribs(
-        context,
-        collection,
-        root,
-        material,
-        "engine_head_rib_%d",
-        head_low,
-        head_high,
-        2,
-    )
-
-    # Water outlet on the head's front face, where the top hose lands.
-    _lathe_object(
-        "engine_water_outlet",
-        _disc_profile(0.016, 0.020),
-        (0.300, head_high[1] + 0.020, head_top - 0.030),
-        context,
-        collection,
-        root,
-        material,
-        axis="Y",
-    )
+    _crankcase(context, collection, root, material, crank_bottom, crank_top)
+    _cylinder(context, collection, root, material, crank_top)
+    _head(context, collection, root, material, head_top)
 
     _lathe_object(
         "engine_starter",
@@ -828,36 +1014,524 @@ def _engine(
     )
 
 
-def _ribs(
+def _crankcase(
+    context: build.BuildContext,
+    collection: bpy.types.Collection,
+    root: bpy.types.Object,
+    material: bpy.types.Material,
+    crank_bottom: float,
+    crank_top: float,
+) -> None:
+    """Two case halves, the clutch bell and cover, and the ignition cover.
+
+    #116's complaint about the crankcase is that it is "a plain box" where a real
+    one is "an organic casting: a bell housing round the clutch, cast ribbing, a
+    raised bearing boss, a sump profile, visible case-half split line and bolt
+    bosses". Of that list, the two that carry the read at the distances this game
+    uses are the **split line** and the **bell**, and both are silhouette rather
+    than surface — a normal bake cannot supply either. Cast ribbing and bolt
+    bosses are surface, and are left to issue #19.
+    """
+    # Upper and lower halves, parted on the crankshaft axis, with the lower one
+    # inset so the upper's bolting flange overhangs it. Two boxes, one shadow
+    # line, and the engine stops being extruded.
+    _block(
+        "engine_crankcase_upper",
+        (CRANKCASE_INBOARD_X, CRANKCASE_REAR_Y, CASE_SPLIT_Z),
+        (CRANKCASE_OUTBOARD_X, CRANKCASE_FRONT_Y, crank_top),
+        context,
+        collection,
+        root,
+        material,
+    )
+    _block(
+        "engine_crankcase_lower",
+        (
+            CRANKCASE_INBOARD_X + CASE_LOWER_INSET,
+            CRANKCASE_REAR_Y + CASE_LOWER_INSET,
+            crank_bottom,
+        ),
+        (
+            CRANKCASE_OUTBOARD_X - CASE_LOWER_INSET,
+            CRANKCASE_FRONT_Y - CASE_LOWER_INSET,
+            CASE_SPLIT_Z,
+        ),
+        context,
+        collection,
+        root,
+        material,
+    )
+
+    # The bell, standing proud of the inboard wall, and the cover bolted to it.
+    bell_inboard = CRANKCASE_INBOARD_X - BELL_PROUD
+    _lathe_object(
+        "engine_clutch_bell",
+        _disc_profile(BELL_RADIUS, BELL_PROUD * 0.5),
+        (bell_inboard + BELL_PROUD * 0.5, BELL_CENTER_Y, BELL_CENTER_Z),
+        context,
+        collection,
+        root,
+        material,
+    )
+
+    # The cover is dished: a rim at full radius, a face set back from it, and a
+    # hub in the middle. Three profile steps, and it stops reading as a decal.
+    cover_thickness = bell_inboard - CLUTCH_COVER_INBOARD_X
+    _lathe_object(
+        "engine_clutch_cover",
+        # Written inboard face first, so the profile's along-axis coordinate only
+        # ever increases. `build.lathe` winds from that order, and a profile that
+        # doubles back emits one ring of inverted faces — which the signed-volume
+        # gate only catches if the whole part comes out negative.
+        [
+            (0.0, -0.014),
+            (CLUTCH_COVER_HUB_RADIUS, -0.014),
+            (CLUTCH_COVER_HUB_RADIUS, -0.008),
+            (CLUTCH_COVER_RADIUS - 0.008, -0.008),
+            (CLUTCH_COVER_RADIUS, -0.003),
+            (CLUTCH_COVER_RADIUS, cover_thickness),
+            (0.0, cover_thickness),
+        ],
+        (CLUTCH_COVER_INBOARD_X, BELL_CENTER_Y, BELL_CENTER_Z),
+        context,
+        collection,
+        root,
+        material,
+    )
+    _cover_bolts(
+        context,
+        collection,
+        root,
+        material,
+        "engine_clutch_bolt_%d",
+        (CLUTCH_COVER_INBOARD_X - 0.008, BELL_CENTER_Y, BELL_CENTER_Z),
+        CLUTCH_BOLT_CIRCLE,
+        CLUTCH_BOLT_COUNT,
+        inward=True,
+    )
+
+    # Ignition / flywheel cover, outboard, with the same treatment.
+    ignition_thickness = IGNITION_COVER_OUTBOARD_X - CRANKCASE_OUTBOARD_X
+    _lathe_object(
+        "engine_ignition_cover",
+        # Every step is inside `IGNITION_COVER_OUTBOARD_X`. The first version put
+        # the hub 6 mm past it, at x 0.436, which is inside the right side bar's
+        # x 0.432..0.452 — a limit this constant exists to hold and that a
+        # profile written outward-last quietly broke.
+        [
+            (0.0, 0.0),
+            (IGNITION_COVER_RADIUS, 0.0),
+            (IGNITION_COVER_RADIUS, ignition_thickness - 0.011),
+            (IGNITION_COVER_RADIUS - 0.007, ignition_thickness - 0.006),
+            (0.022, ignition_thickness - 0.006),
+            (0.018, ignition_thickness),
+            (0.0, ignition_thickness),
+        ],
+        (CRANKCASE_OUTBOARD_X, (CRANKCASE_FRONT_Y + CRANKCASE_REAR_Y) * 0.5, IGNITION_COVER_Z),
+        context,
+        collection,
+        root,
+        material,
+    )
+    _cover_bolts(
+        context,
+        collection,
+        root,
+        material,
+        "engine_ignition_bolt_%d",
+        (
+            IGNITION_COVER_OUTBOARD_X,
+            (CRANKCASE_FRONT_Y + CRANKCASE_REAR_Y) * 0.5,
+            IGNITION_COVER_Z,
+        ),
+        IGNITION_BOLT_CIRCLE,
+        IGNITION_BOLT_COUNT,
+        inward=False,
+        proud=0.007,
+    )
+
+
+def _cover_bolts(
     context: build.BuildContext,
     collection: bpy.types.Collection,
     root: bpy.types.Object,
     material: bpy.types.Material,
     name_format: str,
-    low: tuple[float, float, float],
-    high: tuple[float, float, float],
+    center: tuple[float, float, float],
+    circle_radius: float,
     count: int,
+    *,
+    inward: bool,
+    proud: float = 0.004,
 ) -> None:
-    """Horizontal casting ribs standing proud of a barrel or head.
+    """A ring of hex bolt heads on a cover face normal to X.
 
-    Spaced by index rather than by a fixed pitch so that the same ribs land in
-    the same place whatever the casting's height is, and named with their index
-    so the name is fixed — a rib named from a running counter would move when a
-    part is inserted upstream, which is the failure `build.py`'s rule 3 names.
+    Indexed names rather than a running counter, for `build.py`'s rule 3: a bolt
+    named from a counter moves when a part is inserted upstream, and the name is
+    the glTF node name.
+
+    The first bolt is at angle zero — straight up — rather than at half a pitch,
+    so that a cover with an even count has one at top and one at bottom, which is
+    what the eye checks a bolt circle against.
     """
-    span = high[2] - low[2]
+    height = 0.005
+    # A lathe about X grows from its center along +X, so a bolt head standing
+    # proud of an *inboard* face has to be started `height` back from it.
+    base_x = center[0] - height if inward else center[0] - proud
     for index in range(count):
-        fraction = (index + 0.7) / (count + 0.4)
-        center_z = low[2] + span * fraction
-        _block(
+        angle = 2.0 * math.pi * index / count
+        _hex_nut(
             name_format % index,
-            (low[0] - RIB_PROUD, low[1] - RIB_PROUD, center_z - RIB_THICKNESS * 0.5),
-            (high[0] + RIB_PROUD, high[1] + RIB_PROUD, center_z + RIB_THICKNESS * 0.5),
+            (
+                base_x,
+                center[1] + math.sin(angle) * circle_radius,
+                center[2] + math.cos(angle) * circle_radius,
+            ),
+            0.011,
+            height,
+            context,
+            collection,
+            root,
+            material,
+            axis="X",
+        )
+
+
+def _cylinder(
+    context: build.BuildContext,
+    collection: bpy.types.Collection,
+    root: bpy.types.Object,
+    material: bpy.types.Material,
+    crank_top: float,
+) -> None:
+    """Square base flange, round water jacket, exhaust port flange and springs.
+
+    The shape is the correction. See `CYLINDER_RADIUS`'s docstring for why a KZ
+    barrel carries no fins and why the four that were here read as a 100 cc
+    air-cooled engine instead.
+    """
+    axis = (CYLINDER_AXIS_X, CYLINDER_AXIS_Y)
+
+    _block(
+        "engine_cylinder_base",
+        (axis[0] - CYLINDER_BASE_HALF[0], axis[1] - CYLINDER_BASE_HALF[1], crank_top),
+        (axis[0] + CYLINDER_BASE_HALF[0], axis[1] + CYLINDER_BASE_HALF[1], CYLINDER_BASE_TOP_Z),
+        context,
+        collection,
+        root,
+        material,
+    )
+
+    # Four base studs, one near each corner of the flange, inset far enough that
+    # the nut's own hexagon sits inside the flange rather than overhanging it.
+    for index, (sign_x, sign_y) in enumerate(((-1, -1), (1, -1), (-1, 1), (1, 1))):
+        _hex_nut(
+            "engine_cylinder_base_nut_%d" % index,
+            (
+                axis[0] + sign_x * (CYLINDER_BASE_HALF[0] - 0.014),
+                axis[1] + sign_y * (CYLINDER_BASE_HALF[1] - 0.014),
+                CYLINDER_BASE_TOP_Z,
+            ),
+            0.013,
+            0.008,
             context,
             collection,
             root,
             material,
         )
+
+    # The jacket. Slightly barrelled — widest just above the flange and drawn in
+    # again at the top — because a sand casting has draft on it and a perfect
+    # cylinder reads as turned bar.
+    _lathe_object(
+        "engine_cylinder",
+        [
+            (0.0, CYLINDER_BASE_TOP_Z - 0.004),
+            (CYLINDER_RADIUS - 0.004, CYLINDER_BASE_TOP_Z - 0.004),
+            (CYLINDER_RADIUS, CYLINDER_BASE_TOP_Z + 0.006),
+            (CYLINDER_RADIUS, CYLINDER_TOP_Z - 0.020),
+            (CYLINDER_RADIUS - 0.003, CYLINDER_TOP_Z - 0.006),
+            (HEAD_RADIUS + 0.002, CYLINDER_TOP_Z),
+            (0.0, CYLINDER_TOP_Z),
+        ],
+        (axis[0], axis[1], 0.0),
+        context,
+        collection,
+        root,
+        material,
+        axis="Z",
+    )
+
+    _exhaust_flange(context, collection, root, material)
+
+
+def _exhaust_flange(
+    context: build.BuildContext,
+    collection: bpy.types.Collection,
+    root: bpy.types.Object,
+    material: bpy.types.Material,
+) -> None:
+    """The port flange on the barrel's front face, its nuts, and two springs.
+
+    The flange is placed off the sampled exhaust path rather than off a literal,
+    so it stays on the port when the pipe is re-routed: the path's first point is
+    the port by construction (`EXHAUST_PATH`), and the header's direction there
+    is what the flange is square to. Authoring the two independently is how a
+    flange ends up visibly not perpendicular to its own pipe.
+    """
+    samples = _exhaust_path(context)
+    port = samples[0]
+    forward = (samples[1] - samples[0]).normalized()
+
+    face_y = CYLINDER_AXIS_Y + CYLINDER_RADIUS
+    _block(
+        "exhaust_flange",
+        (
+            port.x - EXHAUST_FLANGE_HALF[0],
+            face_y - 0.004,
+            port.z - EXHAUST_FLANGE_HALF[1],
+        ),
+        (
+            port.x + EXHAUST_FLANGE_HALF[0],
+            face_y + EXHAUST_FLANGE_THICKNESS,
+            port.z + EXHAUST_FLANGE_HALF[1],
+        ),
+        context,
+        collection,
+        root,
+        material,
+    )
+
+    # Two nuts, left and right of the pipe on the flange's face, and two springs
+    # hooked from just outboard of them back to lugs on the header.
+    for index, sign in enumerate((-1, 1)):
+        anchor_x = port.x + sign * (EXHAUST_FLANGE_HALF[0] - 0.009)
+        _hex_nut(
+            "exhaust_flange_nut_%d" % index,
+            (anchor_x, face_y + EXHAUST_FLANGE_THICKNESS, port.z),
+            EXHAUST_FLANGE_NUT_FLATS,
+            0.007,
+            context,
+            collection,
+            root,
+            material,
+            axis="Y",
+        )
+
+        # The far end sits on the header a little way down the pipe. Found by
+        # walking the sampled path so the spring stretches with the pipe rather
+        # than floating when `exhaust_length` changes.
+        far = samples[min(2, len(samples) - 1)]
+        start = Vector((anchor_x, face_y + EXHAUST_FLANGE_THICKNESS + 0.004, port.z))
+        end = far + (Vector((sign, 0.0, 0.0)) * 0.020) - forward * 0.004
+        bm = bmesh.new()
+        build.sweep_tube(
+            bm,
+            _helix(
+                start,
+                end,
+                EXHAUST_SPRING_COIL_RADIUS,
+                EXHAUST_SPRING_TURNS,
+                EXHAUST_SPRING_SAMPLES,
+            ),
+            EXHAUST_SPRING_WIRE_RADIUS,
+            6,
+        )
+        spring = build.object_from_bmesh(
+            "exhaust_spring_%d" % index,
+            bm,
+            collection,
+            material=context.material("axle_steel"),
+            shade_smooth=True,
+        )
+        build.set_parent(spring, root)
+
+
+def _head(
+    context: build.BuildContext,
+    collection: bpy.types.Collection,
+    root: bpy.types.Object,
+    material: bpy.types.Material,
+    head_top: float,
+) -> None:
+    """The head casting, its six nuts, the spark plug, and the water outlet."""
+    axis = (CYLINDER_AXIS_X, CYLINDER_AXIS_Y)
+
+    _lathe_object(
+        "engine_head",
+        [
+            (0.0, CYLINDER_TOP_Z),
+            (HEAD_RADIUS, CYLINDER_TOP_Z),
+            (HEAD_RADIUS, head_top - 0.010),
+            (HEAD_RADIUS - 0.007, head_top),
+            (0.0, head_top),
+        ],
+        (axis[0], axis[1], 0.0),
+        context,
+        collection,
+        root,
+        material,
+        axis="Z",
+    )
+
+    for index in range(HEAD_BOLT_COUNT):
+        angle = 2.0 * math.pi * index / HEAD_BOLT_COUNT
+        _hex_nut(
+            "engine_head_nut_%d" % index,
+            (
+                axis[0] + math.cos(angle) * HEAD_BOLT_CIRCLE,
+                axis[1] + math.sin(angle) * HEAD_BOLT_CIRCLE,
+                head_top - 0.002,
+            ),
+            HEAD_NUT_FLATS,
+            0.009,
+            context,
+            collection,
+            root,
+            material,
+        )
+
+    _spark_plug(context, collection, root, head_top)
+
+    # Water outlet on the head's front face, inboard of the bore, where the top
+    # hose lands. Sharing the front face with the exhaust port is not a conflict:
+    # the port is on the *cylinder* at z 0.288 and this is on the head 88 mm
+    # above it. `HOSE_UPPER`'s last control point is this boss's mouth.
+    _lathe_object(
+        "engine_water_outlet",
+        _disc_profile(0.015, 0.018),
+        (axis[0] - 0.020, axis[1] + HEAD_RADIUS - 0.010, head_top - 0.024),
+        context,
+        collection,
+        root,
+        material,
+        axis="Y",
+    )
+
+    # The water pump's boss on the crankcase's inboard wall, so the bottom hose
+    # lands on a fitting rather than on a blank face.
+    _lathe_object(
+        "engine_water_pump",
+        [
+            (0.0, -0.030),
+            (0.014, -0.030),
+            (0.014, -0.018),
+            (0.026, -0.012),
+            (0.026, 0.0),
+            (0.0, 0.0),
+        ],
+        (CRANKCASE_INBOARD_X, -0.168, 0.194),
+        context,
+        collection,
+        root,
+        material,
+    )
+
+
+def _spark_plug(
+    context: build.BuildContext,
+    collection: bpy.types.Collection,
+    root: bpy.types.Object,
+    head_top: float,
+) -> None:
+    """Boss, plug body, insulator, cap and lead, on the bore axis.
+
+    The plug is on the bore axis and nowhere else — it fires into the middle of
+    the combustion chamber — so it is placed from `CYLINDER_AXIS_*` rather than
+    given coordinates of its own. That also means it cannot drift off center if
+    the cylinder moves.
+    """
+    axis_x, axis_y = CYLINDER_AXIS_X, CYLINDER_AXIS_Y
+    alloy = context.material("engine_alloy")
+
+    boss_top = head_top + PLUG_BOSS_HEIGHT
+    _lathe_object(
+        "engine_plug_boss",
+        [
+            (0.0, head_top - 0.004),
+            (PLUG_BOSS_RADIUS, head_top - 0.004),
+            (PLUG_BOSS_RADIUS, boss_top - 0.003),
+            (PLUG_BOSS_RADIUS - 0.004, boss_top),
+            (0.0, boss_top),
+        ],
+        (axis_x, axis_y, 0.0),
+        context,
+        collection,
+        root,
+        alloy,
+        axis="Z",
+    )
+
+    hex_top = boss_top + 0.010
+    _hex_nut(
+        "engine_plug_hex",
+        (axis_x, axis_y, boss_top),
+        PLUG_HEX_FLATS,
+        0.010,
+        context,
+        collection,
+        root,
+        context.material("axle_steel"),
+    )
+
+    # The insulator has to stand clear of the cap, not disappear into it. At the
+    # first attempt the cap started 14 mm above the hex and covered all but a
+    # sliver, so the one bright white object on the engine — the whole reason to
+    # model a plug at all — was invisible in the render. 26 mm of porcelain
+    # shows now, which is about what R2 has.
+    insulator_top = hex_top + 0.038
+    _lathe_object(
+        "engine_plug_insulator",
+        [
+            (0.0, hex_top),
+            (PLUG_INSULATOR_RADIUS + 0.002, hex_top),
+            (PLUG_INSULATOR_RADIUS, hex_top + 0.007),
+            (PLUG_INSULATOR_RADIUS, insulator_top - 0.006),
+            (PLUG_INSULATOR_RADIUS - 0.002, insulator_top),
+            (0.0, insulator_top),
+        ],
+        (axis_x, axis_y, 0.0),
+        context,
+        collection,
+        root,
+        context.material("plug_ceramic"),
+        axis="Z",
+    )
+
+    # The cap slips over the insulator and leans back off the bore axis, and the
+    # lead runs from it down the back of the engine. Two swept tubes: the cap is
+    # short and fat, the lead is long and thin, and it is the lead that reads at
+    # a distance.
+    cap_base = Vector((axis_x, axis_y, hex_top + 0.026))
+    cap_top = Vector((axis_x - 0.004, axis_y - 0.028, hex_top + 0.058))
+    rubber = context.material("rubber_grip")
+    bm = bmesh.new()
+    build.sweep_tube(
+        bm,
+        [cap_base, cap_base.lerp(cap_top, 0.55), cap_top],
+        PLUG_CAP_DIAMETER * 0.5,
+        context.detail.tube_segments,
+    )
+    cap = build.object_from_bmesh(
+        "engine_plug_cap", bm, collection, material=rubber, shade_smooth=True
+    )
+    build.set_parent(cap, root)
+
+    _tube_object(
+        "engine_plug_lead",
+        (
+            (cap_top.x, cap_top.y, cap_top.z - 0.004),
+            (0.352, -0.330, hex_top + 0.020),
+            (0.404, -0.352, 0.300),
+            (0.404, -0.340, 0.216),
+        ),
+        PLUG_LEAD_DIAMETER,
+        context,
+        collection,
+        root,
+        rubber,
+        bend_radius=0.030,
+    )
 
 
 # --- intake ----------------------------------------------------------------
@@ -878,39 +1552,137 @@ def _intake(
     """
     material = context.material("engine_alloy")
 
-    _block("engine_carb", CARB_LO, CARB_HI, context, collection, root, material)
-
-    bowl_center_x = (CARB_LO[0] + CARB_HI[0]) * 0.5
-    bowl_center_y = (CARB_LO[1] + CARB_HI[1]) * 0.5
-    _lathe_object(
-        "engine_carb_bowl",
-        _disc_profile(
-            CARB_BOWL_RADIUS, (CARB_LO[2] + 0.004 - CARB_BOWL_BOTTOM) * 0.5
+    # The reed cage: a raised bolting frame round a recessed face, which is the
+    # cheapest pair of boxes that reads as a casting bolted to another casting.
+    _block(
+        "engine_reed_block",
+        REED_BLOCK_LO,
+        REED_BLOCK_HI,
+        context,
+        collection,
+        root,
+        material,
+    )
+    _block(
+        "engine_reed_face",
+        (
+            REED_BLOCK_LO[0] + REED_FRAME_INSET,
+            REED_BLOCK_LO[1] - 0.006,
+            REED_BLOCK_LO[2] + REED_FRAME_INSET,
         ),
-        (bowl_center_x, bowl_center_y, (CARB_LO[2] + 0.004 + CARB_BOWL_BOTTOM) * 0.5),
+        (
+            REED_BLOCK_HI[0] - REED_FRAME_INSET,
+            REED_BLOCK_LO[1] + 0.004,
+            REED_BLOCK_HI[2] - REED_FRAME_INSET,
+        ),
+        context,
+        collection,
+        root,
+        material,
+    )
+
+    # The carburetor body, turned about Y with a spigot at each end: 35 mm into
+    # the reed block, 64 mm out to the air boot. Both are the VHSH's published
+    # sizes — see `CARB_AXIS_X`'s docstring.
+    _lathe_object(
+        "engine_carb",
+        # Rear end first: +Y is forward, so the air side is the low end of the
+        # profile's axis coordinate. Getting this backwards builds the whole
+        # carburetor inside out, which is what the winding gate caught.
+        [
+            (0.0, CARB_REAR_Y),
+            (CARB_SPIGOT_AIR_RADIUS, CARB_REAR_Y),
+            (CARB_SPIGOT_AIR_RADIUS, CARB_REAR_Y + 0.010),
+            (CARB_BODY_RADIUS, CARB_REAR_Y + 0.014),
+            (CARB_BODY_RADIUS, CARB_FRONT_Y - 0.005),
+            (CARB_SPIGOT_ENGINE_RADIUS, CARB_FRONT_Y),
+            (CARB_SPIGOT_ENGINE_RADIUS, CARB_FRONT_Y + 0.014),
+            (0.0, CARB_FRONT_Y + 0.014),
+        ],
+        (CARB_AXIS_X, 0.0, CARB_AXIS_Z),
+        context,
+        collection,
+        root,
+        material,
+        axis="Y",
+    )
+
+    # Wrong way round before: a box body with a turned bowl. R2 has a turned
+    # body with a **box** bowl hanging off its underside, forward of center,
+    # with a drain plug in the bottom.
+    _block(
+        "engine_carb_bowl",
+        CARB_BOWL_LO,
+        CARB_BOWL_HI,
+        context,
+        collection,
+        root,
+        material,
+    )
+
+    # The top cap, standing straight up out of the body with the throttle cable
+    # entering it. Two turned steps and a rubber sleeve; it is small, and it is
+    # most of what stops the carburetor reading as a pipe.
+    cap_y = (CARB_FRONT_Y + CARB_REAR_Y) * 0.5 - 0.004
+    _lathe_object(
+        "engine_carb_cap",
+        [
+            (0.0, CARB_AXIS_Z),
+            (CARB_TOP_CAP_RADIUS, CARB_AXIS_Z),
+            (CARB_TOP_CAP_RADIUS, CARB_TOP_CAP_TOP_Z - 0.006),
+            (CARB_TOP_CAP_RADIUS - 0.005, CARB_TOP_CAP_TOP_Z),
+            (0.0, CARB_TOP_CAP_TOP_Z),
+        ],
+        (CARB_AXIS_X, cap_y, 0.0),
         context,
         collection,
         root,
         material,
         axis="Z",
     )
-
-    _block(
-        "engine_airbox",
-        AIRBOX_LO,
-        AIRBOX_HI,
+    _tube_object(
+        "engine_throttle_cable",
+        (
+            (CARB_AXIS_X, cap_y, CARB_TOP_CAP_TOP_Z - 0.004),
+            (CARB_AXIS_X - 0.010, cap_y + 0.010, CARB_TOP_CAP_TOP_Z + 0.030),
+            (CARB_AXIS_X - 0.030, cap_y + 0.090, CARB_TOP_CAP_TOP_Z + 0.024),
+        ),
+        0.008,
         context,
         collection,
         root,
-        context.material("frame_powdercoat"),
+        context.material("rubber_grip"),
+        bend_radius=0.025,
+    )
+
+    # The airbox, as a molded body and a clipped-on lid rather than one brick.
+    plastic = context.material("frame_powdercoat")
+    lid_z = AIRBOX_HI[2] - 0.026
+    _block(
+        "engine_airbox",
+        AIRBOX_LO,
+        (AIRBOX_HI[0], AIRBOX_HI[1], lid_z),
+        context,
+        collection,
+        root,
+        plastic,
+    )
+    _block(
+        "engine_airbox_lid",
+        (AIRBOX_LO[0] + 0.006, AIRBOX_LO[1] + 0.006, lid_z),
+        (AIRBOX_HI[0] - 0.006, AIRBOX_HI[1] - 0.006, AIRBOX_HI[2]),
+        context,
+        collection,
+        root,
+        plastic,
     )
 
     _tube_object(
         "engine_intake_boot",
         (
-            (bowl_center_x, CARB_LO[1] + 0.006, CARB_HI[2] - 0.030),
-            (bowl_center_x + 0.006, CARB_LO[1] - 0.046, CARB_HI[2] + 0.040),
-            (bowl_center_x + 0.010, AIRBOX_LO[1] + 0.070, AIRBOX_LO[2] + 0.040),
+            (CARB_AXIS_X, CARB_REAR_Y + 0.006, CARB_AXIS_Z),
+            (CARB_AXIS_X + 0.006, CARB_REAR_Y - 0.046, CARB_AXIS_Z + 0.040),
+            (CARB_AXIS_X + 0.010, AIRBOX_LO[1] + 0.070, AIRBOX_LO[2] + 0.040),
         ),
         INTAKE_BOOT_DIAMETER,
         context,
@@ -1138,6 +1910,140 @@ def _exhaust(
 
 
 # --- radiator --------------------------------------------------------------
+#
+# The radiator is the one assembly on the kart that is not axis-aligned, so it is
+# authored in a frame of its own and transformed into the world once. Building it
+# in world coordinates would mean every one of its ~45 parts carrying the same
+# two rotations by hand, and any part that got them wrong would be wrong in a way
+# no reader could see.
+
+
+def _radiator_frame(p: P.KartParams) -> tuple[Matrix, Vector]:
+    """The radiator's local-to-world rotation and its center.
+
+    **The core sits where a second seat's back would sit.** Immediately outboard
+    of the driver's, reclined by the same angle, big fin face pointing forward
+    the way the driver does. That single sentence fixes the whole orientation,
+    and two earlier versions of this function were wrong because they did not
+    have it: both reclined the core about the kart's *fore-and-aft* axis, which
+    tips it sideways out over the sidepod and leaves the fin face pointing
+    outboard. The rake is about the kart's **lateral** axis.
+
+    Local axes:
+
+        local +x   the face normal — forward and up
+        local +y   **inboard**, across the kart
+        local +z   up the slant — rearward and up
+
+    `+y` is inboard rather than outboard, which reads backwards for a part that
+    lives on the kart's right, and is not a free choice: with `+y` outboard the
+    three axes are left-handed, the determinant is -1, and every mesh pushed
+    through the matrix comes out with its faces inverted. `genkart`'s signed
+    volume gate catches that, but the fix is a right-handed basis rather than a
+    sign patched in somewhere downstream.
+
+    The rake is `seat_back_angle` plus `radiator_rake_delta`, so the radiator
+    cannot drift away from the seat it is derived from.
+    """
+    rake = p.seat_back_angle + p.radiator_rake_delta
+    sin_rake, cos_rake = math.sin(rake), math.cos(rake)
+
+    # Columns are where local +x, +y and +z land. At rake 0 this is a vertical
+    # panel facing straight up the track; the rake tips its top rearward.
+    normal = Vector((0.0, cos_rake, sin_rake))
+    inboard = Vector((-1.0, 0.0, 0.0))
+    up_slant = Vector((0.0, -sin_rake, cos_rake))
+
+    basis = Matrix((
+        (normal.x, inboard.x, up_slant.x),
+        (normal.y, inboard.y, up_slant.y),
+        (normal.z, inboard.z, up_slant.z),
+    ))
+    return basis, Vector((p.radiator_x, p.radiator_y, p.radiator_z))
+
+
+def _radiator_world(
+    basis: Matrix, center: Vector, local: tuple[float, float, float]
+) -> Vector:
+    """A point given in the radiator's frame, in world coordinates."""
+    return center + basis @ Vector(local)
+
+
+def _radiator_block(
+    name: str,
+    low: tuple[float, float, float],
+    high: tuple[float, float, float],
+    basis: Matrix,
+    center: Vector,
+    context: build.BuildContext,
+    collection: bpy.types.Collection,
+    root: bpy.types.Object,
+    material: bpy.types.Material,
+    *,
+    bevel: bool = True,
+) -> bpy.types.Object:
+    """`_block`, but with its corners given in the radiator's frame.
+
+    `build.box` applies the rotation to the corner offsets rather than to the
+    object, so the object transform stays identity and the vertex buffer is the
+    same pure function of the parameters that everything else here is.
+    """
+    size = tuple(high[axis] - low[axis] for axis in range(3))
+    local_center = Vector(tuple((high[axis] + low[axis]) * 0.5 for axis in range(3)))
+    bm = bmesh.new()
+    build.box(bm, size, center + basis @ local_center, rotation=basis)
+    obj = build.object_from_bmesh(name, bm, collection, material=material)
+    if bevel:
+        build.bevel_object(obj, context.detail)
+    build.set_parent(obj, root)
+    return obj
+
+
+def _radiator_cap(
+    context: build.BuildContext,
+    collection: bpy.types.Collection,
+    root: bpy.types.Object,
+    material: bpy.types.Material,
+    basis: Matrix,
+    center: Vector,
+    half_width: float,
+    half_height: float,
+) -> None:
+    """The filler cap on the top tank.
+
+    Built at the origin about local +z and then moved, because `build.lathe`
+    revolves about a *world* axis and the top tank's normal is not one. Same
+    determinant argument as `_radiator_frame`: the transform is a rotation, so
+    the winding survives it.
+    """
+    bm = bmesh.new()
+    build.lathe(
+        bm,
+        [
+            (0.0, 0.0),
+            (RADIATOR_CAP_RADIUS - 0.003, 0.0),
+            (RADIATOR_CAP_RADIUS - 0.003, 0.006),
+            (RADIATOR_CAP_RADIUS - 0.006, 0.008),
+            (RADIATOR_CAP_RADIUS - 0.006, RADIATOR_CAP_HEIGHT - 0.017),
+            (RADIATOR_CAP_RADIUS, RADIATOR_CAP_HEIGHT - 0.015),
+            (RADIATOR_CAP_RADIUS, RADIATOR_CAP_HEIGHT - 0.003),
+            (RADIATOR_CAP_RADIUS - 0.004, RADIATOR_CAP_HEIGHT),
+            (0.0, RADIATOR_CAP_HEIGHT),
+        ],
+        context.detail.exhaust_segments,
+        axis="Z",
+    )
+    origin = _radiator_world(
+        basis,
+        center,
+        (0.0, half_width * RADIATOR_CAP_ALONG, half_height - 0.004),
+    )
+    for vertex in bm.verts:
+        vertex.co = origin + basis @ vertex.co
+    cap = build.object_from_bmesh(
+        "radiator_cap", bm, collection, material=material, shade_smooth=True
+    )
+    build.set_parent(cap, root)
 
 
 def _radiator(
@@ -1145,39 +2051,36 @@ def _radiator(
     collection: bpy.types.Collection,
     root: bpy.types.Object,
 ) -> None:
-    """Core, top and bottom tanks, fins, two brackets and two hoses.
+    """Core, fin pack, dual-pass divider, end channels, tanks, neck, brackets,
+    hoses — all built in the radiator's own frame. See `_radiator_frame`: the
+    core sits where a second seat's back would sit, next to the driver's.
 
-    **`radiator_width` is the fore-aft dimension, not the lateral one**, and that
-    is forced rather than chosen. A KZ radiator hangs vertically on the right of
-    the kart with its faces pointing left and right, and the parameters only work
-    that way round: 260 mm laid across the kart would run from x = 0.200 to
-    x = 0.460, straight through the shifter lever, which `cockpit.py` sweeps from
-    x 0.247..0.269 up to z = 0.378. Read fore-aft it sits at x 0.305..0.355, and
-    the shifter clears it by 17 mm.
-
-    `radiator_thickness` is therefore the lateral one, and `radiator_height` runs
-    from 0.200 to 0.380 — which is what puts the exhaust belly's crown, 15 mm
-    below it, where it is.
+    Every dimension here is read against that frame and not against a world axis,
+    because none of them is axis-aligned. `radiator_width` is across the kart,
+    `radiator_height` is up the slant, `radiator_thickness` is through the face.
+    Three earlier versions of this function each got one of those wrong; the
+    parameter docstrings now say which is which and this one does not repeat
+    them.
     """
     p = context.params
     core_material = context.material("radiator_core")
     alloy = context.material("engine_alloy")
 
+    basis, center = _radiator_frame(p)
+
     half_thickness = p.radiator_thickness * 0.5
-    front_y = p.radiator_y + p.radiator_width * 0.5
-    rear_y = p.radiator_y - p.radiator_width * 0.5
-    bottom_z = p.radiator_z - p.radiator_height * 0.5
-    top_z = p.radiator_z + p.radiator_height * 0.5
-    core_low_z = bottom_z + RADIATOR_TANK_HEIGHT
-    core_high_z = top_z - RADIATOR_TANK_HEIGHT
+    half_width = p.radiator_width * 0.5
+    half_height = p.radiator_height * 0.5
+    core_half_height = half_height - RADIATOR_TANK_HEIGHT
+    core_half_thickness = half_thickness - RADIATOR_TANK_PROUD
+    core_half_width = half_width - RADIATOR_END_PLATE
 
-    core_inboard = p.radiator_x - half_thickness + RADIATOR_TANK_PROUD
-    core_outboard = p.radiator_x + half_thickness - RADIATOR_TANK_PROUD
-
-    _block(
+    _radiator_block(
         "radiator_core",
-        (core_inboard, rear_y, core_low_z),
-        (core_outboard, front_y, core_high_z),
+        (-core_half_thickness, -core_half_width, -core_half_height),
+        (core_half_thickness, core_half_width, core_half_height),
+        basis,
+        center,
         context,
         collection,
         root,
@@ -1185,30 +2088,67 @@ def _radiator(
         bevel=False,
     )
 
-    for label, low_z, high_z in (
-        ("bottom", bottom_z, core_low_z),
-        ("top", core_high_z, top_z),
+    # Low-forward and high-rearward, not bottom and top: the tanks are at the
+    # two ends of the raked tube run, which is what `radiator_height` measures.
+    for label, low_v, high_v in (
+        ("low", -half_height, -core_half_height),
+        ("high", core_half_height, half_height),
     ):
-        _block(
+        _radiator_block(
             "radiator_tank_%s" % label,
-            (p.radiator_x - half_thickness, rear_y, low_z),
-            (p.radiator_x + half_thickness, front_y, high_z),
+            (-half_thickness, -half_width, low_v),
+            (half_thickness, half_width, high_v),
+            basis,
+            center,
             context,
             collection,
             root,
             alloy,
         )
 
-    # A few vertical ribs across the core. They are what stops a radiator reading
-    # as a painted slab at the distance the chase camera sees it from, and they
-    # are cheap: `RADIATOR_CORE_FINS` boxes, not a fin per millimeter.
-    for index in range(RADIATOR_CORE_FINS):
-        fraction = (index + 0.5) / RADIATOR_CORE_FINS
-        center_y = rear_y + (front_y - rear_y) * fraction
-        _block(
-            "radiator_core_fin_%d" % index,
-            (core_inboard - 0.004, center_y - 0.006, core_low_z),
-            (core_outboard + 0.004, center_y + 0.006, core_high_z),
+    # Side channels closing the ends of the fin pack.
+    for label, sign in (("inboard", 1.0), ("outboard", -1.0)):
+        _radiator_block(
+            "radiator_end_%s" % label,
+            (
+                -half_thickness,
+                sign * half_width - (RADIATOR_END_PLATE if sign > 0 else 0.0),
+                -core_half_height,
+            ),
+            (
+                half_thickness,
+                sign * half_width + (RADIATOR_END_PLATE if sign < 0 else 0.0),
+                core_half_height,
+            ),
+            basis,
+            center,
+            context,
+            collection,
+            root,
+            alloy,
+        )
+
+    # The fin pack. Count follows from the core's length so it is not a free
+    # number, and it is the same at both detail levels — see RADIATOR_FIN_PITCH.
+    fin_count = max(1, int(round(2.0 * core_half_width / RADIATOR_FIN_PITCH)) - 1)
+    for index in range(fin_count):
+        along = -core_half_width + (index + 1) * (
+            2.0 * core_half_width / (fin_count + 1)
+        )
+        _radiator_block(
+            "radiator_fin_%d" % index,
+            (
+                -core_half_thickness - RADIATOR_FIN_PROUD,
+                along - RADIATOR_FIN_THICKNESS * 0.5,
+                -core_half_height,
+            ),
+            (
+                core_half_thickness + RADIATOR_FIN_PROUD,
+                along + RADIATOR_FIN_THICKNESS * 0.5,
+                core_half_height,
+            ),
+            basis,
+            center,
             context,
             collection,
             root,
@@ -1216,13 +2156,53 @@ def _radiator(
             bevel=False,
         )
 
-    for label, path in (
-        ("lower", RADIATOR_BRACKET_LOWER),
-        ("upper", RADIATOR_BRACKET_UPPER),
+    _radiator_block(
+        "radiator_divider",
+        (
+            -core_half_thickness - RADIATOR_DIVIDER_PROUD,
+            core_half_width * RADIATOR_DIVIDER_ALONG - RADIATOR_DIVIDER_THICKNESS * 0.5,
+            -core_half_height,
+        ),
+        (
+            core_half_thickness + RADIATOR_DIVIDER_PROUD,
+            core_half_width * RADIATOR_DIVIDER_ALONG + RADIATOR_DIVIDER_THICKNESS * 0.5,
+            core_half_height,
+        ),
+        basis,
+        center,
+        context,
+        collection,
+        root,
+        alloy,
+    )
+
+    _radiator_cap(context, collection, root, alloy, basis, center, half_width, half_height)
+
+    halves = (half_thickness, half_width, half_height)
+
+    def attach(fractions: tuple[float, float, float]) -> Vector:
+        return _radiator_world(
+            basis,
+            center,
+            tuple(fractions[axis] * halves[axis] for axis in range(3)),
+        )
+
+    for label, local, seat in (
+        ("lower", BRACKET_LOWER_LOCAL, BRACKET_LOWER_SEAT),
+        ("upper", BRACKET_UPPER_LOCAL, BRACKET_UPPER_SEAT),
     ):
+        start = attach(local)
+        end = Vector(seat)
         _tube_object(
             "radiator_bracket_%s" % label,
-            path,
+            (
+                tuple(start),
+                # A kart's radiator bracket is a bent rod, not a straight one.
+                # The mid point is dropped below the chord so the bend is the
+                # right way up — a bracket bowing upward looks sprung.
+                tuple(start.lerp(end, 0.5) - Vector((0.0, 0.0, 0.018))),
+                tuple(end),
+            ),
             BRACKET_DIAMETER,
             context,
             collection,
@@ -1232,10 +2212,19 @@ def _radiator(
         )
 
     hose_material = context.material("rubber_grip")
-    for label, path in (("lower", HOSE_LOWER), ("upper", HOSE_UPPER)):
+    for label, local, fitting in (
+        ("upper", HOSE_UPPER_LOCAL, HOSE_UPPER_ENGINE),
+        ("lower", HOSE_LOWER_LOCAL, HOSE_LOWER_ENGINE),
+    ):
+        start = attach(local)
+        end = Vector(fitting)
         _tube_object(
             "radiator_hose_%s" % label,
-            path,
+            (
+                tuple(start),
+                tuple(start.lerp(end, 0.5) + Vector((0.0, 0.012, 0.010))),
+                tuple(end),
+            ),
             HOSE_DIAMETER,
             context,
             collection,

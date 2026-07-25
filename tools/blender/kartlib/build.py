@@ -785,8 +785,29 @@ MATERIALS: dict[str, tuple[tuple[float, float, float], float, float]] = {
     "axle_steel": ((0.075, 0.075, 0.080), 0.42, 1.0),
     "bodywork_plastic": ((0.520, 0.045, 0.035), 0.28, 0.0),
     "seat_fiberglass": ((0.055, 0.055, 0.058), 0.38, 0.0),
-    "engine_alloy": ((0.290, 0.290, 0.295), 0.46, 1.0),
-    "exhaust_steel": ((0.420, 0.420, 0.430), 0.24, 1.0),
+    # Sand-cast aluminium, not machined billet. The engine cluster read as one
+    # bright white blob because this and `exhaust_steel` were both bright metals
+    # under a 100,000 lx sun and were within 0.13 of each other, so the pipe, the
+    # cases and the head had no value separation between them at all. Same
+    # failure as `tray_aluminium` and `axle_steel` above, and the same fix:
+    # darker, and much rougher, because a casting's surface is not polished.
+    #
+    # 0.255 was the first attempt and it was still wrong — measured off a 1100 px
+    # close-up, the crankcase, cylinder and head all clipped to a flat near-white
+    # and every casting feature this issue added went invisible. On a metal the
+    # base color *is* the specular response, so a rough metal under this sun sits
+    # far brighter than its number suggests. 0.175 is `tray_aluminium`'s scale,
+    # and that one is known to read correctly in these shots.
+    "engine_alloy": ((0.175, 0.172, 0.168), 0.66, 1.0),
+    # A kart expansion chamber is mild steel that has been through a few heat
+    # cycles — dark and satin, near enough black in R2. It has to sit clearly
+    # below `engine_alloy` in value or the two largest metal masses on the kart
+    # merge into each other.
+    "exhaust_steel": ((0.088, 0.085, 0.084), 0.36, 1.0),
+    # Glazed porcelain. Deliberately the brightest thing on the engine: the
+    # spark plug insulator is the highest-contrast object in every reference
+    # photograph of a two-stroke, and that contrast is the point of modeling it.
+    "plug_ceramic": ((0.720, 0.710, 0.690), 0.30, 0.0),
     "radiator_core": ((0.120, 0.120, 0.125), 0.60, 1.0),
     "suit_fabric": ((0.045, 0.075, 0.180), 0.68, 0.0),
     "helmet_shell": ((0.640, 0.620, 0.600), 0.14, 0.0),
