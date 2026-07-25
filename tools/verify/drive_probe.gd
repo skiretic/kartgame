@@ -59,6 +59,36 @@ var _tick := 0
 ## the number described the spawn instead of the driving.
 const SETTLE_TICKS := 90
 
+## Entry speed for the skidpad, m/s. 13.5 m/s is 48.6 km/h.
+##
+## Set from a sweep rather than from an estimate, and the sweep is the reason the
+## number is not the 15.3 m/s a 15 m circle at 2.2 g would support. Measured on
+## the M3a stand-in vehicle, one run per entry speed:
+##
+##     entry m/s   sustained g   peak g   max roll
+##       8.0          1.84        2.14      1.6 deg
+##      10.0          1.84        2.24      1.7 deg
+##      12.0          1.84        2.27      1.7 deg
+##      13.5          1.84        2.30      1.7 deg
+##      15.3          1.84       43.85    167.0 deg   TIPPED OVER
+##
+## The *sustained* figure is independent of entry speed, which is the sign that
+## the kart really is settling into the same steady circle every time and that
+## 1.84 g is a property of the vehicle rather than of the scenario. What entry
+## speed changes is the **transient** as lock is wound on, and above 13.5 m/s
+## that transient exceeds what the kart can stand up to and it rolls over.
+##
+## The transient is partly the scenario's own fault: `STEER_RATE` takes the input
+## from zero to full lock in 0.29 s, which is faster than a driver turns into a
+## corner, so the kart is asked for peak lateral before it has settled. Winding
+## lock on over a second would let the entry speed go back up. That is worth
+## doing when there is a vehicle worth measuring at the limit — M3b — rather than
+## against a stand-in that is deleted at that milestone.
+##
+## Overridable with `--entry=` so the lateral limit can be found by sweeping it
+## rather than by guessing at it once.
+const SKIDPAD_ENTRY_MS := 13.5
+
 ## Speed below which a longitudinal or lateral spike is not reported as a peak.
 ## At walking pace one tick of full brake is a legitimate 12 g — the clamp in the
 ## drive model stops exactly one tick of momentum, by design — and reporting that
@@ -88,11 +118,19 @@ var _previous_velocity := Vector3.ZERO
 var _previous_position := Vector3.ZERO
 var _wheels_down_min := 4
 
+## Set once the skidpad's entry speed is reached; see `_scripted_input`. Latched
+## rather than recomputed, so a kart that scrubs speed off in the corner does not
+## drop back below the threshold and start accelerating again mid-measurement.
+var _skidpad_entered := false
+var _skidpad_entry_tick := -1
+var _entry_ms := SKIDPAD_ENTRY_MS
+
 
 func _initialize() -> void:
 	var args := Cmdline.parse()
 	_scenario = Cmdline.as_string(args, "scenario", "accel")
 	_ticks = Cmdline.as_int(args, "ticks", DEFAULT_TICKS)
+	_entry_ms = Cmdline.as_float(args, "entry", SKIDPAD_ENTRY_MS)
 
 	if not ClassDB.class_exists("KartStateHash"):
 		printerr("KartStateHash is not registered — build the extension: scons target=editor")
@@ -152,20 +190,31 @@ func _scripted_input() -> Dictionary:
 			if second < 6.0:
 				return {"throttle": 1.0, "brake": 0.0, "steer": 0.0}
 			return {"throttle": 0.0, "brake": 1.0, "steer": 0.0}
-		"skidpad":
-			# Accelerate for 2 s to about 55 km/h, then hold full lock on a
-			# trickle of throttle. The kart settles into whatever radius it can
-			# hold at whatever speed it can hold it — the measurement, rather than
-			# a radius chosen in advance and a controller that hunts for it.
+		"skidpad", "skidpad_right":
+			# Accelerate to SKIDPAD_ENTRY_MS, then hold full lock on a trickle of
+			# throttle. The kart settles into whatever radius it can hold at
+			# whatever speed it can hold it — the measurement, rather than a radius
+			# chosen in advance and a controller that hunts for it.
 			#
-			# The entry speed matters and was wrong at first. Full lock at 100 km/h
-			# is not a skidpad, it is a spin: a 15 m circle at 2.2 g only supports
-			# 18 m/s, so the kart arrives 40 km/h too fast, and with its center of
-			# mass at 0.25 m over a 1.185 m rear track it rolled over instead of
-			# sliding. A driver would not do that, so neither does the scenario.
-			if second < 2.0:
+			# The entry speed matters and has now been wrong twice. Full lock at
+			# 100 km/h is not a skidpad, it is a spin: a 15 m circle at 2.2 g only
+			# supports 18 m/s, so the kart arrives 40 km/h too fast and rolls over
+			# instead of sliding. A driver would not do that, so neither does the
+			# scenario.
+			#
+			# **Gated on speed rather than on a tick count**, which is the second
+			# mistake. It was "accelerate for 2.0 s", and 2.0 s is not a speed — it
+			# is a speed only for one particular set of drive constants. When
+			# `_force_at_contact` was corrected to measure its offset from the body
+			# origin, the kart's acceleration changed, 2.0 s stopped meaning 55 km/h,
+			# and the scenario tipped the kart over and reported that as its
+			# cornering figure. A threshold crossing is still a pure function of a
+			# deterministic simulation, so the state hash is unaffected; what it is
+			# not is a *controller*, which is the thing the header comment rules out.
+			var steer := -1.0 if _scenario == "skidpad_right" else 1.0
+			if not _skidpad_entered:
 				return {"throttle": 1.0, "brake": 0.0, "steer": 0.0}
-			return {"throttle": 0.30, "brake": 0.0, "steer": 1.0}
+			return {"throttle": 0.30, "brake": 0.0, "steer": steer}
 		_:
 			return {"throttle": 0.0, "brake": 0.0, "steer": 0.0}
 
@@ -192,6 +241,12 @@ func _sample(delta: float) -> void:
 	var velocity := _kart.linear_velocity
 	var speed := velocity.length()
 	var position := _kart.global_position
+
+	# Latched here rather than inside `_scripted_input`, because this runs before
+	# node propagation and therefore before the kart reads its input for the tick.
+	if not _skidpad_entered and speed >= _entry_ms:
+		_skidpad_entered = true
+		_skidpad_entry_tick = _tick
 
 	if _tick % HASH_INTERVAL == 0:
 		_hash.add_int(_tick)
@@ -281,6 +336,11 @@ func _report() -> void:
 		])
 	else:
 		lines.append("    braking 90-20        not measured in this scenario")
+	if _skidpad_entry_tick >= 0:
+		lines.append("    entry speed     %8.1f km/h at %.2f s" % [
+			KartCore.ms_to_kmh(_entry_ms),
+			float(_skidpad_entry_tick) / float(Engine.physics_ticks_per_second),
+		])
 	lines.append("    wheels down     %8d minimum after settling" % _wheels_down_min)
 	# A kart past about 50 degrees of roll is on its side, and every other number
 	# in the report describes a kart that is on its side. Reported rather than

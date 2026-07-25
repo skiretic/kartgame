@@ -38,7 +38,12 @@ for argument in "$@"; do
 done
 
 if [ ${#SCENARIOS[@]} -eq 0 ]; then
-	SCENARIOS=(accel brake skidpad)
+	# Both skidpad directions, because the kart is not laterally symmetric: 27 kg
+	# of engine, exhaust and radiator hang off the right, which puts the center of
+	# mass 41 mm right of the centerline and makes the rollover threshold 2.43 g
+	# turning left against 2.81 g turning right. A harness that only ever turned
+	# one way measured one of those two karts. See src/core/chassis.h.
+	SCENARIOS=(accel brake skidpad skidpad_right)
 fi
 
 if ! command -v "$GODOT" >/dev/null 2>&1 && [ ! -x "$GODOT" ]; then

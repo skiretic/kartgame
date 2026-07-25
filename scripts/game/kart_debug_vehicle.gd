@@ -545,14 +545,32 @@ func _apply_drive(forward: Vector3, forward_speed: float, delta: float) -> void:
 
 ## Apply a force at a wheel's contact patch.
 ##
-## `apply_force`'s offset is measured from the **center of mass**, not from the
-## body's origin, and getting that wrong is invisible in a straight line and
-## wrong in every corner. The contact point is reconstructed from the wheel node
-## and its radius for the same reason `PhysicsDraw` does it: `VehicleWheel3D`
-## does not publish one.
+## `apply_force`'s offset is measured from the **body's origin**, in global
+## coordinates — not from the center of mass. This file said the opposite for a
+## milestone, CLAUDE.md's trap list said the opposite, and so did ADR-0031.
+## `tools/verify/contact_probe.gd` settles it: with the center of mass moved to
+## (0, 0.5, 0) and the offset passed as exactly zero, the body picks up
+## 0.3788 rad/s where a center-of-mass convention predicts zero, and that matches
+## the body-origin prediction to 1.2e-7. Godot's own documentation agrees in one
+## sentence — "position is the offset from the body origin in global
+## coordinates" — which is the part nobody read.
+##
+## Passing `contact - to_global(center_of_mass)` therefore applied the force at
+## `origin + contact - com`, which is a torque of
+## `(contact - com) x F  +  (origin - com) x F`. The second term is not small and
+## it is not random: the kart mesh's origin sits on the ground and so does every
+## contact patch, so those two arms have the *same* vertical component, and the
+## pitch and roll moments from any tire force came out **exactly doubled** for
+## any center-of-mass height. Measured on this kart's geometry: 5.079 rad/s of
+## pitch per tick where 2.540 was intended, a ratio of 1.99996. Yaw was worse
+## rather than merely doubled — the longitudinal arms differ in sign, so a
+## lateral force produced a yaw moment that should not exist at all.
+##
+## The contact point is reconstructed from the wheel node and its radius for the
+## same reason `PhysicsDraw` does it: `VehicleWheel3D` does not publish one.
 func _force_at_contact(wheel: VehicleWheel3D, force: Vector3) -> void:
 	var contact := wheel.global_position + Vector3.DOWN * wheel.wheel_radius
-	apply_force(force, contact - to_global(center_of_mass))
+	apply_force(force, contact - global_position)
 
 
 ## Drag and engine braking, applied as a force at the center of mass.

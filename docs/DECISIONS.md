@@ -1161,3 +1161,139 @@ single-precision additions. The engine is a single-precision build, which
 for reproduction on one binary, which is the only thing §8 promises, and it is
 the mechanism behind why `state_hash.h` quantizes before hashing rather than
 comparing bits.
+
+
+## ADR-0033 — The contact boundary, measured, and the lever arm it caught
+
+**Status.** Accepted. This is the half of the force-application boundary
+[ADR-0032](#adr-0032--the-force-application-boundary-measured) explicitly left
+open, and it **corrects ADR-0031 and CLAUDE.md on a point both stated as
+settled**.
+
+**Context.** ADR-0032 measured a `RigidBody3D` in free space and closed
+`ARCHITECTURE.md` §19's first risk. Its own "what this does not settle" section
+named what was left: "the wheel raycasts, the friction solver and the resting
+contact behavior are not covered, and a force applied at a contact point that
+Jolt is simultaneously resolving is a harder question." Every one of those is
+load-bearing for issue #31. `tools/verify/contact_probe.gd` asks them the same
+way — one body per question, an analytic prediction printed beside every
+measurement.
+
+**The finding that matters most was not one of the questions.**
+
+`apply_force`'s `position` argument is **an offset from the body's origin, in
+global coordinates**. It is not an offset from the center of mass. Godot's
+documentation says so in one sentence. This project believed the opposite,
+recorded it in CLAUDE.md's trap list as a hard-won fact, wrote it into ADR-0031,
+and implemented it in `kart_debug_vehicle.gd`.
+
+The measurement is decisive and needs no interpretation. Move a body's center of
+mass to (0, 0.5, 0), pass an offset of exactly zero, and apply a force:
+
+    spin: offset zero, com +0.5y
+      measured dw over one tick              ( -0.00000010   0.00000000   0.37878785)
+      A: world offset from center of mass    (  0.00000000   0.00000000   0.00000000)   err 0.378787845
+      B: world offset from body origin       (  0.00000000   0.00000000   0.37878790)   err 0.000000118
+
+A center-of-mass convention predicts no rotation at all. The body rotates.
+
+**What it cost.** Passing `contact - to_global(center_of_mass)` applies the force
+at `origin + contact - com`, so the torque about the center of mass is
+
+    (contact - com) x F  +  (origin - com) x F
+
+The second term is not noise. The kart mesh's origin sits on the ground and so
+does every contact patch, so those two arms have the *same* vertical component,
+and the **pitch and roll moments came out exactly doubled — at any center-of-mass
+height**. Measured on the kart's own geometry, 5.079 rad/s of pitch per tick
+where 2.540 was intended, a ratio of 1.99996. Yaw was worse than doubled rather
+than doubled: the longitudinal arms differ in sign, so a lateral tire force
+produced a yaw moment that should not exist.
+
+**What fixing it changed, measured rather than assumed.** `tools/verify/drive.sh`
+before and after, same scenarios, same constants:
+
+| | Before | After | KZ reference (§6.4) |
+|---|---|---|---|
+| Top speed | 136.9 km/h | 136.9 km/h | 135-145 |
+| 0-100 km/h | 3.40 s | **2.88 s** | 3.0-3.5 |
+| Braking, 90-20 km/h mean | 1.98 g | **1.53 g** | 1.5-2.0 |
+| Lateral, sustained | 1.76 g | **1.84 g** | 2.0-2.5 |
+
+**ADR-0031's headline conclusion survives, and is refined.** It said the 1.76 g
+lateral figure could not be fixed with more grip because the kart rolls over
+first, and that closing the gap needs the inside-rear lift and caster jacking of
+M3b. The doubled roll moment was worth 0.08 g of the shortfall — real, and a
+small fraction of it. The gap is still mostly what ADR-0031 said it was.
+
+**What is no longer true is every other number in ADR-0031.** M3a's constants
+were calibrated against a doubled pitch lever, so 0-100 and braking both moved
+when it was corrected, and 0-100 is now outside its band. Those constants are
+**not being re-tuned**: `kart_debug_vehicle.gd` is deleted at M3b, `ARCHITECTURE.md`
+§19 names unbounded vehicle tuning as a risk, and re-tuning a stand-in to restore
+a pretty number is how that risk lands. The numbers above are recorded as what a
+corrected M3a stand-in does. M3b's solver is calibrated against the corrected
+boundary and its figures are the ones that count.
+
+**The seven answers.**
+
+1. **Resting contact is exact; the read-out is not.** Boxes and spheres at 17.5,
+   175 and 1750 kg rest at exactly their geometric height — penetration
+   0.00000000 m, residual speed under 3e-9 m/s — at 120 and 240 Hz. A wheel
+   spring may compute its length from a raycast with no rest-height correction.
+   But `PhysicsDirectBodyState3D.get_contact_impulse` reports **1.000371x** the
+   true impulse and **lags one tick**, invariant across 100x mass, 4x load,
+   60-240 Hz, gravity on or off, and 1- against 4-point manifolds. The motion is
+   ground truth; the API is not. Normal load comes from the spring, never from
+   there.
+2. **The contact is a clean unilateral constraint.** Below `m*g` the measured
+   acceleration is 0.00000 against a free-body prediction of `(k-1)g`, and the
+   contact supplies exactly the balance. Above it the contact supplies **zero on
+   every tick** and the acceleration is `(k-1)g` to five digits. The body leaves
+   within 1 tick at `k >= 1.5` and 5 ticks at `k = 1.01`. A per-wheel spring may
+   apply its full computed force unconditionally.
+3. **Jolt's friction must be switched off on the chassis.** A custom tire model
+   owns every tangential newton, so anything Jolt contributes is double-counted.
+   `physics_material_override.friction = 0.0` on the vehicle body is sufficient
+   whatever the ground is, because the combine rule is measured to be
+   `min(a, b)` — 0.25/0.50 gives 0.24998, 1.00/0.50 gives 0.49999, and only
+   `min` fits. Two further reasons: at high mu the friction solver is only good
+   to about 10%, and a lateral force at the patch tips the body onto a corner and
+   inflates the normal load to 8x `m*g`.
+4. **Raycasts are exact and cheap, and one case is a trap.** Distance and normal
+   are correct to 0.00000000 over 240 ticks at 60 m/s — no tunneling, no speed
+   dependence. `exclude` is required, because a ray from outside a collider hits
+   its own body 240 times out of 240, and it is free: 1.23 us against 1.26 us
+   over 20,000 rays. The trap: **a ray originating below a surface returns no hit
+   at all**, and `hit_back_faces` does not change that. `hit_from_inside` returns
+   a hit at distance 0.000000 with a normal of (0,0,0), so it is not a depth
+   query. A wheel buried in a curb reports "no contact" exactly when it is
+   deepest, so the spring must latch its last valid normal and depth, and issue
+   #31's "curb strikes do not tunnel" cannot be satisfied by raycasts alone.
+5. **Angular response is exact once the offset convention is right.**
+   `alpha = I^-1 (r x F)` to 4e-7 rad/s for a diagonal tensor, and to 4.4e-7 for
+   a genuinely non-diagonal world tensor — body rolled 45 degrees, `inertia` set
+   to (2, 5, 11), matched against `R I^-1 R^T tau`. The offset is a **world**
+   vector; reading it as body-local is off by 1.70 rad/s in the rolled case.
+6. **ADR-0032's conclusion 3 survives a contact unchanged.** Four applications of
+   `F/4` against one of `F`, on a body resting on a plane, both sliding and
+   crossing the airborne transition: identical to all nine printed digits. The
+   240 Hz solver may accumulate its substep forces and apply the totals once per
+   120 Hz tick, on the ground as well as in the air.
+7. **`max_physics_steps_per_frame` clamps and does not bank.** Under an induced
+   stall Godot ran exactly 8.0000 ticks per frame against an owed 12.35, and
+   simulation time advanced at 0.6476 of wall-clock against an analytic 0.6476.
+   It never catches up. The kart runs in slow motion under a frame-rate collapse
+   and **a tick-counting replay cannot see it**, so M3b's telemetry must publish
+   `simulated_ticks / (wall_seconds * hz)`. It is the one defect invisible to
+   every other check in this project.
+
+**Consequence.** Issue #31 has its answers before a line of suspension code runs.
+The probe stays in the tree so the same questions can be re-asked of a future
+engine version in one command.
+
+**What this does not settle.** `continuous_cd` on the chassis is very likely
+inert — Jolt's movement threshold is 0.75 of the body's own extent per step,
+about 0.41 m for the chassis box, and the kart covers 0.32 m per step at its top
+speed — but that is an argument, not a measurement, and it is filed rather than
+concluded. Kart-to-kart contact is untouched and belongs to M7.
