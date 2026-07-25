@@ -1,0 +1,42 @@
+# Godot 4
+.godot/
+*.translation
+
+# Generated content — reproducible from tools/, never committed
+assets/generated/
+
+# GDExtension build artifacts
+.sconsign.dblite
+.sconf_temp/
+config.log
+*.os
+*.obj
+*.o
+*.so
+*.dylib
+*.dll
+*.lib
+*.pdb
+*.exp
+*.a
+bin/
+
+# Godot export output
+build/
+export/
+
+# Blender
+*.blend1
+*.blend2
+
+# Python
+__pycache__/
+*.pyc
+
+# macOS
+.DS_Store
+
+# Editors
+.vscode/
+.idea/
+*.swp
