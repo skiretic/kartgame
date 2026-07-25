@@ -2,7 +2,7 @@
 
 A physically-grounded KZ shifter kart racing sim. Free, open source, built in the open.
 
-**Status: M0, project foundation.** The architecture is written and the C++ extension builds and loads on macOS, Windows, and Linux. No vehicle yet. See [`docs/ROADMAP.md`](docs/ROADMAP.md) for what is being built and in what order.
+**Status: M2, the Blender pipeline.** The C++ extension builds and loads on macOS, Windows, and Linux. Look development is done — physical sun, AgX, baked GI, motion blur. A KZ kart is generated from a parameter block in Blender and imports into Godot at exact scale, byte-identically between runs. No vehicle physics yet. See [`docs/ROADMAP.md`](docs/ROADMAP.md) for what is being built and in what order.
 
 ---
 

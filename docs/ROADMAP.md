@@ -85,9 +85,10 @@ Proves the content path before anything depends on it.
 - [x] `tools/blender/genkart.py` — headless entry point and parameter block (#11)
 - [x] Frame tubes and floor tray (#12)
 - [x] Wheels, tires and rear axle (#14)
-- [ ] Seat, steering wheel and pedals (#13) — built, not yet verified against its own acceptance criteria
-- [ ] Engine, exhaust and radiator (#15)
-- [ ] Cockpit interior (#16), driver (#17), bodywork (#105)
+- [x] Seat, steering wheel and pedals (#13). Verified numerically, not just built: zero triangle-level intersections with the frame, and `steering_pivot`'s rotation axis proven against the exported `.glb` rather than asserted in a comment. Its third criterion — a plausible seating position — **fails and is deferred to #107**, because the seat is the datum for #16 and #17
+- [x] Engine, exhaust and radiator (#15)
+- [x] **Bodywork** — nose fairing, sidepods, rear plastics (#105). Not in this list originally, which is the gap the issue was filed for: a KZ without plastics reads as a bare rolling chassis. It is also 22.6% of the kart's surface area, so it carries most of the livery and most of the texel budget
+- [ ] Cockpit interior (#16), driver (#17)
 - [x] UV unwrap at the §5 texel density (#18). **No lightmap UV2** — a kart moves, so it is lit by lightmap probes and no channel reads it. [ADR-0025](DECISIONS.md#adr-0025--the-kart-carries-no-lightmap-uv2-because-a-kart-moves) corrects this line as it was originally written
 - [x] Normal bake from a high-poly source, headless through Cycles (#19)
 - [ ] LOD (#20) — **rescoped.** Godot generates its own mesh LODs on import and cannot read a decimated chain from glTF; the interior LOD is a visibility range, not a decimation level. [ADR-0026](DECISIONS.md#adr-0026--godot-generates-its-own-mesh-lods-a-decimated-gltf-chain-is-not-read)
@@ -98,7 +99,11 @@ Proves the content path before anything depends on it.
 
 **Accept:** `blender --background --python tools/blender/genkart.py` produces a glTF that imports into Godot at correct scale with clean UVs and working LODs. Re-running with identical parameters produces an identical mesh.
 
-Measured: wheelbase 1.0500 m in Godot against a parameter of 1.0500, overall length 1.831 m against 1.830, width 1.400 m against 1.400. UV density 512 px/m with a 1.00x spread across every mesh. `genkart.sh --check` confirms the `.glb` **and** the baked normal map are byte-identical between runs.
+Measured: wheelbase 1.0500 m in Godot against a parameter of 1.0500, overall length **1.830 m** against 1.830, width 1.400 m against 1.400. UV density 512 px/m with a 1.00x spread across every mesh. `genkart.sh --check` confirms the `.glb` **and** the baked normal map are byte-identical between runs.
+
+The length read 1.831 m for two milestones. The rear bumper was swept at `tube_secondary` but had its position computed from `tube_bumper`, so its outer surface sat 1 mm past the CIK maximum — close enough to right to read as rounding, which is why it survived that long.
+
+`genkart.py` also asserts face winding now: every watertight part must enclose a positive volume, fatal on failure. `build.box` and `build.lathe` had wound their faces inward since M2 began and **no render could show it**, because Blender materials export `doubleSided: true` and Godot flips the shading normal on backfaces. It would have corrupted the normal bake rather than the silhouette.
 
 **One correction to the gate.** Issue #22 also asked for two runs to produce identical *images*. That is not available — Godot stills on this host drift run to run by up to 18/255 on about half the frame with no input change, so the turntable is compared with a tolerance instead ([ADR-0023](DECISIONS.md#adr-0023--godot-stills-are-not-reliably-bit-identical-so-image-checks-need-a-tolerance)). The *mesh* determinism the gate asks for is exact and unaffected.
 
