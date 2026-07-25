@@ -2,7 +2,7 @@
 
 A physically-grounded KZ shifter kart racing sim. Free, open source, built in the open.
 
-**Status: design phase.** The architecture is written; no engine code exists yet. See [`docs/ROADMAP.md`](docs/ROADMAP.md) for what is being built and in what order.
+**Status: M0, project foundation.** The architecture is written and the C++ extension builds and loads on macOS, Windows, and Linux. No vehicle yet. See [`docs/ROADMAP.md`](docs/ROADMAP.md) for what is being built and in what order.
 
 ---
 
@@ -12,7 +12,7 @@ A racing sim built around one idea: **a kart is not a small car.** A KZ shifter 
 
 Everything else follows from taking that seriously:
 
-- Per-wheel suspension raycasts, Pacejka-style tyre model, load-sensitive grip, emergent weight transfer
+- Per-wheel suspension raycasts, Pacejka-style tire model, load-sensitive grip, emergent weight transfer
 - 6-speed sequential gearbox, clutch, heavy two-stroke engine braking, ~45 hp at 13,000 rpm
 - Solver substepping at 240 Hz inside a 120 Hz fixed tick
 - Validated against real KZ performance figures — ~140 km/h, ~3.5 s to 100 km/h, 2.0–2.5 g lateral — as an automated test suite, not by feel
@@ -31,7 +31,7 @@ Plus a cockpit view, deterministic replays and ghosts, generated tracks and kart
 
 ## Why Godot and not Unreal
 
-Unreal renders better with less effort, and that gap is real. But Unreal's source sits under Epic's EULA, not an open source licence — engine source cannot live in a public repo, and every contributor needs an Epic account and a 100 GB download before they can build. Godot is MIT end to end: clone, build, run, fork the engine itself if you need to. For a project whose point is being open source, that decided it.
+Unreal renders better with less effort, and that gap is real. But Unreal's source sits under Epic's EULA, not an open source license — engine source cannot live in a public repo, and every contributor needs an Epic account and a 100 GB download before they can build. Godot is MIT end to end: clone, build, run, fork the engine itself if you need to. For a project whose point is being open source, that decided it.
 
 The full reasoning, including the calls that were reversed and why, is in [`docs/DECISIONS.md`](docs/DECISIONS.md).
 
@@ -42,23 +42,48 @@ The full reasoning, including the calls that were reversed and why, is in [`docs
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | System design — rendering, physics, vehicle model, determinism, content pipeline, budgets |
 | [`docs/ROADMAP.md`](docs/ROADMAP.md) | Milestones M0–M10, each with a testable acceptance gate |
 | [`docs/DECISIONS.md`](docs/DECISIONS.md) | Architecture decision log, including superseded decisions |
-| [`ATTRIBUTION.md`](ATTRIBUTION.md) | Third-party asset provenance and licences |
+| [`ATTRIBUTION.md`](ATTRIBUTION.md) | Third-party asset provenance and licenses |
 
 ## Building
 
-Not yet buildable — M0 is in progress. Instructions land with it.
+```bash
+git clone --recurse-submodules https://github.com/skiretic/kartgame.git
+cd kartgame
+scons target=editor          # the build the Godot editor loads
+tools/verify/verify.sh       # asserts the extension loaded and is wired correctly
+```
+
+Then open the project in Godot. The default scene is a gamepad probe that prints what
+the C++ extension reports about itself and shows live controller state.
+
+Already cloned without `--recurse-submodules`? `git submodule update --init --recursive`.
+
+`scons target=template_release` builds what an exported game loads. Everything lands in
+`bin/`, which is gitignored — the repository ships source, not binaries.
 
 Toolchain, pinned:
 
 ```
-Godot    4.7.1 stable
-Blender  5.2.0 LTS
-SCons    (godot-cpp build)
-git-lfs  3.7.1
+Godot      4.7.1 stable
+godot-cpp  master @ 9c7567d2   (no 4.7 release branch exists upstream — ADR-0016)
+Blender    5.2.0 LTS
+SCons      4.10.1
+git-lfs    3.7.1
 ```
 
-## Licence
+### macOS: a known engine crash
+
+`godot --headless --import` segfaults inside MoltenVK on macOS 26 and 27. It is an
+upstream Godot defect, reproducible with godot-cpp's own example extension and with
+Godot 4.5.2, and unrelated to this project. The GUI editor and headless *game* mode are
+both unaffected, so normal development needs no workaround.
+
+The crashing run still seeds `.godot/` before dying, so `tools/verify/verify.sh` imports
+twice and ignores the first result. CI runs the headless gate on Linux. Detail and the
+full elimination trail are in [ADR-0018](docs/DECISIONS.md#adr-0018--macos-headless-imports-crash-in-moltenvk-ci-verifies-on-linux).
+
+## License
 
 Code: [MIT](LICENSE).
 
-Assets: per their source, recorded in [`ATTRIBUTION.md`](ATTRIBUTION.md). Third-party material is CC0 wherever possible — for an open source project, licence clarity beats a marginally better scan.
+Assets: per their source, recorded in [`ATTRIBUTION.md`](ATTRIBUTION.md). Third-party material is CC0 wherever possible — for an open source project, license clarity beats a marginally better scan.

@@ -52,11 +52,11 @@ All entries below date from the design session on **2026-07-24**.
 
 **Status:** Accepted. Survived every subsequent reversal.
 
-**Context.** Vehicle physics splits cleanly into two jobs: world collision (broadphase, mesh collision, CCD, contact solving) and vehicle dynamics (suspension, tyre grip, weight transfer). The first is solved, boring, and roughly two months of subtle tunneling and jitter bugs to reimplement. The second is game feel.
+**Context.** Vehicle physics splits cleanly into two jobs: world collision (broadphase, mesh collision, CCD, contact solving) and vehicle dynamics (suspension, tire grip, weight transfer). The first is solved, boring, and roughly two months of subtle tunneling and jitter bugs to reimplement. The second is game feel.
 
-**Decision.** Jolt owns collision. The tyre and suspension model is written by hand.
+**Decision.** Jolt owns collision. The tire and suspension model is written by hand.
 
-**Consequences.** Skips the part no player notices while keeping authorship of the part that defines the game. The tyre model can be replaced without touching collision. Later validated by Godot shipping Jolt in core since 4.4 — the decision survived the engine change for free.
+**Consequences.** Skips the part no player notices while keeping authorship of the part that defines the game. The tire model can be replaced without touching collision. Later validated by Godot shipping Jolt in core since 4.4 — the decision survived the engine change for free.
 
 **Rejected.** Bullet (weaker determinism, dated API); Jolt's own `VehicleConstraint`, which bounds feel to what its controller exposes; writing everything, which spends two months on plumbing that adds nothing kart-specific.
 
@@ -144,7 +144,7 @@ Secondary: the dev machine is an M1 Pro with 16 GB. Unreal's editor is heavy the
 
 **Hardware note.** 16 GB unified memory makes local Flux slow and tight and SDXL sluggish, which reinforces treating AI generation as gap-fill rather than a pipeline to lean on.
 
-**Licence stance.** Prefer CC0 over marginally better restricted sources. Fab/Megascans is deliberately avoided — its terms are not CC0 and have carried engine-use restrictions.
+**License stance.** Prefer CC0 over marginally better restricted sources. Fab/Megascans is deliberately avoided — its terms are not CC0 and have carried engine-use restrictions.
 
 ---
 
@@ -158,7 +158,7 @@ Secondary: the dev machine is an M1 Pro with 16 GB. Unreal's editor is heavy the
 
 **Consequences.** The gearbox becomes a real subsystem — ratios, clutch slip, 50–80 ms shifts with torque cut, engine braking, rev limiting, over-rev consequences. Heavy two-stroke engine braking shapes corner entry more than the brakes do on some corners, which changes how the whole vehicle is driven. Auto-clutch and auto-shift default on, because an unassisted first lap in a shifter kart ends in a stall.
 
-Highest skill ceiling in real karting, and it makes the drivetrain worth modelling rather than a constant.
+Highest skill ceiling in real karting, and it makes the drivetrain worth modeling rather than a constant.
 
 ---
 
@@ -210,11 +210,139 @@ A fictional track is only acceptable *because* that substitute exists. Without i
 
 | C++ GDExtension | GDScript |
 |---|---|
-| Vehicle solver, tyres, gearbox, substepping | Game flow, race states |
+| Vehicle solver, tires, gearbox, substepping | Game flow, race states |
 | Track gameplay data | HUD, menus, settings |
 | AI racing line and speed profile | Camera rigs |
 | Audio DSP and engine synthesis | |
 
 **Reasoning.** The vehicle solver runs a tight numeric loop at 240 Hz — GDScript is too slow and too imprecise. Camera rigs are cheap per-frame math but heavy on tuning, so fast reload is worth more than execution speed there.
 
-**Consequence.** Keeps real systems programming at the centre of the project after ADR-0009 removed the custom engine, while inheriting everything Godot does well. The extension boundary stays narrow and data-oriented — per-frame cross-language calls are fine, per-sample are not.
+**Consequence.** Keeps real systems programming at the center of the project after ADR-0009 removed the custom engine, while inheriting everything Godot does well. The extension boundary stays narrow and data-oriented — per-frame cross-language calls are fine, per-sample are not.
+
+---
+
+The entries below date from the M0 implementation session on **2026-07-24**, and each
+one records something the design session had assumed rather than checked.
+
+---
+
+## ADR-0016 — Pin `godot-cpp` to a `master` commit, because no 4.7 branch exists
+
+**Status:** Accepted
+
+**Context.** `ARCHITECTURE.md` and the M0 gate both assumed the ordinary GDExtension
+setup: add `godot-cpp` at the release branch matching the pinned engine. That branch
+does not exist. Upstream `godot-cpp` has release branches through `4.5` and tags
+through `godot-4.5-stable`, and nothing for 4.6 or 4.7 — even though Godot itself has
+shipped 4.6, three 4.6 patch releases, and 4.7.1.
+
+What upstream does have is a `master` branch under daily development whose bundled
+`gdextension/extension_api.json` reports `4.7.stable`, alongside archived
+`extension_api-4-3.json` through `extension_api-4-6.json` selectable with SCons'
+`api_version` option. So `master` is the supported path for 4.7; there is simply no
+stable tag on it.
+
+**Decision.** `third_party/godot-cpp` is a git submodule pinned to commit `9c7567d2`.
+No branch is recorded in `.gitmodules`, so `git submodule update --remote` cannot
+silently advance it. Bindings are generated from the bundled 4.7 API rather than from
+a locally dumped one, so CI needs no Godot install to build the extension.
+
+**Why not the alternatives.** Vendoring the source drops the ability to see upstream
+history and rebase onto fixes. Tracking `master` as a branch means every clone can get
+a different compiler input, which is the opposite of a pinned toolchain. Using the
+`4.5` branch with `api_version=4.5` would mean giving up 4.6 and 4.7 engine features
+to gain a version tag, which is the wrong trade.
+
+**Consequence.** Moving the pin is a deliberate, reviewable commit, which is what
+`ARCHITECTURE.md` §19 asks for under "Godot version churn". The cost is that the pin
+sits on a development branch with no stability promise, so an engine upgrade means
+re-testing the extension rather than trusting a version match. Verified in practice:
+the extension builds and loads against 4.7.1 with bindings generated from the 4.7.0
+API, which is the expected within-minor compatibility.
+
+**Also worth recording:** the bundled API being 4.7.0 while the engine is 4.7.1 was the
+first suspect for a crash that turned out to be ADR-0018. Rebuilding against 4.7.1's
+own dumped `extension_api.json` changed nothing. The version skew is genuinely benign.
+
+---
+
+## ADR-0017 — `src/core/` is compiled without godot-cpp
+
+**Status:** Accepted. Corrects a claim in `ARCHITECTURE.md` §14.
+
+**Context.** The testing plan called for "doctest or Catch2 on the vehicle math, tire
+curves, spline solver — engine-independent, fast". That is not free. A tire model
+written against `godot::Vector3` needs godot-cpp linked into the test binary, which
+means generated bindings, a GDExtension interface pointer that only exists inside a
+running engine, and a test suite that is no longer engine-independent in any useful
+sense. The claim was aspirational, and left alone it would have quietly become false
+the first time a solver file included a Godot header.
+
+**Decision.** `src/core/` is plain C++ with no godot-cpp includes: math types, PCG32,
+state hashing, unit conversions, and the KZ reference figures. Everything numeric and
+testable lives there. The rest of `src/` may use godot-cpp freely, and is the thin
+layer that marshals between Godot types and core types.
+
+M0 puts `units.h` and `kz_reference.h` there and exercises the boundary through
+`KartCore.kmh_to_ms()`, so the rule has a working example before there is anything
+complicated to test.
+
+**Consequence.** The unit-test binary compiles against `src/core/` alone — no engine,
+no bindings, no fixture. That is what makes the M3b tire and gearbox math testable in
+milliseconds instead of through a running scene. The cost is one conversion at the
+boundary, which is deliberate: it is the same narrow, data-oriented edge ADR-0015
+already asked for, and having it in one place makes it cheap to keep narrow.
+
+**Rejected.** Letting the solver use `godot::Vector3` throughout and linking godot-cpp
+into the tests. It works, it is less code today, and it makes the tests slow, fragile,
+and dependent on the exact engine version — which is precisely what a fixed-point
+rewrite for cross-platform determinism (ADR-0005) would later have to unpick.
+
+---
+
+## ADR-0018 — macOS headless imports crash in MoltenVK; CI verifies on Linux
+
+**Status:** Accepted, as a workaround for an upstream defect.
+
+**Context.** `godot --headless --import` segfaults on this machine. `EXC_BAD_ACCESS`,
+null dereference at address `0x8`, inside MoltenVK converting SPIR-V to Metal Shading
+Language — in `--headless`, where there should be no shader compilation at all.
+
+Diagnosing it consumed most of the M0 session, so the elimination order is worth
+recording:
+
+| Suspected | Test | Result |
+|---|---|---|
+| Our C++ | Register no classes | No crash. Registration implicated. |
+| Our class shape | `Object` vs `RefCounted`, abstract vs concrete | Crashes in every combination. |
+| godot-cpp/engine ABI skew | Diff `gdextension_interface.json`, engine 4.7.1 vs godot-cpp `master` | Byte-identical. Not an ABI mismatch. |
+| API version skew | Rebuild against 4.7.1's own dumped `extension_api.json` | Still crashes. |
+| **Our project at all** | Build and run **godot-cpp's own upstream test extension** | **Crashes identically.** Not our code. |
+| Godot 4.7 specifically | Godot 4.5.2 with matched godot-cpp `4.5` branch | Crashes identically. Not version-specific. |
+| Rendering driver | `--rendering-driver opengl3`, `--display-driver headless`, `--audio-driver Dummy` | No effect. |
+| The editor at all | GUI editor, and headless *game* mode | **Both clean.** Headless *editor* only. |
+
+The host is macOS 27 beta. Upstream has the same crash filed against macOS 26 for Godot
+4.5, 4.5.1, and 4.7, so this is an existing engine defect that the beta has not fixed
+rather than anything introduced by the beta.
+
+**Decision.**
+
+1. **CI runs headless verification on Linux, not macOS.** macOS still builds the
+   extension on every push; it just does not run the headless gate.
+2. **Locally, `tools/verify/verify.sh` imports twice.** The crashing cold run seeds
+   `.godot/` before it dies, so the warm run is clean. The first exit code is ignored.
+3. **The GUI editor is unaffected**, so day-to-day development needs no workaround.
+
+**Consequence.** M0's acceptance gate is met on Linux in CI and interactively on macOS,
+but not headlessly on macOS. That is a real hole and it is stated rather than papered
+over: a macOS-only regression in the headless path would not be caught by CI. Revisit
+when the upstream fix lands — the double-import in `verify.sh` should be deleted, not
+kept as folklore.
+
+**Worth keeping.** Godot's own crash handler symbolizes against the wrong symbol table
+and prints nonsense frames — `SDL_GetPerformanceFrequency + 4158164`,
+`mvk::SPIRVToMSLConverter::convert`. The MoltenVK frame in that garbage was real and
+was dismissed as noise for most of the session. macOS writes an honest report to
+`~/Library/Logs/DiagnosticReports/*.ips`; read that instead. `lldb` is no help here,
+because it cannot parse the stripped official binary.
