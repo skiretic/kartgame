@@ -4,14 +4,21 @@
 #
 #     tools/verify/verify.sh [path-to-godot]
 #
-# Wraps a macOS-only engine bug. On macOS 26 and 27 the *first* headless import
-# of a project segfaults inside MoltenVK while it converts SPIR-V to Metal, even
-# with --headless and even with a non-Metal rendering driver. The crash happens
-# after .godot/ has been seeded, so the second run is clean.
+# Wraps an engine bug in the headless *editor* import. The first import of a cold
+# project dies; the crash happens after .godot/ has been seeded, so the second
+# run is clean.
 #
 # So: import twice, ignore the first exit code, and let the second one speak.
-# Doing this unconditionally rather than only on macOS keeps one code path, and a
-# redundant warm import on Linux costs about a second.
+#
+# This was believed to be macOS-only when it was written. It is not. On macOS it
+# is EXC_BAD_ACCESS inside MoltenVK converting SPIR-V to Metal -- in --headless,
+# where no shader compilation should happen at all, and even with a non-Metal
+# rendering driver. On Linux it is SIGABRT, exit 134. Different signal, same
+# operation and the same cold-run-only behavior.
+#
+# So the double import is load-bearing on both platforms, not a redundant second
+# behind a shared code path. CI calls this script rather than repeating its steps
+# in YAML, which is how the Linux case was found in the first place.
 #
 # See docs/DECISIONS.md ADR-0018.
 

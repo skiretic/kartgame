@@ -15,7 +15,7 @@ Pinned toolchain, installed and verified 2026-07-24:
 
 Pin these. Godot's 4.x line moves, and Blender's `bpy` API shifts between major versions — a 5.x script will not run unmodified on 4.x.
 
-**Known host defect.** On macOS 26 and 27 the *first* headless import of a project segfaults inside MoltenVK. The GUI editor is unaffected and the second headless run is clean. It is an engine bug, not a project one — [ADR-0018](DECISIONS.md#adr-0018--macos-headless-imports-crash-in-moltenvk-ci-verifies-on-linux) has the detail and the workaround.
+**Known host defect.** The *first* headless import of a cold project dies — on macOS inside MoltenVK, on Linux with SIGABRT. The GUI editor is unaffected and the second headless run is clean. It is an engine bug, not a project one — [ADR-0018](DECISIONS.md#adr-0018--macos-headless-imports-crash-in-moltenvk-ci-verifies-on-linux) has the detail, the workaround, and the amendment that widened it beyond macOS.
 
 ---
 

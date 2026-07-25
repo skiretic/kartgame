@@ -340,6 +340,23 @@ over: a macOS-only regression in the headless path would not be caught by CI. Re
 when the upstream fix lands — the double-import in `verify.sh` should be deleted, not
 kept as folklore.
 
+**Amended 2026-07-25 — this is not macOS-only.** The first full CI run after the
+matrix fix showed the Linux runner failing the same way: `godot --headless --import`
+exiting 134, `Aborted (core dumped)`, after the editor had loaded. Different signal from
+the macOS `EXC_BAD_ACCESS`, same operation and the same cold-run-only behavior.
+
+The workaround already existed and CI simply was not using it — the job imported once
+and treated a non-zero exit as failure, while `verify.sh` had imported twice since M0.
+The job now calls `verify.sh` instead of keeping a second copy of its steps in YAML,
+which is the general lesson: a workaround duplicated into CI is a workaround that will
+be absent from one of the two copies.
+
+Two claims above are therefore wrong and are corrected rather than deleted. Decision 1
+said macOS "does not run the headless gate" as though Linux were unaffected; Linux needs
+the same treatment. And `verify.sh`'s comment called the warm import "redundant on Linux,
+costs about a second" — it is load-bearing there too. Removing the double import when the
+upstream fix lands must be verified on both platforms.
+
 **Worth keeping.** Godot's own crash handler symbolizes against the wrong symbol table
 and prints nonsense frames — `SDL_GetPerformanceFrequency + 4158164`,
 `mvk::SPIRVToMSLConverter::convert`. The MoltenVK frame in that garbage was real and
