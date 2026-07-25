@@ -1,0 +1,31 @@
+[configuration]
+
+entry_symbol = "kartgame_library_init"
+
+; The oldest engine this binary will load into. Pinned to the minor version the
+; bindings were generated from — ARCHITECTURE.md §19 calls Godot version churn a
+; named risk, and a loose minimum here is how that risk turns into a silent
+; ABI mismatch instead of a refusal to load.
+compatibility_minimum = "4.7"
+
+; Hot-reload the extension when it is rebuilt while the editor is open.
+reloadable = true
+
+[libraries]
+
+; macOS entries carry no architecture: a universal build covers both, and a local
+; arm64-only build produces the same filename. See SConstruct.
+macos.editor = "res://bin/libkartgame.macos.editor.dylib"
+macos.template_release = "res://bin/libkartgame.macos.template_release.dylib"
+
+linux.editor.x86_64 = "res://bin/libkartgame.linux.editor.x86_64.so"
+linux.template_release.x86_64 = "res://bin/libkartgame.linux.template_release.x86_64.so"
+linux.editor.arm64 = "res://bin/libkartgame.linux.editor.arm64.so"
+linux.template_release.arm64 = "res://bin/libkartgame.linux.template_release.arm64.so"
+
+windows.editor.x86_64 = "res://bin/libkartgame.windows.editor.x86_64.dll"
+windows.template_release.x86_64 = "res://bin/libkartgame.windows.template_release.x86_64.dll"
+
+; template_debug is deliberately absent. Nothing exports a debug build yet, and
+; listing a target CI does not produce would make a missing file look like a bug.
+; It lands with the export pipeline in M10.

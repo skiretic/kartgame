@@ -2,6 +2,10 @@
 .godot/
 *.translation
 
+# .uid files are NOT ignored. Godot 4.4+ writes one per script and resource, and
+# they are what keeps references stable when a file is renamed or moved. Ignoring
+# them makes every clone regenerate different IDs and breaks scene references.
+
 # Generated content — reproducible from tools/, never committed
 assets/generated/
 
