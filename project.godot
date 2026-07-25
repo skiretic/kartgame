@@ -109,19 +109,5 @@ common/physics_ticks_per_second=120
 
 [rendering]
 
-; Both platform variants are named explicitly. The desktop key is the one that
-; matters — the mobile key was the only one set previously, which chose the
-; right renderer by accident, because forward_plus is already the desktop
-; default. Android and iOS are dropped (ADR-0008), so the mobile key is inert
-; either way; it is set to match so a future reader does not read the pair as a
-; deliberate split.
-renderer/rendering_method="forward_plus"
 renderer/rendering_method.mobile="forward_plus"
-
-; ARCHITECTURE.md §5 item 4: "physically-plausible light values, not eyeballed
-; brightness". This is the switch that makes that literal. Lights are then set
-; in lux and lumens, and cameras expose in f-stop, shutter speed and ISO, so a
-; scene is lit by describing the real conditions rather than by turning numbers
-; until it looks right. It is a project-wide setting because a mix of physical
-; and arbitrary light values is worse than either.
 lights_and_shadows/use_physical_light_units=true

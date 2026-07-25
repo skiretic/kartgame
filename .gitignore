@@ -47,3 +47,15 @@ __pycache__/
 
 # Look-dev stills — render output, reproducible from tools/shots/shoot.sh
 shots/
+
+# LightmapGI bake products are NOT ignored, despite being generated output.
+#
+# The §16 rule says generated content stays out of version control, and the
+# first attempt here followed it. That is wrong for a bake: the scene file
+# stores a hard ext_resource reference to its .lmbake, so ignoring the bake
+# leaves every fresh clone with a scene that cannot load. Reproducing one is
+# also not something a build can do -- it needs the GUI editor and GPU time
+# (ADR-0022).
+#
+# They are on LFS. Revisit the size question at M5, where a full track bake is
+# a different order of magnitude than this test scene's 412 KB.

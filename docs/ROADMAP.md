@@ -57,16 +57,22 @@ Deliberately before the vehicle. The look target is the largest open question in
 - [x] **Motion blur compositor effect prototyped** — the one genuinely uncertain piece of §4, surfaced now rather than at M10. Works; four limits recorded in [ADR-0019](DECISIONS.md#adr-0019--motion-blur-is-a-gather-along-godots-velocity-buffer-with-four-limits-stated), two of which become work at M7 and M10
 - [x] Still-capture harness — `tools/shots/shoot.sh` renders a scene to a PNG at fixed parameters. Look development needs the same frame under the same settings every time, or a comparison between two renders means nothing
 - [x] Test scene: flat plane at correct real-world scale, 1 m reference cube and a kart-sized box beside it
-- [ ] CC0 photoscan materials from Poly Haven / ambientCG at the fixed texel density
-- [ ] AgX tonemapping, physical sun angle, PhysicalSkyMaterial, HDRI environment
-- [ ] LightmapGI bake path end to end; SDFGI as the iteration fallback
-- [ ] Reflection probes, SSAO, SSIL, subtle volumetric fog
-- [ ] TAA, FSR2 configured
-- [ ] `ATTRIBUTION.md` populated as assets land
+- [x] CC0 photoscan materials from ambientCG at the fixed texel density — 4.00 m tile, derived from 512 px/m and a 2048 px scan rather than dialed in
+- [x] AgX tonemapping, physical sun angle, PhysicalSkyMaterial, HDRI environment. **Physical light units are on project-wide**, so the sun is set in lux and the camera in f-stop, shutter and ISO
+- [x] LightmapGI bake path end to end; SDFGI as the iteration fallback. The bake cannot be scripted at all — [ADR-0022](DECISIONS.md#adr-0022--lightmapgi-cannot-be-baked-from-a-script-the-bake-is-driven-through-the-editor)
+- [x] Reflection probes, SSAO, SSIL, subtle depth fog. Not *volumetric* fog — [ADR-0021](DECISIONS.md#adr-0021--two-of-architecturemd-4s-rendering-settings-named-the-wrong-feature)
+- [x] TAA, FSR2 configured. Alternatives rather than a stack, same ADR
+- [x] `ATTRIBUTION.md` populated as assets land
 
 **Accept:** a still of an empty asphalt plane under a physical sun reads as photographic. A test object at 80 km/h has motion blur that sells the speed. Scale verified against the reference cube.
 
-**Note on the sky.** §4 asks for `PhysicalSkyMaterial` with a real sun angle, and this milestone also asks for an HDRI environment. Those are alternatives, not a stack: a `Sky` resource holds one material, and it supplies both the visible dome and the ambient radiance. The decision is which one leads — an HDRI wins on fidelity for a fixed time of day, `PhysicalSkyMaterial` wins the moment time of day becomes a lever (§17, M10). Settled with a side-by-side still under issue #5.
+**Note on the sky — settled.** §4 asks for `PhysicalSkyMaterial` with a real sun angle, and this milestone also asks for an HDRI environment. Those are alternatives, not a stack: a `Sky` resource holds one material and it supplies both the visible dome and the ambient radiance.
+
+`PhysicalSkyMaterial` leads. Time of day stays a live parameter, which §17 and M10 both want, and the HDRI plates become look-dev reference and reflection content instead. That is also forced by measurement: the sun disc carries 71–76% of an HDRI's total illuminance, so a plate cannot be mixed with a physically-lit `DirectionalLight3D` without roughly doubling the key light. Either the plate drives everything or the disc is masked out and a real light replaces it — and the second is what §4 already chose.
+
+**Note on the asphalt — settled.** The chosen scan's measured albedo is 0.15, which renders near middle gray and reads paler than a racetrack should. It is kept: §5 item 3 puts real measured albedo above anything hand-authored, and a track surface is darkened by *use* — rubber off the racing line, marbles, dirt at the edges — which is §5 item 7 and arrives with the track in M5. Overriding the measured value now would trade a real number for a chosen one and then have to be undone.
+
+**Note on shutter angle — settled.** 180 degrees, the film convention. It stays exposed as a comfort slider under §18 regardless.
 
 Effort: M
 

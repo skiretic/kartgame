@@ -89,13 +89,13 @@ Forward+ renderer. Not Mobile, not Compatibility.
 | Setting | Choice | Reason |
 |---|---|---|
 | Tonemap | **AgX** | Handles highlight rolloff far better than Filmic or Reinhard. Single biggest one-line realism win. |
-| GI | **LightmapGI baked** for static track, reflection probes for local specular | A racetrack is static geometry under a fixed sun — the exact case baking was made for. Higher quality and cheaper than SDFGI. |
-| GI fallback | SDFGI during development | Bakes are slow; iterate with SDFGI and bake for review builds. |
+| GI | **LightmapGI baked** for static track, reflection probes for local specular | A racetrack is static geometry under a fixed sun — the exact case baking was made for. Higher quality and cheaper than SDFGI. The bake **cannot be scripted or run headlessly** — [ADR-0022](DECISIONS.md#adr-0022--lightmapgi-cannot-be-baked-from-a-script-the-bake-is-driven-through-the-editor) — so it is driven through the GUI editor and cannot be a CI step. |
+| GI fallback | SDFGI during development | Bakes are slow; iterate with SDFGI and bake for review builds. **SDFGI over-bounces relative to the bake** and its cascade cannot resolve thin geometry, so tuning under it and shipping baked shifts the look. Iterate with it, judge with a bake. ADR-0022. |
 | Shadows | Directional, 4 PSSM splits, tight split 0 | Split 0 tightness is set by cockpit self-shadowing (§7). |
-| AA | TAA, plus FSR2 upscaling on weaker targets | TAA also stabilizes thin kart frame tubes. |
+| AA | TAA **or** FSR2 upscaling on weaker targets | Alternatives, not a stack: FSR2 is itself a temporal resolve, so enabling both resolves the frame twice. ADR-0021. TAA also stabilizes thin kart frame tubes, and it cleans up the motion blur pass's tap pattern for free. |
 | SSAO + SSIL | On, subtle | SSIL adds contact bounce cheaply. |
 | SSR | On, tuned so only the track contributes | Weak in Godot, and **not maskable** — `Environment.ssr_enabled` is the only switch, with no per-material or per-instance opt-in. "Track surface only" is therefore a tuning outcome, not a setting: roughness and fade values chosen so a near-horizontal glossy surface is the only thing that returns a visible reflection. Probes do the real work. |
-| Volumetric fog | On, low density | Aerial perspective is a strong realism cue and nearly free. |
+| Fog | Depth fog on, low density | Aerial perspective is a strong realism cue and nearly free — but it is `fog_*` in depth mode, **not** volumetric fog, which is a 64 m froxel volume for light shafts and is neither. [ADR-0021](DECISIONS.md#adr-0021--two-of-architecturemd-4s-rendering-settings-named-the-wrong-feature). |
 | Sky | PhysicalSkyMaterial, real sun angle | Time of day is a lever, not a decoration. |
 | Motion blur | **Compositor effect, custom** | Godot has none built in. Required. Built and measured in M1 — [ADR-0019](DECISIONS.md#adr-0019--motion-blur-is-a-gather-along-godots-velocity-buffer-with-four-limits-stated) has the working version, its cost, and the four things it does not do. |
 | DOF | Cockpit only, very subtle | Overdone DOF reads as fake immediately. |
@@ -416,6 +416,7 @@ kartgame/
 |---|---|
 | C++ units | doctest or Catch2 over `src/core/` — genuinely engine-independent, because nothing in `src/core/` includes godot-cpp ([ADR-0017](DECISIONS.md#adr-0017--srccore-is-compiled-without-godot-cpp)). Vehicle math, tire curves, and the spline solver live there for exactly this reason. |
 | C++ integration | `tools/verify/verify_extension.gd` headless — asserts the things unit tests cannot see: that the extension loads, that its API version matches the engine, that float precision agrees across the boundary |
+| Lightmap preflight | `tools/bake/preflight.gd` headless — a bake reports "no meshes" for four unrelated causes, so this names the offending node instead. The bake itself cannot be a CI step (ADR-0022); its preconditions can be. |
 | Determinism | Replay re-sim state-hash comparison (§8). The most valuable test in the project. |
 | Physics regression | Fixed input scripts producing recorded lap times; fail the build if a tuning change shifts them unexpectedly |
 | Visual | Golden-image comparison on a fixed camera and fixed time of day |

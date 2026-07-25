@@ -1,0 +1,13 @@
+[gd_scene format=3 uid="uid://ccwyictwf38p4"]
+
+[ext_resource type="Script" uid="uid://ytte3ki07lci" path="res://scripts/look/bake_test.gd" id="1_baketest"]
+[ext_resource type="LightmapGIData" uid="uid://c66tu0qve1c73" path="res://scenes/look/bake_test.lmbake" id="2_7epjm"]
+
+[node name="BakeTest" type="Node3D" unique_id=800765715]
+script = ExtResource("1_baketest")
+
+[node name="LightmapGI" type="LightmapGI" parent="." unique_id=1570336161]
+quality = 3
+texel_scale = 2.0
+max_texture_size = 4096
+light_data = ExtResource("2_7epjm")

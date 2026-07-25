@@ -562,3 +562,116 @@ which is the hardest case for an upscaler and the fairest one to judge it on.
 FSR2 was not measurably faster here, because a flat plane and a dozen boxes are
 not pixel-bound on an M1 Pro. That number only becomes meaningful on the target
 it exists for, which is the M10 Steam Deck pass.
+
+---
+
+## ADR-0022 — `LightmapGI` cannot be baked from a script; the bake is driven through the editor
+
+**Status:** Accepted, as a workaround for a missing API. Qualifies `ARCHITECTURE.md`
+§4's "LightmapGI baked" and §14's CI plan.
+
+**Context.** §4 chooses baked lightmaps because a racetrack is static geometry under a
+fixed sun, which is the exact case baking was made for. The plan assumed the bake could
+be automated the way every other tool in this project is.
+
+**It cannot.** `LightmapGI.bake()` is not in the scripting API at all in Godot 4.7:
+
+| Checked | Result |
+|---|---|
+| `ClassDB.class_get_method_list("LightmapGI")` at runtime | 44 methods, every one a property accessor. No `bake`. |
+| godot-cpp's bundled `extension_api.json` for 4.7 | Same. So it is absent from GDScript, `@tool` scripts, `EditorScript` **and** GDExtension. |
+| `godot --help` standalone tools | `--script`, `--import`, `--export-*`, `--doctool`, `--dump-*`, `--benchmark`. No bake. |
+| Engine source at `4.7-stable` | `editor/scene/3d/lightmap_gi_editor_plugin.cpp` calls `lightmap->bake(...)`; `LightmapGI::_bind_methods` never registers it. |
+| Upstream | [godot-proposals#8656](https://github.com/godotengine/godot-proposals/issues/8656) asks for it, still open. |
+
+Headless is doubly impossible regardless: `LightmapperRD` needs a rendering device and
+`--headless` has none.
+
+**Decision.** `tools/bake/bake.sh` launches the **GUI editor** and drives the bake
+plugin from `tools/bake/editor_bake.gd`: select the `LightmapGI` node — which is what
+makes the plugin's `edit()` learn what to bake, and skipping it makes the bake a silent
+no-op — locate the toolbar button structurally as the only control owning an
+`EditorFileDialog` filtering `*.lmbake`, and emit that dialog's `file_selected`. That is
+exactly what a click does, minus the file browser. Finding the button by structure
+rather than by its English label is deliberate.
+
+This is editor internals, not an API, and it is labelled as such in the file. The manual
+click sequence is in `bake.sh`'s header as the fallback for when it breaks.
+
+**Four things UV2 actually requires**, only the first of which is obvious:
+
+1. `PrimitiveMesh.add_uv2 = true`. A `BoxMesh` has **zero** UV2 vertices without it.
+   It also sets `lightmap_size_hint` at a fixed 5 texels/m.
+2. `gi_mode = GI_MODE_STATIC`.
+3. The scene script must be `@tool`. The bake reads the tree *in the editor*, so a
+   scene that builds itself in `_ready()` at runtime has nothing to bake.
+4. **`owner` must be non-null.** `LightmapGI::_find_meshes_and_lights` skips any node
+   with no owner as "maybe a helper". Everything a `@tool` script builds is unowned, so
+   the bake walks past provably correct geometry and reports `BAKE_ERROR_NO_MESHES` —
+   *the same error as having no UV2 at all*. This cost three failed bakes before it was
+   found.
+
+**The trap worth its own paragraph.** Setting `LightmapGI.camera_attributes` to the
+scene's `CameraAttributesPhysical` — the obvious reading of a property documented as
+specifying exposure to bake at — renders **every lightmapped surface pure white**. It
+does not set the bake's exposure; it writes `baked_exposure` into the `.lmbake`, and the
+renderer then scales the lightmap by `camera_exposure / baked_exposure`. Measured
+`baked_exposure = 3.2552e-05`, exactly the normalization for f/16, 1/100 s, ISO 100 —
+which is also what the camera applies, so the ratio is one and unscaled physical
+radiance reaches the tonemapper. Leave it null.
+
+**SDFGI over-bounces relative to the bake**, which matters because §4 makes SDFGI the
+iteration fallback. On the same scene: SDFGI puts a strong, uniform mauve over an entire
+wall with no falloff, because its 0.2 m cascade cannot resolve a 0.3 m wall. The bake
+puts a red band on the soffit nearest the red wall and a gradient across the back wall —
+weaker, and spatially correct. **Tuning under SDFGI and shipping baked will shift the
+look.** Iterate with it, judge with a bake.
+
+**Bake cost**, on a 7-mesh test scene resolving to one 512x512 slice:
+
+| Quality | Time |
+|---|---|
+| Low | 0.7 s |
+| Medium | 1.2 s |
+| High | 3.1 s |
+| Ultra | 11.0 s |
+
+Ultra is the first level free of the denoiser's low-frequency mottle, so it is the
+default. The first-ever bake took 20.9 s including SPIR-V to MSL compilation.
+
+**What bites at M5, recorded now because a flat test scene hides all of it:**
+
+- **A 1,000–1,500 m track cannot be one mesh.** At the fixed 5 texel/m hint a
+  12 x 1500 m surface asks for 7,502 px on its long axis, and `texel_scale = 2.0`
+  doubles that past the 4,096 default and near the 16,384 ceiling. `gentrack.py` has to
+  segment the surface. `tools/bake/preflight.gd` errors on exactly this.
+- **`lightmap_size_hint == 0` silently bakes at 64x64** regardless of mesh size. An
+  imported glTF track with no hint bakes at one texel per ~20 m and looks like a
+  lighting bug rather than a configuration error.
+- **The Metal driver already complains at 11 s** — `ERROR: timeout waiting for fence`
+  at ultra but not at high. The bake completes and is correct, but a multi-minute track
+  bake risks a driver reset. Same family as ADR-0018.
+- **The bake cannot be a CI step**, needing both a GUI editor and a GPU. `preflight.gd`
+  can be and should be: it catches every cause of a failed bake headlessly and names the
+  offending node.
+- **Ambient double-counts.** With a lightmap present, `Environment` sky ambient has to
+  be turned off or the sky is counted twice. Exactly the reflection probe bug in
+  ADR-0021, in a second place.
+- **A still stops being fully described by its command.** `shoot.sh --gi=baked` depends
+  on a bake that happened earlier under its own parameters. That is this project's
+  reproducibility rule quietly breaking, and it needs an answer before M5 — most likely
+  recording the bake parameters into the still's caption the way camera parameters
+  already are.
+
+**Bake products are committed, on LFS**, and `*.lmbake` is added to `.gitattributes`
+for it. §16 says generated output stays out of version control and the first attempt
+here followed that, which was wrong: a scene stores a hard `ext_resource` reference to
+its `.lmbake`, so ignoring the bake leaves every fresh clone with a scene that cannot
+load. Reproducing one is also not something a build can do — it needs the GUI editor and
+GPU time, per this ADR — so the §16 rule's premise, that generated output is cheaply
+regenerable, does not hold for bakes.
+
+The size question is deferred rather than answered: this test scene's products are
+412 KB, and a full track bake at M5 is a different order of magnitude. If it becomes a
+problem the answer is smaller lightmaps or a release-time bake step, not an ignored
+reference the repository is silently broken without.
