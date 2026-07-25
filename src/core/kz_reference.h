@@ -19,7 +19,18 @@
 
 namespace kart::core::kz {
 
-// CIK-FIA KZ class minimum mass, kart plus driver, in kilograms.
+// CIK-FIA minimum mass, kart plus driver, in kilograms.
+//
+// **This is KZ2's figure, not KZ's.** The two classes differ here: KZ runs to
+// 170 kg and KZ2 to 175 kg, driver included. Everything else in this file, and
+// everything in ARCHITECTURE.md §6.3, describes a machine common to both — the
+// same 125 cc six-speed engine, the same tires — and the classes are separated
+// mainly by chassis and brake homologation, which this project does not model.
+//
+// 175 kg is kept, and the label corrected, because KZ2 is the class almost
+// anyone racing a shifter kart is actually in: KZ proper is the international
+// top tier. The 5 kg is not a rounding difference either — it is 2.9% of the
+// vehicle, worth about 0.1 s over a 0-100 km/h run.
 inline constexpr double MASS_WITH_DRIVER_KG = 175.0;
 
 // Top speed is gearing dependent; this is the range a circuit-geared kart reaches.
