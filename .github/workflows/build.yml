@@ -4,13 +4,18 @@ name: build
 # ARCHITECTURE.md names macOS, Windows and Linux/Steam Deck as targets; a
 # cross-platform break found at M10 is a rewrite, and found at M0 it is a typo.
 
+# Manual only. Runs when asked for, not on every push:
+#
+#     gh workflow run build
+#     gh run watch
+#
+# Six jobs across three runner types is not worth spending on every commit while
+# the project is one developer and a handful of C++ files. Revisit when there are
+# contributors whose pushes need gating, or at M10 when release artifacts matter.
 on:
-  push:
-    branches: [main]
-  pull_request:
   workflow_dispatch:
 
-# A new push to the same branch makes the previous run's answer irrelevant.
+# A newer manual run makes the previous one's answer irrelevant.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -20,13 +25,20 @@ env:
 
 jobs:
   build:
-    name: ${{ matrix.name }} (${{ matrix.target }})
-    runs-on: ${{ matrix.runner }}
+    name: ${{ matrix.host.name }} (${{ matrix.target }})
+    runs-on: ${{ matrix.host.runner }}
     strategy:
       # One platform failing should not hide whether the others are also broken.
       fail-fast: false
       matrix:
-        include:
+        target: [editor, template_release]
+        # Two real dimensions, host x target, giving six jobs.
+        #
+        # Not `include:`. With a single `target` dimension, GitHub *merges* each
+        # include entry into the existing combinations rather than adding new
+        # ones, so three platform entries collapse into two jobs and the last
+        # entry silently wins. That produced a green, Windows-only CI run.
+        host:
           # macOS builds universal so one artifact serves both Apple Silicon and
           # Intel. Clang does this in a single invocation, so it costs compile
           # time but no extra job.
@@ -45,7 +57,6 @@ jobs:
             platform: windows
             arch: x86_64
             lib: libkartgame.windows
-        target: [editor, template_release]
 
     steps:
       - name: Checkout
@@ -78,15 +89,15 @@ jobs:
         uses: actions/cache@v4
         with:
           path: .scons-cache
-          key: scons-${{ matrix.name }}-${{ matrix.arch }}-${{ matrix.target }}-${{ steps.pin.outputs.sha }}-${{ hashFiles('src/**') }}
+          key: scons-${{ matrix.host.name }}-${{ matrix.host.arch }}-${{ matrix.target }}-${{ steps.pin.outputs.sha }}-${{ hashFiles('src/**') }}
           restore-keys: |
-            scons-${{ matrix.name }}-${{ matrix.arch }}-${{ matrix.target }}-${{ steps.pin.outputs.sha }}-
-            scons-${{ matrix.name }}-${{ matrix.arch }}-${{ matrix.target }}-
+            scons-${{ matrix.host.name }}-${{ matrix.host.arch }}-${{ matrix.target }}-${{ steps.pin.outputs.sha }}-
+            scons-${{ matrix.host.name }}-${{ matrix.host.arch }}-${{ matrix.target }}-
 
       - name: Build
         env:
           SCONS_CACHE: ${{ github.workspace }}/.scons-cache
-        run: scons platform=${{ matrix.platform }} target=${{ matrix.target }} arch=${{ matrix.arch }} -j4
+        run: scons platform=${{ matrix.host.platform }} target=${{ matrix.target }} arch=${{ matrix.host.arch }} -j4
 
       # Catches the class of failure where the build succeeds but produces a file
       # under a name kartgame.gdextension does not reference, which the engine
@@ -95,10 +106,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          case "${{ matrix.platform }}" in
-            macos)   expected="bin/${{ matrix.lib }}.${{ matrix.target }}.dylib" ;;
-            linux)   expected="bin/${{ matrix.lib }}.${{ matrix.target }}.${{ matrix.arch }}.so" ;;
-            windows) expected="bin/${{ matrix.lib }}.${{ matrix.target }}.${{ matrix.arch }}.dll" ;;
+          case "${{ matrix.host.platform }}" in
+            macos)   expected="bin/${{ matrix.host.lib }}.${{ matrix.target }}.dylib" ;;
+            linux)   expected="bin/${{ matrix.host.lib }}.${{ matrix.target }}.${{ matrix.host.arch }}.so" ;;
+            windows) expected="bin/${{ matrix.host.lib }}.${{ matrix.target }}.${{ matrix.host.arch }}.dll" ;;
           esac
           if [ ! -f "$expected" ]; then
             echo "Expected $expected, found:"
@@ -110,7 +121,7 @@ jobs:
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
-          name: kartgame-${{ matrix.name }}-${{ matrix.target }}
+          name: kartgame-${{ matrix.host.name }}-${{ matrix.target }}
           path: bin/
           if-no-files-found: error
           retention-days: 14
