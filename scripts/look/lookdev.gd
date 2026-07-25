@@ -60,15 +60,8 @@ const POST_RANGE := 300.0
 const POST_SPACING := 5.0
 const ROAD_HALF_WIDTH := 3.2
 
-## ARCHITECTURE.md §5 item 2 fixes the track surface at 512 px/m. The photoscans
-## are 2048 px square, so one tile has to cover 2048 / 512 = 4.00 m exactly.
-## Holding this everywhere is the point — mismatched texel density is named there
-## as the most common tell in amateur work, and it is only avoidable if the
-## number is derived rather than dialed in.
-const TRACK_TEXEL_DENSITY := 512.0
-const PHOTOSCAN_RESOLUTION := 2048.0
-const ASPHALT_DIRECTORY := "res://assets/materials/asphalt_track/"
-const ASPHALT_PREFIX := "Asphalt020L_2K-JPG_"
+## The ground materials and the texel density they are derived from live in
+## LookEnv, shared with the M2 kart turntable. See scripts/look/look_env.gd.
 
 var speed_ms := 0.0
 var yaw_rate_degrees := 0.0
@@ -117,80 +110,19 @@ func _process(_delta: float) -> void:
 # --- construction ----------------------------------------------------------
 
 
+## The environment now comes from `LookEnv`, shared with every other look scene.
+##
+## It was inline here through M1, which is how three ambient double-counting bugs
+## got three separate chances to happen. A second scene needing the same lighting
+## (the M2 kart turntable) would have been a fourth. `scripts/look/look_env.gd`
+## holds the values and the reasoning; this scene keeps only what is specific to
+## an asphalt plane with a camera driving down it.
+##
+## Verified pixel-neutral: the still this produces is byte-identical to the one
+## taken immediately before the extraction.
 func _build_environment(args: Dictionary) -> void:
-	var sky_material := PhysicalSkyMaterial.new()
-	sky_material.sun_disk_scale = 1.0
-
-	var sky := Sky.new()
-	sky.sky_material = sky_material
-
-	var environment := Environment.new()
-	environment.background_mode = Environment.BG_SKY
-	environment.sky = sky
-	# ARCHITECTURE.md §4: AgX. The single biggest one-line realism win, because
-	# it rolls highlights off instead of clipping them to white.
-	environment.tonemap_mode = Environment.TONE_MAPPER_AGX
-	environment.tonemap_exposure = 1.0
-	environment.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
-	environment.ambient_light_sky_contribution = 1.0
-
-	# Each of the following is switchable, because the point of this scene is to
-	# be able to attribute what a still shows to one change at a time.
-
-	if Cmdline.as_bool(args, "ssao", true):
-		environment.ssao_enabled = true
-		# Half a meter. Screen-space AO is a contact term — it is what makes a
-		# post sit on the ground instead of hovering over it — and a radius much
-		# larger than the contact it is describing turns into a dirty smudge
-		# around every object.
-		environment.ssao_radius = 0.5
-		environment.ssao_intensity = 1.5
-		environment.ssao_power = 1.5
-		environment.ssao_detail = 0.5
-		# Baked GI already carries the large-scale occlusion (issue #6), so AO is
-		# held to the close range where a lightmap has no texels to spare.
-		environment.ssao_light_affect = 0.2
-		environment.ssao_ao_channel_affect = 0.0
-
-	if Cmdline.as_bool(args, "ssil", true):
-		environment.ssil_enabled = true
-		# Bounce reaches further than contact occlusion does, so this radius is
-		# deliberately several times the SSAO one.
-		environment.ssil_radius = 3.0
-		environment.ssil_intensity = 1.0
-		environment.ssil_normal_rejection = 1.0
-
-	if Cmdline.as_bool(args, "fog", true):
-		# Depth fog, not volumetric. See the note in _build_environment's caller
-		# and ADR-0021: these are different features solving different problems,
-		# and aerial perspective over a kilometer is this one.
-		environment.fog_enabled = true
-		environment.fog_mode = Environment.FOG_MODE_DEPTH
-		environment.fog_depth_begin = Cmdline.as_float(args, "fog_begin", 20.0)
-		environment.fog_depth_end = Cmdline.as_float(args, "fog_end", 800.0)
-		environment.fog_depth_curve = Cmdline.as_float(args, "fog_curve", 1.0)
-		environment.fog_density = Cmdline.as_float(args, "fog_density", 1.0)
-		environment.fog_light_color = Color(
-			Cmdline.as_float(args, "fog_r", 0.68),
-			Cmdline.as_float(args, "fog_g", 0.76),
-			Cmdline.as_float(args, "fog_b", 0.88))
-		# Physical light units mean fog luminance has to be on the same scale as
-		# everything else. A default energy of 1.0 against a sunlit surface at a
-		# few thousand cd/m2 is effectively black, which is why fog tuned by eye
-		# in arbitrary units darkens the distance instead of lightening it.
-		# Inert while fog_aerial_perspective is 1.0: in that mode the fog takes its
-		# color from the sky per view direction and ignores fog_light_color and
-		# fog_light_energy entirely. Verified by sweeping energy across 1, 300 and
-		# 900 and getting byte-identical renders. Kept switchable because dropping
-		# aerial perspective to 0 hands control back to these, and that is the
-		# lever for weather that is not just haze.
-		environment.fog_light_energy = Cmdline.as_float(args, "fog_energy", 1.0)
-		environment.fog_sun_scatter = 0.2
-		environment.fog_aerial_perspective = Cmdline.as_float(args, "fog_aerial", 1.0)
-		environment.fog_sky_affect = Cmdline.as_float(args, "fog_sky", 0.0)
-
 	var world_environment := WorldEnvironment.new()
-	world_environment.environment = environment
+	world_environment.environment = LookEnv.environment(args)
 	world_environment.compositor = _build_compositor(args)
 	add_child(world_environment)
 
@@ -211,32 +143,7 @@ func _build_compositor(args: Dictionary) -> Compositor:
 
 
 func _build_sun(args: Dictionary) -> void:
-	var sun := DirectionalLight3D.new()
-	# Physical light units are on project-wide, so this is illuminance in lux and
-	# not an arbitrary energy. A clear midday sun is around 100,000 lx; heavy
-	# overcast is nearer 10,000. Those are the numbers to reach for when time of
-	# day and weather arrive in M10, rather than a multiplier someone tuned.
-	sun.light_intensity_lux = Cmdline.as_float(args, "sun_lux", 100000.0)
-	# ~5,500 K is direct midday sunlight. The sky supplies the cool fill.
-	sun.light_temperature = 5500.0
-	# Real sun subtends about half a degree, which is what makes a shadow edge
-	# soften with distance from its caster instead of staying razor sharp.
-	sun.light_angular_distance = 0.53
-	sun.shadow_enabled = true
-	# ARCHITECTURE.md §4 asks for four splits with split 0 tight, because the
-	# cockpit camera sits ~0.6 m off the ground and self-shadowing there is what
-	# sets the tightness. The cockpit does not exist until M4; the intent is
-	# recorded here so the value is a decision rather than a default.
-	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS
-	sun.directional_shadow_split_1 = 0.03
-	sun.directional_shadow_split_2 = 0.12
-	sun.directional_shadow_split_3 = 0.4
-	sun.directional_shadow_max_distance = 200.0
-
-	var elevation := Cmdline.as_float(args, "sun_elevation", 50.0)
-	var azimuth := Cmdline.as_float(args, "sun_azimuth", -35.0)
-	sun.rotation_degrees = Vector3(-elevation, azimuth, 0.0)
-	add_child(sun)
+	add_child(LookEnv.sun(args))
 
 
 func _build_ground(args: Dictionary) -> void:
@@ -250,77 +157,11 @@ func _build_ground(args: Dictionary) -> void:
 	var ground := MeshInstance3D.new()
 	ground.mesh = plane
 	if Cmdline.as_string(args, "ground", "asphalt") == "checker":
-		ground.material_override = _checker_material()
+		ground.material_override = LookEnv.checker_material(GROUND_SIZE)
 	else:
-		ground.material_override = _asphalt_material()
+		ground.material_override = LookEnv.asphalt_material(GROUND_SIZE)
 	ground.name = "Ground"
 	add_child(ground)
-
-
-## The CC0 asphalt photoscan, tiled at exactly the §5 texel density.
-##
-## Every map is loaded from the same prefix so a swap to a different scan is one
-## constant, and the tiling rate is computed from the density standard rather
-## than typed in — the whole value of a density standard is that it is not a
-## number someone chose per surface.
-func _asphalt_material() -> StandardMaterial3D:
-	var tile_meters := PHOTOSCAN_RESOLUTION / TRACK_TEXEL_DENSITY  # 4.00 m
-	var material := StandardMaterial3D.new()
-
-	material.albedo_texture = load(ASPHALT_DIRECTORY + ASPHALT_PREFIX + "Color.jpg")
-
-	material.normal_enabled = true
-	# ambientCG ships NormalGL and NormalDX; only the GL files were extracted,
-	# because Godot expects +Y up and a DX twin sitting alongside is a mistake
-	# waiting to be made. See ATTRIBUTION.md.
-	material.normal_texture = load(ASPHALT_DIRECTORY + ASPHALT_PREFIX + "NormalGL.jpg")
-
-	material.roughness_texture = load(ASPHALT_DIRECTORY + ASPHALT_PREFIX + "Roughness.jpg")
-	material.roughness_texture_channel = BaseMaterial3D.TEXTURE_CHANNEL_RED
-	material.roughness = 1.0
-
-	material.ao_enabled = true
-	material.ao_texture = load(ASPHALT_DIRECTORY + ASPHALT_PREFIX + "AmbientOcclusion.jpg")
-	material.ao_texture_channel = BaseMaterial3D.TEXTURE_CHANNEL_RED
-	# Baked GI supplies real occlusion at M1 issue #6. The map is a close-range
-	# supplement, so it is dialed back rather than doubling up with the bake.
-	material.ao_light_affect = 0.4
-
-	material.metallic = 0.0
-	material.uv1_scale = Vector3(GROUND_SIZE / tile_meters, GROUND_SIZE / tile_meters, 1.0)
-	return material
-
-
-## A 1 m checkerboard with fine grain on top.
-##
-## Kept after the photoscans landed, because the two answer different questions.
-## The scan answers "does this read as asphalt"; the checker answers "is this the
-## right size", and it answers it by being countable — one square is exactly one
-## meter, so the reference geometry can be measured against the floor instead of
-## judged against it.
-func _checker_material() -> StandardMaterial3D:
-	const TEXTURE_SIZE := 256
-	const CELLS := 2
-
-	var image := Image.create(TEXTURE_SIZE, TEXTURE_SIZE, false, Image.FORMAT_RGB8)
-	var cell_pixels := TEXTURE_SIZE / CELLS
-	var noise := RandomNumberGenerator.new()
-	noise.seed = 0x6b617274  # "kart" — fixed, so the texture is the same every run
-	for y in TEXTURE_SIZE:
-		for x in TEXTURE_SIZE:
-			var dark := ((x / cell_pixels) + (y / cell_pixels)) % 2 == 0
-			var base := 0.16 if dark else 0.26
-			var grain := noise.randf_range(-0.025, 0.025)
-			var value := clampf(base + grain, 0.0, 1.0)
-			image.set_pixel(x, y, Color(value, value, value))
-
-	var material := StandardMaterial3D.new()
-	material.albedo_texture = ImageTexture.create_from_image(image)
-	material.roughness = 0.55
-	material.metallic = 0.0
-	# CELLS cells per texture repeat, one meter per cell.
-	material.uv1_scale = Vector3(GROUND_SIZE / CELLS, GROUND_SIZE / CELLS, 1.0)
-	return material
 
 
 ## A 1 m cube and a kart-sized box, both sitting on the ground.
@@ -387,42 +228,13 @@ func _build_crossing_box() -> void:
 	_crossing_box = box
 
 
-## Local specular, which is the half of reflection Godot does well.
-##
-## ARCHITECTURE.md §4 gives probes the real reflection work and leaves SSR as a
-## supplement, because Godot's SSR can only reflect what is already on screen —
-## and a camera 0.6 m off the ground sees almost nothing of the world it would
-## need to reflect. A probe has no such limit.
-##
-## UPDATE_ONCE is the right mode for a fixed sun over static geometry: it is
-## captured on the first frame and then costs nothing. UPDATE_ALWAYS exists for
-## moving content and is not what a racetrack is.
+## Local specular, sized for a road scene. The probe's own reasoning — including
+## why its ambient is disabled — is in `LookEnv.reflection_probe`.
 func _build_reflection_probe(args: Dictionary) -> void:
 	if not Cmdline.as_bool(args, "probe", true):
 		return
-
-	var probe := ReflectionProbe.new()
-	probe.update_mode = ReflectionProbe.UPDATE_ONCE
-	probe.size = Vector3(80.0, 20.0, 120.0)
-	# Origin at ground level would put half the box underground and waste the
-	# capture on the inside of the plane.
-	probe.origin_offset = Vector3(0.0, 0.0, 0.0)
-	probe.position = Vector3(0.0, 8.0, 0.0)
-	probe.max_distance = 400.0
-	# Let the probe blend with the sky-derived ambient rather than replacing it;
-	# a probe that fully overrides ambient makes everything inside its box read
-	# as a different scene from everything outside.
-	probe.interior = false
-	probe.intensity = 1.0
-	# The probe supplies specular only. Its default, AMBIENT_ENVIRONMENT, adds
-	# its own ambient term on top of the environment's — and with the sky already
-	# contributing fully, that is the same light counted twice. Measured: it
-	# lifted the sunlit asphalt from 0.32 to 0.60 sRGB, which is a stop and a
-	# half of free light arriving from nowhere and is exactly the kind of error
-	# physical units exist to make visible.
-	probe.ambient_mode = ReflectionProbe.AMBIENT_DISABLED
-	probe.name = "ReflectionProbe"
-	add_child(probe)
+	add_child(LookEnv.reflection_probe(
+		Vector3(80.0, 20.0, 120.0), Vector3(0.0, 8.0, 0.0), 400.0))
 
 
 func _build_camera(args: Dictionary) -> void:
@@ -469,23 +281,9 @@ func _build_camera(args: Dictionary) -> void:
 			viewport.use_taa = Cmdline.as_bool(args, "taa", true)
 
 
-## Exposure as a real camera states it: f-stop, shutter speed, ISO.
-##
-## The defaults are the sunny 16 rule — f/16 at 1/ISO seconds gives a correct
-## exposure in direct sun — which is the whole reason to work in physical units.
-## The scene is lit by describing the conditions, and the picture comes out at
-## the right brightness because the arithmetic is real, not because anyone
-## adjusted it.
-##
-## Auto-exposure is deliberately off. A still that adapts to its own content
-## cannot be compared with the still taken before it.
+## Exposure in f-stop, shutter and ISO. See `LookEnv.camera_attributes`.
 func _camera_attributes(args: Dictionary) -> CameraAttributesPhysical:
-	var attributes := CameraAttributesPhysical.new()
-	attributes.exposure_aperture = Cmdline.as_float(args, "aperture", 16.0)
-	attributes.exposure_shutter_speed = Cmdline.as_float(args, "shutter_speed", 100.0)
-	attributes.exposure_sensitivity = Cmdline.as_float(args, "iso", 100.0)
-	attributes.auto_exposure_enabled = false
-	return attributes
+	return LookEnv.camera_attributes(args)
 
 
 func _build_caption(args: Dictionary) -> void:
@@ -514,13 +312,7 @@ func _build_caption(args: Dictionary) -> void:
 			Cmdline.as_float(args, "fov", 70.0),
 			Cmdline.as_string(args, "ground", "asphalt"),
 		],
-		"sun %.0f lx at %.0f deg   f/%.0f  1/%.0f s  ISO %.0f" % [
-			Cmdline.as_float(args, "sun_lux", 100000.0),
-			Cmdline.as_float(args, "sun_elevation", 50.0),
-			Cmdline.as_float(args, "aperture", 16.0),
-			Cmdline.as_float(args, "shutter_speed", 100.0),
-			Cmdline.as_float(args, "iso", 100.0),
-		],
+		LookEnv.exposure_caption(args),
 	])
 	layer.add_child(_caption)
 

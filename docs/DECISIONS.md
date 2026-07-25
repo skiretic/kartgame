@@ -692,3 +692,229 @@ The size question is deferred rather than answered: this test scene's products a
 412 KB, and a full track bake at M5 is a different order of magnitude. If it becomes a
 problem the answer is smaller lightmaps or a release-time bake step, not an ignored
 reference the repository is silently broken without.
+
+---
+
+The entries below date from the M2 Blender-pipeline session on **2026-07-25**. Four of
+the five correct something `ROADMAP.md` M2 or an M2 issue had assumed rather than
+checked against the engine.
+
+---
+
+## ADR-0023 — Godot stills are not reliably bit-identical, so image checks need a tolerance
+
+**Status:** Accepted. Corrects `ARCHITECTURE.md` §14's golden-image plan, issue #22's
+acceptance criteria, and the *method* used in [ADR-0021](#adr-0021--two-of-architecturemd-4s-rendering-settings-named-the-wrong-feature).
+
+**Context.** M2's gate requires that re-running the generator with identical parameters
+produces an identical mesh. Issue #22 extends that to the turntable: "two runs with
+identical parameters produce identical images, which makes it a regression check as well
+as a review aid." That is a good idea and it turns out not to be available.
+
+**Measured.** The same `shoot.sh` command on the unchanged M1 look-dev scene, repeated:
+
+| Configuration | Runs | Distinct images |
+|---|---|---|
+| 1920x1080-class, settle 32 | 6 | 2 |
+| 1920x1080-class, settle 128 | 6 | **4** |
+| 640x640, every effect on | 6 | 1 |
+| 640x640, temporal effects off | 6 | 1 |
+
+Where two runs differ, they differ on about **half the frame** by a mean of 2/255 and a
+maximum of 18/255. No input changes between runs.
+
+Two things in that table are worth more than the headline. **More settle frames made it
+worse**, which says the divergence accumulates rather than converging — so it is a
+temporal-accumulation effect, not a first-frame race. And it did not reproduce at all at
+640x640 across eighteen runs in three configurations, so it is intermittent and appears
+to be sensitive to resolution and machine load. Root cause is not diagnosed; it is
+recorded as an observation rather than explained, and issue #102 carries the
+investigation.
+
+**Decision.**
+
+1. **The mesh determinism gate is a byte hash, and it holds.** `genkart.sh --check`
+   generates twice and compares SHA-256. This is the M2 acceptance criterion and it is
+   exact — the glTF *and* the Cycles normal bake are byte-identical between runs.
+2. **Image comparison uses a tolerance, never a hash.** `tools/shots/compare.gd` reports
+   the changed-pixel count, the maximum channel delta and the mean delta, and passes below
+   stated thresholds. A hash-based golden-image test would fail roughly one run in six for
+   no reason, and a flaky gate gets disabled rather than fixed. It is written in GDScript
+   rather than Python so it adds no dependency the project does not already have.
+
+   **The statistic that works is magnitude, not area** — which was not the first guess.
+   Measured across three pairs:
+
+   | Pair | Changed | Max delta | Mean over changed |
+   |---|---|---|---|
+   | Same command twice, identical case | 0% | 0 | — |
+   | Same command twice, drift case | 49.7% | 15 | 2.73 |
+   | Asphalt ground vs checker ground | 51.9% | 255 | 9.82 |
+
+   The drift and a deliberate whole-ground material swap touch the same *fraction* of the
+   frame, about half of it, so no fraction threshold can separate them. Magnitude
+   separates them cleanly. Hence thresholds of max delta 24 and mean 4.0, with the
+   fraction limit off by default.
+
+   **Stated because it is a real limit:** a change smaller than the noise floor is not
+   detectable this way. A light 1% brighter looks exactly like a repeat of the same
+   command. That is the concrete cost of not knowing the root cause, and the reason
+   issue #102 is worth doing rather than living with.
+3. **The turntable turns the temporal effects off by default.** Judging silhouette and
+   scale is not a question about temporal resolve, and it removes most of the variance.
+
+**The uncomfortable part, stated rather than buried.** ADR-0021 concluded that
+`fog_light_energy` is inert while `fog_aerial_perspective` is 1.0, and its evidence was
+"verified by sweeping energy across 1, 300 and 900 and getting byte-identical renders."
+Byte-identical renders were not a safe signal to draw that from — about five runs in six
+are byte-identical whether anything changed or not. The conclusion is still believed
+correct, and it is independently supported by what the feature does, but the method that
+established it was unsound and would not have detected a small real difference. Every
+future look-dev A/B in this project goes through the tolerance comparison, which reports
+a number, instead of through `cmp`, which reports a boolean that is right most of the
+time.
+
+---
+
+## ADR-0024 — The kart is unwrapped at the track's texel density, not a prop's
+
+**Status:** Accepted. Resolves an ambiguity in `ARCHITECTURE.md` §5 item 2.
+
+**Context.** §5 item 2 fixes texel density at "512 px/m for track surface, 256 px/m for
+props" and says to hold it everywhere, because mismatched density is the most common tell
+in amateur work. Issue #18 says to unwrap the kart "at the texel density standard fixed
+in M1". M1 fixed 512 px/m — for the track. A kart is neither a track surface nor a prop,
+and the standard as written does not say which it is.
+
+**Decision.** The kart is unwrapped at **512 px/m**, the track figure.
+
+**Reasoning.** The density standard exists to serve the camera, and the cockpit camera
+sits closer to the kart than to anything else in the game — ARCHITECTURE.md §7 puts its
+near plane at 0.02–0.05 m and gives the interior its own LOD precisely because the player
+looks at it from centimeters away. A prop at 256 px/m is something seen at trackside
+distance. Applying the prop figure to the object the player is sitting inside would put
+the lowest density in the game on the most closely examined surface, which inverts the
+intent.
+
+**Cost, checked rather than assumed.** The kart's total surface area is roughly 10 m². At
+512 px/m that is about 2.6 Mpx of texture, which fits inside a single 2048² atlas
+(4.2 Mpx) with room to spare. So the higher density is affordable and the decision costs
+nothing but the choice.
+
+**Consequence.** `params.texel_density` is 512.0 and the unwrap derives island scale from
+it. A future prop pass gets its own 256 px/m and the two must not be averaged into one
+compromise number, which is the failure mode §5 is warning about.
+
+---
+
+## ADR-0025 — The kart carries no lightmap UV2, because a kart moves
+
+**Status:** Accepted. Corrects `ROADMAP.md` M2 and issue #18.
+
+**Context.** `ROADMAP.md` M2 lists "UV unwrap, lightmap UV2, normal bake, LOD chain via
+decimation", and issue #18 asks for "a second UV channel for lightmap baking" with "no
+overlapping islands in UV2, which silently corrupts a bake".
+
+**A kart cannot be lightmapped.** `LightmapGI` bakes light into a texture parameterized by
+a mesh's second UV channel, which requires the mesh to be in a fixed place relative to the
+light. The kart is the one object in the game that is never in a fixed place. Godot's
+answer for moving geometry is `LightmapGI.generate_probes_subdiv`: the bake also stores a
+grid of light probes, and dynamic objects are lit by interpolating those. That path reads
+no UV2 at all.
+
+Checked, not assumed: `LightmapGI` exposes `generate_probes_subdiv`, and
+`GeometryInstance3D.GIMode` has a `GI_MODE_DYNAMIC` distinct from `GI_MODE_STATIC`.
+
+**Where the claim came from.** `ARCHITECTURE.md` §11's table is right — it lists "UV
+unwrap, normal bake, LOD chain, glTF" for `genkart.py` and lists lightmap UV2 only for
+`gentrack.py`, which is the script whose output genuinely is static. The ROADMAP entry and
+issue #18 picked up UV2 from the track's list. It is a copy-paste, not a design decision,
+and building it would have cost an unwrap pass and four bytes per vertex for a channel
+nothing reads.
+
+**Decision.** `genkart.py` generates UV1 only. Issue #18 is rescoped to the UV1 unwrap and
+the texel-density check, and its UV2 criteria are struck.
+
+**The trap found while establishing this, which is the more useful half.** An imported
+kart arrives with `gi_mode = GI_MODE_STATIC`, because Godot's scene importer defaults
+`meshes/light_baking` to 1, which is Static. So out of the box the kart is a mesh *flagged
+for lightmap baking* that *has no UV2* — which is exactly the configuration ADR-0022
+recorded as reporting `BAKE_ERROR_NO_MESHES`, indistinguishably from having no meshes at
+all. The fix is not to add UV2. It is to set the kart's GI mode to Dynamic so it is lit by
+probes, and that has to happen somewhere, or the first track bake at M5 fails with an
+error message pointing at the wrong thing. Issue #103 carries it.
+
+---
+
+## ADR-0026 — Godot generates its own mesh LODs; a decimated glTF chain is not read
+
+**Status:** Accepted. Corrects issue #20.
+
+**Context.** Issue #20 asks for "automatic LOD generation by decimation, ratios chosen
+against on-screen size" and, as an acceptance criterion, "verify Godot picks up the chain
+on import". It cannot, and the second half of that sentence is not achievable as written.
+
+| Checked | Result |
+|---|---|
+| `GLTFDocument.get_supported_gltf_extensions()` | 13 extensions, no `MSFT_lod`. glTF's LOD extension is not supported. |
+| Scene import options on a generated `.glb` | `meshes/generate_lods=true`, on by default. |
+| `ImporterMesh` | Has `generate_lods`, `get_surface_lod_count`, `get_surface_lod_size`. |
+
+So Godot builds its own LOD chain at import time by simplifying each surface, and there is
+no channel by which a chain decimated in Blender could be handed to it. Exporting four
+decimated copies of the kart would produce four separate meshes that Godot would then
+generate LODs *for*, which is worse than doing nothing.
+
+**Decision.**
+
+1. **Distance LOD is Godot's**, from `meshes/generate_lods`. It is free, it is already on,
+   and it is per-surface rather than per-object, which is better than whole-kart
+   decimation would have been.
+2. **The interior LOD is a visibility range, not a decimation level.** ARCHITECTURE.md §7
+   wants the cockpit interior culled from the chase view. That is
+   `GeometryInstance3D.visibility_range_begin` / `_end` on the interior node, which is why
+   `kartlib` builds the interior into its own group rather than merging it into the body
+   mesh. A decimated copy would not have helped: the requirement is "does not render from
+   that camera", not "renders more cheaply".
+3. **Decimation stays in the pipeline but changes purpose.** `params.lod_ratios` remains,
+   for the case Godot's simplifier handles badly. Thin swept tubes are the obvious
+   candidate — a 30 mm tube at 12 segments has little to give up before it collapses — so
+   the ratios exist as an override to reach for if the automatic chain visibly breaks the
+   frame, not as the primary mechanism. Issue #20 is rescoped accordingly.
+
+**Worth stating plainly:** this milestone's LOD work got smaller because the engine
+already does it. That is the ADR-0009 trade working as intended — the cost of Godot is a
+fidelity ceiling, and the return is that a chunk of planned work turns out to be a
+checkbox. Verifying that is cheaper than building it.
+
+---
+
+## ADR-0027 — Generated assets cannot carry Godot import settings
+
+**Status:** Accepted. A structural consequence of `ARCHITECTURE.md` §16, found in M2 and
+due at M5.
+
+**Context.** §16 gitignores `assets/generated/` because it is reproducible from tools. A
+Godot asset's import settings live in a sibling `.import` file, so ignoring the directory
+ignores those too — they are regenerated at defaults on every fresh clone.
+
+For the kart that is nearly harmless: the defaults are wrong in one place (ADR-0025's
+`gi_mode`) and that is fixable in the scene that instantiates it. For the **track at M5 it
+is not**, because the track needs settings that are emphatically not the defaults: static
+lightmap baking, a `lightmap_texel_size` matched to the density standard, and the
+segmentation ADR-0022 already flagged. A track that silently imports at
+`lightmap_size_hint = 0` bakes at 64x64 and looks like a lighting bug rather than a
+configuration error — ADR-0022 recorded exactly that.
+
+**Decision.** Import configuration for generated assets is version-controlled in
+`project.godot`'s `[importer_defaults]` section, or applied by a tool at generation time —
+never left in an ignored `.import` file. Which of the two, and for which assets, is
+deferred to M5 where the real requirement is; issue #104 carries the decision so it is a
+ticket rather than a sentence in an ADR.
+
+**Note.** This is the same shape as ADR-0022's finding about `.lmbake` files, and the
+opposite resolution. There, the generated product had to be committed because a scene held
+a hard reference to it and it could not be cheaply reproduced. Here the product stays
+ignored and only its *configuration* is committed. The rule §16 states — generated output
+stays out of version control — keeps needing a qualifier, and the qualifier is always
+whether something other than the generator depends on the artifact existing.

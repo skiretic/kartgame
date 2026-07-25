@@ -82,14 +82,25 @@ Effort: M
 
 Proves the content path before anything depends on it.
 
-- `tools/blender/genkart.py` — parametric KZ kart: frame tubes, floor tray, seat, wheels, engine and exhaust, steering wheel, **cockpit interior**, driver
-- UV unwrap, lightmap UV2, normal bake, LOD chain via decimation
-- glTF export, headless invocation, deterministic output from fixed parameters
-- Godot import at correct scale, Y-up, -Z forward
-- Rendered turntable for visual verification
-- `bpy` version pinned to Blender 5.2 API
+- [x] `tools/blender/genkart.py` — headless entry point and parameter block (#11)
+- [x] Frame tubes and floor tray (#12)
+- [x] Wheels, tires and rear axle (#14)
+- [ ] Seat, steering wheel and pedals (#13) — built, not yet verified against its own acceptance criteria
+- [ ] Engine, exhaust and radiator (#15)
+- [ ] Cockpit interior (#16), driver (#17), bodywork (#105)
+- [x] UV unwrap at the §5 texel density (#18). **No lightmap UV2** — a kart moves, so it is lit by lightmap probes and no channel reads it. [ADR-0025](DECISIONS.md#adr-0025--the-kart-carries-no-lightmap-uv2-because-a-kart-moves) corrects this line as it was originally written
+- [x] Normal bake from a high-poly source, headless through Cycles (#19)
+- [ ] LOD (#20) — **rescoped.** Godot generates its own mesh LODs on import and cannot read a decimated chain from glTF; the interior LOD is a visibility range, not a decimation level. [ADR-0026](DECISIONS.md#adr-0026--godot-generates-its-own-mesh-lods-a-decimated-gltf-chain-is-not-read)
+- [x] glTF export, headless invocation, deterministic output from fixed parameters (#21)
+- [x] Godot import at correct scale, Y-up, -Z forward (#21)
+- [x] Rendered turntable for visual verification (#22)
+- [x] `bpy` version pinned to Blender 5.2 API, checked by `genkart.sh` rather than assumed
 
 **Accept:** `blender --background --python tools/blender/genkart.py` produces a glTF that imports into Godot at correct scale with clean UVs and working LODs. Re-running with identical parameters produces an identical mesh.
+
+Measured: wheelbase 1.0500 m in Godot against a parameter of 1.0500, overall length 1.831 m against 1.830, width 1.400 m against 1.400. UV density 512 px/m with a 1.00x spread across every mesh. `genkart.sh --check` confirms the `.glb` **and** the baked normal map are byte-identical between runs.
+
+**One correction to the gate.** Issue #22 also asked for two runs to produce identical *images*. That is not available — Godot stills on this host drift run to run by up to 18/255 on about half the frame with no input change, so the turntable is compared with a tolerance instead ([ADR-0023](DECISIONS.md#adr-0023--godot-stills-are-not-reliably-bit-identical-so-image-checks-need-a-tolerance)). The *mesh* determinism the gate asks for is exact and unaffected.
 
 Effort: M
 

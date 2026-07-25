@@ -23,11 +23,11 @@ config.log
 *.pdb
 *.exp
 *.a
-bin/
+/bin/
 
 # Godot export output
-build/
-export/
+/build/
+/export/
 
 # Blender
 *.blend1
@@ -46,7 +46,13 @@ __pycache__/
 *.swp
 
 # Look-dev stills — render output, reproducible from tools/shots/shoot.sh
-shots/
+#
+# Anchored with a leading slash. Written as a bare `shots/` this matched ANY
+# directory named shots at any depth, which silently excluded tools/shots/ --
+# so the M1 still-capture harness itself was never committed, even though
+# ROADMAP.md M1 lists it as delivered. It kept working locally, which is why
+# nothing noticed. See issue #106.
+/shots/
 
 # LightmapGI bake products are NOT ignored, despite being generated output.
 #
