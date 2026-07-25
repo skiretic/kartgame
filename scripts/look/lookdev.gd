@@ -166,16 +166,28 @@ func _build_environment(args: Dictionary) -> void:
 		# and aerial perspective over a kilometer is this one.
 		environment.fog_enabled = true
 		environment.fog_mode = Environment.FOG_MODE_DEPTH
-		environment.fog_depth_begin = 30.0
-		environment.fog_depth_end = 2000.0
-		environment.fog_depth_curve = 1.0
-		environment.fog_density = Cmdline.as_float(args, "fog_density", 0.4)
-		# Taking the fog color from the sky is what makes distance read as
-		# distance rather than as a gray wash laid over the picture.
-		environment.fog_sky_affect = 0.0
-		environment.fog_light_color = Color(0.62, 0.70, 0.80)
+		environment.fog_depth_begin = Cmdline.as_float(args, "fog_begin", 20.0)
+		environment.fog_depth_end = Cmdline.as_float(args, "fog_end", 800.0)
+		environment.fog_depth_curve = Cmdline.as_float(args, "fog_curve", 1.0)
+		environment.fog_density = Cmdline.as_float(args, "fog_density", 1.0)
+		environment.fog_light_color = Color(
+			Cmdline.as_float(args, "fog_r", 0.68),
+			Cmdline.as_float(args, "fog_g", 0.76),
+			Cmdline.as_float(args, "fog_b", 0.88))
+		# Physical light units mean fog luminance has to be on the same scale as
+		# everything else. A default energy of 1.0 against a sunlit surface at a
+		# few thousand cd/m2 is effectively black, which is why fog tuned by eye
+		# in arbitrary units darkens the distance instead of lightening it.
+		# Inert while fog_aerial_perspective is 1.0: in that mode the fog takes its
+		# color from the sky per view direction and ignores fog_light_color and
+		# fog_light_energy entirely. Verified by sweeping energy across 1, 300 and
+		# 900 and getting byte-identical renders. Kept switchable because dropping
+		# aerial perspective to 0 hands control back to these, and that is the
+		# lever for weather that is not just haze.
+		environment.fog_light_energy = Cmdline.as_float(args, "fog_energy", 1.0)
 		environment.fog_sun_scatter = 0.2
-		environment.fog_aerial_perspective = 1.0
+		environment.fog_aerial_perspective = Cmdline.as_float(args, "fog_aerial", 1.0)
+		environment.fog_sky_affect = Cmdline.as_float(args, "fog_sky", 0.0)
 
 	var world_environment := WorldEnvironment.new()
 	world_environment.environment = environment
@@ -402,6 +414,13 @@ func _build_reflection_probe(args: Dictionary) -> void:
 	# as a different scene from everything outside.
 	probe.interior = false
 	probe.intensity = 1.0
+	# The probe supplies specular only. Its default, AMBIENT_ENVIRONMENT, adds
+	# its own ambient term on top of the environment's — and with the sky already
+	# contributing fully, that is the same light counted twice. Measured: it
+	# lifted the sunlit asphalt from 0.32 to 0.60 sRGB, which is a stop and a
+	# half of free light arriving from nowhere and is exactly the kind of error
+	# physical units exist to make visible.
+	probe.ambient_mode = ReflectionProbe.AMBIENT_DISABLED
 	probe.name = "ReflectionProbe"
 	add_child(probe)
 

@@ -33,7 +33,7 @@
 #                        a modest VRAM budget. Reflections come from probes
 #                        (ARCHITECTURE.md §4), not from squinting at the sky.
 #
-#   .hdr, not .exr       Same pixels, one third the bytes — 25 MB against 96 MB
+#   .hdr, not .exr       Same pixels, one third the bytes — 24 MB against 92 MB
 #                        at 4K. Radiance RGBE carries a shared exponent, which
 #                        costs mantissa precision the sky does not have anyway,
 #                        and Godot imports both identically. LFS bandwidth is
