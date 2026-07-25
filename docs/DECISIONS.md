@@ -1087,3 +1087,77 @@ rear track over the center-of-mass height, 0.5925 / 0.23, is 2.58 g, and
 `VehicleWheel3D` reaches it before the tires let go. Closing the gap needs the
 inside-rear lift and caster jacking of §6, which is M3b — not a larger number
 here.
+
+
+## ADR-0032 — The force-application boundary, measured
+
+**Status.** Accepted. This is issue #28, and `ARCHITECTURE.md` §19's first risk.
+
+**Context.** §19 says applying per-wheel forces to a `RigidBody3D` from
+`_physics_process`, while substepping internally at 240 Hz, is the least-charted
+part of the plan, and that M3b is built on sand if Godot's integration hook and
+Jolt's stepping do not agree. That was written as a risk because nobody had
+measured it. `tools/verify/integration_probe.gd` measures it: one body per
+candidate approach, in free space, no gravity, no contacts, no damping, 100 N on
+10 kg for 120 ticks, against the analytic answer.
+
+    analytic continuous     v  10.000000   x   5.000000
+    discrete symplectic     v  10.000000   x   5.041667
+    discrete explicit       v  10.000000   x   4.958333
+
+    physics_process, force     v   9.999998   x   5.041668   symplectic
+    integrate_forces, force    v   9.999998   x   5.041668   symplectic
+    4 sub-applications of F/4  v   9.999998   x   5.041668   symplectic
+    impulse F*dt each tick     v   9.999998   x   5.041668   symplectic
+    one force, tick 0 only     v   0.083333   x   0.083333   —
+
+**What the numbers say.**
+
+1. **The integrator is symplectic Euler.** Position advances with the *new*
+   velocity, so after N steps it is `a·dt²·N(N+1)/2`, not `N(N-1)/2`. The two
+   differ by one step of `a·dt²` — 83 mm over this run — and the measurement
+   lands on the first to within 1.3 µm, which is single-precision drift over 120
+   additions and not a third possibility. A solver that predicts its own motion,
+   as the tire model will when it substeps, has to use the same scheme or its
+   prediction disagrees with the body it is predicting.
+2. **`_physics_process` and `_integrate_forces` are the same thing** for force
+   application. Identical to the last digit. `_integrate_forces` is still where
+   contact state must be read, but there is no accuracy argument for moving force
+   application into it, and `_physics_process` is where input arrives.
+3. **Applications accumulate within a tick.** Four calls of `F/4` equal one call
+   of `F`. This is the answer M3b actually needed: a 240 Hz solver cannot make
+   the engine step twice, so its substeps sum their forces and apply the total
+   once. Nothing is lost by that — it is what "apply a force for one tick" means.
+4. **`apply_central_impulse(F·dt)` equals `apply_central_force(F)`.** Interchange-
+   able, so the choice is about which unit the calling code is written in.
+5. **Forces are not sticky.** One application at tick 0 produced exactly one
+   step's worth of velocity, `a·dt` = 0.0833 m/s, and nothing after. Every tick
+   that wants force must apply it again. A solver that computed forces only when
+   its inputs changed would silently coast.
+
+**Decision.** M3b's solver substeps internally at 240 Hz, accumulates the forces
+and torques its substeps produce, and applies the totals once per 120 Hz tick
+from `_physics_process`, in newtons, at the contact points — which is what
+`kart_debug_vehicle.gd` already does at M3a per ADR-0031, and is therefore
+already under test by `tools/verify/drive.sh`.
+
+**Consequence.** §19's first risk is closed as measured rather than as mitigated.
+The probe stays in the tree so the same four questions can be re-asked of a
+future engine version in one command, which matters because every answer here is
+an engine behavior and not a specification.
+
+**What this does not settle.** Everything with a contact in it. This measures a
+body in free space; the wheel raycasts, the friction solver and the resting
+contact behavior are not covered, and a force applied at a contact point that
+Jolt is simultaneously resolving is a harder question. It also does not address
+`max_physics_steps_per_frame` (8 by default): under a frame-rate collapse Godot
+runs several physics ticks per frame and then *stops*, so simulation time falls
+behind wall-clock. That is invisible in a deterministic replay, which counts
+ticks, and very visible to a driver — it belongs to M3b's telemetry.
+
+**Note on precision.** Velocity came back as 9.999998 rather than 10.0 after 120
+single-precision additions. The engine is a single-precision build, which
+`KartCore.build_info()` reports and `verify_extension.gd` asserts. That is fine
+for reproduction on one binary, which is the only thing §8 promises, and it is
+the mechanism behind why `state_hash.h` quantizes before hashing rather than
+comparing bits.

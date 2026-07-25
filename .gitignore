@@ -65,3 +65,16 @@ __pycache__/
 #
 # They are on LFS. Revisit the size question at M5, where a full track bake is
 # a different order of magnitude than this test scene's 412 KB.
+
+# doctest, fetched by tools/assets/fetch_doctest.sh with a pinned checksum.
+#
+# Ignored for the same reason assets/generated/ is: it is reproducible from a
+# tool in this repo, and the tool pins the version and the SHA-256, so a clone
+# gets the same 7,000-line header rather than one somebody edited. Anchored,
+# because a bare `doctest/` is exactly the pattern that cost this project its
+# whole shots harness -- issue #106.
+/third_party/doctest/
+
+# The unit-test binary. Built by tests/run.sh into bin/, which is already
+# ignored above, but named here so it is obvious it is not meant to be shipped.
+/bin/tests/

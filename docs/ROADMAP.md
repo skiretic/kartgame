@@ -120,8 +120,8 @@ De-risks the least-charted part of the plan: how Godot's physics hook, Jolt's st
 - [x] Physics debug visualization: suspension rays, contacts, normals, skid, center of mass, velocity (#26). Godot's own `--debug-collisions` draws shapes, which is the one thing worth nothing here
 - [x] **Built-in `VehicleBody3D` driving the M2 kart mesh** (#27) — throwaway, purely to prove the integration boundary and give the camera and track work something real to sit on. It drives on `scenes/game/proving_ground.tscn`, a flat plane with the §6.4 scenarios painted on it at true size
 - [x] Debug free camera with frustum freeze (#29) — the freeze draws the frozen volume rather than freezing culling, which Godot cannot do per viewport; stated in the file rather than implied
-- [ ] C++ unit test harness over `src/core/` (#25)
-- [ ] The force-application and substepping boundary written up beyond ADR-0031 (#28)
+- [x] C++ unit test harness over `src/core/` (#25) — doctest, `tests/run.sh`, 29 cases in ~5 s from cold. No godot-cpp on the include path and a check that refuses to build if anything under `src/core/` reaches for it, so ADR-0017's boundary cannot rot quietly
+- [x] The force-application and substepping boundary, **measured** rather than assumed (#28) — [ADR-0032](DECISIONS.md#adr-0032--the-force-application-boundary-measured)
 
 **Accept:** the kart mesh drives on generated collision geometry with no jitter. Debug draw is correct. Identical scenarios produce identical state hashes across repeated runs. The force-application and substepping boundary is understood and documented before M3b builds on it.
 

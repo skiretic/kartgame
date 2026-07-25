@@ -126,6 +126,27 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  tests:
+    # The C++ unit suite over src/core/. Deliberately has no `needs:` — it does
+    # not build the extension, download Godot, or check out godot-cpp, because
+    # ADR-0017 keeps src/core/ free of godot-cpp precisely so this can run as
+    # ordinary C++. It finishes in seconds, so it is the first thing to go red
+    # when the math breaks.
+    name: unit tests (linux)
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # No submodules. Pulling godot-cpp here would cost minutes and prove
+          # nothing: if this suite ever needs it, ADR-0017 has been violated and
+          # tests/run.sh fails on its own check before the compiler runs.
+          submodules: false
+
+      - name: Run the core unit tests
+        run: tests/run.sh
+
   verify:
     # Compiling proves the extension links. This proves the engine loads it and
     # GDScript can call into it — the actual M0 acceptance gate.

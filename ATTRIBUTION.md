@@ -113,3 +113,4 @@ Both are consistent with §4's decision to drive the sky from `PhysicalSkyMateri
 | Blender 5.2 LTS | GPL — used as an offline tool; output is not a derivative work |
 | godot-cpp (`third_party/godot-cpp`, submodule @ `9c7567d2`) | MIT — vendored as a submodule, so its source and history stay upstream rather than being copied in |
 | SCons 4.10.1 | MIT — build tool only |
+| doctest 2.4.12 (`third_party/doctest`, fetched by `tools/assets/fetch_doctest.sh`) | MIT — single header, gitignored and reproduced from the script's pinned SHA-256 rather than copied into the tree |
