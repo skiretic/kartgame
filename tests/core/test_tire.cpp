@@ -137,11 +137,22 @@ TEST_CASE("the friction ellipse cannot be exceeded") {
 			std::sqrt(force.lateral * force.lateral + force.longitudinal * force.longitudinal);
 	const double capacity = tire.lateral.friction_at(NOMINAL_LOAD) * NOMINAL_LOAD;
 
-	// The ellipse is drawn on two different capacities — the longitudinal curve
-	// has its own peak friction — so the bound is not a perfect circle. What must
-	// hold is that the total never exceeds the larger of the two by more than the
-	// difference between them.
-	CHECK(magnitude <= capacity * 1.05);
+	// This comment used to say the bound "is not a perfect circle" because "the
+	// longitudinal curve has its own peak friction". It does not. `Tire::Tire()`
+	// overrides only `stiffness`, `shape` and `curvature`; `peak_friction`,
+	// `nominal_load` and `load_sensitivity` are left at their defaults on both
+	// axes, so the two capacities are identical at every load and the ellipse is
+	// exactly a circle. The assertion below passed, but for a reason that was not
+	// true, which is worse than a failing test.
+	//
+	// So it is asserted as what it is: a circle, to within float noise rather
+	// than to within a 5% slop that was covering for an eccentricity that is not
+	// there. If the longitudinal axis is ever given its own peak friction — real
+	// tires have one, usually a little above lateral — this assertion is where
+	// that change announces itself.
+	CHECK(tire.longitudinal.friction_at(NOMINAL_LOAD) ==
+			doctest::Approx(tire.lateral.friction_at(NOMINAL_LOAD)));
+	CHECK(magnitude == doctest::Approx(capacity).epsilon(1e-9));
 	CHECK(force.utilization > 1.0);
 }
 
