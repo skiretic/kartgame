@@ -365,7 +365,7 @@ render pass.
 
 **Decision.** A `CompositorEffect` (`scripts/render/motion_blur.gd`) running a compute
 shader (`motion_blur.glsl`) at `EFFECT_CALLBACK_TYPE_POST_TRANSPARENT`. It sets
-`needs_motion_vectors`, reads the engine's velocity buffer, and integrates colour
+`needs_motion_vectors`, reads the engine's velocity buffer, and integrates color
 along each pixel's velocity vector, scaled by a shutter angle.
 
 **It works, and the uncertain parts turned out fine.** The velocity buffer is
@@ -377,10 +377,10 @@ the previous frame, and it carries both camera and object motion.
 **Four things the design did not anticipate.** Each is recorded because each changes
 either the code or a later milestone.
 
-### 1. The colour buffer cannot be copied, so one effect is two dispatches
+### 1. The color buffer cannot be copied, so one effect is two dispatches
 
-A gather blur reads neighbouring pixels while writing this one, so it cannot run in
-place, and the obvious fix is to copy the colour buffer aside first. Godot's colour
+A gather blur reads neighboring pixels while writing this one, so it cannot run in
+place, and the obvious fix is to copy the color buffer aside first. Godot's color
 buffer is created with `SAMPLING | COLOR_ATTACHMENT | STORAGE | INPUT_ATTACHMENT` and
 *neither* copy bit, so `texture_copy()` refuses it in both directions:
 
@@ -388,7 +388,7 @@ buffer is created with `SAMPLING | COLOR_ATTACHMENT | STORAGE | INPUT_ATTACHMENT
     to be set to be retrieved.
 
 What the buffer can do is be sampled and be written as a storage image, which is
-enough: pass one samples colour and writes the blurred result to a scratch texture the
+enough: pass one samples color and writes the blurred result to a scratch texture the
 effect owns, pass two samples the scratch texture and writes it back. Same bandwidth a
 copy would have cost, one extra dispatch, and no dependency on usage bits the engine
 does not promise.
@@ -434,7 +434,7 @@ if cornering stills show it reading as a defect rather than as an absence.
 
 ### 4. A gather blur cannot smear an object past its own silhouette
 
-This is inherent, not a bug: the pass can only collect colour already on screen at
+This is inherent, not a bug: the pass can only collect color already on screen at
 this pixel, so a fast object against a still background blurs *inside* its outline and
 stops dead at the edge. A real exposure bleeds the object out over the background.
 
@@ -444,7 +444,7 @@ convincingly into its lit face, and its silhouette stays sharp.
 It does not matter yet. Camera motion gives every pixel on screen a velocity, so the
 ego-motion case — which is nearly all of what a racing game shows — has no such
 problem. It starts to matter at **M7**, when there are opponents to be passed at a
-closing speed. The fix is the standard tile-max / neighbour-max reconstruction filter
+closing speed. The fix is the standard tile-max / neighbor-max reconstruction filter
 (McGuire et al.): dilate the velocity field so pixels *near* a fast object also gather
 along its velocity. That is three extra passes and is deliberately not being tuned
 against a yellow cube in M1.
@@ -468,7 +468,7 @@ the same texel repeatedly, and a 60 px blur with 16 taps leaves 4 px between tap
 which a hard edge turns into sixteen ghosts.
 
 **Rejected.** Doing the blur after tonemapping in a full-screen shader, which would run
-after TAA but would blur display-referred colour — highlights would smear grey instead
+after TAA but would blur display-referred color — highlights would smear gray instead
 of staying bright, which is the single most recognizable tell of a cheap motion blur.
 Also rejected: implementing the full reconstruction filter now, for the scheduling
 reason in point 4.
@@ -506,3 +506,59 @@ before the first frame on Godot's Metal backend on this host — no output, no c
 `tools/shots/shoot.sh` therefore reports wall-clock frame time with vsync disabled by
 default and puts GPU timestamps behind `--timing=true`. Same class of thing as
 ADR-0018: an upstream macOS-specific defect worked around rather than diagnosed.
+
+---
+
+## ADR-0021 — Two of `ARCHITECTURE.md` §4's rendering settings named the wrong feature
+
+**Status:** Accepted. Corrects `ARCHITECTURE.md` §4.
+
+Both were written from a general understanding of what a renderer offers rather
+than from what Godot 4 actually exposes, and both would have produced a setting
+that quietly does nothing.
+
+### Volumetric fog is not the aerial perspective control
+
+§4 said "Volumetric fog: On, low density — aerial perspective is a strong realism
+cue and nearly free." Those are two different features in Godot.
+
+`Environment.volumetric_fog_*` is a froxel volume, and its depth is bounded by
+`volumetric_fog_length`, which defaults to 64 m. It is what produces light shafts
+and localized haze, and it is genuinely not cheap. Aerial perspective — distant
+things going pale and blue — happens over hundreds of meters to kilometers, and
+in Godot that is `Environment.fog_*` with `fog_mode = FOG_MODE_DEPTH` plus
+`fog_aerial_perspective`. It is nearly free, as §4 claimed; it just is not the
+setting §4 named.
+
+**Decision.** Depth fog is on and carries aerial perspective, tuned against a
+2 km ground plane. Volumetric fog is a separate, later decision, scoped to light
+shafts, and is off until something wants them.
+
+This mattered immediately: the look-dev ground plane was originally 400 m square,
+and its edge 200 m from the camera read as a hard horizon line. That is fixed by
+geometry (the plane is now 2 km) and by depth fog, and neither is what a 64 m
+froxel volume would have touched.
+
+### TAA and FSR2 are alternatives, not a stack
+
+§4 said "AA: TAA, plus FSR2 upscaling on weaker targets". FSR2 *is* a temporal
+resolve — it consumes the same motion vectors TAA does and produces an
+antialiased image as a side effect of upscaling. Enabling both asks the frame to
+be temporally resolved twice.
+
+**Decision.** One or the other. `Viewport.use_taa` is set only when
+`scaling_3d_mode` is not FSR2. Native resolution gets TAA; upscaled targets get
+FSR2 and no TAA.
+
+**Consequence for M10.** "TAA plus FSR2 on weaker targets" implied the Steam Deck
+would get both and therefore look no worse. It gets FSR2 instead of TAA, so the
+temporal quality on that target is FSR2's, not TAA's, and it has to be judged on
+its own rather than assumed.
+
+**Measured, so the expectation is calibrated.** At 1080p with FSR2 at 0.67 render
+scale, the mean absolute difference from a native render is about 2.2 / 255 on
+this test scene — small, but the scene is nearly all high-frequency asphalt,
+which is the hardest case for an upscaler and the fairest one to judge it on.
+FSR2 was not measurably faster here, because a flat plane and a dozen boxes are
+not pixel-bound on an M1 Pro. That number only becomes meaningful on the target
+it exists for, which is the M10 Steam Deck pass.

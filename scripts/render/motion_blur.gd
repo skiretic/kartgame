@@ -14,16 +14,16 @@ extends CompositorEffect
 ## `get_velocity_layer()` hands back an invalid RID.
 ##
 ## **Why there are two dispatches for one effect.** A gather blur reads
-## neighbouring pixels while writing this one, so it cannot run in place. The
-## obvious fix is to copy the colour buffer aside first — but Godot's colour
+## neighboring pixels while writing this one, so it cannot run in place. The
+## obvious fix is to copy the color buffer aside first — but Godot's color
 ## buffer is created with `SAMPLING | COLOR_ATTACHMENT | STORAGE |
 ## INPUT_ATTACHMENT` and neither copy bit, so `texture_copy()` refuses it in both
 ## directions. What the buffer *can* do is be sampled and be written as a storage
 ## image, which is enough:
 ##
-##   1. sample the colour buffer, gather along velocity, write to a scratch
+##   1. sample the color buffer, gather along velocity, write to a scratch
 ##      texture this effect owns;
-##   2. sample the scratch texture, write it back over the colour buffer.
+##   2. sample the scratch texture, write it back over the color buffer.
 ##
 ## Same total bandwidth as a copy would have cost, one extra dispatch, and no
 ## dependency on usage bits the engine does not promise.
@@ -48,7 +48,7 @@ const PUSH_CONSTANT_BYTES := 32
 enum DebugMode {
 	## The blurred image.
 	OFF = 0,
-	## Velocity vectors, red for horizontal and green for vertical, mid grey at
+	## Velocity vectors, red for horizontal and green for vertical, mid gray at
 	## rest. The first thing to look at when the blur does nothing: it separates
 	## "the pass did not run" from "the engine wrote no motion vectors".
 	VELOCITY = 1,
@@ -88,7 +88,7 @@ func _init() -> void:
 	# available point to "the finished 3D image".
 	effect_callback_type = EFFECT_CALLBACK_TYPE_POST_TRANSPARENT
 	needs_motion_vectors = true
-	# Hands the pass an MSAA-resolved colour buffer rather than the raw samples.
+	# Hands the pass an MSAA-resolved color buffer rather than the raw samples.
 	access_resolved_color = true
 	RenderingServer.call_on_render_thread(_initialize_resources)
 
@@ -158,7 +158,7 @@ func _render_callback(callback_type: int, render_data: RenderData) -> void:
 		buffers.create_texture(
 			TEXTURE_CONTEXT,
 			SCRATCH_TEXTURE,
-			# Matches the engine's colour buffer, which reports RGBA16F. The
+			# Matches the engine's color buffer, which reports RGBA16F. The
 			# shader's `layout(rgba16f)` image qualifier has to agree with both.
 			RenderingDevice.DATA_FORMAT_R16G16B16A16_SFLOAT,
 			RenderingDevice.TEXTURE_USAGE_SAMPLING_BIT
@@ -180,27 +180,27 @@ func _render_callback(callback_type: int, render_data: RenderData) -> void:
 	_rd.draw_command_begin_label("kartgame motion blur", Color(0.9, 0.5, 0.2))
 
 	for view in buffers.get_view_count():
-		var colour := buffers.get_color_layer(view, false)
+		var color := buffers.get_color_layer(view, false)
 		var velocity := buffers.get_velocity_layer(view, false)
-		if not colour.is_valid() or not velocity.is_valid():
-			_report_once(colour, velocity)
+		if not color.is_valid() or not velocity.is_valid():
+			_report_once(color, velocity)
 			continue
 
 		var scratch := buffers.get_texture_slice(TEXTURE_CONTEXT, SCRATCH_TEXTURE, view, 0, 1, 1)
 
-		# Pass 1: colour + velocity -> scratch.
+		# Pass 1: color + velocity -> scratch.
 		_dispatch(
 			UniformSetCacheRD.get_cache(_shader, 0, [
-				_sampled(0, colour), _sampled(1, velocity), _storage(2, scratch),
+				_sampled(0, color), _sampled(1, velocity), _storage(2, scratch),
 			]),
 			blur_constant, groups_x, groups_y,
 		)
 
-		# Pass 2: scratch -> colour. Separate compute lists, so the write to the
-		# colour buffer is ordered after every read of it in pass 1.
+		# Pass 2: scratch -> color. Separate compute lists, so the write to the
+		# color buffer is ordered after every read of it in pass 1.
 		_dispatch(
 			UniformSetCacheRD.get_cache(_shader, 0, [
-				_sampled(0, scratch), _sampled(1, velocity), _storage(2, colour),
+				_sampled(0, scratch), _sampled(1, velocity), _storage(2, color),
 			]),
 			blit_constant, groups_x, groups_y,
 		)
@@ -250,12 +250,12 @@ func _storage(binding: int, texture: RID) -> RDUniform:
 
 ## Missing motion vectors are the failure this effect is most likely to hit and
 ## the hardest to read from a black screen, so say so — once, not every frame.
-func _report_once(colour: RID, velocity: RID) -> void:
+func _report_once(color: RID, velocity: RID) -> void:
 	if _reported_buffers:
 		return
 	_reported_buffers = true
 	push_warning(
-		"MotionBlurEffect: skipping, colour valid=%s velocity valid=%s. "
-		% [colour.is_valid(), velocity.is_valid()]
+		"MotionBlurEffect: skipping, color valid=%s velocity valid=%s. "
+		% [color.is_valid(), velocity.is_valid()]
 		+ "An invalid velocity RID means the engine rendered no motion vector pass."
 	)
