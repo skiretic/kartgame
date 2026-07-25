@@ -1,0 +1,161 @@
+name: build
+
+# Three platforms from the first commit, not from the milestone that needs them.
+# ARCHITECTURE.md names macOS, Windows and Linux/Steam Deck as targets; a
+# cross-platform break found at M10 is a rewrite, and found at M0 it is a typo.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# A new push to the same branch makes the previous run's answer irrelevant.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GODOT_VERSION: 4.7.1
+
+jobs:
+  build:
+    name: ${{ matrix.name }} (${{ matrix.target }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      # One platform failing should not hide whether the others are also broken.
+      fail-fast: false
+      matrix:
+        include:
+          # macOS builds universal so one artifact serves both Apple Silicon and
+          # Intel. Clang does this in a single invocation, so it costs compile
+          # time but no extra job.
+          - name: macos
+            runner: macos-15
+            platform: macos
+            arch: universal
+            lib: libkartgame.macos
+          - name: linux
+            runner: ubuntu-24.04
+            platform: linux
+            arch: x86_64
+            lib: libkartgame.linux
+          - name: windows
+            runner: windows-2022
+            platform: windows
+            arch: x86_64
+            lib: libkartgame.windows
+        target: [editor, template_release]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # godot-cpp is a submodule pinned to an exact commit (ADR-0016).
+          # Without this the build fails at the first #include.
+          submodules: recursive
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install SCons
+        run: python -m pip install --upgrade scons
+
+      # Read the pin rather than hashing a path under .git/, which hashFiles does
+      # not reliably see.
+      - name: Resolve the godot-cpp pin
+        id: pin
+        shell: bash
+        run: echo "sha=$(git -C third_party/godot-cpp rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      # godot-cpp is by far the larger half of the compile and it only changes when
+      # the submodule pin moves, so that commit is the primary part of the key. Our
+      # own sources change constantly, hence the restore-key fallback: a miss on
+      # src/** still reuses the godot-cpp objects.
+      - name: Cache SCons artifacts
+        uses: actions/cache@v4
+        with:
+          path: .scons-cache
+          key: scons-${{ matrix.name }}-${{ matrix.arch }}-${{ matrix.target }}-${{ steps.pin.outputs.sha }}-${{ hashFiles('src/**') }}
+          restore-keys: |
+            scons-${{ matrix.name }}-${{ matrix.arch }}-${{ matrix.target }}-${{ steps.pin.outputs.sha }}-
+            scons-${{ matrix.name }}-${{ matrix.arch }}-${{ matrix.target }}-
+
+      - name: Build
+        env:
+          SCONS_CACHE: ${{ github.workspace }}/.scons-cache
+        run: scons platform=${{ matrix.platform }} target=${{ matrix.target }} arch=${{ matrix.arch }} -j4
+
+      # Catches the class of failure where the build succeeds but produces a file
+      # under a name kartgame.gdextension does not reference, which the engine
+      # reports only as "extension not found" at load time.
+      - name: Verify the expected filename exists
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "${{ matrix.platform }}" in
+            macos)   expected="bin/${{ matrix.lib }}.${{ matrix.target }}.dylib" ;;
+            linux)   expected="bin/${{ matrix.lib }}.${{ matrix.target }}.${{ matrix.arch }}.so" ;;
+            windows) expected="bin/${{ matrix.lib }}.${{ matrix.target }}.${{ matrix.arch }}.dll" ;;
+          esac
+          if [ ! -f "$expected" ]; then
+            echo "Expected $expected, found:"
+            ls -la bin/
+            exit 1
+          fi
+          echo "OK: $expected"
+
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: kartgame-${{ matrix.name }}-${{ matrix.target }}
+          path: bin/
+          if-no-files-found: error
+          retention-days: 14
+
+  verify:
+    # Compiling proves the extension links. This proves the engine loads it and
+    # GDScript can call into it — the actual M0 acceptance gate.
+    name: verify (linux, headless)
+    needs: build
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download the Linux editor build
+        uses: actions/download-artifact@v4
+        with:
+          name: kartgame-linux-editor
+          path: bin/
+
+      - name: Cache the Godot editor binary
+        id: godot-cache
+        uses: actions/cache@v4
+        with:
+          path: godot-bin
+          key: godot-${{ env.GODOT_VERSION }}-linux-x86_64
+
+      - name: Download Godot ${{ env.GODOT_VERSION }}
+        if: steps.godot-cache.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          name="Godot_v${GODOT_VERSION}-stable_linux.x86_64"
+          curl -fsSL -o godot.zip \
+            "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/${name}.zip"
+          mkdir -p godot-bin
+          unzip -q godot.zip -d godot-bin
+          mv "godot-bin/${name}" godot-bin/godot
+          chmod +x godot-bin/godot
+
+      # A cold project has no .godot/ directory. Importing first separates
+      # "resources failed to import" from "the extension failed to load", which
+      # otherwise arrive as the same wall of errors.
+      - name: Import resources
+        run: ./godot-bin/godot --headless --path . --import
+
+      - name: Run M0 verification
+        run: ./godot-bin/godot --headless --path . --script tools/verify/verify_extension.gd
