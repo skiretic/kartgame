@@ -48,6 +48,13 @@ inline constexpr int GEAR_COUNT = 6;
 // Derived, so the conversion is exercised rather than hand-copied.
 inline constexpr double TOP_SPEED_MAX_MS = kmh_to_ms(TOP_SPEED_MAX_KMH);
 
+// Static vertical load on one tire, newtons, with the mass split evenly. The
+// real split is nearer 42/58 front to rear on a KZ — the engine and the driver's
+// hips are both behind the middle — so this is the load a tire curve is anchored
+// to, not a load any particular tire actually carries. It exists so the tire
+// model's nominal load and the class minimum mass cannot drift apart.
+inline constexpr double STATIC_LOAD_PER_TIRE_N = MASS_WITH_DRIVER_KG * G / 4.0;
+
 } // namespace kart::core::kz
 
 #endif // KART_CORE_KZ_REFERENCE_H
