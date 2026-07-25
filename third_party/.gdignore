@@ -1,0 +1,5 @@
+Keeps Godot's resource importer out of third_party/.
+
+godot-cpp is ~4000 source files. Without this marker Godot walks all of them on
+every project scan, imports nothing, and clutters the FileSystem dock.
+A directory containing a .gdignore file is skipped entirely, subdirectories included.
