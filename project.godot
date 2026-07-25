@@ -107,6 +107,13 @@ debug_physics_draw={
 
 common/physics_ticks_per_second=120
 
+; ARCHITECTURE.md §1 says Jolt owns collision. That is not what "DEFAULT" means:
+; on 4.7.1 the default 3D engine is still GodotPhysics3D, which the RID leak
+; report at shutdown names outright ("GodotBody3D", "GodotSpace3D"). Named
+; explicitly so the choice survives an engine upgrade changing its own default,
+; and asserted at runtime by tools/verify/verify_extension.gd.
+3d/physics_engine="Jolt Physics"
+
 [rendering]
 
 renderer/rendering_method.mobile="forward_plus"

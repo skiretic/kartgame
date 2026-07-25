@@ -39,6 +39,7 @@ func _initialize() -> void:
 	_check_core_is_reachable()
 	_check_kz_reference_is_self_consistent()
 	_check_physics_tick_rate()
+	_check_physics_engine_is_jolt()
 	_check_input_map()
 	_check_renderer()
 
@@ -150,6 +151,36 @@ func _check_physics_tick_rate() -> void:
 		_fail(
 			"Physics tick is %d Hz, expected %d — tire models go unstable below this (ARCHITECTURE.md §6)"
 			% [Engine.physics_ticks_per_second, REQUIRED_PHYSICS_HZ]
+		)
+
+
+func _check_physics_engine_is_jolt() -> void:
+	# ARCHITECTURE.md §1: Jolt owns collision, and the custom vehicle model in §6
+	# applies its forces to a Jolt body. "DEFAULT" does not mean Jolt — on 4.7.1
+	# the default 3D engine is still GodotPhysics3D — so the setting is named
+	# explicitly in project.godot and checked here.
+	var configured: String = ProjectSettings.get_setting("physics/3d/physics_engine", "")
+	if configured != "Jolt Physics":
+		_fail("physics/3d/physics_engine is '%s', expected 'Jolt Physics'" % configured)
+
+	# The setting says what was asked for; this says what actually loaded. The two
+	# engines ship different defaults for the solver iteration count — Jolt 8,
+	# GodotPhysics3D 16 — so a fresh space answers the question behaviorally
+	# rather than by reading back the same string that was just set.
+	#
+	# If a future engine version changes Jolt's default this reads as a failure.
+	# That is the intended direction of the error: it is a claim about the running
+	# server, so it should break loudly and be re-measured rather than quietly
+	# stop meaning anything.
+	var space := PhysicsServer3D.space_create()
+	var iterations := PhysicsServer3D.space_get_param(
+		space, PhysicsServer3D.SPACE_PARAM_SOLVER_ITERATIONS
+	)
+	PhysicsServer3D.free_rid(space)
+	if not is_equal_approx(iterations, 8.0):
+		_fail(
+			"The active 3D physics server defaults to %s solver iterations; Jolt's default is 8"
+			% iterations
 		)
 
 

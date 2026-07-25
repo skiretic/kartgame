@@ -1001,3 +1001,89 @@ scalar is not a sourced geometry. "55° to the horizontal" was quoted accurately
 source, recorded in `REFERENCES.md`, and still produced two wrong parts, because the axis
 it applies to was never written down. Any angle in this project that does not name its axis
 and its sign should be treated as unbuilt.
+
+
+## ADR-0030 — Jolt is named in `project.godot`, because "DEFAULT" is not Jolt
+
+**Status.** Accepted.
+
+**Context.** `ARCHITECTURE.md` §1 says Jolt owns collision, and §19 names the
+force-application boundary between a custom vehicle and Jolt's stepping as the
+least-charted part of the plan. All of that was written on the assumption that
+Godot 4.4+ having Jolt "built in" meant Jolt was in use. It was not.
+`physics/3d/physics_engine` was left at `DEFAULT`, and on 4.7.1 the default 3D
+engine is still `GodotPhysics3D`. Every physics measurement taken before M3a was
+taken against the wrong engine — which happens to be harmless, because none had
+been taken.
+
+The engine in use is not directly readable: `PhysicsServer3D.get_class()` returns
+the wrapper's name under either engine, `ClassDB.class_exists("JoltPhysicsServer3D")`
+is false, and Jolt's own `physics/jolt_physics_3d/*` settings are registered
+whether or not it is active. What does distinguish them is the RID leak report at
+shutdown, which names the concrete types — `GodotBody3D` and `GodotSpace3D`
+against `JoltBody3D` and `JoltSpace3D`. That is how this was found, by accident,
+in an unrelated probe.
+
+**Decision.** `physics/3d/physics_engine` is set to `"Jolt Physics"` explicitly,
+and `tools/verify/verify_extension.gd` asserts two things: that the setting says
+so, and that the *running* server behaves like Jolt. The behavioral half is a
+fresh space's default solver iteration count, which is **8 under Jolt and 16
+under GodotPhysics3D** — the only difference found among the eight space
+parameters.
+
+**Consequence.** A future engine release that changes Jolt's default iteration
+count will fail this check. That is the intended direction of the error: the
+assertion is a claim about the running server, so it should break loudly and be
+re-measured rather than quietly stop meaning anything.
+
+**What this does not settle.** Nothing here checks that a setting named in
+`project.godot` is honored at all — if the engine silently fell back, only the
+behavioral half would catch it, and only for this one parameter. The general
+problem, that a project setting is a request rather than a fact, has no cheap
+general answer.
+
+
+## ADR-0031 — The M3a vehicle applies its own forces, in newtons
+
+**Status.** Accepted. Scoped to M3a; M3b's solver supersedes the file this
+describes, not the reasoning.
+
+**Context.** ROADMAP M3a drives the M2 kart mesh with Godot's built-in
+`VehicleBody3D`, deliberately throwaway, to prove that a force-driven body, a
+120 Hz `_physics_process` and Jolt's stepping agree. Driving it through
+`VehicleBody3D.engine_force` and `.brake` did not survive measurement.
+
+`engine_force` is documented as a force and behaves as a wheel torque that then
+passes through the wheel's own friction solver. Calibrated against two steady
+states it implied two different conversion factors — about 3.1x the requested
+force at one throttle setting and 0.2x at another — so there is no constant to
+write down. A separate defect compounded it: Godot applies a project-default
+`linear_damp` of 0.1 to every rigid body, worth a full 1 m/s² at 10 m/s, which is
+about a quarter of the kart's acceleration there and was silently absorbing the
+difference between the model's predicted 0-100 time and its measured one.
+
+**Decision.** `engine_force` and `brake` stay at zero. Drive and braking forces
+are applied directly with `apply_force` at each wheel's contact patch, in
+newtons. `linear_damp` and `angular_damp` are set to `DAMP_MODE_REPLACE` at zero,
+and drag is the one explicit `DRAG * v²` term the file documents.
+
+**Consequence.** Every constant in `kart_debug_vehicle.gd` is a real quantity
+checkable against §6.4 by hand, and the measured figures land where they should:
+136.9 km/h top speed, 0-100 km/h in 3.40 s, 1.98 g mean braking from 90 to
+20 km/h. Applying force at the contact patch rather than at the center of mass
+also gets squat and dive out of the geometry for free. And the shape is the one
+M3b needs — per-wheel forces on a Jolt body from `_physics_process` — so M3a now
+proves the integration M3b depends on rather than proving `VehicleBody3D`'s.
+
+**What it costs.** Longitudinal tire slip. The wheel model no longer limits drive
+force, so this kart cannot spin its wheels; `TRACTION_LIMIT` stands in for a
+friction circle until there is a tire model to ask.
+
+**The one figure still outside its band, stated rather than tuned away.**
+Sustained lateral acceleration measures **1.76 g** against §6.4's 2.0-2.5 g. It
+is not a grip constant that is too low — raising it makes the kart **roll over**
+instead of cornering harder. The kart's own geometry sets that ceiling: half the
+rear track over the center-of-mass height, 0.5925 / 0.23, is 2.58 g, and
+`VehicleWheel3D` reaches it before the tires let go. Closing the gap needs the
+inside-rear lift and caster jacking of §6, which is M3b — not a larger number
+here.

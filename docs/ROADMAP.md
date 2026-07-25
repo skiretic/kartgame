@@ -115,13 +115,27 @@ Effort: M
 
 De-risks the least-charted part of the plan: how Godot's physics hook, Jolt's stepping, and a custom force-based solver coexist.
 
-- `_physics_process` at 120 Hz, Jolt confirmed as the active 3D physics engine
-- C++ extension structure: `core/` math, PCG32, state hashing
-- Physics debug visualization: shapes, contacts, normals, raycasts, center of mass
-- **Built-in `VehicleBody3D` driving the M2 kart mesh** — throwaway, purely to prove the integration boundary and give the camera and track work something real to sit on
-- Debug free camera with frustum freeze
+- [x] `_physics_process` at 120 Hz, Jolt confirmed as the active 3D physics engine (#23). **It was not** — `physics/3d/physics_engine` was left at `DEFAULT`, which on 4.7.1 is still `GodotPhysics3D`. Named explicitly and asserted behaviorally, [ADR-0030](DECISIONS.md#adr-0030--jolt-is-named-in-projectgodot-because-default-is-not-jolt)
+- [x] C++ extension structure: `core/` math, PCG32, state hashing (#24) — `KartRandom` and `KartStateHash`, both engine-free under `src/core/` per ADR-0017
+- [x] Physics debug visualization: suspension rays, contacts, normals, skid, center of mass, velocity (#26). Godot's own `--debug-collisions` draws shapes, which is the one thing worth nothing here
+- [x] **Built-in `VehicleBody3D` driving the M2 kart mesh** (#27) — throwaway, purely to prove the integration boundary and give the camera and track work something real to sit on. It drives on `scenes/game/proving_ground.tscn`, a flat plane with the §6.4 scenarios painted on it at true size
+- [x] Debug free camera with frustum freeze (#29) — the freeze draws the frozen volume rather than freezing culling, which Godot cannot do per viewport; stated in the file rather than implied
+- [ ] C++ unit test harness over `src/core/` (#25)
+- [ ] The force-application and substepping boundary written up beyond ADR-0031 (#28)
 
 **Accept:** the kart mesh drives on generated collision geometry with no jitter. Debug draw is correct. Identical scenarios produce identical state hashes across repeated runs. The force-application and substepping boundary is understood and documented before M3b builds on it.
+
+Measured by `tools/verify/drive.sh`, which runs each scenario in two separate processes and compares state hashes:
+
+| | Measured | KZ reference (§6.4) |
+|---|---|---|
+| Top speed | **136.9 km/h** | 135-145 |
+| 0-100 km/h | **3.40 s** | 3.0-3.5 |
+| Braking, 90-20 km/h mean | **1.98 g** | 1.5-2.0 |
+| Lateral, sustained | **1.76 g** | 2.0-2.5 |
+| Determinism | identical hash, two processes | — |
+
+Lateral is the one figure outside its band and it is left there deliberately. More grip does not fix it: the kart rolls over first, because half the rear track over the center-of-mass height is 2.58 g and `VehicleWheel3D` reaches that before the tires slide. The inside-rear lift and caster jacking that let a real kart use 2.5 g are M3b. [ADR-0031](DECISIONS.md#adr-0031--the-m3a-vehicle-applies-its-own-forces-in-newtons) has that and the two measurement traps found on the way: `VehicleBody3D.engine_force` is a wheel torque with no single conversion to newtons, and Godot applies a project-default `linear_damp` of 0.1 to every rigid body — a quarter of the kart's acceleration at 10 m/s, arriving from nowhere.
 
 Effort: S
 

@@ -1,6 +1,8 @@
 #include "register_types.h"
 
 #include "kart_core.h"
+#include "kart_random.h"
+#include "kart_state_hash.h"
 
 #include <gdextension_interface.h>
 
@@ -20,6 +22,12 @@ void initialize_kartgame_module(ModuleInitializationLevel p_level) {
 
 	// Abstract: KartCore is static-only, so GDScript must not be able to .new() it.
 	GDREGISTER_ABSTRACT_CLASS(kartgame::KartCore);
+
+	// These two are instantiable, unlike KartCore: each one owns state that a
+	// caller is expected to hold. RefCounted, so a scenario script can make one
+	// per body without managing lifetimes. ROADMAP M3a.
+	GDREGISTER_CLASS(kartgame::KartRandom);
+	GDREGISTER_CLASS(kartgame::KartStateHash);
 }
 
 void uninitialize_kartgame_module(ModuleInitializationLevel p_level) {
