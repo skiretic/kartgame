@@ -113,6 +113,7 @@ var _chase: ChaseCamera
 var _free: FreeCamera
 var _fixed: Camera3D
 var _hud: Label
+var _driving_hud: Control
 var _physics_draw: PhysicsDraw
 var _camera_mode := "chase"
 
@@ -627,6 +628,22 @@ func _build_hud() -> void:
 	_hud.add_theme_constant_override("outline_size", 5)
 	_hud.position = Vector2(14, 12)
 	layer.add_child(_hud)
+
+	# The driving HUD, on the same layer and under the same flag. Two overlays and
+	# not one, because they answer different questions: the Label above is a
+	# developer read-out with the key bindings on it, and `driving_hud.gd` is the
+	# instrument a driver judges the kart with — issue #73, pulled forward from M6
+	# by #138. Its own header argues why those cannot be the same widget, in the
+	# same terms that keep the F3 telemetry panel separate from both.
+	#
+	# `bind()` rather than an exported property: the HUD reads the limiter and
+	# rollover thresholds off the body once, and `_build_kart()` has already run by
+	# the time this does, so there is a body to read them from.
+	_driving_hud = preload("res://scripts/ui/driving_hud.gd").new()
+	_driving_hud.name = "DrivingHud"
+	layer.add_child(_driving_hud)
+	if _kart != null:
+		_driving_hud.bind(_kart)
 
 
 # --- run time --------------------------------------------------------------

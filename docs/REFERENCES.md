@@ -1124,3 +1124,93 @@ analytic-envelope autocorrelation, the spacing test and the synthetic generator;
 `final_measure.py` the throttle split and the gearshift detector. If these numbers
 are ever challenged, the probes are the place to start: they are the only part
 that can be checked without re-downloading anything.
+
+## Driving HUD — issue #73
+
+### Photographs
+
+| Ref | Subject | Source |
+| --- | --- | --- |
+| H1 | **AiM MyChron 5 face-on, screen legible at full size** — the primary reference | Flickr, [`16097842490`](https://www.flickr.com/photos/16097842490), CC BY-NC-SA 2.0 |
+| H2 | The same unit, three-quarter left, showing the LED strip in relief | Flickr, [`16099072149`](https://www.flickr.com/photos/16099072149), CC BY-NC-SA 2.0 |
+| H3 | Two units, one reversed, showing the connector block and battery | Flickr, [`16099349507`](https://www.flickr.com/photos/16099349507), CC BY-NC-SA 2.0 |
+| H4 | MyChron 4 beside MyChron 5, for what changed between generations | Flickr, [`16351804111`](https://www.flickr.com/photos/16351804111), CC BY-NC-SA 2.0 |
+| H5 | Kart cockpit from the driver's seat, steering wheel and front end | Wikimedia Commons, [`Kart Steering Wheel (8662349718).jpg`](https://commons.wikimedia.org/wiki/File:Kart_Steering_Wheel_(8662349718).jpg), CC BY 2.0, Ernest Duffoo |
+
+**H1-H4 are NC and SA and are reference only.** Nothing is traced, redistributed
+or shipped. What is taken from them is the information architecture — which
+figure is largest, what sits beside what, how the tach is drawn — and a layout is
+not a copyrightable work. The trade dress deliberately is not taken: no maker's
+mark, no product wordmark, no copy of the bezel silhouette, and no buttons.
+
+Discovered through the Openverse API, which indexes Flickr's CC pool directly.
+Wikimedia Commons has essentially nothing on kart instrumentation — searches for
+`MyChron`, `kart dashboard`, `kart tachometer` and `go-kart cockpit` return
+Flat-Earth maps, Mario Kart wheel accessories and 1906 farming bulletins. H5 is
+the only usable Commons result and it is context rather than instrument.
+
+### What the references settled
+
+`scripts/ui/driving_hud.gd` was first written from memory and was wrong in five
+ways, every one of them visible within a second of opening H1. Recorded because
+the same mistake has now been made three times in this project under three
+different headings, and §5 item 10 exists because of it:
+
+1. **It is a positive LCD.** Dark figures on a pale grey-green transflective
+   ground, not glowing white on black. That is the largest single difference,
+   and it is the reason the real instrument is readable in direct sunlight —
+   which is the same problem a HUD over a bright track has.
+2. **Gear is top-left and huge**, occupying roughly a third of the screen height,
+   with `RPM` set **vertically** in three stacked capitals immediately right of
+   it. The first version centered the gear.
+3. **The tachometer is a comb of many thin uniform strokes** — around sixty —
+   over a numeric scale marked every 2,000 rpm, with separate full-height strokes
+   standing clear of the comb as thresholds. The first version drew a dozen
+   chunky segments, which reads as a battery meter.
+4. **Speed is medium and centered**, sitting directly under the tach with a small
+   lowercase `km/h` beside it. The first version made it a hero figure at 95 px.
+5. **The lower right is a 2x2 grid** of small values, each a caps label above a
+   figure — on the real unit Lambda, Pedal, Exhaust and Water.
+
+And one thing the reference has that no amount of thinking produced: **five
+square shift LEDs above the screen plus two round alarm lamps at the outer
+corners**, numbered 1 and 2. Those are two channels, not one. A shift strip says
+"change gear" and an alarm lamp says "something is wrong", and collapsing them
+into a single ten-LED sweep — which is what the first version did — throws away
+the distinction. In this project they map exactly onto `engine.h`'s two states:
+the ignition cut, which is the engine doing its job, and over-rev, which is
+damage.
+
+### Where this kart's instrument necessarily differs
+
+The real unit's 2x2 grid is Lambda, Pedal, Exhaust and Water. This project models
+none of those, and `ARCHITECTURE.md` §12 and issue #138 both say the number a
+driver needs is g. So the same grid carries **LONG g, TIP %, PEAK g and SUST g**,
+and the slot the real unit gives its largest figure to — the running lap time —
+carries **LAT g** until M6 lands lap timing (#73's timing half). The lap counter
+is drawn as an em dash rather than as zero, because a zero lap counter is a claim
+and an em dash is an absence.
+
+`TIP %` has no counterpart on the reference at all. It is lateral g as a fraction
+of the threshold the kart would tip at **in the direction it is currently
+turning**, and it is asymmetric for the reason `chassis.h` gives: 2.4336 g left
+against 2.8061 right, because 27 kg of engine, exhaust and radiator hang off the
+right side and put the center of mass 41 mm right of the centerline.
+
+### What could not be sourced
+
+1. **No photograph of a KZ-class dash in use, at speed, from the driver's seat.**
+   H5 is a stationary kart photographed from behind the seat with no instrument
+   fitted at all. Whether the layout below is actually legible at 100 km/h is
+   therefore a judgement made at the wheel and not a sourced fact, which is
+   exactly what #138 says the instruments exist to enable.
+2. **No measurement of what a driver's eye actually does.** The claim that gear
+   is the figure a kart driver looks at first is inferred from it being the
+   largest thing on the reference unit's screen, which is an argument about the
+   manufacturer's intent rather than a measurement of a driver.
+3. **The segment typeface is an interpretation, not the reference's.** The real
+   unit renders a squared bitmap font on a graphic LCD; this draws true
+   seven-segment glyphs, which is a different thing that reads the same way at a
+   glance. Drawn rather than typed on purpose: Godot's fallback font is a
+   proportional humanist sans, and shipping a segment typeface would be an asset
+   for ten glyphs.

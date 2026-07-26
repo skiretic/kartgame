@@ -277,6 +277,35 @@ public:
 	// owns it and the HUD used to read a GDScript constant for it.
 	double get_steer_lock() const;
 
+	// The ignition cut's two thresholds, rpm, and whether it is currently cutting.
+	//
+	// `engine.h` owns both numbers and the taper between them: from
+	// `soft_cut_rpm` the ignition starts dropping sparks and drive torque falls
+	// linearly to nothing at `hard_cut_rpm`. Served rather than duplicated,
+	// because `scripts/ui/driving_hud.gd` marks the limiter on its tachometer and
+	// a HUD constant that has to be kept in step with the solver's by hand is one
+	// copy of a single-owner number too many — which is the mistake the corner
+	// text made with the steering lock until `get_steer_lock()` was added.
+	//
+	// `is_on_limiter` is deliberately **not** `is_over_rev`. One is the engine
+	// doing its job at the top of the range; the other is past the hard cut and is
+	// damage `engine.h` accumulates against the engine's health. A driver needs to
+	// hear and see the difference, so the HUD gives them separate lamps.
+	double get_soft_cut_rpm() const;
+	double get_hard_cut_rpm() const;
+	bool is_on_limiter() const;
+
+	// The lateral g at which this kart tips, in the direction it is turning.
+	//
+	// Two numbers and not one, because the kart is not laterally symmetric: 27 kg
+	// of engine, exhaust and radiator hang off the right, putting the center of
+	// mass 41 mm right of the centerline, so it tips at 2.4336 g turning left
+	// against 2.8061 turning right. `chassis.h` derives both from the same lump
+	// table. An instrument that drew one symmetric limit would be showing a driver
+	// a kart that does not exist — which is issue #129's defect in a different
+	// place, and #129 was three disagreeing copies of exactly this number.
+	double get_rollover_threshold_g(bool p_turning_left) const;
+
 	// Drivetrain and chassis, individually, for the hot paths that do not want the
 	// Dictionary.
 	double get_engine_rpm() const;

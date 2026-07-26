@@ -186,6 +186,12 @@ void KartBody::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "steer_input"), "", "get_steer_input");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "wheels_on_ground"), "", "get_wheels_on_ground");
 
+	ClassDB::bind_method(D_METHOD("get_soft_cut_rpm"), &KartBody::get_soft_cut_rpm);
+	ClassDB::bind_method(D_METHOD("get_hard_cut_rpm"), &KartBody::get_hard_cut_rpm);
+	ClassDB::bind_method(D_METHOD("is_on_limiter"), &KartBody::is_on_limiter);
+	ClassDB::bind_method(D_METHOD("get_rollover_threshold_g", "turning_left"),
+			&KartBody::get_rollover_threshold_g);
+
 	ClassDB::bind_method(D_METHOD("get_engine_rpm"), &KartBody::get_engine_rpm);
 	ClassDB::bind_method(D_METHOD("get_engine_torque"), &KartBody::get_engine_torque);
 	ClassDB::bind_method(D_METHOD("get_axle_torque"), &KartBody::get_axle_torque);
@@ -767,6 +773,20 @@ Dictionary KartBody::telemetry() const {
 		entry["steer_angle"] = wheel.steer_angle;
 		entry["force"] = to_godot(wheel.force);
 		entry["grounded"] = wheel.grounded;
+		// Issue #136: `grounded` and `tire_contact` are two questions, not one.
+		// `grounded` is carrying load; `tire_contact` is touching the road at all.
+		// A rebound damper can cancel the spring on a tire that never left the
+		// ground, which is real behavior — measured at 98.2 mm/s of extension on
+		// the front corner — and the panel drew "all four down" for it until both
+		// were published.
+		entry["tire_contact"] = wheel.tire_contact;
+		// The latch, which `wheel_report()` has always served and this has not.
+		// A latched contact is a wheel **buried** in a surface rather than one
+		// resting on it: ADR-0033 finding 4 measured that a ray starting below a
+		// surface returns no hit at all, so the boundary re-serves the last valid
+		// plane. Identical to a real contact in every other field here, which is
+		// the same "two states, one read-out" defect #136 was filed about.
+		entry["latched"] = contact_[corner].latched;
 		wheels[corner] = entry;
 	}
 
@@ -820,6 +840,11 @@ Array KartBody::wheel_report() const {
 		entry["point"] = stored.point;
 		entry["normal"] = stored.normal;
 		entry["lift"] = wheel.lift;
+		// Issue #136. `contact` above is the **raycast's** answer, latched when a
+		// wheel is buried; this is what the suspension did with it. The debug draw
+		// wants both, because a corner whose ray found ground while the spring
+		// carries nothing is exactly the state the draw exists to make visible.
+		entry["tire_contact"] = wheel.tire_contact;
 		entry["travel"] = wheel.suspension_travel;
 		entry["load"] = wheel.normal_load;
 		entry["slip_angle"] = wheel.slip_angle;
@@ -867,6 +892,27 @@ double KartBody::get_steer_lock() const {
 	// `steering.h` owns it. The HUD used to read a GDScript constant that had to
 	// be kept in step with it by hand.
 	return kz_front_geometry().max_lock;
+}
+
+double KartBody::get_soft_cut_rpm() const {
+	return vehicle_.drivetrain.engine.soft_cut_rpm;
+}
+
+double KartBody::get_hard_cut_rpm() const {
+	return vehicle_.drivetrain.engine.hard_cut_rpm;
+}
+
+bool KartBody::is_on_limiter() const {
+	// Asked of the engine rather than compared against the thresholds here, so
+	// that the taper's shape stays in one place. `limiter_scale` is 1.0 below the
+	// soft cut and falls linearly to 0.0 at the hard cut; anything below 1.0 means
+	// sparks are being dropped.
+	const kart::core::Engine &engine = vehicle_.drivetrain.engine;
+	return engine.limiter_scale(vehicle_.telemetry().engine_rpm) < 1.0;
+}
+
+double KartBody::get_rollover_threshold_g(bool p_turning_left) const {
+	return kart::core::kz::rollover_threshold_g(vehicle_.mass_properties(), p_turning_left);
 }
 
 double KartBody::get_engine_rpm() const {
