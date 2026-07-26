@@ -1046,8 +1046,21 @@ func _demo_sample(tick: int) -> Dictionary:
 		var slip_ratio := (longitudinal * 0.06 if front else longitudinal * 0.05
 				+ (0.05 if longitudinal > 0.0 else 0.0)) \
 				+ sin(t * 27.0 + float(index) * 2.0) * 0.004
+		# Per wheel, not per chassis. The first version computed this from the
+		# chassis accelerations alone, so all four wheels reported an identical
+		# number however differently they were loaded — 0.559 across loads of 576,
+		# 244, 614 and 283 N. That is the shape a real bug takes once the solver is
+		# wired in, and a demo that renders it as normal is a demo that would hide
+		# it.
+		#
+		# A lightly loaded tire has to use more of what it has to produce its share
+		# of the same cornering force, so utilization rises as load falls. Scaled
+		# against the static rear load from chassis.h.
+		var load_share := 497.7 / maxf(load, 40.0)
 		var utilization := clampf(
-				sqrt(pow(lateral / 2.1, 2.0) + pow(longitudinal / 2.0, 2.0)) * 1.05, 0.0, 1.4)
+				sqrt(pow(lateral / 2.1, 2.0) + pow(longitudinal / 2.0, 2.0))
+						* sqrt(load_share) * 0.95,
+				0.0, 1.4)
 		wheels.append({
 			"normal_load": load,
 			"slip_angle": slip_angle,
