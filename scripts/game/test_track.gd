@@ -1056,11 +1056,10 @@ func _hud_text() -> String:
 		Engine.get_frames_per_second(),
 		ProjectSettings.get_setting("physics/3d/physics_engine", "?"),
 	])
-	lines.append(
-		"W/S throttle-brake  A/D steer  E/Q shift up-down  Shift clutch  "
-		+ "C look back  R respawn  V camera (chase/cockpit/free)  G auto-shift   F2 tuning  F3 telemetry  "
-		+ "F4 frustum  F5 physics"
-	)
+	# `include_debug` off, because this scene has F2's tuning overlay on the end of
+	# the same line and the shared list does not know about it.
+	lines.append_array(ControlHints.lines(false))
+	lines.append("F2 tuning  F3 telemetry  F4 frustum  F5 physics")
 	return "\n".join(lines)
 
 

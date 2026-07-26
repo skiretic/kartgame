@@ -869,9 +869,5 @@ func _hud_text() -> String:
 	# presses F11, sees nothing and concludes the physics draw is broken is a
 	# plausible half-hour that no headless gate can catch. Read off project.godot's
 	# `debug_*` actions: F3, F4, F5.
-	lines.append(
-		"W/S throttle-brake  A/D steer  E/Q shift up-down  Shift clutch  "
-		+ "C look back  R respawn  V camera (chase/cockpit/free)  G auto-shift"
-	)
-	lines.append("F3 telemetry  F4 freeze frustum  F5 physics draw")
+	lines.append_array(ControlHints.lines())
 	return "\n".join(lines)

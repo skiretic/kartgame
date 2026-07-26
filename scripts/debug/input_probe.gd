@@ -47,6 +47,7 @@ const DIGITAL_ACTIONS: Array[StringName] = [
 	&"look_back",
 	&"respawn",
 	&"camera_cycle",
+	&"auto_shift_toggle",
 	&"pause",
 ]
 
