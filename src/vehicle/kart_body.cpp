@@ -4,6 +4,8 @@
 #include "core/steering.h"
 #include "core/surface.h"
 
+#include <godot_cpp/classes/audio_stream_player.hpp>
+#include <godot_cpp/classes/audio_stream_player3d.hpp>
 #include <godot_cpp/classes/collision_shape3d.hpp>
 #include <godot_cpp/classes/engine.hpp>
 #include <godot_cpp/classes/input.hpp>
@@ -15,6 +17,8 @@
 #include <godot_cpp/classes/world3d.hpp>
 #include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
+
+#include <cstring>
 
 using namespace godot;
 using namespace kart::core;
@@ -113,6 +117,14 @@ void KartBody::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_auto_shift", "enabled"), &KartBody::set_auto_shift);
 	ClassDB::bind_method(D_METHOD("is_auto_shift"), &KartBody::is_auto_shift);
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "auto_shift"), "set_auto_shift", "is_auto_shift");
+
+	ClassDB::bind_method(D_METHOD("set_engine_voice_player", "path"),
+			&KartBody::set_engine_voice_player);
+	ClassDB::bind_method(D_METHOD("get_engine_voice_player"), &KartBody::get_engine_voice_player);
+	ClassDB::bind_method(D_METHOD("engine_mount_position"), &KartBody::engine_mount_position);
+	ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "engine_voice_player", PROPERTY_HINT_NODE_PATH_VALID_TYPES,
+						"AudioStreamPlayer3D,AudioStreamPlayer"),
+			"set_engine_voice_player", "get_engine_voice_player");
 
 	ClassDB::bind_method(D_METHOD("set_jacking_enabled", "enabled"),
 			&KartBody::set_jacking_enabled);
@@ -328,6 +340,8 @@ void KartBody::_ready() {
 		spawn_ = get_global_transform();
 	}
 
+	resolve_engine_voice();
+
 	wall_start_usec_ = Time::get_singleton()->get_ticks_usec();
 	tick_count_ = 0;
 	// Not 1.0. Nothing has been measured yet, and 1.0 is precisely the value that
@@ -362,6 +376,8 @@ void KartBody::_physics_process(double p_delta) {
 	apply_torque(to_godot(forces.central_torque));
 
 	last_input_ = input;
+
+	publish_engine_audio();
 
 	// --- time ratio, telemetry and nothing else ------------------------------
 	//
@@ -634,6 +650,39 @@ bool KartBody::is_auto_shift() const {
 	return vehicle_.drivetrain.assists.auto_shift;
 }
 
+void KartBody::set_engine_voice_player(const NodePath &p_path) {
+	engine_voice_path_ = p_path;
+	// Re-resolved immediately when the node is already in the tree, so that setting
+	// the path from a script after `_ready` works rather than silently doing nothing
+	// until the next scene load.
+	if (is_inside_tree()) {
+		resolve_engine_voice();
+	}
+}
+
+NodePath KartBody::get_engine_voice_player() const {
+	return engine_voice_path_;
+}
+
+Vector3 KartBody::engine_mount_position() const {
+	// Looked up by name rather than by index. The table is edited — the lead ballast
+	// was added to it after the fact, and issue #107's calibration moved four driver
+	// rows — and an index would silently start pointing at the exhaust.
+	for (int index = 0; index < kart::core::kz::KART_LUMP_COUNT; ++index) {
+		const kart::core::MassLump &lump = kart::core::kz::KART_LUMPS[index];
+		if (lump.name != nullptr && std::strcmp(lump.name, "engine") == 0) {
+			return to_godot(lump.position);
+		}
+	}
+	// Not silently (0,0,0), which is a legal-looking position at the kart's origin —
+	// on the floor, on the centerline — and would sound like the engine had been
+	// moved into the driver's lap.
+	UtilityFunctions::push_error(
+			"KartBody: chassis.h's lump table has no row named 'engine'. The engine "
+			"note has nowhere to come from.");
+	return Vector3();
+}
+
 void KartBody::set_jacking_enabled(bool p_enabled) {
 	vehicle_.jacking_enabled = p_enabled;
 }
@@ -748,6 +797,151 @@ void KartBody::engage(int p_gear, double p_road_speed_ms) {
 	set_linear_velocity(-get_global_transform().basis.get_column(2).normalized() *
 			static_cast<real_t>(p_road_speed_ms));
 	set_angular_velocity(Vector3());
+}
+
+// --- the engine note ------------------------------------------------------------
+
+void KartBody::resolve_engine_voice() {
+	engine_voice_.unref();
+	if (engine_voice_path_.is_empty()) {
+		return;
+	}
+
+	Node *node = get_node_or_null(engine_voice_path_);
+	if (node == nullptr) {
+		UtilityFunctions::push_warning(
+				"KartBody: engine_voice_player '", engine_voice_path_,
+				"' resolves to nothing. The kart will be silent.");
+		return;
+	}
+
+	// Both player types, because the two are siblings rather than parent and child
+	// in Godot's hierarchy and there is no common base that carries `get_stream`.
+	// `AudioStreamPlayer3D` is what the kart scene uses — the note comes from the
+	// engine mount and pans with the look-back camera — and the plain player is
+	// accepted because a probe or a menu has no reason to place a voice in space.
+	Ref<AudioStream> stream;
+	if (AudioStreamPlayer3D *player_3d = Object::cast_to<AudioStreamPlayer3D>(node)) {
+		stream = player_3d->get_stream();
+	} else if (AudioStreamPlayer *player = Object::cast_to<AudioStreamPlayer>(node)) {
+		stream = player->get_stream();
+	} else {
+		UtilityFunctions::push_warning(
+				"KartBody: engine_voice_player '", engine_voice_path_,
+				"' is a ", node->get_class(),
+				", not an AudioStreamPlayer3D or AudioStreamPlayer. The kart will be silent.");
+		return;
+	}
+
+	engine_voice_ = stream;
+	if (engine_voice_.is_null()) {
+		// Said loudly, because this is the failure mode with no other symptom. A
+		// player whose stream is the wrong resource plays happily and silently, and
+		// the first guess when a kart is quiet is always the synth.
+		UtilityFunctions::push_warning(
+				"KartBody: '", engine_voice_path_,
+				"' has no EngineVoiceStream. Its stream is ",
+				stream.is_null() ? String("empty") : stream->get_class(),
+				". The kart will be silent, and nothing else will report it.");
+	}
+}
+
+// One tick of engine state, published through the stream's seqlock.
+//
+// **This is the only place `VehicleTelemetry` becomes `EngineAudioInput`.**
+// `audio_state.h` puts the mapping at the boundary rather than in `src/core/` on
+// purpose, so that the solver keeps having no opinion about who is listening.
+//
+// Wait-free: `publish` is two counter stores and a struct copy, measured at 3.5 ns.
+// Nothing here can make the physics tick wait on the audio thread, which is the
+// property that matters — the reverse, an audio thread waiting on physics, is what
+// the seqlock's bounded retry handles.
+void KartBody::publish_engine_audio() {
+	if (engine_voice_.is_null()) {
+		return;
+	}
+
+	const VehicleTelemetry &source = vehicle_.telemetry();
+	const kart::core::Engine &engine = vehicle_.drivetrain.engine;
+
+	kart::core::EngineAudioInput audio;
+	audio.rpm = source.engine_rpm;
+
+	// `load` is not `throttle`, and `audio_state.h` explains at length why: the
+	// measured on/off-throttle constraint was extracted by splitting frames on the
+	// sign of df0/dt, which is an *engine* state and not a pedal. Off the pipe, wide
+	// open throttle makes very little torque and should not sound like it makes a
+	// lot.
+	//
+	// The denominator is what the engine could make at this rpm, so `load` is 1.0
+	// when the engine is doing everything it can *here* rather than everything it
+	// could anywhere. At 3,000 rpm a KZ at full throttle is working flat out and
+	// making very little, which is exactly the sound being asked for.
+	const double capacity = engine.wide_open_torque(source.engine_rpm);
+	const double ratio = capacity > 0.0 ? source.engine_torque / capacity : 0.0;
+	audio.load = ratio < 0.0 ? 0.0 : (ratio > 1.0 ? 1.0 : ratio);
+
+	audio.throttle = last_input_.throttle;
+
+	// Negative crank torque is the road driving the engine. Clamped to zero load
+	// above and reported as a state here, because the measurement behind the ladder
+	// tilt is a two-state observation and nothing in `kz_audio_reference.h`
+	// describes an in-between. This flag is what makes #39's engine braking audible.
+	audio.trailing = source.engine_torque <= 0.0;
+
+	audio.gear = source.gear;
+	audio.shifting = source.shifting;
+	audio.over_rev = engine.over_rev(source.engine_rpm);
+	// Between the soft and hard cuts, where the ignition is dropping sparks and
+	// `limiter_scale` is below 1. Distinct from `over_rev`, which is past the hard
+	// cut: one is the engine doing its job and the other is a mistake, and a driver
+	// has to be able to hear which.
+	audio.on_limiter = engine.limiter_scale(source.engine_rpm) < 1.0 &&
+			!engine.over_rev(source.engine_rpm);
+
+	audio.clutch_slip = source.clutch_slip;
+	audio.speed_ms = source.speed_ms;
+
+	// Scrub, aggregated across the corners. The mean of the four rather than the
+	// maximum: one wheel kerbing is not the sound of a kart sliding, and a maximum
+	// would make it one.
+	//
+	// Slip *angle* only, and normalized against the tire's own peak. The longitudinal
+	// slip ratio is deliberately left out of v1 — a locked wheel and a spinning wheel
+	// are different noises, and §12's scrub layer has no measured spectrum for either
+	// (`SCRUB_SPECTRUM_MEASURED` is false), so adding a second unsourced driver to an
+	// unsourced filter is two guesses stacked. Issue #83 owns it.
+	double scrub_sum = 0.0;
+	int scrub_count = 0;
+	for (int corner = 0; corner < CORNER_COUNT; ++corner) {
+		const WheelTelemetry &wheel = source.wheel[corner];
+		if (!wheel.tire_contact) {
+			continue;
+		}
+		const double normalized = std::fabs(wheel.slip_angle) / SCRUB_REFERENCE_SLIP_RAD;
+		scrub_sum += normalized > 1.0 ? 1.0 : normalized;
+		++scrub_count;
+	}
+	audio.scrub = scrub_count > 0 ? scrub_sum / static_cast<double>(scrub_count) : 0.0;
+
+	// One surface for the whole kart, from a wheel that is actually on something.
+	// Four surfaces would be right and there is one scrub layer, so the first wheel
+	// with contact wins. A kart straddling a curb reports one of the two rather than
+	// an average of an enum, which is what averaging a `SurfaceType` would produce.
+	//
+	// Read from `contact_` and not from `WheelTelemetry`, which has no `surface`
+	// field: the surface is an input to the solver rather than an output of it, so it
+	// lives on `GroundQuery` and this class's own copy of what it served is the
+	// authoritative record of it.
+	audio.surface = 0;
+	for (int corner = 0; corner < CORNER_COUNT; ++corner) {
+		if (contact_[corner].grounded) {
+			audio.surface = contact_[corner].surface;
+			break;
+		}
+	}
+
+	engine_voice_->publish(audio);
 }
 
 // --- read-out -------------------------------------------------------------------

@@ -382,7 +382,44 @@ int32_t AudioProbePlayback::_mix(AudioFrame *p_buffer, float p_rate_scale, int32
 	const double dphi = TAU * f0 / rate;
 
 	const int64_t synth_start_ns = now_ns();
-	if (partials > 0 && g_tables_ready) {
+	if (s.use_engine_synth.load(std::memory_order_relaxed) != 0) {
+		// The real class, at a held operating point. `publish` is a plain store and
+		// `render` is documented as the audio-thread call, so this is the production
+		// call sequence and not an imitation of it.
+		//
+		// The state is assembled here rather than seqlocked in because the question
+		// is what `render` costs, and a transport already measured at 4.6 ns per
+		// block would be 0.04% of the answer while making the operating point
+		// depend on a second thread's timing.
+		kart::core::EngineAudioInput input;
+		input.rpm = s.synth_rpm.load(std::memory_order_relaxed);
+		input.load = s.synth_load.load(std::memory_order_relaxed);
+		input.throttle = input.load;
+		input.trailing = s.synth_trailing.load(std::memory_order_relaxed) != 0;
+		input.gear = 2;
+		_synth.publish(input);
+
+		// Chunked against the scratch, so a device asking for a larger block than
+		// the 512 this was measured at degrades into two renders rather than into a
+		// buffer overrun.
+		int32_t done = 0;
+		while (done < p_frames) {
+			int32_t chunk = p_frames - done;
+			if (chunk > AUDIO_PROBE_SCRATCH_FRAMES) {
+				chunk = AUDIO_PROBE_SCRATCH_FRAMES;
+			}
+			_synth.render(_scratch, chunk);
+			for (int32_t i = 0; i < chunk; ++i) {
+				const float sample = _scratch[i];
+				p_buffer[done + i].left = sample;
+				p_buffer[done + i].right = sample;
+			}
+			done += chunk;
+		}
+		// The count is the synth's own decision, so it is read back rather than
+		// assumed. Without it a nanosecond figure has no denominator.
+		s.synth_partials.store(static_cast<int32_t>(_synth.partial_count()), std::memory_order_relaxed);
+	} else if (partials > 0 && g_tables_ready) {
 		if (s.use_table.load(std::memory_order_relaxed) != 0) {
 			render_table(_phase, partials, dphi, gain, p_buffer, p_frames);
 		} else {
@@ -425,6 +462,12 @@ int32_t AudioProbePlayback::_mix(AudioFrame *p_buffer, float p_rate_scale, int32
 	return p_frames;
 }
 
+void AudioProbePlayback::configure_synth(double p_sample_rate) {
+	kart::core::EngineAudioConfig config;
+	_synth.configure(config, p_sample_rate > 1.0 ? p_sample_rate : 48000.0);
+	g_stats.synth_rate.store(_synth.nyquist_hz() * 2.0, std::memory_order_relaxed);
+}
+
 // --- AudioProbeStream -------------------------------------------------------
 
 void AudioProbeStream::_bind_methods() {}
@@ -432,6 +475,10 @@ void AudioProbeStream::_bind_methods() {}
 Ref<AudioStreamPlayback> AudioProbeStream::_instantiate_playback() const {
 	Ref<AudioProbePlayback> playback;
 	playback.instantiate();
+	// Sized here, on the main thread, from the rate the caller cached before
+	// `play()`. `configure` fills a 4,096-point sine table and both ladders, which
+	// is exactly the kind of work that must not happen on the audio thread.
+	playback->configure_synth(g_stats.mix_rate.load(std::memory_order_relaxed));
 	return playback;
 }
 
@@ -458,6 +505,9 @@ void AudioProbe::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_gain", "gain"), &AudioProbe::set_gain);
 	ClassDB::bind_method(D_METHOD("set_use_table", "use_table"), &AudioProbe::set_use_table);
 	ClassDB::bind_method(D_METHOD("set_torture", "torture"), &AudioProbe::set_torture);
+	ClassDB::bind_method(D_METHOD("set_engine_synth", "enabled"), &AudioProbe::set_engine_synth);
+	ClassDB::bind_method(D_METHOD("set_synth_operating_point", "rpm", "load", "trailing"),
+			&AudioProbe::set_synth_operating_point);
 	ClassDB::bind_method(D_METHOD("set_physics_busy_us", "us"), &AudioProbe::set_physics_busy_us);
 	ClassDB::bind_method(D_METHOD("report"), &AudioProbe::report);
 	ClassDB::bind_method(D_METHOD("call_frames"), &AudioProbe::call_frames);
@@ -508,7 +558,24 @@ void AudioProbe::arm() {
 	s.naked_reads.store(0, std::memory_order_relaxed);
 	s.naked_torn.store(0, std::memory_order_relaxed);
 
+	// Not `use_engine_synth`, `synth_rpm`, `synth_load` or `synth_trailing`: those
+	// are the operating point the caller sets *before* arming, and clearing them
+	// here would silently measure a synth at zero rpm. `synth_partials` is a
+	// read-back and does get cleared, so that a stale count from a previous case
+	// cannot be mistaken for this one's.
+	s.synth_partials.store(0, std::memory_order_relaxed);
+
 	_publish_counter = 0;
+}
+
+void AudioProbe::set_engine_synth(bool p_enabled) {
+	g_stats.use_engine_synth.store(p_enabled ? 1 : 0, std::memory_order_relaxed);
+}
+
+void AudioProbe::set_synth_operating_point(double p_rpm, double p_load, bool p_trailing) {
+	g_stats.synth_rpm.store(p_rpm > 0.0 ? p_rpm : 0.0, std::memory_order_relaxed);
+	g_stats.synth_load.store(p_load < 0.0 ? 0.0 : (p_load > 1.0 ? 1.0 : p_load), std::memory_order_relaxed);
+	g_stats.synth_trailing.store(p_trailing ? 1 : 0, std::memory_order_relaxed);
 }
 
 void AudioProbe::set_partials(int32_t p_partials) {
@@ -662,6 +729,13 @@ Dictionary AudioProbe::report() const {
 	d["reads_per_mix"] = s.reads_per_mix.load(std::memory_order_relaxed);
 	d["mix_rate"] = s.mix_rate.load(std::memory_order_relaxed);
 	d["fundamental_hz"] = s.fundamental_hz.load(std::memory_order_relaxed);
+
+	d["use_engine_synth"] = s.use_engine_synth.load(std::memory_order_relaxed) != 0;
+	d["synth_rpm"] = s.synth_rpm.load(std::memory_order_relaxed);
+	d["synth_load"] = s.synth_load.load(std::memory_order_relaxed);
+	d["synth_trailing"] = s.synth_trailing.load(std::memory_order_relaxed) != 0;
+	d["synth_partials"] = s.synth_partials.load(std::memory_order_relaxed);
+	d["synth_rate"] = s.synth_rate.load(std::memory_order_relaxed);
 	return d;
 }
 

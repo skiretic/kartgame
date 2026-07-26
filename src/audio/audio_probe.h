@@ -2,6 +2,7 @@
 #define KARTGAME_AUDIO_AUDIO_PROBE_H
 
 #include "core/audio_state.h"
+#include "core/engine_synth.h"
 
 #include <godot_cpp/classes/audio_frame.hpp>
 #include <godot_cpp/classes/audio_stream.hpp>
@@ -76,6 +77,12 @@ inline constexpr int AUDIO_PROBE_MAX_THREADS = 4;
 // is 20-60 us depending on the core, which is a few tenths of a percent of an
 // 11.6 ms mix block — visible to a timer, invisible to the audio device.
 inline constexpr int AUDIO_PROBE_CALIB_ITERS = 20000;
+
+// Mono scratch the real `EngineSynth` renders into before it is fanned out to
+// `AudioFrame`. Sized well past the 512 frames `_mix` was measured to ask for, so
+// that a driver with a larger buffer cannot make the audio thread allocate. A
+// block larger than this renders in chunks rather than overflowing.
+inline constexpr int AUDIO_PROBE_SCRATCH_FRAMES = 4096;
 
 // Everything the audio thread writes and the main thread reads.
 //
@@ -191,6 +198,42 @@ struct ProbeStats {
 	// exactly the "conclusion resting on a model" issue #107 is the worked example
 	// of. Both get measured where they will actually run.
 	std::atomic<int32_t> use_table{ 0 };
+
+	// --- the real synth, on the real audio thread ----------------------------
+	//
+	// Everything above measures a *stand-in* stack: a bare phase accumulator and a
+	// gain, which is the cheapest thing that has the right shape. That was the
+	// right instrument for ADR-0035, whose question was about the transport.
+	//
+	// It is the wrong instrument for the question that follows it. `EngineSynth`
+	// does per-partial work the stand-in does not — two ladders crossfaded, a
+	// per-partial gain ramp, a comb, a noise layer, combustion jitter — and its
+	// partial count is chosen from a frequency ceiling rather than passed in, so
+	// `active_partials()` returns 192 at a 2,000 rpm idle and 40 at 12,000. **Idle
+	// is the worst case and it is 8x the 24 partials ADR-0035 costed.** Multiplying
+	// that measurement by eight is a model, and issue #107 is what this project
+	// calls the practice of trusting one. So the real class renders in the real
+	// `_mix` instead.
+	std::atomic<int32_t> use_engine_synth{ 0 };
+
+	// Crank speed the synth is held at, rpm. The operating point, and the only
+	// input that changes the partial count.
+	std::atomic<double> synth_rpm{ 0.0 };
+
+	// Load, 0..1, and the trailing-throttle flag. Both change which ladder is in
+	// use and therefore the per-partial arithmetic, so a cost figure taken at one
+	// of them is not a cost figure for the other.
+	std::atomic<double> synth_load{ 1.0 };
+	std::atomic<int32_t> synth_trailing{ 0 };
+
+	// What `active_partials()` actually chose, read back from `_mix`. The point of
+	// the exercise: a cost per frame means nothing without the partial count it was
+	// paid for, and that count is the synth's decision rather than the caller's.
+	std::atomic<int32_t> synth_partials{ 0 };
+
+	// Sample rate the synth was configured at, echoed so the report can divide by
+	// the right frame period rather than by an assumed one.
+	std::atomic<double> synth_rate{ 0.0 };
 };
 
 ProbeStats &audio_probe_stats();
@@ -219,6 +262,19 @@ private:
 	// block would click at every block boundary, which is a different bug from
 	// the one being measured here, so the probe does it properly.
 	double _phase[AUDIO_PROBE_MAX_PARTIALS] = {};
+
+	// The real thing, when `use_engine_synth` is set. A member rather than a
+	// pointer so that no allocation happens anywhere near `_mix`, and configured in
+	// `_instantiate_playback` — which is provably the main thread, being called out
+	// of `AudioStreamPlayer::play()` — rather than in `_start`, whose thread this
+	// probe has never measured and therefore does not get to assume.
+	kart::core::EngineSynth _synth;
+	float _scratch[AUDIO_PROBE_SCRATCH_FRAMES] = {};
+
+public:
+	// Size the synth to a device rate and clear it. Main thread only: it fills a
+	// 4,096-point sine table and both ladder tables.
+	void configure_synth(double p_sample_rate);
 };
 
 // The stream half of architecture (b). Exists only to hand back a playback.
@@ -261,6 +317,13 @@ public:
 	void set_gain(double p_gain);
 	void set_use_table(bool p_use_table);
 	void set_torture(bool p_torture);
+
+	// Render the real `EngineSynth` inside `_mix` instead of the stand-in stack,
+	// held at one operating point. `p_rpm` is the only lever that changes the
+	// partial count; `p_load` and `p_trailing` change which ladder is being
+	// crossfaded and so change the per-partial arithmetic.
+	void set_engine_synth(bool p_enabled);
+	void set_synth_operating_point(double p_rpm, double p_load, bool p_trailing);
 
 	// Microseconds `_physics_process` spends in its busy window, sampling
 	// `mix_active`. Zero disables the window entirely.

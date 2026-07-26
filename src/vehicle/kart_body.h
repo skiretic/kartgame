@@ -1,6 +1,7 @@
 #ifndef KARTGAME_VEHICLE_KART_BODY_H
 #define KARTGAME_VEHICLE_KART_BODY_H
 
+#include "audio/engine_voice.h"
 #include "core/vehicle.h"
 #include "core/vehicle_state.h"
 
@@ -8,6 +9,7 @@
 #include <godot_cpp/variant/array.hpp>
 #include <godot_cpp/variant/callable.hpp>
 #include <godot_cpp/variant/dictionary.hpp>
+#include <godot_cpp/variant/node_path.hpp>
 #include <godot_cpp/variant/transform3d.hpp>
 #include <godot_cpp/variant/vector3.hpp>
 
@@ -273,6 +275,31 @@ public:
 	double get_steer_input() const; // normalized, rate limited, -1..1
 	int get_wheels_on_ground() const;
 
+	// The `AudioStreamPlayer3D` (or `AudioStreamPlayer`) whose stream is an
+	// `EngineVoiceStream`. Issues #81, #82.
+	//
+	// A path set by the scene rather than a node this class creates, for the same
+	// reason the collision shape is: the note comes from the engine mount, which is
+	// a position only the scene knows, and a boundary that placed its own emitter
+	// would be deciding where the engine is.
+	//
+	// Empty is legal and silent. Every headless probe runs that way — `drive.sh`
+	// switches the HUD and both cameras off already — and a solver that needed an
+	// audio device to step would be a solver no gate could run.
+	void set_engine_voice_player(const godot::NodePath &p_path);
+	godot::NodePath get_engine_voice_player() const;
+
+	// Where the engine sits in the body's own frame, meters. The place to put the
+	// emitter, served rather than retyped.
+	//
+	// `src/core/chassis.h`'s lump table is the single owner of every mass and every
+	// position on this kart, and it puts the engine at (0.319, 0.150, 0.190) — 319 mm
+	// right of centerline and 190 mm behind the origin, which is where a KZ's engine
+	// is and is why the center of mass is 41 mm right. A scene that retyped those
+	// three numbers would be a second owner, and the failure mode is silent: the
+	// engine note would drift away from the engine the day somebody moved the lump.
+	godot::Vector3 engine_mount_position() const;
+
 	// The front wheels' actual steer angle at full input, radians — `steering.h`
 	// owns it and the HUD used to read a GDScript constant for it.
 	double get_steer_lock() const;
@@ -342,7 +369,35 @@ private:
 	// This body's pose and motion, in `vehicle_state.h`'s vocabulary.
 	kart::core::BodyState read_body_state() const;
 
+	// Find the voice named by `engine_voice_player` and hold its stream. Called from
+	// `_ready`, so a scene that reparents its audio after that gets what it asks for
+	// only by setting the path again — which is deliberate, because resolving a
+	// NodePath every tick to serve a pointer that never changes is 120 lookups a
+	// second for nothing.
+	void resolve_engine_voice();
+
+	// Map this tick's `VehicleTelemetry` onto `EngineAudioInput` and publish it.
+	// The only place that mapping exists. See the definition for why `load` is not
+	// `throttle`.
+	void publish_engine_audio();
+
+	// Slip angle at which the scrub layer is driven flat out, radians.
+	//
+	// **A tunable, and it has to be, because the thing it feeds is unmeasured.**
+	// `kz_audio::SCRUB_SPECTRUM_MEASURED` is false: §12 specifies scrub as filtered
+	// noise driven by slip and no recording in the corpus isolates a tire from the
+	// engine running over the top of it. So this number cannot be sourced and is not
+	// pretending to be.
+	//
+	// 0.20 rad, about 11.5 degrees, chosen from the tire model rather than from the
+	// sound: it is past where `tire.h`'s lateral curve peaks, so the noise is at full
+	// drive by the time the tire is genuinely sliding rather than merely working.
+	static constexpr double SCRUB_REFERENCE_SLIP_RAD = 0.20;
+
 	kart::core::KartVehicle vehicle_;
+
+	godot::NodePath engine_voice_path_;
+	godot::Ref<EngineVoiceStream> engine_voice_;
 
 	// What was served to the solver last tick, per corner: the latch's storage and
 	// the debug-draw getters' source.

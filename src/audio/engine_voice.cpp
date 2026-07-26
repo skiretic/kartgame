@@ -1,0 +1,306 @@
+#include "audio/engine_voice.h"
+
+#include <godot_cpp/classes/audio_server.hpp>
+#include <godot_cpp/core/class_db.hpp>
+
+#include <chrono>
+#include <cstring>
+
+using namespace godot;
+
+namespace kartgame {
+
+namespace {
+
+// How many times a seqlock read may retry before giving up and repeating the last
+// good snapshot. 64, matching the probe: far more than a 120 Hz writer can force,
+// and bounded because an unbounded spin on the audio thread is a lock by another
+// name. ADR-0035 counted "gave up" separately from "torn" for the same reason this
+// file does — merging them reported 1022 phantom torn reads.
+constexpr int64_t SEQ_RETRY_BUDGET = 64;
+
+int64_t now_ns() {
+	return std::chrono::duration_cast<std::chrono::nanoseconds>(
+			std::chrono::steady_clock::now().time_since_epoch())
+			.count();
+}
+
+} // namespace
+
+// --- EngineVoiceStream ------------------------------------------------------
+
+void EngineVoiceStream::_bind_methods() {
+	ClassDB::bind_method(D_METHOD("set_gain", "gain"), &EngineVoiceStream::set_gain);
+	ClassDB::bind_method(D_METHOD("get_gain"), &EngineVoiceStream::get_gain);
+	ClassDB::bind_method(D_METHOD("voice_stats"), &EngineVoiceStream::voice_stats);
+	ClassDB::bind_method(D_METHOD("reset_stats"), &EngineVoiceStream::reset_stats);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "gain", PROPERTY_HINT_RANGE, "0.0,1.0,0.01"),
+			"set_gain", "get_gain");
+}
+
+void EngineVoiceStream::publish(const kart::core::EngineAudioInput &p_input) {
+	// Enter the write: the counter goes odd, and the release ordering means no
+	// reader can observe the odd counter *after* observing a byte of the payload
+	// written below it.
+	const uint32_t start = _seq.load(std::memory_order_relaxed);
+	_seq.store(start + 1u, std::memory_order_release);
+	std::atomic_thread_fence(std::memory_order_release);
+
+	_payload = p_input;
+
+	// Leave the write. The fence before this store is what makes the payload
+	// visible to a reader that then sees an even, unchanged counter.
+	std::atomic_thread_fence(std::memory_order_release);
+	_seq.store(start + 2u, std::memory_order_release);
+}
+
+bool EngineVoiceStream::read(kart::core::EngineAudioInput &r_input) const {
+	int64_t retries = 0;
+	for (;;) {
+		const uint32_t first = _seq.load(std::memory_order_acquire);
+		if ((first & 1u) != 0u) {
+			// A write is in progress. Nothing to do but look again.
+			++retries;
+			if (retries > SEQ_RETRY_BUDGET) {
+				break;
+			}
+			continue;
+		}
+		// `memcpy` rather than assignment, deliberately: the source is being written
+		// concurrently, so this is a racy read by construction and the validation
+		// below is what makes it safe. A struct assignment would be the same machine
+		// code with a stronger implication about it.
+		std::memcpy(&r_input, &_payload, sizeof(r_input));
+		std::atomic_thread_fence(std::memory_order_acquire);
+		const uint32_t second = _seq.load(std::memory_order_relaxed);
+		if (first == second) {
+			_seq_retries.fetch_add(retries, std::memory_order_relaxed);
+			return true;
+		}
+		++retries;
+		if (retries > SEQ_RETRY_BUDGET) {
+			break;
+		}
+	}
+	_seq_retries.fetch_add(retries, std::memory_order_relaxed);
+	_seq_gave_up.fetch_add(1, std::memory_order_relaxed);
+	return false;
+}
+
+void EngineVoiceStream::set_gain(double p_gain) {
+	_gain.store(p_gain < 0.0 ? 0.0 : (p_gain > 1.0 ? 1.0 : p_gain), std::memory_order_relaxed);
+}
+
+double EngineVoiceStream::get_gain() const {
+	return _gain.load(std::memory_order_relaxed);
+}
+
+Dictionary EngineVoiceStream::voice_stats() const {
+	Dictionary d;
+	const int64_t calls = _mix_calls.load(std::memory_order_relaxed);
+	const int64_t frames = _render_frames_total.load(std::memory_order_relaxed);
+	const int64_t total_ns = _render_ns_total.load(std::memory_order_relaxed);
+	const int64_t worst_ns = _render_ns_worst.load(std::memory_order_relaxed);
+	const int32_t worst_frames = _worst_block_frames.load(std::memory_order_relaxed);
+	const double rate = _mix_rate.load(std::memory_order_relaxed);
+
+	d["mix_calls"] = calls;
+	d["partials"] = _partials.load(std::memory_order_relaxed);
+	d["mix_rate"] = rate;
+	d["seq_gave_up"] = _seq_gave_up.load(std::memory_order_relaxed);
+	d["seq_retries"] = _seq_retries.load(std::memory_order_relaxed);
+
+	// Per frame, because the block size is the device's choice and the frame period
+	// is the deadline's unit.
+	d["render_ns_per_frame"] = frames > 0 ? static_cast<double>(total_ns) / static_cast<double>(frames) : 0.0;
+	d["render_ns_worst_per_frame"] = worst_frames > 0
+			? static_cast<double>(worst_ns) / static_cast<double>(worst_frames)
+			: 0.0;
+
+	// The fraction of real time the synth consumed, mean and worst block. This is
+	// the figure that either does or does not starve the device, and §15's 0.5 ms of
+	// a rendered frame is *not* — the audio thread spends none of a rendered frame.
+	// Issue #155 restates that row; `tools/verify/synth_cost_probe.gd` holds the
+	// measurement it gets restated against.
+	const double frame_period_ns = rate > 0.0 ? 1.0e9 / rate : 0.0;
+	if (frame_period_ns > 0.0) {
+		d["load_fraction"] = frames > 0
+				? (static_cast<double>(total_ns) / static_cast<double>(frames)) / frame_period_ns
+				: 0.0;
+		d["load_fraction_worst"] = worst_frames > 0
+				? (static_cast<double>(worst_ns) / static_cast<double>(worst_frames)) / frame_period_ns
+				: 0.0;
+	} else {
+		d["load_fraction"] = 0.0;
+		d["load_fraction_worst"] = 0.0;
+	}
+	return d;
+}
+
+void EngineVoiceStream::reset_stats() {
+	_mix_calls.store(0, std::memory_order_relaxed);
+	_render_ns_total.store(0, std::memory_order_relaxed);
+	_render_frames_total.store(0, std::memory_order_relaxed);
+	_render_ns_worst.store(0, std::memory_order_relaxed);
+	_worst_block_frames.store(0, std::memory_order_relaxed);
+	_seq_gave_up.store(0, std::memory_order_relaxed);
+	_seq_retries.store(0, std::memory_order_relaxed);
+}
+
+Ref<AudioStreamPlayback> EngineVoiceStream::_instantiate_playback() const {
+	Ref<EngineVoicePlayback> playback;
+	playback.instantiate();
+
+	// The sample rate is read here rather than in `_mix`. `AudioServer::get_mix_rate`
+	// is a call into the engine and the audio thread must make none, so the rate is
+	// captured once on the main thread and the synth is sized to it.
+	AudioServer *server = AudioServer::get_singleton();
+	const double rate = server != nullptr ? server->get_mix_rate() : 48000.0;
+
+	// `const_cast` to hand the playback a counted reference to its own stream. The
+	// stream does not reference the playback, so there is no cycle; what this buys
+	// is that a playback outliving its stream reads a live object instead of a freed
+	// one. `_instantiate_playback` is const because it does not mutate the stream's
+	// *stream-ness*, which is a different question from refcounting it.
+	playback->bind(Ref<EngineVoiceStream>(const_cast<EngineVoiceStream *>(this)), rate);
+	_mix_rate.store(rate, std::memory_order_relaxed);
+	return playback;
+}
+
+String EngineVoiceStream::_get_stream_name() const {
+	return String("KZ engine voice");
+}
+
+double EngineVoiceStream::_get_length() const {
+	// Zero means unbounded to the player, which is what a live synth is.
+	return 0.0;
+}
+
+bool EngineVoiceStream::_is_monophonic() const {
+	return true;
+}
+
+// --- EngineVoicePlayback ----------------------------------------------------
+
+void EngineVoicePlayback::_bind_methods() {}
+
+void EngineVoicePlayback::bind(const Ref<EngineVoiceStream> &p_stream, double p_sample_rate) {
+	_stream = p_stream;
+	_rate = p_sample_rate > 1.0 ? p_sample_rate : 48000.0;
+
+	kart::core::EngineAudioConfig config;
+	if (_stream.is_valid()) {
+		config.gain = _stream->get_gain();
+	}
+	_synth.configure(config, _rate);
+	_last_good = kart::core::EngineAudioInput();
+}
+
+int32_t EngineVoicePlayback::_mix(AudioFrame *p_buffer, float p_rate_scale, int32_t p_frames) {
+	// `p_rate_scale` is the pitch scale the player asks for, and it is ignored on
+	// purpose: a synthesized note computes its own frequency from rpm and has no
+	// source rate to resample from, so honoring it would pitch-shift the engine
+	// away from the rpm the driver is reading off the tachometer.
+	(void)p_rate_scale;
+
+	if (p_buffer == nullptr || p_frames <= 0) {
+		return 0;
+	}
+	if (_stream.is_null()) {
+		for (int32_t i = 0; i < p_frames; ++i) {
+			p_buffer[i].left = 0.0f;
+			p_buffer[i].right = 0.0f;
+		}
+		return p_frames;
+	}
+
+	// One seqlock read per block, which is the rate ADR-0035 costed at 4.6 ns and
+	// 0.0013% of the budget. Reading per frame would be 512 times that for a state
+	// that only changes every 1.39 blocks.
+	kart::core::EngineAudioInput input;
+	if (_stream->read(input)) {
+		_last_good = input;
+	} else {
+		// Budget exhausted. Repeat the last good tick rather than render a torn one:
+		// a partial whose harmonic number came from one publish and whose rpm came
+		// from another is a frequency that no engine state ever had.
+		input = _last_good;
+	}
+	_synth.publish(input);
+
+	const int64_t start_ns = now_ns();
+	int32_t done = 0;
+	while (done < p_frames) {
+		int32_t chunk = p_frames - done;
+		if (chunk > SCRATCH_FRAMES) {
+			chunk = SCRATCH_FRAMES;
+		}
+		_synth.render(_scratch, chunk);
+		// Mono to both channels. The player above this — an `AudioStreamPlayer3D` on
+		// the engine mount — owns panning and distance; a synth that panned itself
+		// would fight it.
+		for (int32_t i = 0; i < chunk; ++i) {
+			const float sample = _scratch[i];
+			p_buffer[done + i].left = sample;
+			p_buffer[done + i].right = sample;
+		}
+		done += chunk;
+	}
+	const int64_t render_ns = now_ns() - start_ns;
+
+	EngineVoiceStream *stream = _stream.ptr();
+	stream->_mix_calls.fetch_add(1, std::memory_order_relaxed);
+	stream->_render_ns_total.fetch_add(render_ns, std::memory_order_relaxed);
+	stream->_render_frames_total.fetch_add(p_frames, std::memory_order_relaxed);
+	stream->_partials.store(static_cast<int32_t>(_synth.partial_count()), std::memory_order_relaxed);
+
+	// The worst block, kept with a compare-exchange so that two playbacks reporting
+	// into one stream cannot lose the larger of them. The block size is stored with
+	// it because a worst *block* is only comparable per frame, and the largest block
+	// is not necessarily the slowest one.
+	int64_t previous_worst = stream->_render_ns_worst.load(std::memory_order_relaxed);
+	while (render_ns > previous_worst) {
+		if (stream->_render_ns_worst.compare_exchange_weak(previous_worst, render_ns,
+					std::memory_order_relaxed, std::memory_order_relaxed)) {
+			stream->_worst_block_frames.store(p_frames, std::memory_order_relaxed);
+			break;
+		}
+	}
+
+	_position += static_cast<double>(p_frames) / _rate;
+	return p_frames;
+}
+
+void EngineVoicePlayback::_start(double p_from_pos) {
+	_active = true;
+	_position = p_from_pos;
+	// Not `_synth.reset()`. `reset` clears the sine table's consumers, the comb line
+	// and every phase — cheap, but this may be the audio thread and the phases are
+	// exactly what must survive a restart to avoid a click. The synth is already
+	// clean from `bind`.
+}
+
+void EngineVoicePlayback::_stop() {
+	_active = false;
+}
+
+bool EngineVoicePlayback::_is_playing() const {
+	return _active;
+}
+
+int32_t EngineVoicePlayback::_get_loop_count() const {
+	return 0;
+}
+
+double EngineVoicePlayback::_get_playback_position() const {
+	return _position;
+}
+
+void EngineVoicePlayback::_seek(double p_position) {
+	// A live synth has nothing to seek to. Accepting the position and ignoring it is
+	// honest; refusing it would make `AudioStreamPlayer` log a failure every time
+	// something in the scene tried.
+	_position = p_position;
+}
+
+} // namespace kartgame

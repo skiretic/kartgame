@@ -114,6 +114,11 @@ var _free: FreeCamera
 var _fixed: Camera3D
 var _hud: Label
 var _driving_hud: Control
+## The `EngineVoiceStream` the kart is publishing into, or null where there is no
+## audio device. Held so the HUD can read `voice_stats()` — the worst-block
+## render figure is the one that sees a dropout, and a mean never will.
+var _engine_voice: Object
+
 var _physics_draw: PhysicsDraw
 var _camera_mode := "chase"
 
@@ -444,6 +449,10 @@ func _build_kart() -> void:
 				+ "run tools/blender/genkart.sh"
 			)
 	add_child(_kart)
+
+	# The engine note, at the engine. Null under every headless gate, which have no
+	# audio device and must not need one — see `engine_voice_rig.gd`.
+	_engine_voice = EngineVoiceRig.attach(_kart)
 
 	_physics_draw = PhysicsDraw.new()
 	_physics_draw.name = "PhysicsDraw"

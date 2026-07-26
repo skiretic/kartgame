@@ -1,6 +1,7 @@
 #include "register_types.h"
 
 #include "audio/audio_probe.h"
+#include "audio/engine_voice.h"
 #include "kart_core.h"
 #include "kart_random.h"
 #include "kart_state_hash.h"
@@ -47,6 +48,19 @@ void initialize_kartgame_module(ModuleInitializationLevel p_level) {
 	GDREGISTER_CLASS(kartgame::AudioProbePlayback);
 	GDREGISTER_CLASS(kartgame::AudioProbeStream);
 	GDREGISTER_CLASS(kartgame::AudioProbe);
+
+	// The production engine note. Issues #81 and #82, ADR-0035.
+	//
+	// The playback is registered for the same reason the probe's is, and the
+	// consequence of forgetting is quieter than a crash: Godot would call
+	// `AudioStreamPlayback::_mix` from the base class, the player would report itself
+	// as playing, and the kart would be silent with no error anywhere.
+	//
+	// Registration order matters here in a way it does not for a Node. The playback
+	// is instantiated from `EngineVoiceStream::_instantiate_playback`, so it must be
+	// known to ClassDB before any stream can hand one back.
+	GDREGISTER_CLASS(kartgame::EngineVoicePlayback);
+	GDREGISTER_CLASS(kartgame::EngineVoiceStream);
 }
 
 void uninitialize_kartgame_module(ModuleInitializationLevel p_level) {
