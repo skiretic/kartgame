@@ -3,6 +3,7 @@
 #include "kart_core.h"
 #include "kart_random.h"
 #include "kart_state_hash.h"
+#include "vehicle/kart_body.h"
 
 #include <gdextension_interface.h>
 
@@ -28,6 +29,12 @@ void initialize_kartgame_module(ModuleInitializationLevel p_level) {
 	// per body without managing lifetimes. ROADMAP M3a.
 	GDREGISTER_CLASS(kartgame::KartRandom);
 	GDREGISTER_CLASS(kartgame::KartStateHash);
+
+	// The M3b boundary. A Node, so SCENE is the level it must appear at — and it
+	// is instantiable because `scripts/game/proving_ground.gd` builds one in code
+	// and hands it the mesh and collision shape this class deliberately does not
+	// own. ROADMAP M3b, issues #30 and #31.
+	GDREGISTER_CLASS(kartgame::KartBody);
 }
 
 void uninitialize_kartgame_module(ModuleInitializationLevel p_level) {
