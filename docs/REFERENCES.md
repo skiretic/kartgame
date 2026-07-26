@@ -530,3 +530,149 @@ second gear at 60 km/h decelerates the kart at 0.29 g, which is the fraction of
 `kz_reference.h`'s 1.5-2.0 g braking that makes ARCHITECTURE.md §6.3's claim —
 that lifting can shape corner entry more than the brakes — true rather than
 decorative.
+
+## Surfaces — issue #42
+
+*A fragment for `docs/REFERENCES.md`. Merge it in as a top-level section; it is
+kept separate only so that two agents did not write the same file at once.*
+
+`src/core/surface.h` gives asphalt, curb, grass and dirt a grip multiplier. This
+is where every one of those numbers comes from, and where the ones that came
+from nowhere are named as such.
+
+### The one assumption everything else rests on
+
+Published friction coefficients are measured with ordinary road tires, whose own
+dry-asphalt coefficient is 0.65–0.70. `tire.h` gives a kart slick **2.10**. So a
+multiplier cannot simply be "the literature's grass over the literature's
+asphalt" — that ratio is 0.53, and it would hand a slick 1.1 g on a lawn.
+
+The table splits on where the shear plane is:
+
+- **Hard surfaces** — asphalt, painted concrete. The failure is rubber against
+  stone, so the compound is what differs between a road tire and a slick, and a
+  *ratio between two hard surfaces* carries across. The **curb** multiplier is a
+  ratio.
+- **Deformable surfaces** — grass, compacted earth. The failure is inside the
+  terrain. Soil shears at the soil's strength regardless of what is standing on
+  it, so the published coefficient carries across as an **absolute** number and
+  the multiplier is that coefficient divided by the tire's own 2.10. **Grass**
+  and **dirt** are absolutes.
+
+That split is reasoned, not measured. It is the single thing in this section most
+worth disagreeing with, and disagreeing with it moves grass by a factor of three.
+
+### The table
+
+| Surface | Multiplier | Derived from | Lateral g the kart can hold |
+| --- | --- | --- | --- |
+| asphalt | 1.00 | definition — `tire.h` is already a slick on hot asphalt | 2.13 |
+| curb | 0.72 | PTV 35 / PTV 49, paint over asphalt (S1) | 1.53 |
+| grass | 0.18 | μ 0.37 dry rye-grass / 2.10 (S2) | 0.38 |
+| dirt | 0.17 | μ 0.35 gravel-and-dirt road / 2.10 (S3) | 0.36 |
+
+The lateral-g column is measured, not multiplied out by hand:
+`tests/core/test_surface.cpp` puts a quarter of 175 kg on each of four tires,
+asks `Tire::evaluate` for pure lateral force at the slip angle where the curve
+peaks, and divides the sum by the weight. It is the number issue #42's "driving
+onto grass loses grip immediately and obviously" is really about — a kart holding
+2.13 g that puts two wheels on grass keeps 18% of what it had.
+
+### Sources
+
+- **S1 — road marking paint against the pavement under it.**
+  Burghardt, T. E., Köck, B., Pashkevich, A., & Fasching, A. (2023). *Skid
+  resistance of road markings: literature review and field test results.* Roads
+  and Bridges – Drogi i Mosty, 22(2), 141–165.
+  <https://doi.org/10.7409/rabdim.023.007>,
+  <https://rabdim.pl/index.php/rb/article/view/v22n2p141>.
+  Field experiment: the asphalt surface measured **PTV 49**; the same surface
+  painted with no anti-skid additive measured **PTV 35**; with glass microbeads
+  45; with microbeads plus 10% corundum 50. **35 / 49 = 0.714 → 0.72.**
+
+- **S1b — that a kart kerb is a painted surface at all.**
+  CIK-FIA, *Circuit Regulations, Part 1* (2025 preparatory text), §14.6:
+  "Kerbs must be painted in two colours alternately (recommended colours: red and
+  white)." <https://www.fiakarting.com/sites/default/files/2025-04/7.1_Pr%C3%A9pa%20RCIRC%20PI%20+%20II%202025.pdf>
+  This is what justifies using a *paint* figure rather than a concrete figure for
+  the curb: what a tire touches on a kerb is enamel, not aggregate.
+
+- **S2 — grass.**
+  Cenek, P. D., Jamieson, N. J., & McLarin, M. W., *Frictional Characteristics of
+  Roadside Grass Types*, Opus International Consultants, Central Laboratories,
+  New Zealand.
+  <https://saferroadsconference.com/wp-content/uploads/2016/05/Peter-Cenek-Frictional-Characteristics-Roadside-Grass-Types.pdf>
+  Table 4, locked-wheel braking, coefficient of braking friction, dry:
+  **rye-grass (long) 0.36, rye-grass (short) 0.38**; wet 0.21 and 0.24. Mean of
+  the dry pair, **0.37 / 2.10 = 0.176 → 0.18.**
+  The same paper's multi-surface skid case quotes **dry chipseal at μ = 0.70**
+  measured by the same team, which is where the road-car ratio of 0.53 comes from
+  — the number this table deliberately does not use.
+  Two caveats the authors state themselves and that matter here: their test
+  ground "was very hard due to a dry spell", so the values "are likely to be at
+  the lower range of what can be expected"; and their tyre-dragging test (Table 3,
+  dry rye-grass 0.77) uses a very lightly loaded tyre at ≤ 3 km/h and the authors
+  say those figures "should only be used for ranking purposes". The locked-wheel
+  numbers are the ones used above.
+
+- **S3 — dirt.**
+  Noon, R. (1994), *Coefficients of Friction of Various Roadway Surfaces*,
+  reproduced as Table 1 of S2: gravel and dirt road **0.35**, wet grassy field
+  0.20, dry asphaltic concrete 0.65, dry concrete 0.75, loose moist dirt that
+  allows the tyre to sink about 5 cm 0.60–0.65. **0.35 / 2.10 = 0.167 → 0.17.**
+  Which of Noon's dirt rows applies is settled by the CIK-FIA regulations rather
+  than by preference: *Circuit Regulations, Part 1* §7.5 requires the verge
+  bordering a kart track to be "grass-covered or **compacted** ground over a
+  minimum width of 1 m", and §8.2 makes a loose gravel bed a separate,
+  deliberately decompacted deceleration device. The dirt this game drives onto is
+  the compacted verge, so the compacted row is the right one.
+
+- **S4 — cross-check, not used directly.**
+  Wong, J. Y. (1993), *Theory of Ground Vehicles*, 2nd ed., p. 26, via
+  <https://hpwizard.com/tire-friction-coefficient.html>: asphalt and concrete
+  (dry) peak 0.80–0.90 / sliding 0.75; gravel 0.60 / 0.55; earth road (dry) 0.68
+  / 0.65; snow 0.20; ice 0.10. Wong's dry earth road is a *road*, and its ratio
+  to his asphalt (0.80) is far higher than Noon's (0.54) — the two tables are
+  describing different surfaces under the same word. Recorded because that
+  disagreement is the reason the CIK-FIA text was needed to decide which one this
+  game's "dirt" is.
+
+### What could not be sourced, and what was assumed instead
+
+1. **The curb ripple's dimensions.** `surface.h` carries a 12 mm amplitude and a
+   0.15 m wavelength and **neither is sourced**. The CIK-FIA circuit regulations
+   specify a kerb's paint and its repair and say nothing about its profile, and
+   no dimensioned drawing of a kart kerb was found. What the wavelength *is*
+   anchored to is the tire rather than to a kerb: a 0.1475 m rear slick
+   deflecting about 2 mm has a contact chord of 2·√(2Rd) ≈ 49 mm, and a tire
+   bridges any ripple much shorter than its own patch instead of following it, so
+   0.15 m is about the shortest ripple a kart can feel as individual bumps. 12 mm
+   is an amplitude a kart can ride without grounding its floor tray. Both are
+   candidates for replacement by a photographed kerb under the §5 item 10 rule,
+   and both are pinned by a test so that changing them has to be deliberate.
+
+2. **Whether the curb figure should be a dry number.** PTV and BPN are
+   conventionally measured on a wetted surface, so 0.714 is a wet ratio and the
+   dry ratio of paint to asphalt is probably higher. 0.72 is therefore
+   conservative on a dry track. It was kept low on purpose — a kerb that costs
+   nothing is not a kerb — but it is the first number a tuner should reach for,
+   and the honest description of it is "a wet-test ratio used dry".
+
+3. **Rolling resistance.** Not in the table at all. A kart on grass loses speed
+   to more than grip: the tire ploughs, and that is a drag term, not a friction
+   multiplier. No sourced rolling-resistance coefficient for a slick on turf was
+   found, and inventing one and calling it data would be worse than leaving the
+   column out. It is the honest lever if grass and dirt ever need to be told
+   apart by feel — see the next point — and it wants a ticket rather than a
+   guess.
+
+4. **Grass and dirt come out 6% apart, and that is not a mistake.** S2 says it in
+   as many words: "the coefficient of dry rye-grass is comparable to gravel." The
+   two independent derivations agreeing is a reason to believe them, not a reason
+   to spread them. They are told apart by what they sound like, what they throw,
+   and what they look like — the §12 and M10 hooks — and not by grip.
+
+5. **Surface temperature, rubber pickup, and marbles.** All real, all absent.
+   A kart returning from a dirt verge carries the dirt on its tires for most of a
+   lap, which is a memory effect this table has no room for and §5 item 7's
+   "marbles off the racing line" will eventually want. Out of scope for #42.

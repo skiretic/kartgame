@@ -166,11 +166,42 @@ struct TireForce {
 	double longitudinal = 0.0;
 	double lateral = 0.0;
 
-	// How much of the available grip is being used, 0 to 1 and beyond. Above 1
-	// means the friction ellipse had to scale the forces down, which is the
-	// definition of sliding — telemetry and the tire-scrub audio in §12 both
-	// want it, and it costs nothing to return.
+	// How much of the available grip the two axes together demanded, before the
+	// ellipse scaled them back. Above 1 means it had to scale them, which is the
+	// definition of *combined-slip* saturation.
+	//
+	// **It is not a measure of sliding, and it used to claim to be.** The comment
+	// here said "above 1 ... is the definition of sliding — telemetry and the
+	// tire-scrub audio in §12 both want it". Measured, that is exactly backwards
+	// in pure slip:
+	//
+	//     slip ratio   longitudinal force   utilization
+	//        +0.108              1050.0 N         1.000    at the peak
+	//        +0.300               840.2 N         0.800
+	//        +1.000               642.5 N         0.612    fully locked
+	//
+	// Each axis's fraction reduces algebraically to `normalized(slip)`, which
+	// peaks at 1.0 *and falls past the peak*. So a locked wheel reports 0.612 and
+	// keeps falling as it slides harder, and pure slip can never exceed 1 at all
+	// — only combined slip can, and at most sqrt(2). Both named consumers would
+	// have read a sliding tire as a gripping one.
+	//
+	// The quantity they actually want is `slide` below. This one is still worth
+	// returning, because "did the ellipse bind" is a real question about combined
+	// slip, but it is now named for what it does.
 	double utilization = 0.0;
+
+	// How far past its peak the tire is, 1.0 at the peak and unbounded above.
+	//
+	// This is the sliding measure. Unlike `utilization` it is monotone in slip,
+	// so it keeps rising as a wheel locks or spins, which is what the §12 scrub
+	// audio modulates on and what the telemetry panel needs in order to say "this
+	// tire is past the peak" rather than "this tire is producing less force than
+	// it could, for one of two opposite reasons".
+	//
+	// Combined as a quadrature sum of each axis against its own peak slip, so it
+	// reaches sqrt(2) when both axes are at peak simultaneously.
+	double slide = 0.0;
 };
 
 class Tire {
@@ -178,14 +209,35 @@ public:
 	TireCurve lateral;
 	TireCurve longitudinal;
 
+	// Where each curve peaks, cached. `peak_slip` is a 60-step bisection and the
+	// `slide` figure needs it on every tire on every substep, so it is computed
+	// once here rather than 1,920 times a second.
+	//
+	// The cost of caching is that it goes stale if a coefficient is changed after
+	// construction, which the tuning UI will want to do. `refresh_peaks()` is the
+	// answer and callers that mutate a curve must call it — stated here because a
+	// silently stale peak makes `slide` wrong in a way nothing else notices.
+	double lateral_peak_slip = 0.0;
+	double longitudinal_peak_slip = 0.0;
+
 	Tire() {
 		// The longitudinal curve is stiffer and peaks earlier than the lateral
-		// one, which is true of real tires and is why a locked wheel loses so
-		// much more than a sliding one: peak braking arrives at a slip ratio
-		// around 0.12 and is gone by 1.0.
+		// one, which is true of real tires. Measured from these coefficients:
+		// peak braking arrives at a slip ratio of 0.108, and a fully locked wheel
+		// still returns 61% of it.
+		//
+		// This comment used to end "and is gone by 1.0", which is wrong by 61
+		// percentage points and contradicted test_tire.cpp's own deliberate
+		// assertion that the force must *not* fall away to nothing.
 		longitudinal.stiffness = 12.0;
 		longitudinal.shape = 1.65;
 		longitudinal.curvature = -0.30;
+		refresh_peaks();
+	}
+
+	void refresh_peaks() {
+		lateral_peak_slip = lateral.peak_slip();
+		longitudinal_peak_slip = longitudinal.peak_slip();
 	}
 
 	// Combined-slip forces through a friction ellipse.
@@ -221,6 +273,16 @@ public:
 				lateral_fraction * lateral_fraction +
 				longitudinal_fraction * longitudinal_fraction);
 		result.utilization = demand;
+
+		// How far past peak each axis is, in quadrature. Monotone in slip, so it
+		// keeps climbing as the wheel locks or spins — see `TireForce::slide`.
+		if (lateral_peak_slip > 0.0 && longitudinal_peak_slip > 0.0) {
+			const double lateral_slide = slip.slip_angle / lateral_peak_slip;
+			const double longitudinal_slide = slip.slip_ratio / longitudinal_peak_slip;
+			result.slide = std::sqrt(
+					lateral_slide * lateral_slide +
+					longitudinal_slide * longitudinal_slide);
+		}
 
 		if (demand > 1.0) {
 			result.lateral /= demand;

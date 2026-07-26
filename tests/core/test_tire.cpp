@@ -193,3 +193,50 @@ TEST_CASE("the model can produce the cornering force the KZ figures require") {
 	CHECK(achievable_g > 2.0);
 	CHECK(achievable_g < 3.2);
 }
+
+TEST_CASE("slide rises with slip where utilization falls") {
+	// The defect this pair of fields was split to fix. `utilization` peaks at 1.0
+	// and comes back down past the peak, so a locked wheel looked like a gripping
+	// one to both of the consumers tire.h names — the telemetry panel and §12's
+	// scrub audio. `slide` is monotone, which is what those two actually want.
+	Tire tire;
+	CHECK(tire.longitudinal_peak_slip == doctest::Approx(tire.longitudinal.peak_slip()));
+	CHECK(tire.lateral_peak_slip == doctest::Approx(tire.lateral.peak_slip()));
+
+	double previous_slide = -1.0;
+	double utilization_at_peak = 0.0;
+	double utilization_when_locked = 0.0;
+
+	for (double ratio = 0.05; ratio <= 1.0001; ratio += 0.05) {
+		TireSlip slip;
+		slip.normal_load = NOMINAL_LOAD;
+		slip.slip_ratio = ratio;
+		const TireForce force = tire.evaluate(slip);
+
+		// Monotone, strictly. This is the whole property.
+		CHECK(force.slide > previous_slide);
+		previous_slide = force.slide;
+
+		if (ratio > tire.longitudinal_peak_slip && utilization_at_peak == 0.0) {
+			utilization_at_peak = force.utilization;
+		}
+		utilization_when_locked = force.utilization;
+	}
+
+	// At the peak, slide is 1.0 by construction.
+	TireSlip at_peak;
+	at_peak.normal_load = NOMINAL_LOAD;
+	at_peak.slip_ratio = tire.longitudinal_peak_slip;
+	CHECK(tire.evaluate(at_peak).slide == doctest::Approx(1.0));
+
+	// A fully locked wheel is far past it.
+	TireSlip locked;
+	locked.normal_load = NOMINAL_LOAD;
+	locked.slip_ratio = -1.0;
+	const TireForce sliding = tire.evaluate(locked);
+	CHECK(sliding.slide > 9.0);
+	// ...and this is the number that was being reported as "how much grip is in
+	// use" for a wheel that has completely let go.
+	CHECK(sliding.utilization == doctest::Approx(0.612).epsilon(1e-2));
+	CHECK(utilization_when_locked < utilization_at_peak);
+}

@@ -1,0 +1,20 @@
+[gd_scene load_steps=2 format=3]
+
+; Deliberately almost empty, the same as scenes/game/proving_ground.tscn: the
+; whole panel is built by scripts/game/telemetry_panel.gd at run time, so its
+; layout is described by code that can be read and reviewed rather than by
+; editor state that cannot.
+;
+; A CanvasLayer root rather than a Control, for two reasons. It can be added
+; straight to a 3D scene with one line and will draw over it —
+;
+;     add_child(preload("res://scenes/ui/telemetry.tscn").instantiate())
+;
+; — and it can also be run on its own as a main scene, which is what
+; `--telemetry=demo` exists for.
+
+[ext_resource type="Script" path="res://scripts/game/telemetry_panel.gd" id="1_telemetry"]
+
+[node name="TelemetryPanel" type="CanvasLayer"]
+layer = 100
+script = ExtResource("1_telemetry")
