@@ -1,0 +1,25 @@
+# kartgame driver profile. One profile per file, and settings are not here:
+# they live alongside in settings.cfg so that a profile which will not parse
+# still leaves a menu a player can read. See src/core/profile.h, ADR-0042.
+version 1
+driver_name Skirving, Anthony
+driver_number 101
+driver_nationality GBR
+driver_livery works_blue
+career_class ok
+career_season 0
+career_round 2
+
+standing turney_joe 88.000000
+standing toviggino_maximo 76.000000
+standing cuman_nicolo 71.000000
+standing skirving_anthony 63.000000
+standing bertuca_alfio 57.000000
+standing lammers_kean 44.000000
+standing vidales_david 38.000000
+standing powell_zachary 29.000000
+
+best autumn_ridge forward ok 48.412355 ar_fwd_ok_0001
+best autumn_ridge forward kz2 44.108900 ar_fwd_kz2_0003
+best autumn_ridge reverse ok 49.877010 ar_rev_ok_0001
+best brackwater forward ok 62.330500 bw_fwd_ok_0002

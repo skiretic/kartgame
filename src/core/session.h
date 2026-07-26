@@ -373,6 +373,16 @@ struct SessionConfig {
 	// here are configuration, not simulation state: a lap count and a distance in
 	// meters are exact numbers a person typed, and `TUNING_QUANTUM` is the grid the
 	// tuning set already quantizes to.
+	//
+	// **One thing here is safe by accident and the next field could break it.**
+	// `track_id`'s characters go into the same byte stream as the field names, with
+	// no length prefix and no separator, so in principle a string could impersonate
+	// the name of the field that follows it. It cannot today, and the reason is that
+	// `track_id` is the *only* variable-length field: a variable string followed by
+	// a fixed known suffix is injective. Add a second string — a roster id, a driver
+	// name, a preset label — and two different configurations can fingerprint
+	// identically, which is exactly the false "yes" this hash exists not to give.
+	// Whoever adds one mixes its length first.
 	uint64_t hash() const {
 		StateHash digest(SESSION_HASH_QUANTUM);
 		mix_name(digest, "track_id");
@@ -470,6 +480,67 @@ inline const char *session_field_name(SessionField field) {
 		case SessionField::Seed: return "seed";
 	}
 	return "invalid";
+}
+
+// Print one configuration field's value. Returns the length written or -1.
+//
+// The pair to `session_field_name` above, and it is here for the same reason: a
+// switch over the field list belongs beside the list. It was first written in
+// `replay.h`, by the agent that needed ADR-0041's error sentence, with a comment
+// saying it wanted to live here — a second reader of this list is how a diagnostic
+// ends up naming one field and printing another's value. There is no `default:`
+// label, so adding a `SessionField` without adding a line here is a compiler
+// warning rather than a field that prints nothing.
+inline int session_field_value(const SessionConfig &config, SessionField field, char *out,
+		int cap) {
+	if (out == nullptr || cap < 2) {
+		return -1;
+	}
+	auto copy = [&](const char *text) {
+		int written = 0;
+		while (text[written] != '\0') {
+			if (written + 1 >= cap) {
+				return -1;
+			}
+			out[written] = text[written];
+			++written;
+		}
+		out[written] = '\0';
+		return written;
+	};
+	switch (field) {
+		case SessionField::None:
+			return copy("none");
+		case SessionField::TrackId:
+			return copy(config.track_id);
+		case SessionField::TrackHash:
+			return format_hex64(config.track_hash, out, cap);
+		case SessionField::Layout:
+			return copy(track_layout_name(config.layout));
+		case SessionField::Condition:
+			return copy(track_condition_name(config.condition));
+		case SessionField::Type:
+			return copy(session_type_name(config.type));
+		case SessionField::KartClass:
+			return copy(kart_class_name(config.kart_class));
+		case SessionField::LimitKind:
+			return copy(session_limit_kind_name(config.limit.kind));
+		case SessionField::LimitValue:
+			return format_value(config.limit.value, out, cap);
+		case SessionField::EntryCount:
+			return format_int(config.entry_count, out, cap);
+		case SessionField::RosterHash:
+			return format_hex64(config.roster_hash, out, cap);
+		case SessionField::AutoClutch:
+			return copy(config.assists.auto_clutch ? "on" : "off");
+		case SessionField::AutoShift:
+			return copy(config.assists.auto_shift ? "on" : "off");
+		case SessionField::Tuning:
+			return format_hex64(config.tuning.hash(), out, cap);
+		case SessionField::Seed:
+			return format_hex64(config.seed, out, cap);
+	}
+	return copy("invalid");
 }
 
 // The first field on which two configurations disagree, in the order they are

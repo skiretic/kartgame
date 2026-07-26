@@ -252,22 +252,47 @@ TEST_CASE("the compressed weekend is the FIA distances times the scale, not a la
 	}
 }
 
-TEST_CASE("GAMEDESIGN's 15-minute round is what the compression actually produces") {
-	// The compression exists to hit one number — a round of about 15 minutes — and
-	// nothing else in the codebase checks that it does. At the kart pace §4 assumes
-	// on a 1,200 m circuit, roughly 48 s a lap.
+TEST_CASE("what the compression really costs, in whole laps") {
+	// The compression exists to hit one number — a round of about 15 minutes,
+	// `GAMEDESIGN.md` §4 — and nothing else in the codebase checks that it does.
+	//
+	// **A race is a whole number of laps, and rounding it down is what makes this
+	// test agree with a table that is wrong.** FIA Karting's General Prescriptions
+	// specify a distance and the race runs the minimum number of *full* laps that
+	// reaches it, which is a ceiling: 3,750 m on a 1,200 m circuit is 4 laps, not
+	// 3.125 and not 3. §4's lap column says ~3, ~4 and ~6 against the ceiling's
+	// 4, 5 and 7, so the doc is one lap short on all three races and its "Round
+	// ~= 15 minutes, Season ~= 60 minutes" follows from the short count.
+	//
+	// This case measures both and asserts the ceiling, because that is what the
+	// game will actually run. The 60-minute season is a design constraint and
+	// whether to move `SESSION_DISTANCE_SCALE` to meet it is not this test's call —
+	// but the figure is written down here so the choice is made against a number.
 	const double lap_time_s = 48.0;
 	const double lap_length_m = 1200.0;
 
-	double round_s = scheduled_limit(SessionType::Qualifying).value;
+	double fractional_s = scheduled_limit(SessionType::Qualifying).value;
+	double whole_lap_s = fractional_s;
+	int laps = 0;
 	for (const SessionType type :
 			{ SessionType::Heat, SessionType::SuperHeat, SessionType::Final }) {
 		const SessionLimit limit = scheduled_limit(type);
 		REQUIRE(limit.kind == SessionLimitKind::Distance);
-		round_s += limit.value / lap_length_m * lap_time_s;
+		fractional_s += limit.value / lap_length_m * lap_time_s;
+		const int full_laps = static_cast<int>(std::ceil(limit.value / lap_length_m));
+		laps += full_laps;
+		whole_lap_s += static_cast<double>(full_laps) * lap_time_s;
 	}
-	// 180 s of qualifying plus 16.25 km of racing at 25 m/s.
-	CHECK(round_s / 60.0 == doctest::Approx(13.9).epsilon(0.02));
-	// A season is four rounds, and the design's constraint was one evening.
-	CHECK(4.0 * round_s / 60.0 < 60.0);
+
+	// 4 + 5 + 7 on a 1,200 m circuit.
+	CHECK(laps == 16);
+	MESSAGE("a round is " << whole_lap_s / 60.0 << " min over " << laps
+						  << " racing laps, against " << fractional_s / 60.0
+						  << " min if part laps counted; a season of four rounds is "
+						  << 4.0 * whole_lap_s / 60.0 << " min");
+	// 180 s of qualifying plus 16 laps at 48 s.
+	CHECK(whole_lap_s == doctest::Approx(948.0));
+	// And the season overshoots the design's one evening by 3.2 minutes. Asserted
+	// rather than lamented: if the scale moves, this line is what notices.
+	CHECK(4.0 * whole_lap_s / 60.0 == doctest::Approx(63.2));
 }
