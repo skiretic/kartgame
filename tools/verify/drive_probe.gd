@@ -1,7 +1,14 @@
 extends SceneTree
 
-## ROADMAP M3a's acceptance harness: drive the kart with scripted input, measure
+## The driving acceptance harness: drive the kart with scripted input, measure
 ## what it does, and hash what it did.
+##
+## Written for M3a's GDScript stand-in and now pointed at M3b's `KartBody`, which
+## is the C++ solver on a Jolt body. Nothing in the harness changed shape to
+## follow it — the vehicle is found by name, driven through the same `input_driver`
+## Callable, and read through the same property names — which is the useful part
+## of the migration: the whole vehicle model was replaced underneath a measurement
+## rig that did not have to be rewritten to notice.
 ##
 ##     tools/verify/drive.sh
 ##     godot --headless --path . --script tools/verify/drive_probe.gd -- --ticks=1800
@@ -45,7 +52,7 @@ const DEFAULT_TICKS := 1200
 ## still far finer than the timescale any real divergence takes to grow.
 const HASH_INTERVAL := 4
 
-var _kart: KartDebugVehicle
+var _kart: KartBody
 var _root: Node
 var _hash: KartStateHash
 
@@ -62,8 +69,13 @@ const SETTLE_TICKS := 90
 ## Entry speed for the skidpad, m/s. 13.5 m/s is 48.6 km/h.
 ##
 ## Set from a sweep rather than from an estimate, and the sweep is the reason the
-## number is not the 15.3 m/s a 15 m circle at 2.2 g would support. Measured on
-## the M3a stand-in vehicle, one run per entry speed:
+## number is not the 15.3 m/s a 15 m circle at 2.2 g would support. **The table
+## below was measured on the M3a stand-in vehicle, which no longer exists**, and
+## is kept because it is the record of why this constant is what it is, not
+## because it describes the current kart. It has deliberately not been re-swept
+## against `KartBody`: re-choosing an entry speed to improve a lateral figure
+## would be tuning the scenario to hit a number, which is the one thing this
+## harness must not do. One run per entry speed, on the deleted vehicle:
 ##
 ##     entry m/s   sustained g   peak g   max roll
 ##       8.0          1.84        2.14      1.6 deg
@@ -89,6 +101,55 @@ const SETTLE_TICKS := 90
 ## rather than by guessing at it once.
 const SKIDPAD_ENTRY_MS := 13.5
 
+## Steering input held through the skidpad, 0 to 1, where 1 is full lock.
+##
+## The default is 1.0, which is what the scenario has always used and is **left
+## alone deliberately** — changing a scenario's input until a figure improves is
+## tuning, whatever it is called. What it is now is an argument, for the same
+## reason `--entry=` is one: the lateral limit is found by sweeping a lever and
+## reading the result, not by picking a value once and defending it.
+##
+## It is worth knowing what full lock means to this vehicle, because it changed
+## when the vehicle did. M3a's stand-in scaled its lock down with speed
+## (`STEER_SPEED_FALLOFF`), an explicit driver aid, so "full lock" there was a
+## moderate angle at 48 km/h. `steering.h` has no such aid and must not — the real
+## kart's high-speed stability is emergent from caster and Ackermann — so full
+## lock now genuinely is full lock, and full lock at 48 km/h is a spin rather than
+## a skidpad. Sweep it before reading the sustained figure below.
+const SKIDPAD_LOCK := 1.0
+
+## Throttle held through the skidpad. Also unchanged, and also now a lever.
+##
+## A real skidpad is driven on a throttle that holds the speed constant, which is
+## a closed loop and is the one thing this file will not have — a scenario that
+## reads its own state to decide what to do measures the controller as much as the
+## kart. So the throttle is a constant, and a constant throttle can only hold one
+## speed against one amount of corner scrub.
+##
+## That is not a detail, it is the binding constraint on the number this scenario
+## exists to produce. Measured against `KartBody`, on the 15 m marked circle's own
+## entry speed, one run per cell:
+##
+##     lock   throttle   sustained g   settled radius   at
+##     0.25     0.30        0.88 g        18.99 m      46.0 km/h
+##     0.25     0.60        1.59 g        32.64 m      81.3 km/h
+##     0.25     1.00        1.84 g        58.49 m     116.9 km/h
+##     0.40     1.00        1.82 g        50.95 m     108.5 km/h
+##     0.60     1.00        1.02 g         3.49 m      21.2 km/h
+##     1.00     0.30        0.09 g         2.70 m       5.6 km/h   <- the default
+##
+## Two things fall out of that table and both are about the scenario rather than
+## about the kart. At 1.84 g the kart reproduces ROADMAP M3b's solver-only 1.86 g
+## to within 1%, so the boundary is not losing grip anywhere. And the default row
+## is not a cornering measurement at all: at full lock the kart scrubs to walking
+## pace and the "sustained" figure describes a kart that has nearly stopped.
+##
+## Left at 0.30 rather than raised, because raising a scenario's throttle until
+## its lateral figure enters a band is tuning to hit a number however it is
+## justified. What the lever is for is making the row above reproducible from a
+## command instead of from this comment.
+const SKIDPAD_THROTTLE := 0.30
+
 ## Speed below which a longitudinal or lateral spike is not reported as a peak.
 ## At walking pace one tick of full brake is a legitimate 12 g — the clamp in the
 ## drive model stops exactly one tick of momentum, by design — and reporting that
@@ -109,11 +170,23 @@ var _peak_lateral_g := 0.0
 var _peak_braking_g := 0.0
 var _steady_lateral_sum := 0.0
 var _steady_lateral_ticks := 0
+## Speed over the same window, so the settled circle's radius can be reported.
+## `v^2 / a` is the whole of it, and a radius is the one number that says at a
+## glance whether the kart is on a skidpad or spinning on the spot.
+var _steady_speed_sum := 0.0
 var _brake_start_speed := -1.0
 var _brake_start_tick := 0
 var _brake_mean_g := 0.0
 var _max_roll_deg := 0.0
 var _distance := 0.0
+
+## Peak wheel lift per corner, meters, FL FR RL RR. Issue #32's acceptance and
+## `ARCHITECTURE.md` §6's defining kart behavior: with no differential, the inside
+## rear leaving the ground *is* the differential. It is measured here rather than
+## being read off the telemetry panel by eye, because "the inside rear lifts" is a
+## claim with a number attached and the number belongs in the same report as every
+## other §6.4 figure.
+var _peak_lift := [0.0, 0.0, 0.0, 0.0]
 var _previous_velocity := Vector3.ZERO
 var _previous_position := Vector3.ZERO
 var _wheels_down_min := 4
@@ -124,6 +197,8 @@ var _wheels_down_min := 4
 var _skidpad_entered := false
 var _skidpad_entry_tick := -1
 var _entry_ms := SKIDPAD_ENTRY_MS
+var _lock := SKIDPAD_LOCK
+var _corner_throttle := SKIDPAD_THROTTLE
 
 
 func _initialize() -> void:
@@ -131,6 +206,9 @@ func _initialize() -> void:
 	_scenario = Cmdline.as_string(args, "scenario", "accel")
 	_ticks = Cmdline.as_int(args, "ticks", DEFAULT_TICKS)
 	_entry_ms = Cmdline.as_float(args, "entry", SKIDPAD_ENTRY_MS)
+	_lock = clampf(Cmdline.as_float(args, "lock", SKIDPAD_LOCK), 0.0, 1.0)
+	_corner_throttle = clampf(
+		Cmdline.as_float(args, "corner-throttle", SKIDPAD_THROTTLE), 0.0, 1.0)
 
 	if not ClassDB.class_exists("KartStateHash"):
 		printerr("KartStateHash is not registered — build the extension: scons target=editor")
@@ -164,7 +242,7 @@ func _initialize() -> void:
 ## physics tick, which is where the lookup belongs. `shoot.gd` has the same shape
 ## for the same reason.
 func _attach() -> bool:
-	_kart = _root.find_child("Kart", false, false) as KartDebugVehicle
+	_kart = _root.find_child("Kart", false, false) as KartBody
 	if _kart == null:
 		printerr("no Kart in the scene — is assets/generated/kart.glb built?")
 		return false
@@ -191,10 +269,19 @@ func _scripted_input() -> Dictionary:
 				return {"throttle": 1.0, "brake": 0.0, "steer": 0.0}
 			return {"throttle": 0.0, "brake": 1.0, "steer": 0.0}
 		"skidpad", "skidpad_right":
-			# Accelerate to SKIDPAD_ENTRY_MS, then hold full lock on a trickle of
-			# throttle. The kart settles into whatever radius it can hold at
-			# whatever speed it can hold it — the measurement, rather than a radius
-			# chosen in advance and a controller that hunts for it.
+			# Accelerate to SKIDPAD_ENTRY_MS, then hold `SKIDPAD_LOCK` on
+			# `SKIDPAD_THROTTLE`. The kart settles into whatever radius it can hold
+			# at whatever speed it can hold it — the measurement, rather than a
+			# radius chosen in advance and a controller that hunts for it.
+			#
+			# **Against `KartBody` it does not settle into a circle at all.** Both
+			# constants' headers carry the measured sweep: at full lock the kart
+			# scrubs to 5.6 km/h on a 2.7 m radius, so what the sustained figure
+			# below describes is a kart that has nearly stopped. The vehicle is not
+			# the problem — the same scenario at lock 0.25 and full throttle holds
+			# 1.84 g against the solver's own 1.86 g. The scenario is, and it is
+			# left alone here rather than adjusted, because adjusting it until the
+			# figure lands in a band is tuning whatever else it is called.
 			#
 			# The entry speed matters and has now been wrong twice. Full lock at
 			# 100 km/h is not a skidpad, it is a spin: a 15 m circle at 2.2 g only
@@ -211,10 +298,10 @@ func _scripted_input() -> Dictionary:
 			# cornering figure. A threshold crossing is still a pure function of a
 			# deterministic simulation, so the state hash is unaffected; what it is
 			# not is a *controller*, which is the thing the header comment rules out.
-			var steer := -1.0 if _scenario == "skidpad_right" else 1.0
+			var steer := -_lock if _scenario == "skidpad_right" else _lock
 			if not _skidpad_entered:
 				return {"throttle": 1.0, "brake": 0.0, "steer": 0.0}
-			return {"throttle": 0.30, "brake": 0.0, "steer": steer}
+			return {"throttle": _corner_throttle, "brake": 0.0, "steer": steer}
 		_:
 			return {"throttle": 0.0, "brake": 0.0, "steer": 0.0}
 
@@ -259,6 +346,13 @@ func _sample(delta: float) -> void:
 	_top_speed = maxf(_top_speed, speed)
 	if _tick >= SETTLE_TICKS:
 		_wheels_down_min = mini(_wheels_down_min, _kart.wheels_on_ground)
+		# After settling only: the kart is spawned above the ground and dropped, so
+		# the first fraction of a second reports four wheels a long way off the
+		# ground and that is the spawn rather than any behavior of the kart.
+		var wheels: Array = _kart.telemetry().get("wheel", [])
+		for corner in mini(wheels.size(), _peak_lift.size()):
+			var wheel: Dictionary = wheels[corner]
+			_peak_lift[corner] = maxf(float(_peak_lift[corner]), float(wheel.get("lift", 0.0)))
 	# Roll, so that a kart which tipped over is reported as having tipped over
 	# rather than as having pulled a spectacular lateral g on its way past
 	# vertical. Measured from the body's up axis against the world's, which stays
@@ -280,6 +374,7 @@ func _sample(delta: float) -> void:
 			_peak_lateral_g = maxf(_peak_lateral_g, lateral_g)
 		if _tick >= int(float(_ticks) * (1.0 - STEADY_FRACTION)):
 			_steady_lateral_sum += lateral_g
+			_steady_speed_sum += speed
 			_steady_lateral_ticks += 1
 
 		# Braking only counts when the kart is going forwards and slowing down;
@@ -327,21 +422,69 @@ func _report() -> void:
 	var steady := 0.0
 	if _steady_lateral_ticks > 0:
 		steady = _steady_lateral_sum / float(_steady_lateral_ticks)
-	lines.append("    lateral         %8.2f g sustained, %.2f peak   (KZ %.1f-%.1f)" % [
-		steady, _peak_lateral_g, kz["lateral_g_min"], kz["lateral_g_max"],
+	# Two rows against two bands, because they are two different quantities and
+	# this file printed one of them against the other's band for two milestones.
+	#
+	# ADR-0034. The skidpad settles into a circle and holds it, so what it measures
+	# is *sustained*, and a sustained figure may only be judged against the
+	# sustained band — whose ceiling is 18% below this kart's own 2.4336 g rollover
+	# threshold, because nothing sustains more lateral acceleration than it tips
+	# at. The peak below is a transient and is shown against the transient band,
+	# which is allowed to sit above that threshold precisely because tipping takes
+	# time. Both pairs come from `kz_reference.h` through the extension; neither is
+	# restated here, and the ambiguous `lateral_g_*` keys they replaced were
+	# removed rather than aliased so that a caller which had not been updated would
+	# fail loudly instead of quietly reading the wrong band.
+	lines.append("    lateral sust    %8.2f g            (KZ %.1f-%.1f sustained)" % [
+		steady, kz["lateral_sustained_g_min"], kz["lateral_sustained_g_max"],
+	])
+	lines.append("    lateral peak    %8.2f g            (KZ %.1f-%.1f transient)" % [
+		_peak_lateral_g, kz["lateral_peak_g_min"], kz["lateral_peak_g_max"],
 	])
 	if _brake_mean_g > 0.0:
-		lines.append("    braking 90-20   %8.2f g mean, %.2f peak      (KZ %.1f-%.1f)" % [
+		# Issue #131 is the same peak-versus-mean confusion in the braking row and
+		# it is **not resolved here**: §6.4's 1.5-2.0 g has never been labeled
+		# either way, so there is no honest band to compare a mean against yet. The
+		# measurement is untouched and both numbers are printed; which of them the
+		# band describes is stated as open rather than assumed, because assuming it
+		# is what put the lateral row wrong for two milestones.
+		lines.append("    braking 90-20   %8.2f g mean, %.2f peak      (KZ %.1f-%.1f, #131: the" % [
 			_brake_mean_g, _peak_braking_g, kz["braking_g_min"], kz["braking_g_max"],
 		])
+		lines.append("                                                     band is unlabeled)")
 	else:
 		lines.append("    braking 90-20        not measured in this scenario")
-	if _skidpad_entry_tick >= 0:
-		lines.append("    entry speed     %8.1f km/h at %.2f s" % [
+	# Only for the scenarios these two lines describe. `accel` and `brake` also
+	# cross the entry threshold on their way up the straight, and a "settled
+	# circle" printed for a kart driving in a straight line is a number that reads
+	# as a measurement and is not one.
+	if _scenario.begins_with("skidpad") and _skidpad_entry_tick >= 0:
+		lines.append("    entry speed     %8.1f km/h at %.2f s   lock %.2f" % [
 			KartCore.ms_to_kmh(_entry_ms),
 			float(_skidpad_entry_tick) / float(Engine.physics_ticks_per_second),
+			_lock,
+		])
+		# The settled circle, stated as a radius. `v^2 / a` over the same window
+		# the sustained figure is averaged on, so the two describe one state. It is
+		# the number that tells a skidpad from a spin at a glance: the marked circle
+		# in the scene is 15 m and it is drawn at true size.
+		var steady_speed := 0.0
+		if _steady_lateral_ticks > 0:
+			steady_speed = _steady_speed_sum / float(_steady_lateral_ticks)
+		var radius := 0.0
+		if steady > 0.001:
+			radius = steady_speed * steady_speed / (steady * 9.80665)
+		lines.append("    settled circle  %8.2f m radius at %.1f km/h" % [
+			radius, KartCore.ms_to_kmh(steady_speed),
 		])
 	lines.append("    wheels down     %8d minimum after settling" % _wheels_down_min)
+	# Issue #32, per corner, in millimeters. The order is `CORNER_COUNT` order —
+	# FL, FR, RL, RR — which is `chassis_flex.h`'s and therefore the same order the
+	# telemetry panel's columns are in.
+	lines.append("    peak lift mm    %8.1f FL %7.1f FR %7.1f RL %7.1f RR" % [
+		float(_peak_lift[0]) * 1000.0, float(_peak_lift[1]) * 1000.0,
+		float(_peak_lift[2]) * 1000.0, float(_peak_lift[3]) * 1000.0,
+	])
 	# A kart past about 50 degrees of roll is on its side, and every other number
 	# in the report describes a kart that is on its side. Reported rather than
 	# inferred, because a tipped kart still produces plausible-looking g figures.

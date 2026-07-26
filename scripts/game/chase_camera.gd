@@ -31,9 +31,12 @@ const FOV_STATIC := 62.0
 const FOV_AT_SPEED := 78.0
 const FOV_REFERENCE_SPEED := 38.9  # 140 km/h, the §6.4 top-speed figure
 
-## Roll from lateral acceleration, radians at 2.5 g — the top of §6.4's cornering
-## range. Small on purpose: a rig that rolls with the kart reads as drunk rather
-## than as fast.
+## Roll from lateral acceleration, radians at 2.5 g — the top of §6.4's
+## **transient peak** band, which ADR-0034 split out from the sustained one. The
+## peak figure is the right one here: a camera roll is a response to a transient,
+## and scaling it against the sustained band would saturate the rig in every
+## corner. Small on purpose either way: a rig that rolls with the kart reads as
+## drunk rather than as fast.
 const ROLL_AT_PEAK_G := deg_to_rad(3.5)
 
 ## Smoothing half-lives, seconds. Position is followed harder than aim, because a
@@ -44,7 +47,7 @@ const AIM_HALF_LIFE := 0.16
 
 var camera: Camera3D
 
-var _target: KartDebugVehicle
+var _target: KartBody
 var _aim := Vector3.ZERO
 var _previous_velocity := Vector3.ZERO
 var _roll := 0.0
@@ -65,7 +68,7 @@ func _ready() -> void:
 	add_child(camera)
 
 
-func set_target(kart: KartDebugVehicle) -> void:
+func set_target(kart: KartBody) -> void:
 	_target = kart
 	_aim = kart.global_position
 	global_position = kart.global_position

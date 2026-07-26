@@ -10,7 +10,7 @@ extends Camera3D
 ##     Q E            down / up
 ##     mouse          look, once the window is clicked
 ##     shift          x4 speed
-##     F12            freeze / unfreeze the frustum   (debug_camera)
+##     F4             freeze / unfreeze the frustum   (debug_camera)
 ##
 ## ## What "frustum freeze" can and cannot mean here
 ##
