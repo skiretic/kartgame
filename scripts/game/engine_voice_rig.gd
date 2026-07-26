@@ -80,7 +80,7 @@ const VOLUME_DB := 0.0
 ## the whole of what issue #160 has to settle. `src/core/tuning.h` carries the same
 ## two values with the same reasoning and F2 moves them from the first drive; this
 ## file is where they are applied rather than a second owner of them.
-const SCRUB_GAIN := 0.30
+const SCRUB_GAIN := 0.45
 const WIND_GAIN := 0.20
 
 ## Where the scrub emitter sits, and how it falls off.

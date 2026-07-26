@@ -639,7 +639,15 @@ func _build_hud() -> void:
 	add_child(layer)
 
 	_hud = Label.new()
-	_hud.add_theme_font_size_override("font_size", 15)
+	# Scaled to the viewport, not fixed. This was a hard 15 px and the first real
+	# drive reported it as unreadable — at Godot's old 1152x648 default it was 15 px
+	# in a small window, and with `canvas_items` stretch now on it would have stayed
+	# 15 px of a 1600x900 canvas however large the window got. 20 px at 1080 with a
+	# floor of 15 so it cannot shrink below where it started.
+	# `driving_hud.gd` uses the same `viewport.y / 1080` reference, deliberately, so
+	# the two overlays grow together.
+	_hud.add_theme_font_size_override("font_size",
+			maxi(15, int(round(20.0 * get_viewport().get_visible_rect().size.y / 1080.0))))
 	_hud.add_theme_color_override("font_color", Color.WHITE)
 	_hud.add_theme_color_override("font_outline_color", Color.BLACK)
 	_hud.add_theme_constant_override("outline_size", 5)

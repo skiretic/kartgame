@@ -168,6 +168,46 @@ inline double band_q_for_width_oct(double width_oct) {
 // into a different filter at one end of its range.
 inline constexpr double SCRUB_TILT_LP_RATIO = 1.0;
 
+// What the band-pass chain does to the level of white noise, so it can be divided
+// back out.
+//
+// **Without this, `scrub_gain` is not a level control**, and that is a defect
+// rather than a missing feature. Measured RMS through the shipped chain, white
+// noise in, at f0 = 1 kHz:
+//
+//     Q      0.8    1.5    2.4    3.2   6.402   10.0    20.0
+//     RMS  0.127  0.192  0.254  0.300   0.437  0.551   0.775
+//
+// A 6:1 swing. Turning `scrub_q` — a **timbre** knob — moved the loudness with it,
+// so a driver adjusting the band's width would then have had to re-set the gain,
+// and the two knobs would fight every time. Issue #160's third acceptance item is
+// that turning one thing must not require re-judging another; this is that
+// property inside a single layer.
+//
+// It also made the layer quiet in absolute terms, which is how it was found: at
+// the shipped Q of 6.4 the chain passes 0.437 of white, so `scrub_gain` 0.30 was
+// really 0.13 against an engine voice at 0.18.
+//
+// The fit is `rms = C * Q^E * sqrt(f0 / fs)`.
+//
+// **The exponent is 0.61 and not the 0.5 the theory gives**, and the difference is
+// the tilt low-pass. The Cytomic band-pass output has a peak gain of Q rather than
+// 1 and its noise bandwidth falls as 1/Q, so power goes as Q and RMS as sqrt(Q) —
+// for the band-pass alone. The one-pole tilt sits at the band center, so as the
+// band narrows around that corner it removes proportionally less of it, and the
+// measured exponent comes out above a half. 0.5 was tried first and left a
+// residual that climbed monotonically with Q, which is what a wrong exponent looks
+// like as distinct from a wrong constant.
+//
+// The `sqrt(f0/fs)` term is the bandwidth scaling with center frequency, measured
+// flat to 2.6% over 320 Hz to 2 kHz and left at the theoretical value.
+//
+// `tests/core/test_scrub_wind.cpp` measures the realized RMS across Q and across
+// the band center and asserts both are flat, which is the property these two
+// constants exist to buy.
+inline constexpr double SCRUB_CHAIN_RMS_C = 0.98;
+inline constexpr double SCRUB_CHAIN_RMS_Q_EXPONENT = 0.61;
+
 // Where the band moves to on a fully rough surface — `Surface::roughness` of 1.
 // Interpolated linearly against that column, which is dimensionless by design so
 // that nobody mistakes it for a texture depth.
@@ -191,7 +231,15 @@ inline constexpr double SCRUB_ROUGH_Q = 0.8;
 // visuals do, which argues for the low end of the range — but a layer that is
 // always on signals nothing, so the two pull against each other and only an ear
 // settles it.
-inline constexpr double SCRUB_GAMMA = 1.6;
+//
+// **1.0 after the first drive, down from 1.6.** 1.6 was a guess and it was the
+// wrong side of that tension: the drive is a *mean over four corners*, so a kart
+// with its fronts sliding and its rears gripping only reaches about half, and
+// raising a half to the 1.6 gives a third. Reported as "I don't really hear much
+// tire noise", which is the acceptance criterion failing. 1.0 is the identity and
+// makes the layer track the drive linearly; anything below 1 is available and
+// starts trading warning for a layer that is always on.
+inline constexpr double SCRUB_GAMMA = 1.0;
 
 // Road speed at which the scrub layer reaches full level, m/s.
 //
@@ -359,7 +407,7 @@ struct ScrubWindConfig {
 	// `EngineAudioConfig::gain` is — set low so a first drive cannot be painful,
 	// with nothing yet to be low relative to. **Issue #160 owns making these mean
 	// something**, and it is blocked on this file existing.
-	double scrub_gain = 0.30;
+	double scrub_gain = 0.45;
 	double wind_gain = 0.20;
 
 	// And the timbre, every field defaulted from the constant above it.
@@ -463,7 +511,14 @@ public:
 				(config_.scrub_full_speed_ms > 1e-6 ? config_.scrub_full_speed_ms : 1e-6);
 		speed_weight = speed_weight < 0.0 ? 0.0 : (speed_weight > 1.0 ? 1.0 : speed_weight);
 
-		const double target = shaped * speed_weight * config_.scrub_gain;
+		// Divided by what the chain does to white noise, so `scrub_gain` is a level
+		// and not a level-times-whatever-Q-happens-to-be. See SCRUB_CHAIN_RMS_C.
+		const double chain_rms = scrub_wind_tuning::SCRUB_CHAIN_RMS_C *
+				std::pow(q, scrub_wind_tuning::SCRUB_CHAIN_RMS_Q_EXPONENT) *
+				std::sqrt(center / sample_rate_);
+		const double normalize = chain_rms > 1e-9 ? 1.0 / chain_rms : 1.0;
+
+		const double target = shaped * speed_weight * config_.scrub_gain * normalize;
 
 		// The drive one-pole, scaled to this device rate so the time constant is a
 		// time and not a sample count.

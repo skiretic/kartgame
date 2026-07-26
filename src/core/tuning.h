@@ -411,11 +411,12 @@ inline constexpr Tunable TUNABLES[TUNABLE_COUNT] = {
 	// asymmetry is the whole shape of #84 and this block is where it shows.
 	{
 			"scrub_gain", "tire scrub gain", "", "src/core/scrub_wind.h",
-			0.30, 0.0, 1.00, 0.01, Provenance::Unsourced,
-			"A placeholder in the sense voice_gain is: set so a first drive cannot "
-			"be painful, with nothing yet to be loud relative to. Issue #160 owns "
-			"the mixing pass. Listen for: scrub has to signal grip loss before the "
-			"visuals do, and it cannot do that under the engine.",
+			0.45, 0.0, 2.00, 0.01, Provenance::Unsourced,
+			"Now a real level: the band-pass chain's white-noise RMS is divided back "
+			"out, so this no longer moves when scrub_q does. 0.30 before that fix "
+			"was really 0.13 against an engine voice at 0.18, and the first drive "
+			"reported it as inaudible. Listen for: scrub has to signal grip loss "
+			"before the visuals do, and it cannot do that under the engine.",
 			TuningOwner::Audio,
 	},
 	{
@@ -442,7 +443,7 @@ inline constexpr Tunable TUNABLES[TUNABLE_COUNT] = {
 	},
 	{
 			"scrub_gamma", "scrub onset shaping", "", "src/core/scrub_wind.h",
-			1.60, 0.40, 4.00, 0.05, Provenance::Unsourced,
+			1.00, 0.30, 4.00, 0.05, Provenance::Unsourced,
 			"Exponent on the 0..1 slip drive, and the knob #84's acceptance "
 			"criterion turns on. Below 1 the layer is audible from the first degree "
 			"of slip; above 1 it stays quiet until the tire is genuinely past its "

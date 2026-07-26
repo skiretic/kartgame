@@ -5,6 +5,7 @@
 #include "core/surface.h"
 #include "core/tuning.h"
 
+#include <algorithm>
 #include <cmath>
 #include <string>
 #include <vector>
@@ -343,6 +344,71 @@ TEST_CASE("the scrub band reproduces the width and the skirts that were measured
 	CHECK(below_slope < kart::core::kz_audio::SCRUB_SLOPE_BELOW_DB_OCT);
 }
 
+TEST_CASE("the layer level does not move when the band width does") {
+	// **The defect this asserts against shipped and was caught by driving.** The
+	// Cytomic band-pass output has a peak gain of Q rather than 1 and its noise
+	// bandwidth falls as 1/Q, so white noise through it comes out proportional to
+	// sqrt(Q): measured 0.127 at Q 0.8 against 0.775 at Q 20, a 6:1 swing. That
+	// made `scrub_gain` not a gain. A driver widening the band to taste would have
+	// found it quieter and reached for the level knob, and the two would fight
+	// every time.
+	//
+	// It is also why the layer was inaudible on the first drive: at the shipped Q
+	// of 6.4 the chain passes 0.437 of white, so a `scrub_gain` of 0.30 was really
+	// 0.13 against an engine voice at 0.18.
+	//
+	// #160's third acceptance item is that turning one thing must not require
+	// re-judging another. This is that property inside one layer, and it is the
+	// reason `SCRUB_CHAIN_RMS_C` exists.
+	ScrubSynth synth;
+	const EngineAudioInput state = sliding(1.0, 30.0, kart::core::SURFACE_ASPHALT);
+
+	std::string row;
+	double first = 0.0;
+	bool first_set = false;
+	double worst = 0.0;
+	// The range the surface table actually produces is 1.9 on grass to 6.4 on
+	// asphalt; the wider sweep is the adjustable range a driver can reach on F2.
+	for (const double q : { 1.0, 1.9, 3.0, 6.402, 10.0 }) {
+		ScrubWindConfig config;
+		config.scrub_q = q;
+		synth.configure(config, SAMPLE_RATE);
+		const double level = settled_rms(synth, state);
+		if (!first_set) {
+			first = level;
+			first_set = true;
+		}
+		worst = std::max(worst, relative_error(level, first));
+		row += "  Q " + std::to_string(q) + " -> " + std::to_string(level);
+	}
+	MESSAGE("RMS against band Q:" << row);
+	MESSAGE("worst deviation from the Q=1.0 level: " << (100.0 * worst) << "%");
+	// Flat to within the fit's residual. Before the normalization this spanned 6:1.
+	CHECK(worst < 0.05);
+
+	// And the same for the band center, which the surface table also moves: grass
+	// pulls the band from 1000 Hz down to 456 Hz, and running onto it must change
+	// the character without changing the volume.
+	double centre_worst = 0.0;
+	double centre_first = 0.0;
+	bool centre_set = false;
+	std::string centre_row;
+	for (const double hz : { 456.0, 700.0, 1000.0, 1600.0 }) {
+		ScrubWindConfig config;
+		config.scrub_center_hz = hz;
+		synth.configure(config, SAMPLE_RATE);
+		const double level = settled_rms(synth, state);
+		if (!centre_set) {
+			centre_first = level;
+			centre_set = true;
+		}
+		centre_worst = std::max(centre_worst, relative_error(level, centre_first));
+		centre_row += "  " + std::to_string(hz) + " Hz -> " + std::to_string(level);
+	}
+	MESSAGE("RMS against band center:" << centre_row);
+	CHECK(centre_worst < 0.10);
+}
+
 TEST_CASE("the shipped defaults are the arithmetic on the measurement, not a retype") {
 	// `core/tuning.h`'s table has to hold literals — `Tunable` is `constexpr` and
 	// `std::pow` is not usable in one — so the two derived audio defaults are
@@ -374,6 +440,22 @@ TEST_CASE("the shipped defaults are the arithmetic on the measurement, not a ret
 	CHECK(relative_error(defaults.scrub_q, q) < 1e-12);
 	CHECK(relative_error(defaults.wind_speed_exponent, n) < 1e-12);
 	CHECK(defaults.scrub_center_hz == kart::core::kz_audio::SCRUB_PEAK_HZ);
+
+	// **The gains too, because one of them drifted the first time it was moved.**
+	// Raising `scrub_gain` after the first drive touched `core/tuning.h` and
+	// `engine_voice_rig.gd` and left `ScrubWindConfig` behind, so a stream nobody
+	// tuned would have seeded itself from the old value while the overlay showed
+	// the new one. Three owners of one number is exactly what these checks are for.
+	CHECK(defaults.scrub_gain ==
+			kart::core::TUNABLES[kart::core::TUNE_SCRUB_GAIN].default_value);
+	CHECK(defaults.wind_gain ==
+			kart::core::TUNABLES[kart::core::TUNE_WIND_GAIN].default_value);
+	CHECK(defaults.scrub_gamma ==
+			kart::core::TUNABLES[kart::core::TUNE_SCRUB_GAMMA].default_value);
+	CHECK(defaults.scrub_full_speed_ms ==
+			kart::core::TUNABLES[kart::core::TUNE_SCRUB_FULL_SPEED].default_value);
+	CHECK(defaults.wind_cutoff_hz_per_ms ==
+			kart::core::TUNABLES[kart::core::TUNE_WIND_CUTOFF_PER_MS].default_value);
 }
 
 TEST_CASE("a rough surface moves the scrub band down and widens it") {

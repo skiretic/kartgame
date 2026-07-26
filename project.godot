@@ -15,6 +15,41 @@ config/description="A physically-grounded KZ shifter kart racing sim."
 run/main_scene="res://scenes/debug/input_probe.tscn"
 config/features=PackedStringArray("4.7", "Forward Plus")
 
+[display]
+
+; There was no [display] section at all until the first real drive, so the game
+; launched at Godot's 1152x648 default. `scripts/ui/driving_hud.gd` scales itself
+; by `viewport.y / 1080`, so at that height every glyph on it was drawn at 60% of
+; its designed size and the overlay was reported as unreadable. The window size
+; and the HUD legibility were the same bug.
+;
+; 1600x900 rather than 1920x1080: it has to fit on a laptop display without being
+; larger than the screen, and 900 puts the HUD's scale factor at 0.83 rather than
+; 0.60.
+window/size/viewport_width=1600
+window/size/viewport_height=900
+
+; Below this the HUD stops being legible whatever the scale factor does, so the
+; window is not allowed to get there.
+window/size/window_width_override=1600
+window/size/window_height_override=900
+
+; **`canvas_items`, so the UI scales with the window instead of staying 1600x900
+; worth of pixels in the middle of a larger one.** Without it, maximizing the
+; window makes the world bigger and leaves every overlay the same physical size,
+; which is what "the text is too small even fullscreen" describes.
+;
+; `expand` rather than `keep`: the aspect ratio of a driving view should follow
+; the display rather than letterbox, and the HUD is anchored to the viewport
+; rather than laid out at a fixed aspect.
+window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"
+
+; On by default in Godot 4 and named explicitly because it is load-bearing on a
+; Retina display: with it off macOS upscales a low-resolution framebuffer and
+; everything reads as both small and soft.
+window/dpi/allow_hidpi=true
+
 [input]
 
 throttle={
