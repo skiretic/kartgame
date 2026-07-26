@@ -689,6 +689,13 @@ func _respawn() -> void:
 	_kart.respawn()
 	_kart.set_physics_process(false)
 	_respawn_quiet = RESPAWN_QUIET_TICKS + 1
+	# The HUD's peak and sustained figures are session records, and a session ends
+	# at the grid. Without this a 2.4 g spike from the spin that caused the respawn
+	# outlives the spin and sits on the panel for the rest of the evening, which
+	# makes the one number every M3b acceptance criterion reduces to a lie about a
+	# lap that is over.
+	if _driving_hud != null:
+		_driving_hud.reset_peaks()
 
 
 ## Turn the front wheel meshes to the angle the solver is steering at.

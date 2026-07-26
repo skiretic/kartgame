@@ -176,7 +176,11 @@ var _trail: PackedVector2Array = PackedVector2Array()
 var _trail_head := 0
 var _trail_filled := 0
 
-var _sustained_run := 0
+## The last `SUSTAINED_TICKS` lateral magnitudes, as a ring. See `_physics_process`
+## for why a window and not a counter.
+var _lateral_window := PackedFloat32Array()
+var _lateral_head := 0
+var _lateral_filled := 0
 var _sustained_best := 0.0
 var _peak_lateral := 0.0
 
@@ -215,6 +219,7 @@ func _ready() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	_font = ThemeDB.fallback_font
 	_trail.resize(G_TRAIL_SAMPLES)
+	_lateral_window.resize(SUSTAINED_TICKS)
 	set_physics_process(true)
 
 	_sb_surround.bg_color = SURROUND
@@ -276,15 +281,32 @@ func _physics_process(delta: float) -> void:
 	var magnitude := absf(lateral)
 	_peak_lateral = maxf(_peak_lateral, magnitude)
 
-	# The run counter resets the moment the figure drops below the level it is
-	# being credited against, so two separate corners cannot accumulate into one
-	# sustained reading.
-	if magnitude >= _sustained_best:
-		_sustained_run += 1
-		if _sustained_run >= SUSTAINED_TICKS:
-			_sustained_best = magnitude
-	else:
-		_sustained_run = 0
+	# Sustained is the **largest floor the kart has held for half a second**:
+	# the maximum over time of the minimum over the last `SUSTAINED_TICKS`
+	# samples. Every value in the window is at or above the figure reported, which
+	# is what "sustained" has to mean for the number to be comparable against
+	# §6.4's band.
+	#
+	# The first version of this counted ticks above the running best and then
+	# recorded the **instantaneous** magnitude on the tick the counter tripped.
+	# That reports a spike as a skidpad figure: 59 ticks at 0.60 g followed by one
+	# single tick at 2.40 g reported 2.40 g sustained, reproduced exactly. It is
+	# ADR-0034's error — a transient read as a steady-state number — living inside
+	# the widget written to keep a driver from making it, and #32 and #40 are
+	# judged off this readout.
+	#
+	# A linear scan of sixty floats at 120 Hz is 7,200 comparisons a second. A
+	# monotonic deque would be asymptotically better and is not worth the code at
+	# this size.
+	_lateral_window[_lateral_head] = magnitude
+	_lateral_head = (_lateral_head + 1) % SUSTAINED_TICKS
+	if _lateral_filled < SUSTAINED_TICKS:
+		_lateral_filled += 1
+	elif _lateral_filled == SUSTAINED_TICKS:
+		var lowest := INF
+		for sample in _lateral_window:
+			lowest = minf(lowest, sample)
+		_sustained_best = maxf(_sustained_best, lowest)
 
 	queue_redraw()
 
@@ -292,7 +314,8 @@ func _physics_process(delta: float) -> void:
 func reset_peaks() -> void:
 	_peak_lateral = 0.0
 	_sustained_best = 0.0
-	_sustained_run = 0
+	_lateral_filled = 0
+	_lateral_head = 0
 	_trail_filled = 0
 	_trail_head = 0
 
