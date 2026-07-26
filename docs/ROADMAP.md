@@ -145,6 +145,14 @@ Effort: S
 
 The feel milestone. `VehicleBody3D` is deleted here.
 
+**Status: the math is done and measured; nothing is wired to Godot yet.** Every
+subsystem below exists as engine-free C++ under `src/core/`, held by 175 test
+cases and 244,091 assertions that run in seconds with no engine at all. What is
+left is the boundary — a `RigidBody3D` that raycasts, calls the solver, and
+applies the forces — plus everything whose acceptance is written to be judged by
+driving. Closed with measured evidence: #33, #34, #35, #36, #37, #41. Open on the
+boundary: #30, #31, #32, #38, #39, #40, #42, #43.
+
 - Chassis `RigidBody3D`, 175 kg with driver, KZ mass properties
 - Per-wheel raycasts, spring and damper, travel limits
 - **Chassis torsional flex and inside-rear-wheel lift** (`ARCHITECTURE.md` §6) — the defining kart dynamic
@@ -160,6 +168,43 @@ The feel milestone. `VehicleBody3D` is deleted here.
 - **Physics validation scenarios** (§6.4): acceleration run, constant-radius skidpad, braking test
 
 **Accept:** the kart is driveable and unmistakably not a car — the inside rear wheel visibly lifts in a corner and the kart rotates on it. Engine braking is felt on corner entry. Validation scenarios land inside the KZ reference ranges: ~140 km/h top speed, ~3.5 s to 100, 2.0–2.5 g lateral, 1.5–2.0 g braking. Presets round-trip. No tire-force instability at any speed.
+
+Measured through the solver, with no engine running:
+
+| | Measured | KZ reference (§6.4) |
+|---|---|---|
+| Top speed | **143.9 km/h** | 135–145 |
+| 0–100 km/h | **4.50 s** | 3.0–3.5 — [#121](https://github.com/skiretic/kartgame/issues/121) |
+| Braking, 90–20 km/h mean | **1.53 g** at threshold | 1.5–2.0 |
+| Lateral, best sustained | **1.86 g** | 2.0–2.5 — [#120](https://github.com/skiretic/kartgame/issues/120) |
+| Solver cost | **15.4 µs/tick**, 0.77% of the §15 budget | — |
+| Determinism | identical per-tick hash, two instances, 2,400 ticks | — |
+
+**The defining dynamic works and is the milestone's real result.** With the wheels
+straight the inside rear lifts at 2.556 g — above the tire's own ceiling *and*
+above the 2.43 g rollover threshold — so load transfer alone can never lift it and
+no amount of grip tuning changes that. Caster jacking is the mechanism, not a
+garnish: at full lock it lifts at 1.530 g. Disable the jacking and the locked axle
+scrubs exactly as §6 says it must — the inside rear pushes forward 252 N while the
+outside rear drags back 113 N, a 216 N·m couple opposing the turn, and the kart
+reaches 85.5% of its geometric yaw rate instead of 108.8%.
+
+**Two figures are outside their bands and are recorded outside them.** 0–100 is
+entirely the auto-clutch launch (time from first motion is 3.90 s however the
+throttle is fed in). Lateral does not respond to grip: raising `peak_friction`
+from 2.10 to 2.70 buys 0.265 g with collapsing returns, because the kart runs out
+of ability to *use* grip at its own rollover threshold. That re-measures
+[ADR-0031](DECISIONS.md#adr-0031--the-m3a-vehicle-applies-its-own-forces-in-newtons)'s
+conclusion with the real solver, and ADR-0031 was right.
+
+**A correction to M3a's recorded figures.**
+[ADR-0033](DECISIONS.md#adr-0033--the-contact-boundary-measured-and-the-lever-arm-it-caught)
+measured that `apply_force`'s offset is taken from the **body origin**, not the
+center of mass — the opposite of what this project believed for a milestone. The
+kart's mesh origin and its contact patches are both at ground level, so every
+pitch and roll moment in M3a was **exactly doubled**. Fixing it moved M3a's
+sustained lateral 1.76 → 1.84 g and invalidated its other constants, which were
+calibrated against the doubled lever.
 
 Effort: XL
 
