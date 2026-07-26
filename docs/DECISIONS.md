@@ -1402,7 +1402,10 @@ do. The ROADMAP sentence is restated accordingly.
 relabels, and every deformable-surface grip multiplier is a quotient of it;
 [#129](https://github.com/skiretic/kartgame/issues/129), because three
 disagreeing rollover thresholds turned up while checking this one, and the one in
-`chassis_flex.h` cannot see the lateral center-of-mass offset at all;
+`chassis_flex.h` could not see the lateral center-of-mass offset at all — **since
+closed**: it had no production caller and was deleted, and the test file that
+pinned it turned out to be measuring a kart 4.7% taller than the one the solver
+configures;
 [#130](https://github.com/skiretic/kartgame/issues/130), four citations pointing
 at reference files that no longer exist; and
 [#131](https://github.com/skiretic/kartgame/issues/131), the identical peak-versus-mean

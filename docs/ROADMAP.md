@@ -156,8 +156,9 @@ answer: the kart rolls over before the tires let go, and `VehicleWheel3D` reache
 that threshold first. The figure quoted here was 2.58 g, half the rear track over
 the center-of-mass height; that naive form has since been superseded twice and
 the kart's real threshold is 2.43 g turning left against 2.81 g turning right —
-[#129](https://github.com/skiretic/kartgame/issues/129) tracks the three
-disagreeing versions still in the tree. The inside-rear lift and caster jacking
+[#129](https://github.com/skiretic/kartgame/issues/129) found three disagreeing
+versions and resolved it to one: the second was deleted, and it had no production
+caller at all. The inside-rear lift and caster jacking
 are M3b. [ADR-0031](DECISIONS.md#adr-0031--the-m3a-vehicle-applies-its-own-forces-in-newtons) has that and the two measurement traps found on the way: `VehicleBody3D.engine_force` is a wheel torque with no single conversion to newtons, and Godot applies a project-default `linear_damp` of 0.1 to every rigid body — a quarter of the kart's acceleration at 10 m/s, arriving from nowhere.
 
 Effort: S
@@ -179,8 +180,17 @@ solver and applies the forces; `scenes/game/proving_ground.tscn` drives it and
 within 2 µm of its predicted rest height, static corner loads sum to `m·g` to
 0.02 N, and 0–100 through the engine reproduces the solver-only figure to 0.2%.
 
-Closed with measured evidence: #33, #34, #35, #36, #37, #41, and now #30, #31,
-#42, #43, #124.
+Closed with measured evidence: #33, #34, #35, #36, #37, #41, and now #30, #43,
+#124.
+
+**#31 and #42 closed on part of their acceptance, not all of it, and the
+remainder is a ticket rather than a tick.** #31's "curb strikes do not tunnel"
+cannot be satisfied by raycasts alone — ADR-0033 finding 4 established that
+before any suspension code was written — so it is
+[#139](https://github.com/skiretic/kartgame/issues/139), which also owes the
+proving ground a curb with a real vertical edge. #42's "curbs are distinct from
+both asphalt and grass" is true in `surface.h`'s table and unit-tested there, but
+nothing has driven over a curb, because none exists. The two land together.
 
 **Blocked on being able to judge it by feel: #32, #38, #39, #40.** All four have
 acceptance criteria written in a driver's language — "visibly lifts", "requires

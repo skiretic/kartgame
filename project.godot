@@ -116,5 +116,6 @@ common/physics_ticks_per_second=120
 
 [rendering]
 
+renderer/rendering_method="forward_plus"
 renderer/rendering_method.mobile="forward_plus"
 lights_and_shadows/use_physical_light_units=true
