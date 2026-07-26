@@ -57,7 +57,23 @@ void KartStateHash::add_transform(const Transform3D &p_value) {
 }
 
 String KartStateHash::hex() const {
-	return String::num_uint64(hash_.digest(), 16).pad_zeros(16);
+	// **Not `pad_zeros`.** It counts only *digit* characters before deciding how
+	// many zeros a string is short, so a hex digest beginning with a letter has
+	// its padding inserted after the letters instead of before them, and one made
+	// entirely of letters is padded as if it were empty. Measured on 4.7.1:
+	//
+	//     "c06ed343d87c897d".pad_zeros(16) -> "c006ed343d87c897d"   17 characters
+	//     "ffffffffffffffff".pad_zeros(16) -> "ffff...ff0000000000000000"   32
+	//
+	// Nothing was ever measured wrong by this — `drive.sh` compares two digests
+	// that are mangled identically — but it printed a 17-character hash beside a
+	// 16-character one, and two digests differing only in leading zeros would
+	// compare equal as strings. Pad by hand.
+	String digits = String::num_uint64(hash_.digest(), 16);
+	while (digits.length() < 16) {
+		digits = "0" + digits;
+	}
+	return digits;
 }
 
 int64_t KartStateHash::digest() const {
