@@ -61,6 +61,15 @@ func _ready() -> void:
 
 	Input.joy_connection_changed.connect(_on_joy_connection_changed)
 
+	# Every pad already present, printed once at startup.
+	#
+	# `joy_connection_changed` fires on a *change*, so a pad that was paired
+	# before the scene launched — the normal case — announces itself nowhere.
+	# That left M0's last acceptance item with its evidence visible only in a
+	# window: the GUID was on screen and could not be pasted into an issue.
+	for device: int in Input.get_connected_joypads():
+		_report_pad(device, "present")
+
 
 func _process(_delta: float) -> void:
 	_pad_label.text = _describe_pads()
@@ -180,7 +189,22 @@ func _bar(value: float) -> String:
 func _on_joy_connection_changed(device: int, connected: bool) -> void:
 	# Printed rather than only displayed, so a Bluetooth pad that drops and
 	# reconnects mid-session leaves a trace in the log.
-	print("joypad %d %s: %s" % [device, "connected" if connected else "disconnected", Input.get_joy_name(device)])
+	if connected:
+		_report_pad(device, "connected")
+	else:
+		print("joypad %d disconnected: %s" % [device, Input.get_joy_name(device)])
+
+
+## One pad, to stdout, with the GUID.
+##
+## The GUID is the *evidence* M0's last acceptance item asks for: USB and
+## Bluetooth report different GUIDs for the same physical pad, so two runs
+## printing two GUIDs are the proof that two transports were exercised rather
+## than one tested twice. A number that only ever appears in a window cannot be
+## pasted into an issue, which is what closing that item requires.
+func _report_pad(device: int, state: String) -> void:
+	print("joypad %d %s: %s" % [device, state, Input.get_joy_name(device)])
+	print("      guid %s" % Input.get_joy_guid(device))
 
 
 func _build_ui() -> void:
