@@ -375,35 +375,6 @@ inline bool profile_is_display_name(const char *text, int len) {
 	return true;
 }
 
-// "101", "-3", "0". Hand-rolled for the same reason `format_value` is: no locale,
-// no `snprintf`, writes into the caller's buffer and returns the length or -1.
-inline int profile_format_int(long long value, char *out, int cap) {
-	char digits[24];
-	int count = 0;
-	const bool negative = value < 0;
-	// Negated through unsigned so `LLONG_MIN` does not overflow on the way.
-	unsigned long long magnitude = negative
-			? static_cast<unsigned long long>(-(value + 1)) + 1ULL
-			: static_cast<unsigned long long>(value);
-	do {
-		digits[count++] = static_cast<char>('0' + static_cast<int>(magnitude % 10));
-		magnitude /= 10;
-	} while (magnitude != 0 && count < 24);
-
-	const int length = count + (negative ? 1 : 0);
-	if (length + 1 > cap) {
-		return -1;
-	}
-	int written = 0;
-	if (negative) {
-		out[written++] = '-';
-	}
-	for (int i = count - 1; i >= 0; --i) {
-		out[written++] = digits[i];
-	}
-	out[written] = '\0';
-	return written;
-}
 
 // Parse an integer, rejecting anything that is not entirely one. A prefix is not
 // a number, for the reason `parse_value` gives: a silently truncated "3abc" is a
@@ -882,7 +853,7 @@ inline int format_profile(const Profile &profile, char *out, int cap) {
 	append(PROFILE_PREAMBLE);
 
 	append("version ");
-	if (profile_format_int(PROFILE_FORMAT_VERSION, number, sizeof(number)) < 0) {
+	if (format_int(PROFILE_FORMAT_VERSION, number, sizeof(number)) < 0) {
 		return -1;
 	}
 	append(number);
@@ -893,7 +864,7 @@ inline int format_profile(const Profile &profile, char *out, int cap) {
 	append("\n");
 
 	append("driver_number ");
-	if (profile_format_int(profile.driver.number, number, sizeof(number)) < 0) {
+	if (format_int(profile.driver.number, number, sizeof(number)) < 0) {
 		return -1;
 	}
 	append(number);
@@ -912,14 +883,14 @@ inline int format_profile(const Profile &profile, char *out, int cap) {
 	append("\n");
 
 	append("career_season ");
-	if (profile_format_int(profile.career.season, number, sizeof(number)) < 0) {
+	if (format_int(profile.career.season, number, sizeof(number)) < 0) {
 		return -1;
 	}
 	append(number);
 	append("\n");
 
 	append("career_round ");
-	if (profile_format_int(profile.career.round, number, sizeof(number)) < 0) {
+	if (format_int(profile.career.round, number, sizeof(number)) < 0) {
 		return -1;
 	}
 	append(number);
@@ -1867,7 +1838,7 @@ inline int profile_corrupt_name(const char *base, int index, char *out, int cap)
 		return -1;
 	}
 	char digits[16];
-	const int digit_len = profile_format_int(index, digits, sizeof(digits));
+	const int digit_len = format_int(index, digits, sizeof(digits));
 	if (digit_len < 0) {
 		return -1;
 	}

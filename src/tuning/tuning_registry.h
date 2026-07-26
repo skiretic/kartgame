@@ -295,6 +295,19 @@ private:
 
 	kart::core::TuningSet set_;
 
+public:
+	// The live configuration, for C++ that has to record it. Not bound: GDScript
+	// reaches values through `get_value` and the whole set through `to_text`, and a
+	// bound copy of a 23-field struct would be a second representation of the one
+	// thing this class exists to be the single owner of.
+	//
+	// `KartSession::adopt_tuning` is the caller: a session records the preset it was
+	// driven under, per ADR-0041, because a replay that re-sims under the defaults
+	// reports a determinism failure that is nothing of the sort.
+	const kart::core::TuningSet &tuning_set() const { return set_; }
+
+private:
+
 	// Per-tunable, per-session, never persisted. See the header note on why this
 	// is not a global expert mode.
 	bool acknowledged_[kart::core::TUNABLE_COUNT] = {};

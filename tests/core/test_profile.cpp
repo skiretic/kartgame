@@ -1186,19 +1186,19 @@ TEST_CASE("every status and problem name is distinct, so a message names one thi
 
 TEST_CASE("profile_format_int writes canonical integers and refuses to truncate") {
 	char buffer[24];
-	CHECK(profile_format_int(0, buffer, sizeof(buffer)) == 1);
+	CHECK(format_int(0, buffer, sizeof(buffer)) == 1);
 	CHECK(std::strcmp(buffer, "0") == 0);
-	profile_format_int(101, buffer, sizeof(buffer));
+	format_int(101, buffer, sizeof(buffer));
 	CHECK(std::strcmp(buffer, "101") == 0);
-	profile_format_int(-7, buffer, sizeof(buffer));
+	format_int(-7, buffer, sizeof(buffer));
 	CHECK(std::strcmp(buffer, "-7") == 0);
-	profile_format_int(2147483647LL, buffer, sizeof(buffer));
+	format_int(2147483647LL, buffer, sizeof(buffer));
 	CHECK(std::strcmp(buffer, "2147483647") == 0);
 	// The most negative value, which a naive `-value` would overflow.
-	profile_format_int(-9223372036854775807LL - 1, buffer, sizeof(buffer));
+	format_int(-9223372036854775807LL - 1, buffer, sizeof(buffer));
 	CHECK(std::strcmp(buffer, "-9223372036854775808") == 0);
 	char tiny[3];
-	CHECK(profile_format_int(1000, tiny, sizeof(tiny)) == -1);
+	CHECK(format_int(1000, tiny, sizeof(tiny)) == -1);
 }
 
 TEST_CASE("profile_parse_int accepts what a person might type and rejects a prefix") {

@@ -6,6 +6,7 @@
 #include "kart_core.h"
 #include "kart_random.h"
 #include "kart_state_hash.h"
+#include "session/kart_session.h"
 #include "tuning/tuning_registry.h"
 #include "vehicle/kart_body.h"
 #include "vehicle/player_driver.h"
@@ -89,6 +90,15 @@ void initialize_kartgame_module(ModuleInitializationLevel p_level) {
 	// `drive.sh` and be one edit away from a §6.4 figure measured under a preset
 	// that nothing recorded. A scene that wants tuning adds one.
 	GDREGISTER_CLASS(kartgame::KartTuning);
+
+	// The shell's seam. ROADMAP M3c, `GAMEDESIGN.md` §9: the front end picks a
+	// configuration, hands it to the session runner and reads a result back, and
+	// that is what keeps M6's determinism work from having to reason about menus.
+	//
+	// RefCounted rather than Node, both of them: a session configuration is an
+	// argument and a lap timer is one per kart, and neither belongs in a tree.
+	GDREGISTER_CLASS(kartgame::KartSession);
+	GDREGISTER_CLASS(kartgame::KartLapTimer);
 }
 
 void uninitialize_kartgame_module(ModuleInitializationLevel p_level) {
