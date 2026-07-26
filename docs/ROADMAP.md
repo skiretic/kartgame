@@ -168,13 +168,34 @@ Effort: S
 
 The feel milestone. `VehicleBody3D` is deleted here.
 
-**Status: the math is done and measured; nothing is wired to Godot yet.** Every
-subsystem below exists as engine-free C++ under `src/core/`, held by 175 test
-cases and 244,091 assertions that run in seconds with no engine at all. What is
-left is the boundary — a `RigidBody3D` that raycasts, calls the solver, and
-applies the forces — plus everything whose acceptance is written to be judged by
-driving. Closed with measured evidence: #33, #34, #35, #36, #37, #41. Open on the
-boundary: #30, #31, #32, #38, #39, #40, #42, #43.
+**Status: the boundary is built and the kart drives. It does not yet drive
+*well*, and what is wrong is now measured rather than suspected.**
+
+Every subsystem below exists as engine-free C++ under `src/core/`, held by 180
+test cases and 266,816 assertions that run in seconds with no engine at all.
+`src/vehicle/kart_body.{h,cpp}` is the `RigidBody3D` that raycasts, calls the
+solver and applies the forces; `scenes/game/proving_ground.tscn` drives it and
+`kart_debug_vehicle.gd` is deleted. The boundary measured clean — the kart settles
+within 2 µm of its predicted rest height, static corner loads sum to `m·g` to
+0.02 N, and 0–100 through the engine reproduces the solver-only figure to 0.2%.
+
+Closed with measured evidence: #33, #34, #35, #36, #37, #41, and now #30, #31,
+#42, #43, #124.
+
+**Blocked on being able to judge it by feel: #32, #38, #39, #40.** All four have
+acceptance criteria written in a driver's language — "visibly lifts", "requires
+clutch modulation", "lifting off in second decelerates hard", "demonstrably
+harder" — and none can be answered from a scrolling graph while both hands are on
+a pad. [#138](https://github.com/skiretic/kartgame/issues/138) is the sequencing
+problem: there is no engine sound and no driving HUD, so M8's audio (#81, #82,
+#83) and M6's HUD (#73) are prerequisites for closing M3b rather than successors
+to it. That ordering assumed the vehicle could be judged silently. It cannot.
+
+**And the vehicle itself has one open problem, found in the first ten minutes of
+driving:** past a quarter of steering lock the kart scrubs off nearly all its
+speed, and the inside-rear lift that would relieve the scrub needs more lateral g
+than the scrub permits.
+[#137](https://github.com/skiretic/kartgame/issues/137) has the sweep.
 
 - Chassis `RigidBody3D`, 175 kg with driver, KZ mass properties
 - Per-wheel raycasts, spring and damper, travel limits
@@ -190,7 +211,9 @@ boundary: #30, #31, #32, #38, #39, #40, #42, #43.
 - Tuning presets saving to disk in a diffable text format
 - **Physics validation scenarios** (§6.4): acceleration run, constant-radius skidpad, braking test
 
-**Accept:** the kart is driveable and unmistakably not a car — the inside rear wheel visibly lifts in a corner and the kart rotates on it. Engine braking is felt on corner entry. Validation scenarios land inside the KZ reference ranges: ~140 km/h top speed, ~3.5 s to 100, 2.0–2.5 g lateral, 1.5–2.0 g braking. Presets round-trip. No tire-force instability at any speed.
+**Accept:** the kart is driveable and unmistakably not a car — the inside rear wheel visibly lifts in a corner and the kart rotates on it. Engine braking is felt on corner entry. Validation scenarios land inside the KZ reference ranges: ~140 km/h top speed, ~3.5 s to 100, **1.5–2.0 g sustained lateral** ([ADR-0034](DECISIONS.md#adr-0034--64s-lateral-band-was-a-peak-figure-being-read-as-a-sustained-one) split that from the 2.0–2.5 g transient-peak band), 1.5–2.0 g braking. Presets round-trip. No tire-force instability at any speed.
+
+Half of that is now measurable and measured. The other half — "unmistakably not a car", "felt on corner entry" — is a judgement a person makes at the wheel, and [#138](https://github.com/skiretic/kartgame/issues/138) records that the instruments to make it do not exist yet.
 
 Measured through the solver, with no engine running:
 
@@ -203,14 +226,38 @@ Measured through the solver, with no engine running:
 | Solver cost | **15.4 µs/tick**, 0.77% of the §15 budget | — |
 | Determinism | identical per-tick hash, two instances, 2,400 ticks | — |
 
-**The defining dynamic works and is the milestone's real result.** With the wheels
-straight the inside rear lifts at 2.556 g — above the tire's own ceiling *and*
-above the 2.43 g rollover threshold — so load transfer alone can never lift it and
-no amount of grip tuning changes that. Caster jacking is the mechanism, not a
-garnish: at full lock it lifts at 1.530 g. Disable the jacking and the locked axle
-scrubs exactly as §6 says it must — the inside rear pushes forward 252 N while the
-outside rear drags back 113 N, a 216 N·m couple opposing the turn, and the kart
-reaches 85.5% of its geometric yaw rate instead of 108.8%.
+**The defining dynamic works in the solver, and it does not yet survive being
+driven.** With the wheels straight the inside rear lifts at 2.556 g — above the
+tire's own ceiling *and* above the 2.43 g rollover threshold — so load transfer
+alone can never lift it and no amount of grip tuning changes that. Caster jacking
+is the mechanism, not a garnish: at full lock it lifts at **1.691 g**. Disable the
+jacking and the locked axle scrubs exactly as §6 says it must — the inside rear
+pushes forward **366.4 N** while the outside rear drags back **114.0 N**, a
+**≈285 N·m** couple opposing the turn, and the kart reaches 85.5% of its geometric
+yaw rate instead of 108.8%.
+
+Those three figures were 1.530 g, 252/113 N and 216 N·m until
+[#134](https://github.com/skiretic/kartgame/issues/134) found that per-wheel
+telemetry reported the last substep while `step()` returns the substep mean. No
+dynamics changed — every rig-derived figure above is bit-identical — but the
+read-out those numbers were taken from was sampling a 240 Hz signal at 120 Hz.
+The 1.691 g figure is now an extrapolation as well as a correction: with the load
+averaged, the inside rear bottoms out at 25.7 N, 6% of its static 429 N, at the
+fastest steady corner the kart can hold at full lock, and departs before reaching
+zero.
+
+**And that last clause is the milestone's open problem, found by driving it.**
+The kart needs about 1.69 g to lift the inside rear at full lock, but past a
+quarter lock the scrub caps it far below that — 1.02 g at 0.60 lock and full
+throttle, settling at 21.2 km/h, and 0.09 g at full lock. The state that would
+relieve the scrub is unreachable from the states the scrub produces, so the kart
+washes off speed until it nearly stops.
+[#137](https://github.com/skiretic/kartgame/issues/137) holds the measurement and
+what has *not* been established: whether this is correct kart behavior at an
+exaggerated magnitude, an input-mapping problem (M3a's stand-in quietly scaled
+steering lock with speed and `steering.h` correctly does not), or a scrub term
+that is too strong. Nothing is being tuned until that is measured — §19's risk,
+and #107's lesson about a right measurement drawing a wrong conclusion.
 
 **One figure is outside its band; the other target was wrong.** 0–100 is entirely
 the auto-clutch launch (time from first motion is 3.90 s however the throttle is
