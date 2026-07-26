@@ -102,11 +102,17 @@ func _process(delta: float) -> void:
 	var look_at_point := _target.global_position + velocity * LOOK_AHEAD_SECONDS
 	_aim = _aim.lerp(look_at_point, _decay(AIM_HALF_LIFE, delta))
 
-	# The arm points from the target back along the kart's heading, so the camera
-	# sits behind the kart rather than behind its velocity — otherwise a slide
-	# would swing the camera around to the side and hide the thing worth watching.
-	var back := -flat_forward
-	look_at_from_position(global_position, global_position + back, Vector3.UP)
+	# The camera sits behind the kart's *heading*, not behind its velocity —
+	# otherwise a slide would swing the rig around to the side and hide the thing
+	# worth watching.
+	#
+	# **`SpringArm3D` places its children along its own +Z, so the arm is aimed
+	# down the kart's forward axis and the camera lands behind it.** Aiming the
+	# arm backward — the intuitive reading, and what this file did until it was
+	# first driven — puts the camera 3.4 m in front of the nose, looking back at
+	# the kart. Every still taken so far parked a camera with --eye/--look, so
+	# nothing had ever exercised the rig.
+	look_at_from_position(global_position, global_position + flat_forward, Vector3.UP)
 
 	# Lateral acceleration measured from the change in velocity rather than read
 	# from the body, because Godot exposes no accelerometer. Projected onto the
