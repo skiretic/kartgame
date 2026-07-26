@@ -86,6 +86,18 @@ struct Rig {
 	VehicleForces last_forces;
 	Vec3 last_acceleration;
 
+	// The tick's contact normals and body frame, kept because `step()` advances
+	// the body and they cannot be read back off the rig afterwards.
+	//
+	// They exist for one test — "what the wheel telemetry reports is what the
+	// solver applied" — and they are the exact three things a caller outside the
+	// solver has to hold on to in order to reconstruct an applied force from
+	// `WheelTelemetry`. `WheelTelemetry` carries no contact normal, because the
+	// side that filled the `GroundQuery` already has one.
+	Vec3 last_normal[CORNER_COUNT];
+	Vec3 last_origin;
+	Vec3 last_com;
+
 	void configure() {
 		vehicle.configure();
 		// Start one static deflection low so the settle is short. The exact value
@@ -151,6 +163,15 @@ struct Rig {
 
 		const BodyState state = body_state();
 		last_forces = vehicle.step(state, input, contacts, TICK);
+
+		last_origin = state.origin;
+		last_com = state.center_of_mass;
+		for (int corner = 0; corner < CORNER_COUNT; ++corner) {
+			// The same fallback the solver uses for a corner whose ray missed:
+			// nothing is applied there, so the value only has to be finite and
+			// unit. See `KartVehicle::step`.
+			last_normal[corner] = contacts[corner].hit ? contacts[corner].normal : state.basis_y;
+		}
 
 		const double mass = vehicle.mass_properties().mass;
 		Vec3 force = last_forces.central_force + Vec3(0.0, -G, 0.0) * mass;
@@ -776,9 +797,15 @@ TEST_CASE("the skidpad, and whether the dynamic answer agrees with the quasi-sta
 	double lift_g = -1.0;
 	double previous_lateral = 0.0;
 	double previous_load = 0.0;
+	// The sample before the last one, kept because the crossing is no longer
+	// always bracketed — see below, where it is extrapolated.
+	double prior_lateral = 0.0;
+	double prior_load = 0.0;
+	double previous_longitudinal = 0.0;
 	double peak_lateral = 0.0;
 	double peak_speed = 0.0;
 	double long_at_lift = 0.0;
+	bool extrapolated = false;
 	for (double target = 3.0; target <= 8.01; target += 0.5) {
 		const Steady corner = steady_corner(1.0, target, true);
 		if (!corner.stable) {
@@ -802,8 +829,36 @@ TEST_CASE("the skidpad, and whether the dynamic answer agrees with the quasi-sta
 			lift_g = previous_lateral + fraction * (corner.lateral_g - previous_lateral);
 			long_at_lift = corner.longitudinal_g;
 		}
+		prior_lateral = previous_lateral;
+		prior_load = previous_load;
 		previous_lateral = corner.lateral_g;
 		previous_load = corner.inside_rear_load;
+		previous_longitudinal = corner.longitudinal_g;
+	}
+
+	// **The crossing is no longer bracketed, and issue #134 is why.** This read
+	// 1.530 g while `WheelTelemetry::normal_load` was the last substep's value, and
+	// it read that because the last substep under-reported the inside rear by
+	// 40-50 N at every speed in the sweep — systematically, not as noise: the four
+	// last-substep loads summed to 1703.6 N against the kart's 1716.2 N of weight,
+	// and the four averaged ones sum to the weight exactly. The bias is the
+	// solver's own contact extrapolation, which advances the ray length with the
+	// closing speed the tire forces are about to arrest and so over-extends the
+	// unloading corner within the tick.
+	//
+	// With the load averaged, the inside rear is down to 25.7 N — 6% of the 429 N
+	// it carries standing — at the fastest steady corner this kart can hold at full
+	// lock, and it departs before it reaches zero. So the number is extrapolated
+	// from the last two steady points rather than interpolated between a positive
+	// and a negative one, and it is labeled as an extrapolation wherever it is
+	// printed. The mechanism issue #32 asks for is not in question either way; what
+	// moved is where the last few percent of load finally goes.
+	if (lift_g < 0.0 && prior_load > previous_load && previous_load > 0.0) {
+		const double span = prior_load - previous_load;
+		const double fraction = prior_load / span; // > 1: past the last sample
+		lift_g = prior_lateral + fraction * (previous_lateral - prior_lateral);
+		long_at_lift = previous_longitudinal;
+		extrapolated = true;
 	}
 
 	const double as_written = quasi_static_lift_g(1.0);
@@ -814,7 +869,11 @@ TEST_CASE("the skidpad, and whether the dynamic answer agrees with the quasi-sta
 			as_written);
 	std::printf("    %-52s %7.3f g\n",
 			"  corrected for the 41 mm lateral CoM and the long. g", corrected);
-	std::printf("    %-52s %7.3f g\n", "dynamic, this solver, steady state", lift_g);
+	std::printf("    %-52s %7.3f g\n",
+			extrapolated ? "dynamic, this solver, extrapolated past the last hold"
+						 : "dynamic, this solver, steady state",
+			lift_g);
+	std::printf("    %-52s %7.1f N\n", "  inside rear at the fastest steady corner", previous_load);
 	std::printf("\n    peak sustained lateral at full lock %.3f g at %.1f km/h\n", peak_lateral,
 			ms_to_kmh(peak_speed));
 
@@ -1364,6 +1423,327 @@ TEST_CASE("the substep count is fixed and the totals are impulses, not sums") {
 													  << rig.vehicle.telemetry().substeps
 													  << " substeps");
 	CHECK(total == doctest::Approx(weight).epsilon(0.01));
+}
+
+TEST_CASE("what the wheel telemetry reports is what the solver applied") {
+	// **Issue #134, and the hole that let it exist.** Nothing asserted the
+	// relationship between `step()`'s return value and what `telemetry()` reports,
+	// so the two were free to disagree — and they did. The forces were right, the
+	// read-out described the **last substep**, and anything reconstructing an
+	// applied force from `WheelTelemetry` was off by the substep spread. It was
+	// found from outside, reconstructing the kart's pitch rate through the Godot
+	// boundary, which is the expensive way to find it.
+	//
+	// ## The reconstruction, and why it is exact rather than approximate
+	//
+	// One corner's applied force is `normal * normal_load + tire_force`. The
+	// normal is the **tick's** — `KartVehicle::step` extrapolates the ray length
+	// across the substeps and deliberately holds the contact plane — so it factors
+	// straight out of the mean:
+	//
+	//     mean(normal * load_i + tire_i) == normal * mean(load_i) + mean(tire_i)
+	//
+	// which is why averaging the two telemetry fields makes this identity hold to
+	// rounding rather than to a tolerance. It also gives the two halves separately
+	// for free: the tire force is `roll_dir * long + right_dir * lat` and both of
+	// those are in the contact plane, so `applied.dot(normal)` **is** the applied
+	// normal load and the remainder is the applied tire force. No extra plumbing
+	// is needed to say which of the two a mismatch came from.
+	//
+	// ## What it read before the fix
+	//
+	// Recorded because a test whose failure mode nobody has seen is a test nobody
+	// trusts, and because "it is small" is not a measurement. With the per-wheel
+	// fields left at their last substep, this same loop reported:
+	//
+	//     scenario                          load %        tire %       pitch
+	//                                     mean   peak   mean    peak    N m  % peak
+	//     launch, full throttle           0.69  18.35   1.52  102.19  143.3   58.2
+	//     braking from 90 km/h, 0.8 pedal 11.20 100.00   9.94  100.02  220.6  128.7
+	//     full lock at 6.5 m/s             8.30  49.69  16.35  100.00   20.5  230.0
+	//     the floor drops away and returns 13.76 100.00  16.83 1135.61  58795  686.9
+	//
+	// Three things in that table are worth reading rather than skipping.
+	//
+	// **A 100% error is a corner the read-out said was carrying nothing** while the
+	// mean says it carried half of what the first substep put through it. That is
+	// the lift-off case, and it is why `grounded` is an OR: the wheel was on the
+	// ground for half the tick and the last substep did not see it.
+	//
+	// **Past 100% is a sign change between the substeps.** With two substeps the
+	// error is `|F2 - F1| / |F1 + F2|`, which is unbounded exactly when the two
+	// substeps disagree about which way the force points — the tire reversing
+	// through a landing. That is aliasing, not noise, and it is the case a mean
+	// describes correctly and a sample cannot.
+	//
+	// **The pitch column is in newton meters first for a reason.** See the note by
+	// `pitch_reference` below.
+	//
+	// The number that reached daylight was none of these: it was 3.4%, on a pitch
+	// **rate** reconstructed from `wheel_report()` in `tools/verify/kart_body_probe.gd`.
+	// A rate integrates, so it averages a good deal of this away — which is what
+	// makes a defect this size cheap to dismiss from outside and worth pinning from
+	// inside.
+	struct Scenario {
+		const char *name;
+		int gear;
+		double speed;
+		double throttle;
+		double brake;
+		double clutch;
+		double steer;
+		double ground_drop; // meters, one corner's floor lowered mid-run
+		int ticks;
+	};
+	const Scenario scenarios[] = {
+		{ "launch, full throttle", 0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 360 },
+		{ "braking from 90 km/h, 0.8 pedal", 5, kmh_to_ms(90.0), 0.0, 0.8, 1.0, 0.0, 0.0, 240 },
+		{ "full lock at 6.5 m/s", 2, 6.5, 0.35, 0.0, 0.0, 1.0, 0.0, 480 },
+		// The floor drops away under the whole kart at 15 m/s and comes back. Both
+		// halves are the interesting case: the wheels extend across the substeps
+		// and then load up across them, which is the largest legitimate spread a
+		// substep can produce and the case where a last-substep read-out is most
+		// obviously not a description of the tick.
+		{ "the floor drops away and returns", 4, 15.0, 0.4, 0.0, 0.0, 0.2, 0.08, 240 },
+	};
+
+	std::printf("\n    telemetry against what was applied\n");
+	std::printf("    %-34s %15s %15s %17s\n", "scenario", "normal load %", "tire force %",
+			"pitch moment");
+	std::printf("    %-34s %7s %7s %7s %7s %9s %7s\n", "", "mean", "peak", "mean", "peak", "N m",
+			"% peak");
+
+	for (const Scenario &scenario : scenarios) {
+		Rig rig;
+		rig.configure();
+		rig.settle();
+		if (scenario.speed > 0.5) {
+			rig.vehicle.engage(scenario.gear, scenario.speed);
+			rig.linear_velocity = -rig.basis_z * scenario.speed;
+		}
+
+		DriverInput input;
+		input.throttle = scenario.throttle;
+		input.brake = scenario.brake;
+		input.clutch = scenario.clutch;
+		input.steer = scenario.steer;
+
+		// Mean and peak of the relative error, each over the samples that clear a
+		// floor. The floors are the whole reason this is readable: a corner
+		// carrying 2 N reports a 400% error on a rounding difference, and a table
+		// of worst cases without them measures the smallest denominator in the
+		// run rather than the size of the effect. 100 N is a quarter of what a
+		// static corner carries; 10 N m is well under a tenth of the pitch moment
+		// a kart makes braking.
+		const double FORCE_FLOOR = 100.0;
+		double load_sum = 0.0;
+		double load_peak = 0.0;
+		double load_samples = 0.0;
+		double tire_sum = 0.0;
+		double tire_peak = 0.0;
+		double tire_samples = 0.0;
+
+		// The pitch moment is measured in newton meters and then against the
+		// largest one the scenario produced, **not** against the instantaneous
+		// moment, and the reason is worth writing down because it is a trap. The
+		// net pitch moment about the center of mass is near zero whenever the kart
+		// is in equilibrium — that is what equilibrium means — so it is a small
+		// difference of four large corner moments, and a relative error against it
+		// reads in the hundreds of percent from an error of a few newton meters.
+		// That number would be true and would measure nothing.
+		double pitch_error = 0.0; // N m, the largest reconstruction error
+		double pitch_reference = 0.0; // N m, the largest applied pitch moment
+
+		for (int tick = 0; tick < scenario.ticks; ++tick) {
+			if (scenario.ground_drop > 0.0) {
+				const bool dropped = tick > 60 && tick < 140;
+				rig.ground_height = dropped ? -scenario.ground_drop : 0.0;
+			}
+			rig.step(input);
+			REQUIRE(rig.finite());
+
+			Vec3 applied_torque;
+			Vec3 reported_torque;
+			for (int corner = 0; corner < CORNER_COUNT; ++corner) {
+				const WheelTelemetry &wheel = rig.vehicle.telemetry().wheel[corner];
+				const Vec3 normal = rig.last_normal[corner];
+				const Vec3 applied = rig.last_forces.force[corner];
+				const Vec3 reported = normal * wheel.normal_load + wheel.force;
+
+				// The two halves, separated by the projection above.
+				const double applied_load = applied.dot(normal);
+				const Vec3 applied_tire = applied - normal * applied_load;
+				const Vec3 reported_tire = wheel.force;
+
+				if (std::fabs(applied_load) > FORCE_FLOOR) {
+					const double error = 100.0 *
+							std::fabs(wheel.normal_load - applied_load) / std::fabs(applied_load);
+					load_sum += error;
+					load_samples += 1.0;
+					load_peak = error > load_peak ? error : load_peak;
+				}
+				const double tire_magnitude = applied_tire.length();
+				if (tire_magnitude > FORCE_FLOOR) {
+					const double error =
+							100.0 * (reported_tire - applied_tire).length() / tire_magnitude;
+					tire_sum += error;
+					tire_samples += 1.0;
+					tire_peak = error > tire_peak ? error : tire_peak;
+				}
+
+				// Offset from the body ORIGIN, so the arm about the center of mass
+				// is `origin + point - com`. ADR-0033, and the same arithmetic
+				// `Rig::step` does — written out again rather than shared, because
+				// a reconstruction that borrows the harness's own moment could not
+				// catch the harness getting it wrong.
+				const Vec3 arm = rig.last_origin + rig.last_forces.application_point[corner] -
+						rig.last_com;
+				applied_torque += arm.cross(applied);
+				reported_torque += arm.cross(reported);
+
+				// The identity itself, per corner and per tick. Tight, because
+				// nothing here is an approximation: exact for the same reason the
+				// normal factors out of the mean.
+				CHECK(std::fabs(reported.x - applied.x) < 1e-9 * (1.0 + std::fabs(applied.x)));
+				CHECK(std::fabs(reported.y - applied.y) < 1e-9 * (1.0 + std::fabs(applied.y)));
+				CHECK(std::fabs(reported.z - applied.z) < 1e-9 * (1.0 + std::fabs(applied.z)));
+			}
+
+			// Pitch, because that is the axis the defect was found on: a probe
+			// integrating the reconstructed moment against the measured pitch rate.
+			// Chassis +X is right, so a moment about it is a pitch moment.
+			const double applied_pitch = applied_torque.dot(rig.basis_x);
+			const double reported_pitch = reported_torque.dot(rig.basis_x);
+			const double error = std::fabs(reported_pitch - applied_pitch);
+			pitch_error = error > pitch_error ? error : pitch_error;
+			const double magnitude = std::fabs(applied_pitch);
+			pitch_reference = magnitude > pitch_reference ? magnitude : pitch_reference;
+		}
+
+		const double load_mean = load_samples > 0.0 ? load_sum / load_samples : 0.0;
+		const double tire_mean = tire_samples > 0.0 ? tire_sum / tire_samples : 0.0;
+		const double pitch_relative =
+				pitch_reference > 0.0 ? 100.0 * pitch_error / pitch_reference : 0.0;
+		std::printf("    %-34s %7.4f %7.4f %7.4f %7.4f %9.4f %7.4f\n", scenario.name, load_mean,
+				load_peak, tire_mean, tire_peak, pitch_error, pitch_relative);
+
+		// A hundredth of a percent would still be a read-out that does not describe
+		// what was applied. The identity is exact, so the band is rounding.
+		CHECK(load_peak < 1e-6);
+		CHECK(tire_peak < 1e-6);
+		CHECK(pitch_relative < 1e-6);
+	}
+}
+
+TEST_CASE("grounded covers the tick, so a corner that produced force never reports airborne") {
+	// The one field in `WheelTelemetry` that cannot be averaged, and the reason it
+	// is an OR across the substeps rather than the last one.
+	//
+	// A corner can be grounded on the first substep and not on the second — the
+	// ray length is extrapolated, so a wheel extending off a crest crosses its free
+	// length mid-tick. The mean force is then non-zero while a last-substep
+	// `grounded` says the wheel is in the air, and every consumer of that pair is
+	// wrong in the same direction: the HUD's wheel count flickers, the §12 scrub
+	// audio cuts on a wheel that is still loaded, and the invariant below has no
+	// meaning at all.
+	//
+	// Stated as the invariant rather than as the mechanism, because the mechanism
+	// is the solver's business and the invariant is the contract:
+	//
+	//     grounded == false  =>  normal_load == 0 and force == 0
+	//
+	// It runs both ways. `suspension.h` sets `grounded` from `normal_force > 0`, so
+	// a grounded corner carrying nothing is not a contradiction — a wheel just
+	// touching carries zero load — and the implication is deliberately one-way.
+	Rig rig;
+	rig.configure();
+	rig.settle();
+	rig.vehicle.engage(4, 18.0);
+	rig.linear_velocity = -rig.basis_z * 18.0;
+
+	DriverInput input;
+	input.throttle = 0.6;
+	// Straight, deliberately. Half lock at 18 m/s is four times what the tires can
+	// hold — the kart rolls onto its side and every corner reports airborne for the
+	// rest of the run, which measures the rollover rather than the flag.
+	input.steer = 0.05;
+
+	int airborne_ticks = 0;
+	int loaded_ticks = 0;
+	for (int tick = 0; tick < 600; ++tick) {
+		// A dip every half second, deep enough that the wheels leave the ground on
+		// the way in and load up on the way out, and shallow enough that the kart
+		// spends most of the run on the road rather than in the air. 12 cm of drop
+		// held for a third of a second launched it and measured nothing.
+		rig.ground_height = tick % 60 < 12 ? -0.03 : 0.0;
+		rig.step(input);
+		REQUIRE(rig.finite());
+
+		for (int corner = 0; corner < CORNER_COUNT; ++corner) {
+			const WheelTelemetry &wheel = rig.vehicle.telemetry().wheel[corner];
+			if (wheel.grounded) {
+				++loaded_ticks;
+				continue;
+			}
+			++airborne_ticks;
+			CHECK(wheel.normal_load == doctest::Approx(0.0));
+			CHECK(wheel.force.length() < 1e-9);
+			CHECK(rig.last_forces.force[corner].length() < 1e-9);
+		}
+	}
+
+	MESSAGE("dips at 18 m/s: " << airborne_ticks << " airborne corner-ticks, "
+										 << loaded_ticks << " loaded");
+	// The scenario has to actually lift wheels or it has checked nothing.
+	CHECK(airborne_ticks > 100);
+	CHECK(loaded_ticks > 100);
+}
+
+TEST_CASE("time_ratio is a sentinel, because the solver cannot honestly fill it in") {
+	// `time_ratio` is simulated seconds per wall-clock second. ADR-0033 finding 7:
+	// `max_physics_steps_per_frame` clamps and does not bank, so under a frame-rate
+	// collapse the simulation falls behind at a measured 0.6476 of real time and
+	// never catches up, and a tick-counting replay cannot see it.
+	//
+	// Only the Godot boundary can measure it, because only the boundary may read a
+	// clock — `ARCHITECTURE.md` §8 item 1 forbids the solver to. So the field has to
+	// carry a value that means "nobody has measured this", and the value it used to
+	// carry was **1.0**, which means "everything is fine". A caller reading
+	// telemetry straight off `KartVehicle` got a plausible lie.
+	//
+	// The sentinel is negative rather than NaN, and that is a decision about the
+	// one consumer that exists. `scripts/game/telemetry_panel.gd` frames the whole
+	// panel in its alert color when `absf(ratio - 1.0) > 0.02`; every comparison
+	// against NaN is false, so NaN is silent in the exact place that is built to
+	// shout, and it would then poison the graph's own vertical span through `maxf`
+	// permanently, because the span decays multiplicatively and never recovers. A
+	// negative trips the alert on the first frame and is arithmetically inert.
+	Rig rig;
+	rig.configure();
+	rig.settle();
+
+	DriverInput input;
+	input.throttle = 1.0;
+	for (int tick = 0; tick < 240; ++tick) {
+		rig.step(input);
+	}
+
+	const double ratio = rig.vehicle.telemetry().time_ratio;
+	MESSAGE("240 ticks driven, solver-side time_ratio " << ratio);
+	CHECK(ratio == doctest::Approx(TIME_RATIO_UNMEASURED));
+	// Impossible as a measurement: it is a ratio of two durations.
+	CHECK(ratio < 0.0);
+	// And not NaN. This is the assertion that stops the sentinel being "improved"
+	// into one — see above for what that costs the panel.
+	CHECK(std::isfinite(ratio));
+	// The panel's own test, reproduced so the sentinel cannot drift out of the
+	// band that makes it visible.
+	CHECK(std::fabs(ratio - 1.0) > 0.02);
+
+	// A reset leaves it a sentinel too. A respawn that reports a healthy frame rate
+	// nobody measured is the same lie arriving by a different route.
+	rig.vehicle.reset();
+	CHECK(rig.vehicle.telemetry().time_ratio == doctest::Approx(TIME_RATIO_UNMEASURED));
 }
 
 TEST_CASE("a surface grip multiplier scales the grip and nothing else") {

@@ -345,9 +345,16 @@ private:
 	double step_dt_ = 1.0 / 120.0;
 
 	// Wall-clock bookkeeping for `time_ratio`. Telemetry only.
+	//
+	// Starts at `TIME_RATIO_UNMEASURED`, not at 1.0. Before the first window
+	// closes this node has not measured anything, and 1.0 is the specific value
+	// that means "the simulation is keeping up" — publishing it unmeasured is a
+	// plausible lie in the one read-out that exists to catch a defect nothing else
+	// in this project can see. `vehicle_state.h` made the same change to the
+	// struct's own default for the same reason.
 	uint64_t wall_start_usec_ = 0;
 	uint64_t tick_count_ = 0;
-	double time_ratio_ = 1.0;
+	double time_ratio_ = kart::core::TIME_RATIO_UNMEASURED;
 };
 
 } // namespace kartgame

@@ -324,7 +324,9 @@ void KartBody::_ready() {
 
 	wall_start_usec_ = Time::get_singleton()->get_ticks_usec();
 	tick_count_ = 0;
-	time_ratio_ = 1.0;
+	// Not 1.0. Nothing has been measured yet, and 1.0 is precisely the value that
+	// asserts the simulation is keeping up.
+	time_ratio_ = kart::core::TIME_RATIO_UNMEASURED;
 }
 
 void KartBody::_physics_process(double p_delta) {

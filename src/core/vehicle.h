@@ -46,6 +46,21 @@
 // substeps and four times at four, and it looks exactly like a solver that needs
 // its constants halved.
 //
+// **And the read-out averages with them.** Issue #134: `fill_telemetry` averaged
+// the chassis scalars and left every per-wheel field at whatever the **last**
+// substep produced, so `WheelTelemetry` described an instant the kart passed
+// through rather than the tick that was applied. Nothing was applied wrongly —
+// `step()`'s return value was always the mean — but a caller reconstructing an
+// applied force from telemetry got the substep spread as an error, measured here
+// at 8.3% mean and 49.7% peak on the normal load and 16.4% mean on the tire force
+// in a steady full-lock corner, and found from outside as 3.4% on a pitch rate
+// through the Godot boundary. `vehicle_state.h` states the contract at the
+// declaration and `tests/core/test_vehicle.cpp` asserts it per corner per tick;
+// what belongs here is the arithmetic that makes it exact rather than close: the
+// contact normal is held at its tick value across the substeps, so it factors out
+// of the mean and `normal * mean(load) + mean(tire force)` **is** the applied
+// corner force.
+//
 // **2. `VehicleForces::application_point` is an offset from the body origin.**
 // Not from the center of mass. ADR-0033 measured it after this project believed
 // the opposite for a milestone, and the cost was every pitch and roll moment
@@ -400,6 +415,14 @@ public:
 					: body.basis_y;
 		}
 
+		// The tick's per-wheel read-out starts empty and is accumulated across the
+		// substeps exactly as the forces are. Zeroed here rather than in
+		// `fill_telemetry` so that the accumulator and the forces it has to agree
+		// with are cleared in the same place and cannot fall out of step.
+		for (int corner = 0; corner < CORNER_COUNT; ++corner) {
+			wheel_sum_[corner] = WheelTelemetry();
+		}
+
 		// The predicted body state, advanced by each substep's own forces.
 		BodyState predicted = body;
 
@@ -411,6 +434,7 @@ public:
 			// went below a substep.
 			const bool first = substep == 0;
 			solve_substep(predicted, input, first, h, accumulator_);
+			accumulate_wheel_telemetry();
 
 			for (int corner = 0; corner < CORNER_COUNT; ++corner) {
 				total.force[corner] += accumulator_.force[corner];
@@ -1017,7 +1041,62 @@ private:
 
 	// --- telemetry -------------------------------------------------------------
 
+	// Add the substep that just ran to the tick's per-wheel accumulator.
+	//
+	// `solve_substep` writes its per-wheel numbers straight into `telemetry_`,
+	// which is where they are read from here. That is deliberate rather than lazy:
+	// the alternative is to pass an accumulator down into the corner loop, which
+	// would put the averaging arithmetic in the middle of the tire model where the
+	// next person to touch it has to think about it. Here the substep's read-out is
+	// still a complete `WheelTelemetry` — every field is written on every substep,
+	// on both paths through the corner loop — and this is the only place that knows
+	// there is more than one substep.
+	//
+	// `grounded` is the one field that is an OR rather than a sum, because a bool
+	// has no mean. `vehicle_state.h` has the invariant that choice preserves.
+	void accumulate_wheel_telemetry() {
+		for (int corner = 0; corner < CORNER_COUNT; ++corner) {
+			const WheelTelemetry &wheel = telemetry_.wheel[corner];
+			WheelTelemetry &sum = wheel_sum_[corner];
+			sum.normal_load += wheel.normal_load;
+			sum.slip_angle += wheel.slip_angle;
+			sum.slip_ratio += wheel.slip_ratio;
+			sum.suspension_travel += wheel.suspension_travel;
+			sum.lift += wheel.lift;
+			sum.utilization += wheel.utilization;
+			sum.steer_angle += wheel.steer_angle;
+			sum.force += wheel.force;
+			sum.grounded = sum.grounded || wheel.grounded;
+		}
+	}
+
 	void fill_telemetry(const BodyState &body, const VehicleForces &total) {
+		// The per-wheel mean, for the same reason and over the same substeps as
+		// the forces above — issue #134, and note 1 in the header comment. The
+		// division is the last write to these fields in the tick, so what a caller
+		// reads is never a substep's own value.
+		//
+		// The whole read-out costs 80 adds and 40 multiplies per tick — ten fields
+		// at four corners over two substeps, then one divide each — against the
+		// solver's measured 15.4 us, which is not a number worth reporting. The
+		// cost that was worth checking is the one §8 and §15 both care about: this
+		// allocates nothing, reads no clock, and has no bound that depends on its
+		// input.
+		const double inverse = 1.0 / static_cast<double>(SUBSTEP_COUNT);
+		for (int corner = 0; corner < CORNER_COUNT; ++corner) {
+			const WheelTelemetry &tick = wheel_sum_[corner];
+			WheelTelemetry &wheel = telemetry_.wheel[corner];
+			wheel.normal_load = tick.normal_load * inverse;
+			wheel.slip_angle = tick.slip_angle * inverse;
+			wheel.slip_ratio = tick.slip_ratio * inverse;
+			wheel.suspension_travel = tick.suspension_travel * inverse;
+			wheel.lift = tick.lift * inverse;
+			wheel.utilization = tick.utilization * inverse;
+			wheel.steer_angle = tick.steer_angle * inverse;
+			wheel.force = tick.force * inverse;
+			wheel.grounded = tick.grounded;
+		}
+
 		Vec3 sum = total.central_force + gravity * mass_properties_.mass;
 		for (int corner = 0; corner < CORNER_COUNT; ++corner) {
 			sum += total.force[corner];
@@ -1058,6 +1137,10 @@ private:
 	WheelContact contact_[CORNER_COUNT];
 	CornerState corner_state_[CORNER_COUNT];
 	SubstepForces accumulator_;
+	// The per-wheel read-out summed over the tick's substeps, divided in
+	// `fill_telemetry`. A member for the same reason `accumulator_` is one: so
+	// `step()` allocates nothing.
+	WheelTelemetry wheel_sum_[CORNER_COUNT];
 
 	VehicleTelemetry telemetry_;
 };

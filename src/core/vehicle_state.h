@@ -85,10 +85,15 @@ struct GroundQuery {
 
 // What the solver produces for one tick, for the engine to apply.
 //
-// One entry per corner plus a central term. The forces are already summed over
+// One entry per corner plus a central term. The forces are the **mean** over
 // however many substeps ran — ADR-0032 conclusion 3, re-confirmed against a
 // contact in ADR-0033 finding 6: a 240 Hz solver cannot make the engine step
-// twice, so its substeps accumulate and the total is applied once.
+// twice, so its substeps accumulate and the total is applied once. "Accumulate"
+// means the impulse is conserved, and since each substep's force acted for
+// `dt / N`, the single force delivering the same impulse over `dt` is the
+// average and not the sum. This comment said "summed" for a milestone;
+// `KartVehicle::step` has always divided, and the word was the thing that was
+// wrong.
 struct VehicleForces {
 	Vec3 force[CORNER_COUNT]; // world, newtons
 	Vec3 application_point[CORNER_COUNT]; // world offset FROM THE BODY ORIGIN
@@ -97,7 +102,49 @@ struct VehicleForces {
 };
 
 // Per-wheel telemetry. Issue #43 lists exactly these.
+//
+// ## Every number here describes the whole tick, not an instant inside it
+//
+// The solver substeps and returns the **mean** of the substep forces, because
+// that is the single force delivering the same impulse — see `VehicleForces`
+// above. These fields are averaged over the same substeps, for the same reason
+// and so that they agree with what was applied. Issue #134: they used to be
+// whatever the last substep happened to produce, which made this struct a
+// read-out that did not describe what the solver did with it. The forces were
+// never wrong; the description of them was, which is the same class of defect as
+// `get_contact_impulse` reading 1.000371x high (ADR-0033 finding 1) and gets the
+// same treatment — stated here rather than left for a caller to discover.
+//
+// **The identity that makes it worth doing.** One corner's applied force is
+//
+//     VehicleForces::force[corner] == normal * normal_load + force
+//
+// where `normal` is the contact normal from the `GroundQuery` that produced the
+// tick. That is exact, not approximate: `KartVehicle::step` extrapolates the ray
+// length across its substeps and deliberately holds the contact plane, so the
+// normal is common to every substep and factors straight out of the mean. There
+// is no normal in this struct because the side that filled the `GroundQuery`
+// already has one, and duplicating it would create two that could disagree.
+// `tests/core/test_vehicle.cpp` asserts the identity per corner per tick.
+//
+// **What averaging is and is not.** For a force or a load it is exactly right —
+// the mean is the value that conserves the impulse. For the kinematic fields it
+// is a choice, and the choice is the same one for two reasons. A last-substep
+// read-out samples a 240 Hz signal at 120 Hz, which is aliasing, and the thing it
+// aliases is precisely what this solver's stability guards exist to suppress: the
+// note above `SLIP_CONVERGENCE_FRACTION` records a measured limit cycle that
+// alternated sign **every substep**, and a graph of every other substep would
+// have shown a steady bias where the mean shows the truth. And a caller that
+// reads a slip angle beside the force it produced should be looking at one tick,
+// not at two halves of one.
+//
+// The one number that could have been made meaningless by averaging is
+// `slip_angle`, because a wrapping angle averaged across the wrap is a value that
+// occurred at neither end. It cannot wrap: it is `atan2(-lateral, reference)`
+// with a strictly positive second argument, so it lives in (-pi/2, pi/2) and the
+// mean of two of them is between them.
 struct WheelTelemetry {
+	// All doubles below are the mean over the tick's substeps.
 	double normal_load = 0.0; // N
 	double slip_angle = 0.0; // rad
 	double slip_ratio = 0.0; // dimensionless
@@ -106,8 +153,43 @@ struct WheelTelemetry {
 	double utilization = 0.0; // fraction of the friction ellipse in use
 	double steer_angle = 0.0; // rad
 	Vec3 force; // world, N, what this tire produced
+
+	// True if the corner was grounded on **any** substep — the one field that
+	// cannot be averaged, so it is an OR rather than a mean.
+	//
+	// The alternative, the last substep's value, breaks the only invariant this
+	// flag has: a wheel that extends past its free length on the second substep
+	// contributed force on the first, so the mean force is non-zero while the
+	// flag says the wheel is in the air. With the OR,
+	//
+	//     grounded == false  =>  normal_load == 0 and force == 0
+	//
+	// holds by construction. One way only: `suspension.h` sets its own flag from
+	// `normal_force > 0`, so a wheel just touching is grounded and carrying
+	// nothing.
 	bool grounded = false;
 };
+
+// The value `VehicleTelemetry::time_ratio` carries until something that can see a
+// wall clock overwrites it.
+//
+// A ratio of two durations cannot be negative, so this is unreachable as a
+// measurement and unambiguous as a sentinel. The field used to default to 1.0,
+// which is not a sentinel at all — it is the value that means "the simulation is
+// keeping up", so a caller reading telemetry straight off the solver was handed a
+// plausible lie rather than an obvious absence.
+//
+// **Negative and not NaN**, and the difference is not a matter of taste. The one
+// consumer is `scripts/game/telemetry_panel.gd`, which frames the entire panel in
+// its alert color when `absf(ratio - 1.0) > 0.02`. Every comparison against NaN
+// is false, so NaN would be silent in exactly the place built to shout — and it
+// would then propagate through the graph's `maxf` span update, which decays
+// multiplicatively and so would never recover, blanking that graph for the rest
+// of the session even after real values started arriving. The panel also reads
+// the key with `float(sample.get("time_ratio", 1.0))`, so its default only covers
+// a **missing** key: a present-and-NaN value goes straight through. A negative
+// trips the alert on the first frame and is arithmetically inert.
+inline constexpr double TIME_RATIO_UNMEASURED = -1.0;
 
 // Everything the telemetry panel and the HUD read. Issue #43 ships with the
 // milestone rather than after it, because ARCHITECTURE.md §19 names unbounded
@@ -115,7 +197,14 @@ struct WheelTelemetry {
 struct VehicleTelemetry {
 	WheelTelemetry wheel[CORNER_COUNT];
 
-	// Drivetrain, straight out of DrivetrainOutput.
+	// Drivetrain, straight out of DrivetrainOutput, and **end of tick** rather than
+	// averaged over the substeps the way `WheelTelemetry` is. That is not an
+	// inconsistency: every number below is integrated state, and the value of an
+	// integrated state at the end of the tick is the state — it is what the next
+	// tick starts from and what `axle_speed()` and `drivetrain` themselves report.
+	// Averaging an rpm across two substeps would produce a figure that disagrees
+	// with the engine that is turning at it. The per-wheel fields are averaged
+	// because they are not state: they are what the solver *did* during the tick.
 	double engine_rpm = 0.0;
 	double engine_torque = 0.0; // N m at the crank
 	double axle_torque = 0.0; // N m at the rear axle
@@ -126,11 +215,17 @@ struct VehicleTelemetry {
 	bool shifting = false;
 	bool over_rev = false;
 
-	// Chassis.
+	// Chassis. The two accelerations are computed from the tick's applied forces,
+	// so they are already averages and agree with `VehicleForces` by construction.
 	double speed_ms = 0.0;
 	double lateral_g = 0.0;
 	double longitudinal_g = 0.0;
-	double frame_warp = 0.0; // m, the warp mode's amplitude — #32 made visible
+	// The warp mode's amplitude — #32 made visible. End of tick, and deliberately:
+	// the solver re-solves it in closed form every substep and keeps the answer in
+	// the member `warp_amplitude()` returns and the state hash quantizes, so a
+	// telemetry copy that was a mean would be a fifth number disagreeing with the
+	// three that are the same one.
+	double frame_warp = 0.0; // m
 
 	// Solver health.
 	int substeps = 0;
@@ -143,7 +238,12 @@ struct VehicleTelemetry {
 	// at a measured 0.6476 of real time, and it never catches up. A replay that
 	// counts ticks cannot see it and a driver can see nothing else. This is the
 	// only place it becomes visible.
-	double time_ratio = 1.0;
+	//
+	// **The solver never writes it** — it would have to read a clock, which
+	// `ARCHITECTURE.md` §8 item 1 forbids it — so it arrives from the Godot
+	// boundary or it does not arrive at all. Which is why it starts at a sentinel
+	// and not at 1.0: see `TIME_RATIO_UNMEASURED`.
+	double time_ratio = TIME_RATIO_UNMEASURED;
 };
 
 } // namespace kart::core
