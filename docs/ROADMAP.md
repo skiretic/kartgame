@@ -192,6 +192,25 @@ proving ground a curb with a real vertical edge. #42's "curbs are distinct from
 both asphalt and grass" is true in `surface.h`'s table and unit-tested there, but
 nothing has driven over a curb, because none exists. The two land together.
 
+**A test track landed, and it is an instrument rather than a circuit.**
+`scenes/game/test_track.tscn` is a closed 1,030 m loop built procedurally by
+`scripts/game/test_track.gd` from a centerline in `scripts/track/track_layout.gd`
+— **in code, not through `genkart.sh`**, so it stays off the geometry determinism
+gate and out of the gitignored asset path. It does not replace the proving
+ground, which stays exactly as it is and keeps every §6.4 figure. Each of its
+four corners is sized from a row of `drive_probe.gd`'s recorded steering-lock
+sweep and exists to provoke one named behavior: a 120 m kink taken flat at about
+140 km/h, an 11 m hairpin that cannot be taken without going past quarter lock
+(#137, deliberately), a 30 m sweeper sat on that same boundary, and a 55 m
+constant-radius left that is where this kart actually holds its best sustained
+lateral g — the sweep settles at 58.49 m / 1.84 g and 50.95 m / 1.82 g, and a
+20 m circle is held at 0.88 g, not 1.86. It carries curbs with a 30 mm vertical
+face at `surface_type` 1 and grass run-off at 2, which closes the *geometry* half
+of #139 and #42 — a wheel placed on a curb reads `curb` and stands 15 mm higher,
+and threshold braking measures 1.156 g on asphalt against 0.286 g on grass.
+Measured by `scripts/track/track_probe.gd`. What is still open is #139's
+tunneling half, which needs repeated crossings and a cost measurement.
+
 **Blocked on being able to judge it by feel: #32, #38, #39, #40.** All four have
 acceptance criteria written in a driver's language — "visibly lifts", "requires
 clutch modulation", "lifting off in second decelerates hard", "demonstrably

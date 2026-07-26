@@ -1,0 +1,20 @@
+[gd_scene load_steps=2 format=3]
+
+; Almost empty on purpose, the same as scenes/game/proving_ground.tscn: the whole
+; track is built by scripts/game/test_track.gd from a centerline in
+; scripts/track/track_layout.gd, so a driving session or a still is described
+; completely by the command that started it rather than by editor state.
+;
+; Geometry in code rather than through tools/blender/genkart.sh, deliberately.
+; That pipeline owns a determinism gate and writes into the gitignored
+; assets/generated/, and a track has to exist on a fresh clone. M5 builds the real
+; track pipeline from data/track.json; see the script header.
+;
+; The kart it spawns is loaded at run time from assets/generated/kart.glb, which
+; IS gitignored — a hard ext_resource here would make the scene fail to load
+; before genkart.sh has ever run.
+
+[ext_resource type="Script" path="res://scripts/game/test_track.gd" id="1_test_track"]
+
+[node name="TestTrack" type="Node3D"]
+script = ExtResource("1_test_track")
