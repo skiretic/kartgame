@@ -676,3 +676,451 @@ onto grass loses grip immediately and obviously" is really about — a kart hold
    A kart returning from a dirt verge carries the dirt on its tires for most of a
    lap, which is a memory effect this table has no room for and §5 item 7's
    "marbles off the racing line" will eventually want. Out of scope for #42.
+
+## Engine audio — §12
+
+`ARCHITECTURE.md` §12 decides the engine note is **synthesized, not sampled**:
+"harmonic stack with fundamental driven by RPM, per-harmonic gain envelopes
+shaped by load, noise layer, comb-filtered exhaust resonance." Every one of those
+words hides a number. This section is where those numbers come from, and — more
+often — where they could not be got.
+
+§5 item 10 says do not model a real part from memory or from prose. That rule was
+written about geometry, but a two-stroke's harmonic ladder is exactly the kind of
+thing a session will otherwise invent from a plausible-sounding intuition, so it
+is applied here too. Everything below was measured off a recording that is named,
+licensed and hash-pinned, or it is marked as not measured.
+
+### What was listened to
+
+Twelve recordings, all from Wikimedia Commons, all CC0 / public-domain / CC BY /
+CC BY-SA. Nothing with an ambiguous license was used. Full attribution, file
+URLs and SHA-256 are in `ATTRIBUTION.md`; this table is the engineering view.
+
+| Recording | What the engine actually is | License |
+| --- | --- | --- |
+| `WWS_MotorcycleTOMOSD-9` | **Tomos D-9**, 1965 50 cc two-stroke GP racer, expansion chamber, **11 hp @ 14,000 rpm**, nine-speed | CC BY 4.0 |
+| `WWS_MotorcycleTOMOSD7` | **Tomos D-7**, 1962 50 cc two-stroke GP racer, expansion chamber, ~7 kW | CC BY 4.0 |
+| `WWS_MotorcycleTOMOSColibrispecialD-3` | **Tomos Colibri special D-3**, 1959 50 cc two-stroke racer, 3.7 kW, three-speed | CC BY 4.0 |
+| `Yamaha_RX-100_accelerates_to_top_speed` | **Yamaha RX-100**, 98.2 cc reed-valve two-stroke street single, four-speed, accelerating through all four gears | CC BY-SA 4.0 |
+| `WWS_Chainsaw` | Stihl MS 150 C, 23.6 cc two-stroke, **muffler, no tuned pipe** — the negative control | CC BY 4.0 |
+| `Chainsaw_1`, `Chainsaw_5` | Unnamed two-stroke chainsaws | Public domain |
+| `Piaggio_Vespa_Suono_Motore` | Vespa PK 125 S, 125 cc two-stroke, **touring silencer** | CC BY-SA 4.0 |
+| `Garelli_Bonanza_starten_01` | Garelli Bonanza moped, cold start and ride away | CC BY-SA 3.0 |
+| `USSR_bicycle_2T_engine_D-4` | D-4 auxiliary bicycle engine, 45 cc, USSR 1956 | Public domain |
+| `Wurstelprater_Wien_2024_GoKart_Honda` | Honda 200 cc **four-stroke** rental kart, governed to 30 km/h — the four-stroke control | CC BY-SA 4.0 |
+| `Wurstelprater_Wien_2024_Bandito_Rennbahn_Go-Kart` | Amusement-park kart, type unstated | CC BY-SA 4.0 |
+
+A second sweep — archive.org's `radio-aporee-maps` field-recording collection,
+Freesound's public preview URLs, and Commons video — turned up recordings that are
+much closer to the target, and these are the ones that matter:
+
+| Recording | What it is | f0 measured | Implied rpm (2T) | License |
+| --- | --- | --- | --- | --- |
+| `commons_Patras2011_PICK_kart` | Patras International Circuit for Kart, Greece, 2011 — **a kart racing circuit** | 204.5 Hz median, 261.2 p95 | **12,270–15,670** | CC BY-SA 3.0 |
+| `fs529071_Eindhoven_kartbaan` | Eindhoven kart track, Netherlands, 2020 | 157.1 Hz median, 207.1 p95 | **9,430–12,430** | **CC0** |
+| `aporee_Scarborough_2012_125-400cc` | Oliver's Mount road races, described as "125-400 cc practice two stroke" | 173.0 Hz median, 214.4 p95 | **10,380–12,860** | CC BY 3.0 |
+| `fs317470_GoKartRacing_Outdoors` | **Negative control** — four-stroke rental kart | 25.2 Hz | 1,510 (2T) / 3,020 (4T) | CC0 |
+
+**So a two-stroke racing kart at KZ rpm *was* found, and the earlier conclusion
+that none existed was wrong.** What does not exist under any acceptable license is
+a recording *labeled* as a specific KZ engine — no TM KZ-R1, no Vortex ROK
+Shifter, no IAME Screamer, no Modena. These three are identified **by
+measurement, not by their labels**: a firing fundamental of 157–261 Hz can only be
+a two-stroke, because read as a four-stroke it would demand 18,000–31,000 rpm,
+which no kart engine of any kind reaches. The negative control confirms the split
+is real rather than an artifact of the tracker — the rental kart lands at 25 Hz,
+a factor of eight below, exactly where a governed four-stroke belongs.
+
+**Patras is the single best analogue in the corpus**: an actual kart circuit,
+running at 12,270–15,670 rpm, which is a KZ's working range. Eindhoven is the best
+*licensed* one, being CC0 and therefore free of any obligation.
+
+Among the older set the closest analogue is the Tomos D-9: a quarter of the
+displacement, but a tuned expansion chamber and a published **14,000 rpm**
+peak-power speed. Rev range and pipe design are what shape the spectrum;
+displacement mostly sets how much air moves. The Vespa is the *only* 125 cc
+two-stroke in the corpus and it is the **least** representative, because a touring
+silencer is the opposite of a tuned pipe — its rows are marked scooter-derived
+wherever they appear and none of them is used.
+
+All four new recordings pass the subharmonic test described next (m = 1, every gap
+within ±2.9 dB) and were re-measured with the same pipeline rather than trusted
+from the search that found them.
+
+### The subharmonic question, and how it was settled
+
+An earlier pass produced harmonic ladders that peaked at h3–h8 with the
+fundamental apparently sitting at the noise floor, and suspected its own pitch
+tracker had locked to a subharmonic. If true, every rpm figure below would be
+wrong by an integer factor. A tracker locked to f0/m and a genuinely suppressed
+fundamental look **identical in a single spectrum**, and a small two-stroke with
+a tuned pipe legitimately can have a weak h1, so this could not be settled by
+looking harder at the same picture.
+
+It was settled with three estimators whose failure modes point in **opposite
+directions**, scored first against a synthetic signal whose answer is known
+exactly (`probe_f0.py`, true f0 = 120.000 Hz):
+
+| Estimator | Bias when it fails | Result on the probe, h1 40 dB down | Result with h1 removed entirely |
+| --- | --- | --- | --- |
+| A — harmonic sum (log-mean scoring) | toward **sub**multiples | 120.0 Hz | 120.0 Hz |
+| B — cepstrum of the log spectrum | measures spacing, blind to which partial is loud | 118.8 Hz | 118.8 Hz |
+| C — analytic-envelope autocorrelation | toward **multiples** of the period | 117.6 Hz | 117.6 Hz |
+
+and a fourth, direct test: under the hypothesis f0_true = m·f0, the harmonic
+slots not divisible by m contain no partial at all. Handed a deliberately wrong
+f0, that test fires hard and unambiguously:
+
+| f0 handed to the test | gap at m=2 | m=3 | m=4 |
+| --- | --- | --- | --- |
+| 120 Hz — correct | 1.4 dB | −0.1 dB | −1.3 dB |
+| 60 Hz — f0/2 | **41.6 dB** | 0.6 dB | 40.8 dB |
+| 40 Hz — f0/3 | 0.1 dB | **42.1 dB** | 0.4 dB |
+| 30 Hz — f0/4 | 8.5 dB | −0.0 dB | **41.7 dB** |
+
+So a real subharmonic lock shows a ~41 dB gap and a correct f0 shows under
+1.4 dB. There is no middle ground to argue about.
+
+**The test has a resolution floor, and finding it is what actually resolved the
+question.** Harmonic slots sit f0/Δf bins apart and a Hanning main lobe is four
+bins wide, so once f0 approaches the bin width, leakage from each real partial
+fills its neighbors' slots and the empty-slot signature cannot exist whatever the
+truth is. Measured (`probe_resolution.py`), feeding the test a known-wrong f0/2:
+
+| bins per f0 | m=2 gap | verdict |
+| --- | --- | --- |
+| 27.3 | 42.3 dB | works |
+| 8.5 | 37.3 dB | works |
+| 5.1 | 11.1 dB | marginal |
+| 3.4 | **0.0 dB** | blind |
+
+At the 8192-point window originally used (Δf = 5.86 Hz at 48 kHz) the test is
+therefore trustworthy above about 50 Hz and **worthless below 30 Hz** — which is
+precisely where the suspicious recordings sat. Re-run at 32768 points
+(Δf = 1.46 Hz), where the probe says it is sensitive down to 20 Hz, the test
+reports **m = 1 on all twelve recordings**, every gap within ±2.0 dB of zero.
+The tracked fundamentals also moved by at most 17% across a fourfold change of
+window length and a threefold widening of the search band — no estimate moved by
+anything near a factor of two.
+
+**Conclusion: no recording was tracked to a subharmonic, and no rpm figure below
+is corrupted.** The apparent "h1 at the noise floor" was a measurement artifact
+of a different kind: h1 was being compared against a *global* inter-harmonic
+median taken across the whole 0–24 kHz spectrum. Outdoors, wind and handling
+rumble raise the floor near a 20 Hz fundamental 20–30 dB above the floor at
+2 kHz, so a perfectly healthy h1 scores as buried. Against the floor **in its own
+octave**, which is the honest comparison, h1 stands 14–36 dB clear on every
+high-revving recording:
+
+| Recording | h1 over global median | h1 over local floor |
+| --- | --- | --- |
+| `WWS_Chainsaw` | 44.1 dB | 35.6 dB |
+| `WWS_MotorcycleTOMOSD7` | 33.2 dB | 20.9 dB |
+| `WWS_MotorcycleTOMOSColibrispecialD-3` | 32.7 dB | 18.2 dB |
+| `Yamaha_RX-100` | 41.5 dB | 15.1 dB |
+| `WWS_MotorcycleTOMOSD-9` | 19.1 dB | 14.0 dB |
+| `Piaggio_Vespa_Suono_Motore` | 5.5 dB | 2.4 dB |
+
+The fundamental is genuinely weak only on the recordings whose f0 is 17–28 Hz —
+idling mopeds and governed four-stroke rental karts — where it falls below the
+recording chain's usable response. That is a property of those recordings, not a
+property of two-stroke engines, and none of them is used for anything.
+
+**One recording is partly corrupted, by a different mechanism.** The Tomos D-9's
+f0 track contains 44 frame-to-frame jumps at simple *rational* ratios out of 2679
+transitions (1.6%): 15 at 2/3, 10 at 3/2, 10 at 1/2, 9 at 2. A ratio of 2/3
+recurring fifteen times is not a gearbox — a nine-speed close-ratio box steps by
+0.90–0.94, which is the *other* cluster in the same data — it is the tracker
+jumping between the second and third partial. The integer-m spacing test cannot
+see this, because 3/2 is not an integer. The comparison files are clean:
+D-7 0.2%, Colibri 0.8%, Yamaha 0.08%. **The D-9's extreme rpm readings (its
+17,000–18,000 rpm peaks, against a published 14,000 rpm peak-power speed) sit on
+the wrong side of these jumps and are not trustworthy.** Its ladder and its
+resonance, which are computed from partial positions in absolute frequency, are
+unaffected and stayed rock-stable.
+
+### That the firing fundamental is rpm/60
+
+A single-cylinder two-stroke fires once per revolution, so the firing
+fundamental *should* be rpm/60 Hz. No recording here has a tachometer channel, so
+this was verified indirectly, on the Yamaha RX-100, by the **gearbox**:
+
+- A gearbox multiplies crank speed by a ratio the exhaust knows nothing about. If
+  f0 really is the firing rate, an upshift must step f0 by exactly that ratio.
+- Commons documents the recording as accelerating "through all four gears".
+  A four-speed box gives **three** upshifts. Exactly **three** clean downward f0
+  steps were found under power, at t = 6.0, 8.8 and 15.6 s.
+- Their ratios are **0.844, 0.905, 0.921** — increasing monotonically, which is
+  what a real gearbox does and what nothing else in a recording does.
+- Read as a two-stroke, the three shift points are **7214, 7341 and 7733 rpm**,
+  against a published peak-torque speed of **7500 rpm** (peak power on a
+  two-stroke sits above peak torque, so shifting a little past 7500 is exactly
+  right). Read as a four-stroke the same shifts would be at 14,400–15,500 rpm,
+  which a 98 cc air-cooled street single cannot do.
+
+So **f0 = rpm/60 holds**, to the accuracy of "a rider shifts near peak power".
+It is verified on one engine, not on all of them; the four-stroke rental-kart
+control was too contaminated by other karts in the same recording to serve as the
+matching negative test, and that is noted below as unfinished.
+
+### The harmonic ladder — and what the tuned pipe does to it
+
+This is §12's "harmonic stack", and it is the measurement most worth having,
+because the intuitive guess is wrong in a way that matters. Per-harmonic gains,
+dB relative to h1, median over all confidently-tracked frames, and the decay
+fitted against log2 of harmonic number:
+
+| Engine | Exhaust | Decay, dB per doubling of n | h24 re h1 |
+| --- | --- | --- | --- |
+| Stihl MS 150 C chainsaw | muffler, **no tuned pipe** | **−6.7** | −26.4 |
+| Yamaha RX-100 | mild street expansion chamber | −3.6 | −22.3 |
+| Tomos Colibri D-3 (1959) | racing expansion chamber | −3.2 | −8.8 |
+| Tomos D-7 (1962) | racing expansion chamber | −2.7 | −9.3 |
+| Tomos D-9 (1965) | racing expansion chamber | **−0.4** | **+4.9** |
+
+That table is the headline result of this whole section, and the D-9 is both its
+strongest case and the file with the 1.6% tracking jumps, so the two could have
+been the same thing. They are not: re-fitting on only the frames more than five
+frames away from any single-step f0 change above 3% — which throws away **79%** of
+the D-9's frames, 2837 down to 607 — moves its slope from −0.4 to −0.1 and its h24
+from +4.9 to +5.5. The other three move by 0.3 dB or less. The flat ladder is not
+an artifact of the tracker.
+
+**A racing two-stroke's harmonic stack is nearly flat.** The chainsaw — the one
+engine here with an ordinary muffler — rolls off at 6.7 dB per doubling, which is
+almost exactly the 1/n a synth gets by default and almost exactly what somebody
+would invent. The three engines with tuned pipes roll off at 0.4 to 3.2 dB per
+doubling and are still within 10 dB of the fundamental at the **twenty-fourth**
+harmonic. Building a KZ on a 6 dB/octave stack would produce a chainsaw, and the
+measurement says so literally.
+
+The full ladders, dB re h1 (`WWS_Chainsaw` included as the negative control):
+
+| h | Tomos D-7 | Tomos D-9 | Colibri | Yamaha | Chainsaw |
+| --- | --- | --- | --- | --- | --- |
+| 1 | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 |
+| 2 | −1.2 | +3.5 | −2.6 | −9.2 | −7.0 |
+| 3 | −0.8 | +5.5 | −0.6 | −7.3 | −5.4 |
+| 4 | −2.7 | +5.5 | −2.9 | −9.2 | −2.9 |
+| 5 | −0.6 | +9.5 | −3.4 | −7.3 | −5.1 |
+| 6 | −1.0 | +10.3 | −0.4 | −12.0 | −14.8 |
+| 8 | −1.7 | +9.6 | +0.7 | −13.1 | −15.3 |
+| 10 | −3.4 | +9.3 | −2.3 | −5.5 | −21.2 |
+| 12 | −5.1 | +7.5 | −2.8 | −8.3 | −22.8 |
+| 16 | −6.4 | +6.2 | −9.0 | −14.6 | −21.8 |
+| 20 | −8.1 | +5.9 | −10.0 | −19.7 | −23.2 |
+| 24 | −9.3 | +4.9 | −8.8 | −22.3 | −26.4 |
+
+The ladder is not smooth and should not be smoothed. The Yamaha's h10 sits 6.5 dB
+above its h9 and the Colibri's h8 sits above its h7; those bumps are the exhaust
+system's fixed transfer function crossing a moving harmonic, which is the next
+measurement.
+
+How far up the stack is worth synthesizing: partials stand 10 dB or more clear of
+the inter-harmonic floor **out to h24 on every usable recording**, which is where
+the analysis stopped rather than where the engine did. At a KZ's 14,000 rpm the
+fundamental is 233 Hz and h24 is 5.6 kHz, so a stack truncated at h24 leaves the
+top two octaves of the audible band to the noise layer.
+
+### Exhaust resonance, and the comb delay
+
+§12 asks for a comb filter, whose delay is a real physical quantity. An engine's
+partials move with rpm; its exhaust system's transfer function does not, so
+plotting every partial's level against its **absolute** frequency over a rev
+sweep averages out everything that moves and leaves the acoustic path. The
+periodic ripple in what remains is a comb, and a cepstrum along the frequency
+axis recovers its delay.
+
+**The trap is that a ground reflection produces exactly the same ripple**, and
+attributing a microphone's height above the tarmac to an expansion chamber would
+be fabricating a physical quantity. These are separable: a pipe is bolted to the
+engine and its delay must be constant for the whole recording, while a reflection
+path changes as the vehicle moves. Splitting each file into quarters:
+
+| Recording | τ per quarter (ms) | Spread | Verdict |
+| --- | --- | --- | --- |
+| **Tomos D-9** (museum, stationary) | 1.40, 1.42, 1.42, 1.42 | **1%** | **engine-fixed** |
+| Colibri D-3 (museum, stationary) | 2.46, 1.67, 1.73, 1.79 | 17% | drifts |
+| Yamaha RX-100 (riding past) | 2.54, 1.35, 2.38, 1.54 | 26% | drifts |
+| Tomos D-7 (museum, stationary) | 5.38, 5.29, 2.81, 2.79 | 31% | drifts |
+| Stihl chainsaw (handheld) | 1.75, 1.65, 2.40, 2.52 | 19% | drifts |
+| Eindhoven kartbaan (trackside) | 1.31, 2.27, 1.31, 1.27 | 27% | drifts |
+| Scarborough (trackside) | 1.69, 4.79, 2.90, 4.67 | 37% | drifts |
+| Patras (trackside) | 9.62, 2.42, 2.38, 3.67 | 66% | drifts |
+
+**Exactly one recording of sixteen yields a defensible comb delay: the Tomos D-9
+at τ = 1.42 ms, comb spacing 704 Hz**, peak-to-median significance 7.5–8.9 across
+all four quarters. Every other file's apparent resonance is dominated by where the
+microphone was standing and is not usable. The three trackside kart recordings are
+the worst offenders, which is exactly what should be expected — the vehicle is
+moving past the microphone, so its reflection geometry changes continuously, and
+their cepstral significance (2.7–3.7) barely clears the noise anyway. **A comb
+delay for a kart pipe therefore remains unmeasured even though kart recordings
+were finally obtained.** The measured ripple depth, which
+is the depth the comb would need, is **1.6–2.6 dB RMS** — a gentle filter, not the
+deep metallic comb a first guess reaches for.
+
+Backing a length out of τ = 1.42 ms requires the speed of sound **in exhaust
+gas**, not in ambient air, and that is where this stops being measured:
+
+- at 343 m/s (20 °C air): path difference 487 mm, half-wave resonator 243 mm
+- at ~557 m/s (a plausible 500 °C in-pipe figure): path difference 791 mm,
+  half-wave resonator **396 mm**
+
+The second is the right order for a 50 cc racing expansion chamber's tuned
+length, but **no dimensioned drawing of a Tomos D-9 pipe was found and no in-pipe
+gas temperature was measured**, so "396 mm" is consistent-with, not established.
+What *is* established and directly usable is τ itself: **1.42 ms on an engine
+whose peak power is at 14,000 rpm**. A KZ's pipe is longer, so its τ is longer,
+and the honest scaling is given under assumptions below.
+
+### On throttle versus off throttle — issue #39
+
+Issue #39's engine braking currently cannot be judged at all, because nothing
+says how the note is supposed to *change*. None of these recordings carries a
+throttle channel, so frames were split by the sign of df0/dt — nothing but a
+closed throttle makes a free-revving engine lose speed — with a ±2%/s dead band
+so that steady cruising pollutes neither group.
+
+| Recording | On-throttle frames | Off-throttle | Broadband on − off | h1 over local floor, on → off |
+| --- | --- | --- | --- | --- |
+| Yamaha RX-100 | 651 | 320 | +1.1 dB | 19.3 → 9.2 dB (**−10.1**) |
+| Tomos Colibri D-3 | 1403 | 1367 | **+4.6 dB** | 24.0 → 14.9 dB (**−9.1**) |
+| Tomos D-7 | 876 | 1991 | **+4.3 dB** | 24.7 → 19.1 dB (−5.6) |
+
+Two effects, and the second is the interesting one:
+
+1. **Level.** Closing the throttle costs 4–5 dB broadband on the two recordings
+   where the engine stays at a fixed distance from the microphone. The Yamaha's
+   +1.1 dB is not a contradiction — the bike is riding away from the mic, so its
+   level change is contaminated by distance and should not be used.
+2. **The ladder tilts, it does not just drop.** On the Yamaha the fundamental
+   loses 10.1 dB against its local floor off-throttle while h20–h24 lose only
+   4–5 dB; the ON-minus-OFF ladder difference is −5.2 dB at h2 and around
+   0 dB at h11. Off-throttle the note is therefore **relatively brighter and
+   thinner**, not simply quieter. On the D-7 the tilt runs the other way at the
+   low end (h2 and h3 are 3 dB *stronger* on throttle) while h5–h8 are 3–4 dB
+   weaker. There is no single "load" scalar that reproduces both; §12's
+   "per-harmonic gain envelopes shaped by load" is the right shape of model, and
+   these three columns are the only measured constraint on it.
+
+### The rev limiter
+
+**No recording here catches one, and that is a real gap.** A hard limiter parks
+f0 on a plateau and makes it ring; a rider shifting sweeps through the top of the
+range and leaves. Measured as the fraction of usable time spent within 3% of each
+recording's 99th-percentile f0, and the spread of f0 while there:
+
+| Recording | Top of range | Time within 3% of it | Spread while there |
+| --- | --- | --- | --- |
+| Yamaha RX-100 | 8020 rpm | 5.1% | 1.39% |
+| Tomos Colibri D-3 | 9639 rpm | 5.1% | 4.74% |
+| Tomos D-7 | 13,278 rpm | 2.3% | 2.27% |
+| Tomos D-9 | 16,892 rpm (unreliable, see above) | 1.5% | 2.92% |
+
+Every one of these is a rider shifting. None shows the plateau-and-ring
+signature. All four engines are also carbureted period racers and road bikes with
+no electronic limiter to catch — a KZ's limiter is an ignition cut, which is a
+different artifact entirely and is **not represented anywhere in this corpus**.
+
+### What could not be sourced, and what stays assumed
+
+1. **No recording identifying a specific KZ engine was found**, under any
+   license. Searches for `TM Racing kart engine`, `Vortex ROK`, `Modena kart`,
+   `KZ2`, `ICC kart`, `shifter kart engine`, `Superkart` and `gearbox kart` on
+   Commons return zero audio or video; Openverse returns zero for `RS125`,
+   `TZ125`, `GP125` and `expansion chamber`. The karting vendor sites that would
+   have video (tkart.it, mondokart, iamekarting) return 403 to everything. The
+   four two-stroke racing recordings above are identified by their spectra, not
+   by their captions, and **no recording in this corpus is known to be a KZ**.
+   Displacement, pipe dimensions, ignition timing and exhaust-port timing are all
+   unknown for every one of them.
+
+2. **No 125 cc racing two-stroke of known specification.** The Scarborough
+   recording is captioned "125-400 cc practice two stroke" and so contains
+   125 cc machines, but it is a trackside recording of a mixed field and no
+   individual pass can be attributed to a displacement. The only 125 cc
+   two-stroke in the corpus whose model is known is the Vespa PK 125 S, which has
+   a touring silencer, idles at ~1700 rpm and never exceeds ~4900 rpm. **Its
+   ladder is not used and its rows are marked scooter-derived wherever they
+   appear.** Its h1 sits 2.4 dB over its own local noise floor, which makes every
+   "dB re h1" figure derived from it meaningless — that is why it is excluded,
+   not merely deprecated.
+
+3. **The new recordings are all field recordings of moving vehicles**, which
+   costs them something the museum recordings have. Distance brings air
+   absorption and ground effect, both strongly frequency-dependent, so a ladder
+   measured off a drive-by is the engine's spectrum *times an unknown transfer
+   function that changes as the vehicle moves*. This shows in the Patras ladder,
+   where h1 sits 13–17 dB below h2–h8: its h1 is healthy against its own local
+   floor (15.3 dB clear), so the fundamental is really there and really weak,
+   but how much of that is the pipe and how much is 50 m of air is not separable
+   from a single microphone. **Use the Patras and Eindhoven figures for rev range
+   and for the fact that the ladder stays flat; do not use them for absolute
+   per-harmonic gains.** The Work With Sounds museum recordings, made at a fixed
+   short distance from a stationary engine, are the ones whose ladder shapes are
+   trustworthy — and they are 50 cc.
+
+4. **Freesound needed no token after all**, which contradicts the assumption this
+   work started from. Its `cdn.freesound.org/previews/…-hq.mp3` URLs are public
+   and Openverse indexes them directly. The catch is that those are **lossy mp3
+   previews**; the original WAV/FLAC does require an account. Everything taken
+   from Freesound here is a preview, so its high-frequency content is
+   codec-limited and the top of every ladder derived from one should be treated
+   as a lower bound. Anything that ever ships should fetch the original.
+
+5. **The comb delay for a KZ pipe is not measured, and must not be invented.**
+   What is measured is τ = 1.42 ms for a 50 cc pipe tuned for 14,000 rpm. Tuned
+   length scales roughly inversely with the tuned rpm and directly with the
+   in-pipe wave speed, and a KZ's pipe is physically longer than a 50 cc pipe at
+   a similar peak rpm, so its τ is **longer than 1.42 ms** — but by how much is
+   unknown here. Until a KZ pipe is measured or a dimensioned drawing is found,
+   the comb delay is a tunable with a measured lower bound and no upper one.
+
+6. **No in-pipe gas temperature, so no defensible length.** The 396 mm above
+   rests on assuming ~500 °C and hence ~557 m/s. Neither figure was measured or
+   sourced. The delay τ is the honest parameter to carry into the synth; the
+   length is decoration.
+
+7. **The rpm/60 relation is verified on one engine, and its negative control
+   failed.** The Yamaha's gearbox verification is solid. The matching test — that
+   the four-stroke rental kart needs rpm/120 — could not be run, because the
+   Wurstelprater recordings contain several karts at once and the tracker finds a
+   spurious low common divisor across them. A single-engine four-stroke recording
+   would close this and none was found.
+
+8. **No rev-limiter spectrum, no gearshift transient, no clutch.** A KZ's
+   ignition-cut limiter, the momentary unloading during a shift, and the
+   centrifugal clutch's slip at low rpm are all audible signatures of a shifter
+   kart, and none is measured or sourced here. The shift *ratios* are measured;
+   what a shift sounds like is not.
+
+9. **Nothing was measured about tire scrub or wind.** §12 specifies both as
+   filtered noise driven by slip and speed. No recording in this corpus isolates
+   either — every one of them has an engine running over the top of it. Those two
+   remain entirely unsourced, and §12's claim that scrub "falls straight out of
+   §6 for free" is about the *modulation*, not about the filter shape, which
+   nobody has measured.
+
+10. **Almost everything here is lossy, and all of it was analyzed as mono.** Ogg
+   Vorbis for the Commons files, mp3 previews for the Freesound ones; only the
+   D-4 and the extracted Patras audio are uncompressed, and the Scarborough
+   recording is binaural stereo folded down to mono for analysis. The ladders
+   above are therefore the spectrum of *a
+   recording of* an engine — including its microphone, its codec, its distance
+   and its ground reflection — and only the quantities explicitly separated from
+   the recording geometry (the D-9's τ, and the ladder shapes, which are stable
+   across quarters) survive that. Absolute levels do not, and none is quoted.
+
+### The scripts
+
+The analysis lives in the session scratchpad, not in the repository, because it
+consumes audio that is deliberately not committed. `engine_analysis.py` holds the
+STFT, the harmonic-sum tracker and the ladder; `f0_methods.py` the cepstrum, the
+analytic-envelope autocorrelation, the spacing test and the synthetic generator;
+`probe_f0.py` and `probe_resolution.py` the two probes with analytic answers;
+`resonance.py` the fixed-frequency profile and the cepstral comb estimator;
+`final_measure.py` the throttle split and the gearshift detector. If these numbers
+are ever challenged, the probes are the place to start: they are the only part
+that can be checked without re-downloading anything.

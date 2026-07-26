@@ -85,9 +85,66 @@ Both are consistent with §4's decision to drive the sky from `PhysicalSkyMateri
 
 ## Audio
 
-| Asset | Source | License | Imported |
-|---|---|---|---|
-| _none yet_ | | | |
+**No audio ships in this repository, and none of the files below is committed.**
+`ARCHITECTURE.md` §12 synthesizes the engine note rather than sampling it, so these
+recordings are *reference material* — they were measured to find the numbers the
+synthesizer needs, and then discarded. They are listed here for the same reason the
+HDRIs are: knowing where a number came from and what its terms are is worth more
+than the credit is, and a later session that wants to re-derive or challenge a
+figure in `docs/REFERENCES.md` §"Engine audio" needs to be able to fetch exactly
+the same bytes.
+
+All twelve are from Wikimedia Commons. Nothing with an ambiguous license was used.
+
+| File | Engine | License | Author / credit line | SHA-256 (first 16) |
+|---|---|---|---|---|
+| [`WWS_MotorcycleTOMOSD-9.ogg`](https://commons.wikimedia.org/wiki/File:WWS_MotorcycleTOMOSD-9.ogg) | Tomos D-9, 1965 50 cc two-stroke GP racer | CC BY 4.0 | Work With Sounds / Technical Museum of Slovenia; recordist Boštjan Troha | `14a32409a5f82988` |
+| [`WWS_MotorcycleTOMOSD7.ogg`](https://commons.wikimedia.org/wiki/File:WWS_MotorcycleTOMOSD7.ogg) | Tomos D-7, 1962 50 cc two-stroke GP racer | CC BY 4.0 | Work With Sounds / Technical Museum of Slovenia; recordist Dušan Oblak | `7b7a0e97c4429ef6` |
+| [`WWS_MotorcycleTOMOSColibrispecialD-3.ogg`](https://commons.wikimedia.org/wiki/File:WWS_MotorcycleTOMOSColibrispecialD-3.ogg) | Tomos Colibri special D-3, 1959 50 cc racer | CC BY 4.0 | Work With Sounds / Technical Museum of Slovenia; recordist Dušan Oblak | `33c818d6117ac996` |
+| [`WWS_Chainsaw.ogg`](https://commons.wikimedia.org/wiki/File:WWS_Chainsaw.ogg) | Stihl MS 150 C, 23.6 cc two-stroke, muffler | CC BY 4.0 | Work With Sounds / Werstas | `d38921e33a47bc34` |
+| [`Yamaha_RX-100_accelerates_to_top_speed.ogg`](https://commons.wikimedia.org/wiki/File:Yamaha_RX-100_accelerates_to_top_speed.ogg) | Yamaha RX-100, 98.2 cc two-stroke | CC BY-SA 4.0 | Marianoberna | `87e580700bf803d0` |
+| [`Piaggio_Vespa_Suono_Motore.ogg`](https://commons.wikimedia.org/wiki/File:Piaggio_Vespa_Suono_Motore.ogg) | Vespa PK 125 S, 125 cc two-stroke | CC BY-SA 4.0 | Dan1gia2 | `d8011a525efaaf71` |
+| [`Garelli_Bonanza_starten_01.ogg`](https://commons.wikimedia.org/wiki/File:Garelli_Bonanza_starten_01.ogg) | Garelli Bonanza moped | CC BY-SA 3.0 | Huhu Uet | `6c8da5d2b53f5e55` |
+| [`Wurstelprater_Wien_2024_GoKart_Honda.ogg`](https://commons.wikimedia.org/wiki/File:Wurstelprater_Wien_2024_GoKart_Honda.ogg) | Honda 200 cc four-stroke rental kart | CC BY-SA 4.0 | DrTrumpet | `f8c570d08a13fe8b` |
+| [`Wurstelprater_Wien_2024_Bandito_Rennbahn_Go-Kart.ogg`](https://commons.wikimedia.org/wiki/File:Wurstelprater_Wien_2024_Bandito_Rennbahn_Go-Kart.ogg) | Amusement-park kart, type unstated | CC BY-SA 4.0 | DrTrumpet | `d900aeaf27c2d8c5` |
+| [`USSR_bicycle_2T_engine_D-4.wav`](https://commons.wikimedia.org/wiki/File:USSR_bicycle_2T_engine_D-4.wav) | D-4 auxiliary bicycle engine, 45 cc, 1956 | Public domain | Віктор Ходєєв / Viktor Khodyeyev | `f5decafe374eb8f7` |
+| [`Chainsaw_1.ogg`](https://commons.wikimedia.org/wiki/File:Chainsaw_1.ogg) | Unnamed two-stroke chainsaw | Public domain | ezwa, via PDSounds (rec. 648) | `f3c89a03a08cec37` |
+| [`Chainsaw_5.ogg`](https://commons.wikimedia.org/wiki/File:Chainsaw_5.ogg) | Unnamed two-stroke chainsaw | Public domain | ezwa, via PDSounds (rec. 652) | `3821c83d77837703` |
+
+A second sweep found the recordings that actually matter — two-stroke racing karts
+at KZ engine speeds. These are from archive.org's `radio-aporee-maps` collection,
+Freesound and Commons video:
+
+| File | What it is | License | Author / credit line | SHA-256 (first 16) |
+|---|---|---|---|---|
+| [Eindhoven kartbaan](https://freesound.org/people/peter1955/sounds/529071) | Kart track, Netherlands 2020 — measured 9,430–12,430 rpm two-stroke | **CC0 1.0** | peter1955 | `c8897be7d88bbae9` |
+| [3ο P.I.C.K Patras 2011](https://commons.wikimedia.org/wiki/File:3ο_P.I.C.K_Patras_2011_video.ogv) | Patras International Circuit for Kart — measured 12,270–15,670 rpm two-stroke | CC BY-SA 3.0 | Tony Esopi | `80122451865e74c8` |
+| [Scarborough 2012, 125-400cc practice](https://archive.org/details/aporee_33170_38124) | Oliver's Mount road races, "125-400 cc practice two stroke", binaural | CC BY 3.0 | david m, via radio aporee ::: maps | `047e63b42c13787e` |
+| [Oliver's Mount, Lightweight 400, Mere Hairpin](https://archive.org/details/aporee_33573_38630) | Same series, recorded at a hairpin — has the full off-throttle→on-throttle transition | CC BY 3.0 | david m, via radio aporee ::: maps | `0eb98f2eec5c4a50` |
+| [Karting CCaroya 2010, jump start](https://freesound.org/people/rfhache/sounds/98210) | Colonia Caroya, Argentina — race start | CC BY 3.0 | rfhache | `3803907b46abf4fd` |
+| [Go-kart racing outdoors](https://freesound.org/people/rodincoil/sounds/317470) | **Negative control** — four-stroke rental kart, measured 3,020 rpm | **CC0 1.0** | rodincoil | `0c96699ef4e0c4f4` |
+
+The Freesound files are the **public lossy mp3 previews**, not the originals — the
+original WAV/FLAC requires an account. Fine for measuring a harmonic ladder up to
+a few kHz, not fine for anything that ships. `docs/REFERENCES.md` records that
+caveat against the measurements that depend on it.
+
+**Nine of these carry a share-alike or attribution obligation that would bind
+shipped audio.** None is shipped, and nothing derived from them is either: what
+crossed from these files into the repository is a set of *measurements* — decay
+slopes, a comb delay, harmonic gain ratios — written into `docs/REFERENCES.md` as
+prose and numbers. Measured facts about a recording are not a derivative work of
+it. If a sample from any of these ever does ship, the CC BY-SA files
+(Yamaha, Vespa, Garelli, both Wurstelprater) would make that audio share-alike,
+and the CC BY files (all four Work With Sounds recordings) would require the
+credit lines above to appear in-product. That is the reason to keep synthesizing.
+
+The three Work With Sounds motorcycle recordings and the Stihl chainsaw are the
+load-bearing ones — they are the only engines here with a documented specification
+and a controlled, stationary recording. The Vespa is listed but **deliberately
+unused**; see `docs/REFERENCES.md` for why a 125 cc scooter is the least
+representative file in the set despite being the only one that matches a KZ's
+displacement.
 
 ---
 
@@ -97,12 +154,18 @@ Both are consistent with §4's decision to drive the sky from `PhysicalSkyMateri
 |---|---|---|
 | [Poly Haven](https://polyhaven.com) | CC0 | HDRIs, PBR materials, models. Unambiguous. |
 | [ambientCG](https://ambientcg.com) | CC0 | PBR materials, scanned surfaces. Unambiguous. |
+| [Wikimedia Commons](https://commons.wikimedia.org) | mixed, per file | Reference audio. License is per file and must be read per file — the twelve above span PD, CC BY 4.0, CC BY-SA 3.0 and CC BY-SA 4.0. The API reports `LicenseShortName` and `UsageTerms` per file and that is what the table records. |
+| [Work With Sounds](https://workwithsounds.eu) | CC BY 4.0 | Industrial and vehicle sound archive, EU-funded, mirrored onto Commons. The only source found with documented engine specifications attached to each recording. |
+| [radio aporee ::: maps](https://archive.org/details/radio-aporee-maps) | mixed CC, per file | Field-recording collection on archive.org. The richest source of real motorsport audio found. Note the collection identifier is `radio-aporee-maps`; searching `aporee` returns nothing. |
+| [Freesound](https://freesound.org) | mixed, per file | No token needed for the `cdn.freesound.org/previews/…-hq.mp3` URLs, which Openverse indexes directly. Those are **lossy previews**; originals need an account. License is per file — CC0, CC BY and CC BY-NC all coexist there, and the NC ones are unusable. |
 
 ## Sources deliberately avoided
 
 | Source | Reason |
 |---|---|
 | Fab / Quixel Megascans | Not CC0. Epic's terms have carried engine-use restrictions. License clarity matters more here than scan quality. |
+| _(none — Freesound was expected to need a token and does not; see the sources table above)_ | |
+| YouTube, karting vendor sites (tkart.it, mondokart, iamekarting) | No license grant compatible with reuse, and all three vendor sites return 403 to anything without a browser. This is where actual KZ engine audio lives and none of it is usable. |
 
 ## Software
 
