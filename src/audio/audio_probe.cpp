@@ -382,7 +382,43 @@ int32_t AudioProbePlayback::_mix(AudioFrame *p_buffer, float p_rate_scale, int32
 	const double dphi = TAU * f0 / rate;
 
 	const int64_t synth_start_ns = now_ns();
-	if (s.use_engine_synth.load(std::memory_order_relaxed) != 0) {
+	if (s.use_scrub_wind.load(std::memory_order_relaxed) != 0) {
+		// Issue #84's layers, at a held operating point, in the production call
+		// sequence: `publish` is a plain store and `render` is the audio-thread call.
+		//
+		// Checked before the engine-synth branch so the two are never timed together
+		// -- the whole reason this is a separate mode is that "what did scrub add"
+		// has to be answerable, and a summed figure cannot answer it.
+		kart::core::EngineAudioInput input;
+		input.scrub = s.scrub_drive.load(std::memory_order_relaxed);
+		input.speed_ms = s.scrub_speed_ms.load(std::memory_order_relaxed);
+		input.surface = static_cast<int>(s.scrub_surface.load(std::memory_order_relaxed));
+		_scrub.publish(input);
+		_wind.publish(input);
+
+		const bool with_wind = s.scrub_wind_include_wind.load(std::memory_order_relaxed) != 0;
+
+		int32_t done = 0;
+		while (done < p_frames) {
+			int32_t chunk = p_frames - done;
+			if (chunk > AUDIO_PROBE_SCRATCH_FRAMES) {
+				chunk = AUDIO_PROBE_SCRATCH_FRAMES;
+			}
+			_scrub.render(_scratch, chunk);
+			if (with_wind) {
+				_wind.render(_scratch_wind, chunk);
+			}
+			for (int32_t i = 0; i < chunk; ++i) {
+				// Summed here only so both renders reach the device and neither can be
+				// optimized away. In production these are two separate streams on two
+				// players -- scrub positional, wind not -- and this add does not exist.
+				const float sample = with_wind ? (_scratch[i] + _scratch_wind[i]) : _scratch[i];
+				p_buffer[done + i].left = sample;
+				p_buffer[done + i].right = sample;
+			}
+			done += chunk;
+		}
+	} else if (s.use_engine_synth.load(std::memory_order_relaxed) != 0) {
 		// The real class, at a held operating point. `publish` is a plain store and
 		// `render` is documented as the audio-thread call, so this is the production
 		// call sequence and not an imitation of it.
@@ -466,6 +502,15 @@ void AudioProbePlayback::configure_synth(double p_sample_rate) {
 	kart::core::EngineAudioConfig config;
 	_synth.configure(config, p_sample_rate > 1.0 ? p_sample_rate : 48000.0);
 	g_stats.synth_rate.store(_synth.nyquist_hz() * 2.0, std::memory_order_relaxed);
+
+	// Issue #84's layers, sized to the same device rate. Unconditional rather than
+	// gated on `use_scrub_wind`, because this runs on the main thread out of
+	// `_instantiate_playback` and the mode may be armed after the player is playing.
+	// A synth configured lazily inside `_mix` would be exactly the allocation this
+	// whole file exists to prove does not happen.
+	const kart::core::ScrubWindConfig sw_config;
+	_scrub.configure(sw_config, p_sample_rate > 1.0 ? p_sample_rate : 48000.0);
+	_wind.configure(sw_config, p_sample_rate > 1.0 ? p_sample_rate : 48000.0);
 }
 
 // --- AudioProbeStream -------------------------------------------------------
@@ -513,6 +558,10 @@ void AudioProbe::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("call_frames"), &AudioProbe::call_frames);
 	ClassDB::bind_method(D_METHOD("call_intervals_ns"), &AudioProbe::call_intervals_ns);
 	ClassDB::bind_method(D_METHOD("call_synth_ns"), &AudioProbe::call_synth_ns);
+	ClassDB::bind_method(D_METHOD("set_scrub_wind", "enabled", "include_wind"),
+			&AudioProbe::set_scrub_wind);
+	ClassDB::bind_method(D_METHOD("set_scrub_wind_operating_point", "drive", "speed_ms", "surface"),
+			&AudioProbe::set_scrub_wind_operating_point);
 	ClassDB::bind_method(D_METHOD("call_calib_ns"), &AudioProbe::call_calib_ns);
 	ClassDB::bind_method(D_METHOD("benchmark_int", "reps"), &AudioProbe::benchmark_int);
 	ClassDB::bind_method(D_METHOD("benchmark_synth", "partials", "frames", "reps", "f0_hz"), &AudioProbe::benchmark_synth);
@@ -576,6 +625,25 @@ void AudioProbe::set_synth_operating_point(double p_rpm, double p_load, bool p_t
 	g_stats.synth_rpm.store(p_rpm > 0.0 ? p_rpm : 0.0, std::memory_order_relaxed);
 	g_stats.synth_load.store(p_load < 0.0 ? 0.0 : (p_load > 1.0 ? 1.0 : p_load), std::memory_order_relaxed);
 	g_stats.synth_trailing.store(p_trailing ? 1 : 0, std::memory_order_relaxed);
+}
+
+void AudioProbe::set_scrub_wind(bool p_enabled, bool p_include_wind) {
+	g_stats.use_scrub_wind.store(p_enabled ? 1 : 0, std::memory_order_relaxed);
+	g_stats.scrub_wind_include_wind.store(p_include_wind ? 1 : 0, std::memory_order_relaxed);
+}
+
+void AudioProbe::set_scrub_wind_operating_point(double p_drive, double p_speed_ms, int32_t p_surface) {
+	const double drive = p_drive < 0.0 ? 0.0 : (p_drive > 1.0 ? 1.0 : p_drive);
+	g_stats.scrub_drive.store(drive, std::memory_order_relaxed);
+	g_stats.scrub_speed_ms.store(p_speed_ms > 0.0 ? p_speed_ms : 0.0, std::memory_order_relaxed);
+	// Clamped to the enum's range here rather than trusted, because `surface()` in
+	// `core/surface.h` falls back to asphalt for an out-of-range value and a probe
+	// silently measuring asphalt while its report says grass is the kind of thing
+	// that gets quoted for a milestone.
+	const int32_t surface = (p_surface >= 0 && p_surface < kart::core::SURFACE_COUNT)
+			? p_surface
+			: static_cast<int32_t>(kart::core::SURFACE_ASPHALT);
+	g_stats.scrub_surface.store(surface, std::memory_order_relaxed);
 }
 
 void AudioProbe::set_partials(int32_t p_partials) {
@@ -736,6 +804,11 @@ Dictionary AudioProbe::report() const {
 	d["synth_trailing"] = s.synth_trailing.load(std::memory_order_relaxed) != 0;
 	d["synth_partials"] = s.synth_partials.load(std::memory_order_relaxed);
 	d["synth_rate"] = s.synth_rate.load(std::memory_order_relaxed);
+	d["use_scrub_wind"] = s.use_scrub_wind.load(std::memory_order_relaxed) != 0;
+	d["scrub_wind_include_wind"] = s.scrub_wind_include_wind.load(std::memory_order_relaxed) != 0;
+	d["scrub_drive"] = s.scrub_drive.load(std::memory_order_relaxed);
+	d["scrub_speed_ms"] = s.scrub_speed_ms.load(std::memory_order_relaxed);
+	d["scrub_surface"] = s.scrub_surface.load(std::memory_order_relaxed);
 	return d;
 }
 

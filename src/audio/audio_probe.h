@@ -3,6 +3,7 @@
 
 #include "core/audio_state.h"
 #include "core/engine_synth.h"
+#include "core/scrub_wind.h"
 
 #include <godot_cpp/classes/audio_frame.hpp>
 #include <godot_cpp/classes/audio_stream.hpp>
@@ -234,6 +235,37 @@ struct ProbeStats {
 	// Sample rate the synth was configured at, echoed so the report can divide by
 	// the right frame period rather than by an assumed one.
 	std::atomic<double> synth_rate{ 0.0 };
+
+	// --- the scrub and wind layers, same treatment ---------------------------
+	//
+	// Issue #84's layers cost something and #152 records that there is not much
+	// room: the harmonic stack is already 69% of §15's audio row at idle and
+	// twelve voices are 74.76% of real time. A new layer per kart lands on top of
+	// that, so it gets measured where it will run before it gets built into a
+	// scene — the same order ADR-0035 used, and for the same reason.
+	//
+	// **A separate mode rather than a flag on the engine one**, because the two
+	// have to be attributable separately. Summed into one timing there would be no
+	// way to answer "what did scrub add", which is the only question that matters
+	// for the twelve-kart budget.
+	//
+	// Unlike the harmonic stack, these have no partial count and no operating point
+	// that changes their arithmetic: a band-pass is nine multiply-adds whatever its
+	// cutoff is, and `std::pow` and `std::tan` are per block. The sweep therefore
+	// exists to *confirm* that flatness rather than to find a worst case, and a
+	// sweep that came back non-flat would itself be the finding.
+	std::atomic<int32_t> use_scrub_wind{ 0 };
+
+	// Render the wind layer too, and sum it. Set together with `use_scrub_wind` to
+	// get the cost of what a player's kart actually runs; cleared to attribute the
+	// scrub layer alone, which is what an opponent's kart costs.
+	std::atomic<int32_t> scrub_wind_include_wind{ 0 };
+
+	// The operating point. `EngineAudioInput`'s three scrub fields and nothing
+	// else, because nothing else in that struct reaches either layer.
+	std::atomic<double> scrub_drive{ 0.0 };
+	std::atomic<double> scrub_speed_ms{ 0.0 };
+	std::atomic<int32_t> scrub_surface{ 0 };
 };
 
 ProbeStats &audio_probe_stats();
@@ -270,6 +302,17 @@ private:
 	// probe has never measured and therefore does not get to assume.
 	kart::core::EngineSynth _synth;
 	float _scratch[AUDIO_PROBE_SCRATCH_FRAMES] = {};
+
+	// Issue #84's two layers, same arrangement and for the same reasons: members
+	// so `_mix` allocates nothing, configured from `_instantiate_playback` because
+	// `configure` resets a filter and reseeds an RNG and is not an audio-thread
+	// call. A second scratch so the wind layer can be rendered and summed without
+	// either layer having to accumulate into the other's buffer — which would
+	// measure an add that the production path, where they are separate streams,
+	// never performs.
+	kart::core::ScrubSynth _scrub;
+	kart::core::WindSynth _wind;
+	float _scratch_wind[AUDIO_PROBE_SCRATCH_FRAMES] = {};
 
 public:
 	// Size the synth to a device rate and clear it. Main thread only: it fills a
@@ -324,6 +367,12 @@ public:
 	// crossfaded and so change the per-partial arithmetic.
 	void set_engine_synth(bool p_enabled);
 	void set_synth_operating_point(double p_rpm, double p_load, bool p_trailing);
+
+	// Issue #84's layers, inside the same `_mix`. `p_include_wind` false costs an
+	// opponent's kart (scrub only, positional); true costs the player's (scrub plus
+	// the non-positional wind layer).
+	void set_scrub_wind(bool p_enabled, bool p_include_wind);
+	void set_scrub_wind_operating_point(double p_drive, double p_speed_ms, int32_t p_surface);
 
 	// Microseconds `_physics_process` spends in its busy window, sampling
 	// `mix_active`. Zero disables the window entirely.
