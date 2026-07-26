@@ -55,7 +55,11 @@ namespace {
 // the figure is "derived in kart_debug_vehicle.gd from two masses". That was the
 // best number available when it was written. `chassis.h` now derives 0.2197 from
 // twenty-one, so the two are reconciled here rather than left to disagree by
-// 1.4% in a quantity that every threshold in this file divides by.
+// **4.7%** in a quantity that every threshold in this file divides by — which is
+// a 4.5% error in the thresholds themselves. This comment said 1.4% for a
+// milestone; the figure was wrong by more than three times, and it made the
+// reconciliation look optional. Issue #129 is what the same defect did to
+// `chassis_flex.h`, where the assertions pinned the default and nobody noticed.
 ChassisGeometry kart_geometry() {
 	ChassisGeometry geometry;
 	const MassProperties properties = kz::kart_mass_properties();

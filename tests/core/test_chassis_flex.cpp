@@ -1,5 +1,6 @@
 #include "doctest.h"
 
+#include "core/chassis.h"
 #include "core/chassis_flex.h"
 #include "core/kz_reference.h"
 #include "core/units.h"
@@ -12,6 +13,13 @@
 // Most of these cases print a table. That is deliberate — the acceptance
 // evidence for #31 and #32 is measured numbers, and a suite that only says
 // "passed" would have to be re-derived by hand to close either ticket.
+//
+// **Every case below runs on `kart_geometry()`, not on a default-constructed
+// `ChassisGeometry`.** Issue #129 is the reason. The struct's `com_height`
+// default of 0.23 is not the value `vehicle.h::configure()` installs, and this
+// file used to measure a kart 4.7% taller than the one the solver runs — which
+// is a 4.5% error in every threshold printed here, and it survived because the
+// assertions pinned the default too.
 
 using namespace kart::core;
 
@@ -30,11 +38,31 @@ const char *corner_name(int corner) {
 	}
 }
 
+// The geometry `vehicle.h::configure()` builds, reproduced field for field.
+//
+// Only `mass` and `com_height` actually move — the tracks, the wheelbase and the
+// front share are assigned there from `kz::` constants that already equal this
+// struct's defaults — but they are all written out rather than assumed, and the
+// case below asserts each one, so a `kz::` constant that drifts away from the
+// default breaks a test instead of quietly making this file measure a different
+// kart again.
+ChassisGeometry kart_geometry() {
+	const MassProperties properties = kz::kart_mass_properties();
+	ChassisGeometry geometry;
+	geometry.mass = properties.mass;
+	geometry.com_height = properties.center_of_mass.y;
+	geometry.front_mass_share = kz::STATIC_FRONT_SHARE;
+	geometry.track_front = kz::FRONT_HALF_TRACK * 2.0;
+	geometry.track_rear = kz::REAR_HALF_TRACK * 2.0;
+	geometry.wheelbase = kz::REAR_AXLE_Z - kz::FRONT_AXLE_Z;
+	return geometry;
+}
+
 LoadCase kart_load_case() {
 	LoadCase load_case;
-	const ChassisGeometry geometry;
+	load_case.geometry = kart_geometry();
 	for (int corner = 0; corner < CORNER_COUNT; ++corner) {
-		load_case.corner_rate[corner] = corner_setup(geometry, corner).spring_rate;
+		load_case.corner_rate[corner] = corner_setup(load_case.geometry, corner).spring_rate;
 	}
 	return load_case;
 }
@@ -107,7 +135,7 @@ TEST_CASE("four equal modal rates are four independent springs") {
 }
 
 TEST_CASE("warp is far softer than the other three modes") {
-	const ChassisGeometry geometry;
+	const ChassisGeometry geometry = kart_geometry();
 	const ChassisFlex flex = chassis_flex(geometry);
 
 	char line[240];
@@ -156,38 +184,108 @@ TEST_CASE("at rest the four loads sum to the class mass and split 42/58") {
 	CHECK(loads.frame_warp == doctest::Approx(0.0).epsilon(1e-9));
 }
 
-TEST_CASE("the rollover threshold uses the tipping axis, not half the rear track") {
-	// ADR-0031 quotes 0.5925 / 0.23 = 2.58 g, taking half the **rear** track as
-	// the lever. The kart tips about the line joining the outside-front and
-	// outside-rear contact patches, and the front track is 80 mm narrower, so
-	// that line runs inboard of the rear patch and the center of mass is closer
-	// to it than half the rear track.
-	const ChassisGeometry geometry;
-	const double naive = geometry.track_rear * 0.5 / geometry.com_height;
-	const double actual = geometry.rollover_threshold_g();
+TEST_CASE("this file measures the kart the solver configures") {
+	// The hole issue #129 came through. Everything below is a threshold divided
+	// by `com_height`, and `ChassisGeometry`'s default is not the value
+	// `vehicle.h::configure()` installs. Asserted field by field, so a `kz::`
+	// constant that moves is caught here rather than by a number in a printed
+	// table quietly changing.
+	const MassProperties properties = kz::kart_mass_properties();
+	const ChassisGeometry geometry = kart_geometry();
+	const ChassisGeometry defaults;
 
-	char line[220];
+	char line[240];
 	std::snprintf(line, sizeof(line),
-			"  half rear track %.4f m -> %.3f g;  perpendicular to the tipping axis"
-			" %.4f m -> %.3f g", geometry.track_rear * 0.5, naive,
-			actual * geometry.com_height, actual);
+			"  configured: mass %.3f kg  com height %.4f m  (the struct default is"
+			" %.4f m, %.1f%% high)", geometry.mass, geometry.com_height,
+			defaults.com_height,
+			(defaults.com_height / geometry.com_height - 1.0) * 100.0);
 	MESSAGE(line);
 
-	CHECK(actual < naive);
-	CHECK(actual == doctest::Approx(2.50).epsilon(0.01));
-	// The difference is not academic: it decides whether the kart has any margin
-	// over the lateral band at all. Compared against the **peak** band, because
-	// that is the pair of numbers this comparison was originally written against
-	// — ADR-0034 has since split §6.4's single 2.0-2.5 g band into sustained
-	// (1.5-2.0) and transient peak (2.0-2.5), after finding it was a peak figure
-	// being asserted against sustained measurements.
+	CHECK(geometry.com_height == doctest::Approx(properties.center_of_mass.y).epsilon(1e-12));
+	CHECK(geometry.com_height == doctest::Approx(0.2197).epsilon(1e-3));
+	CHECK(geometry.mass == doctest::Approx(kz::MASS_WITH_DRIVER_KG).epsilon(1e-9));
+	// The five fields `configure()` also writes. These do equal the defaults
+	// today; the check is that they still do.
+	CHECK(geometry.track_front == doctest::Approx(defaults.track_front).epsilon(1e-12));
+	CHECK(geometry.track_rear == doctest::Approx(defaults.track_rear).epsilon(1e-12));
+	CHECK(geometry.wheelbase == doctest::Approx(defaults.wheelbase).epsilon(1e-12));
+	CHECK(geometry.front_mass_share == doctest::Approx(defaults.front_mass_share).epsilon(1e-12));
+	// And the one that does not, which is the whole ticket.
+	CHECK(geometry.com_height != doctest::Approx(defaults.com_height).epsilon(1e-6));
+}
+
+TEST_CASE("the rollover threshold is chassis.h's, it is asymmetric, and this model"
+		  " reproduces its mean") {
+	// Issue #129. A `ChassisGeometry::rollover_threshold_g()` used to live in
+	// `chassis_flex.h` and return one number — 2.501 g default-constructed,
+	// 2.618 g at the geometry above, and nothing tested the second because the
+	// assertion that stood here pinned the first. It is deleted. `chassis.h`
+	// owns the threshold and returns two, because the center of mass is 41 mm
+	// right of the centerline.
+	const MassProperties properties = kz::kart_mass_properties();
+	const double left = kz::rollover_threshold_g(properties, true);
+	const double right = kz::rollover_threshold_g(properties, false);
+
+	char line[260];
+	std::snprintf(line, sizeof(line),
+			"  chassis.h: tips at %.4f g turning left, %.4f g turning right"
+			" (com_x %+.4f m, com_height %.4f m)", left, right,
+			properties.center_of_mass.x, properties.center_of_mass.y);
+	MESSAGE(line);
+
+	CHECK(left == doctest::Approx(2.4336).epsilon(1e-3));
+	CHECK(right == doctest::Approx(2.8061).epsilon(1e-3));
+
+	// **Half the rear track is not even a conservative lever.** ADR-0031 quotes
+	// `0.5925 / com_height`. Turning left that overstates the threshold, which is
+	// the direction that gets someone hurt; turning right it understates it. One
+	// number cannot be safe in both directions, which is the argument for two.
+	const ChassisGeometry geometry = kart_geometry();
+	const double naive = geometry.track_rear * 0.5 / geometry.com_height;
+	std::snprintf(line, sizeof(line),
+			"  half rear track %.4f m -> %.4f g, which is %+.3f g on the left and"
+			" %+.3f g on the right", geometry.track_rear * 0.5, naive, naive - left,
+			naive - right);
+	MESSAGE(line);
+	CHECK(naive > left);
+	CHECK(naive < right);
+
+	// The flex model's own statement of the same quantity. `lift_threshold_g` on
+	// the **second** inside corner to unload is a tipping point rather than a
+	// lift — its own comment says so — and `solve_corner_loads` balances the roll
+	// moment about the origin, so it is centerline-symmetric and lands on the
+	// mean of the two rather than on either. That agreement is the check: the two
+	// models are built out of different equations and the only thing between them
+	// is the lateral offset one of them does not have. Issue #123.
+	LoadCase load_case = kart_load_case();
+	const double rear_lift = lift_threshold_g(load_case, CORNER_RL);
+	const double tips = lift_threshold_g(load_case, CORNER_FL);
+	REQUIRE(rear_lift < tips); // The rear is first, so the front is the tipping one.
+
+	const double mean = (left + right) * 0.5;
+	std::snprintf(line, sizeof(line),
+			"  chassis_flex.h: second inside corner unloads at %.9f g, against a"
+			" chassis.h mean of %.9f g — %.2e apart", tips, mean, tips - mean);
+	MESSAGE(line);
+
+	// **Exactly equal, to nine figures, and it has to be.** At the tipping point
+	// only the outside front and outside rear carry load; the pitch and heave
+	// equations fix that pair at the 42/58 static split whatever the frame does,
+	// and the roll equation then reads `N_f*x_f + N_r*x_r = m*a_y*h`. That is the
+	// half-track interpolated by the mass share at the center of mass's
+	// longitudinal station, which is precisely the lever `chassis.h` writes in
+	// closed form. Two solvers, no shared code, one answer — so the *only* thing
+	// separating this model from `chassis.h` is the 41 mm the roll equation has
+	// nowhere to put. Issue #123.
 	//
-	// Issue #129 is open on this whole assertion: `actual` here is the
-	// **default-constructed** 2.50 g, and the running solver produces 2.618
-	// because `vehicle.h` overwrites `com_height` with the mass table's 0.2197.
-	// The kart's real left-turn threshold is 2.4336. So this pins a number the
-	// solver never sees, which is precisely how the divergence went unnoticed.
-	CHECK(actual < kz::LATERAL_PEAK_G_MAX * 1.01);
+	// The deleted `rollover_threshold_g()` did not reproduce this. It took the
+	// perpendicular distance to the tipping axis instead of the distance along X,
+	// which is short by the cosine of the axis' 2.18 degree skew — 40 mm of track
+	// difference over a 1.05 m wheelbase. 0.5753 m against 0.5757 m, 0.07%,
+	// 2.6179 g against 2.6198 g. The smaller of its two errors by a factor of a
+	// hundred, and recorded only so nobody reintroduces it as a simplification.
+	CHECK(tips == doctest::Approx(mean).epsilon(1e-9));
 }
 
 // ---------------------------------------------------------------------------
@@ -199,7 +297,7 @@ TEST_CASE("a rear-biased roll-stiffness split lifts the inside rear") {
 	// frame, because the split is only a free parameter when the frame can carry
 	// the roll moment between the axles — with a real frame it is not, which is
 	// the next test and the more interesting one.
-	const ChassisGeometry geometry;
+	const ChassisGeometry geometry = kart_geometry();
 	LoadCase load_case = kart_load_case();
 	load_case.torsion_nm_per_deg = 1.0e7; // Effectively rigid.
 	load_case.lateral_g = 2.0;
@@ -242,7 +340,7 @@ TEST_CASE("a rear-biased roll-stiffness split lifts the inside rear") {
 }
 
 TEST_CASE("the as-built kart's split comes out of the tire rates and the frame") {
-	const ChassisGeometry geometry;
+	const ChassisGeometry geometry = kart_geometry();
 	LoadCase load_case = kart_load_case();
 
 	const double share = roll_stiffness_front_share(geometry, load_case.corner_rate);
@@ -276,9 +374,16 @@ TEST_CASE("the as-built kart's split comes out of the tire rates and the frame")
 			front_transfer / (front_transfer + rear_transfer));
 	MESSAGE(line);
 
+	// The inside front is the *second* corner to unload, so its figure is the
+	// tipping point rather than a lift — this model's symmetric one. `chassis.h`
+	// splits it in two, and the pair is what a scenario has to respect: a
+	// validation run that only ever turns left measures the 2.43 g kart.
+	const MassProperties properties = kz::kart_mass_properties();
 	std::snprintf(line, sizeof(line),
-			"  no jacking: inside FRONT reaches zero at %.3f g, inside REAR at %.3f g,"
-			" kart tips at %.3f g", front_lift, rear_lift, geometry.rollover_threshold_g());
+			"  no jacking: inside REAR reaches zero at %.3f g, and the kart is over at"
+			" %.3f g — chassis.h says %.3f g left, %.3f g right", rear_lift, front_lift,
+			kz::rollover_threshold_g(properties, true),
+			kz::rollover_threshold_g(properties, false));
 	MESSAGE(line);
 
 	// The rear is the one that lifts. Barely.
@@ -409,6 +514,15 @@ TEST_CASE("jacking at a lower lateral g still lifts the wheel, given enough of i
 	// Karts lift the inside rear at corner entry, well before the skidpad limit,
 	// because the steering angle is largest there. This checks the model has that
 	// shape rather than only working at the limit.
+	//
+	// Below about 0.7 g the answer is not "more jacking": the **outside front**
+	// unloads first and the kart tips about the FL-RR diagonal instead. The row
+	// says which corner went, because "not reachable" on its own reads as a
+	// numerical ceiling and it is not one — it is the crossover moving up as the
+	// lateral load transfer that keeps FR planted goes away. The crossover sits
+	// higher than it used to for exactly the reason this file exists: at
+	// `com_height` 0.23 there was more transfer at a given g, and 0.50 g printed a
+	// number here. Issue #129.
 	LoadCase load_case = kart_load_case();
 	MESSAGE("  jacking needed to zero the inside rear, against lateral g:");
 	MESSAGE("  lateral g    jacking mm");
@@ -429,7 +543,20 @@ TEST_CASE("jacking at a lower lateral g still lifts the wheel, given enough of i
 		const double needed = (low + high) * 500.0;
 		char line[160];
 		if (needed > 190.0) {
-			std::snprintf(line, sizeof(line), "  %9.2f      not reachable", lateral);
+			// Find the corner that did leave, at the top of the swept range.
+			load_case.geometric_offset[CORNER_FL] = 0.20;
+			load_case.geometric_offset[CORNER_FR] = -0.20;
+			const CornerLoads loads = solve_corner_loads(load_case);
+			int first = CORNER_RL;
+			for (int corner = 0; corner < CORNER_COUNT; ++corner) {
+				if (loads.normal_force[corner] <= 0.0) {
+					first = corner;
+					break;
+				}
+			}
+			std::snprintf(line, sizeof(line),
+					"  %9.2f      never — %s leaves the ground first", lateral,
+					corner_name(first));
 		} else {
 			std::snprintf(line, sizeof(line), "  %9.2f %13.2f", lateral, needed);
 		}
@@ -478,7 +605,7 @@ TEST_CASE("no load case produces a negative normal force or loses the kart's wei
 }
 
 TEST_CASE("the roll-share inverse round trips") {
-	const ChassisGeometry geometry;
+	const ChassisGeometry geometry = kart_geometry();
 	double rate[CORNER_COUNT] = {};
 	for (const double share : { 0.25, 0.42, 0.66 }) {
 		corner_rates_for_roll_share(geometry, share, 190000.0, rate);

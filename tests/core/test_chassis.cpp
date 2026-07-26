@@ -123,8 +123,11 @@ TEST_CASE("the center of mass is low, rearward, and biased right by the engine")
 	const MassProperties properties = kz::kart_mass_properties();
 
 	// Height. `kart_debug_vehicle.gd` assumed 0.23 m from a two-mass argument in
-	// a comment; the table gets 0.2197 m from twenty-one parts. Those agreeing
-	// to 1.4% is the M3a estimate being vindicated, not this file copying it.
+	// a comment; the table gets 0.2197 m from twenty-one parts. They agree to
+	// **4.7%**, which is the M3a estimate being roughly vindicated rather than
+	// confirmed — this comment claimed 1.4% for a milestone, and at that size the
+	// difference reads as noise when it is worth 4.5% of every threshold that
+	// divides by it. See #129 and `test_kart_lift.cpp`.
 	CHECK(properties.center_of_mass.y == doctest::Approx(0.2197).epsilon(1e-3));
 	CHECK(properties.center_of_mass.y > 0.18);
 	CHECK(properties.center_of_mass.y < 0.28);

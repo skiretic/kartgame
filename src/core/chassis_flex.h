@@ -91,6 +91,14 @@ struct ChassisGeometry {
 	// Center-of-mass height, meters. Derived in `kart_debug_vehicle.gd` from two
 	// masses rather than picked — an 80 kg kart carrying its frame, engine and
 	// tires around 0.12 m, and a 95 kg driver reclined at about 0.32 m.
+	//
+	// **This default is not what the solver runs.** `vehicle.h::configure()`
+	// replaces it with `kz::kart_mass_properties().center_of_mass.y` = 0.2197,
+	// derived from twenty-one lumps rather than from two, and every threshold in
+	// this file divides by it — so 0.23 is 1.4% low in a divisor and the tests
+	// here use the configured value rather than this one. Issue #129 is what
+	// happens when they do not: 0.23 is 4.7% high as a divisor, so a threshold
+	// computed from it is 4.5% low.
 	double com_height = 0.23;
 
 	// **Centerline** track, meters, front and rear. `params.py` records
@@ -142,34 +150,47 @@ struct ChassisGeometry {
 	// Mass carried at one corner, for the natural frequency and damping ratios.
 	double corner_mass(int corner) const { return static_load(corner) / G; }
 
-	// Lateral acceleration, in g, at which the kart tips rather than slides.
+	// **There is no rollover threshold on this struct, and that is deliberate.**
+	// `chassis.h` owns it: `kz::rollover_threshold_g(properties, turning_left)`
+	// returns **2.434 g turning left and 2.806 g turning right**. Two numbers,
+	// because the center of mass sits 41 mm right of the centerline — 27 kg of
+	// engine, exhaust and radiator hung outboard, against 7.3 kg of ballast on
+	// the left that does not cover it — so a kart turning left rolls onto its
+	// right-hand tires with the mass already leaning that way.
 	//
-	// **Not half the rear track over the CoM height.** The kart pivots about the
-	// line joining the outside-front and outside-rear contact patches, and
-	// because the front track is 80 mm narrower than the rear, that line is not
-	// parallel to the kart's axis and the center of mass is closer to it than
-	// half the rear track. The perpendicular distance is 0.575 m against the
-	// 0.5925 m the naive figure gives, so the threshold is **2.50 g and not
-	// 2.58 g** — which matters, because 2.58 sits comfortably above
-	// ARCHITECTURE.md §6.4's 2.0-2.5 g band and 2.50 sits exactly on top of it.
-	// ADR-0031 uses the naive figure.
-	double rollover_threshold_g() const {
-		// Outside contact patches, in the ground plane.
-		const double front_x = track_front * 0.5;
-		const double rear_x = track_rear * 0.5;
-		const double front_z = corner_z(CORNER_FL);
-		const double rear_z = corner_z(CORNER_RL);
-		// Perpendicular distance from the origin — the center of mass's ground
-		// projection — to the line through the two patches.
-		const double dx = rear_x - front_x;
-		const double dz = rear_z - front_z;
-		const double cross = dx * (0.0 - front_z) - dz * (0.0 - front_x);
-		const double length = std::sqrt(dx * dx + dz * dz);
-		if (length <= 0.0 || com_height <= 0.0) {
-			return 0.0;
-		}
-		return std::fabs(cross) / length / com_height;
-	}
+	// A `rollover_threshold_g()` stood here and returned one number. It was wrong
+	// twice, and issue #129 is the cleanup:
+	//
+	//   * It measured from the **origin** rather than from the center of mass's
+	//     ground projection, which silently assumes that projection is on the
+	//     centerline. It is not: the 41 mm is `com_x / com_height` = **±0.186 g**,
+	//     7.1% either way, and it is the whole of the 0.372 g between the two
+	//     figures above.
+	//   * It took the **perpendicular** distance to the tipping axis. The lever
+	//     the lateral force works against is the distance measured along the
+	//     kart's X axis at the center of mass's longitudinal station, which is
+	//     the perpendicular distance divided by the cosine of the axis' skew.
+	//     The tipping axis runs 2.18 degrees off the kart's axis — 40 mm of track
+	//     difference over a 1.05 m wheelbase — so this one is only 0.07%, and it
+	//     is recorded rather than fixed because the function is gone. The old
+	//     comment was right that half the rear track is the wrong lever and that
+	//     the tipping axis is the right one; it just stopped one cosine short.
+	//
+	// It also cited ARCHITECTURE.md §6.4's "2.0-2.5 g" band, which ADR-0034 has
+	// since split into a **sustained** 1.5-2.0 g and a **transient peak**
+	// 2.0-2.5 g, exactly because the old band's top edge sat above the kart's own
+	// tipping point. The comparison the function turned on no longer exists.
+	//
+	// **Adding a `com_x` here would not have fixed it.** `solve_corner_loads`
+	// below balances `m*a_y*h` about the origin too, so the tipping point this
+	// model implies — `lift_threshold_g` on the *second* inside corner to unload
+	// — is centerline-symmetric as well, and it lands on the **mean** of the two
+	// `kz::` figures rather than on either: 2.6198 g, equal to machine epsilon,
+	// which the tests assert because it says the two models differ by the lateral
+	// offset and by nothing else at all. A lateral offset honored by an
+	// accessor and ignored by the equilibrium solve would put two disagreeing
+	// numbers straight back. Issue #123 is that field, and it has to reach
+	// `static_load`, `corner_x` and the roll equation together or not at all.
 };
 
 // ---------------------------------------------------------------------------
