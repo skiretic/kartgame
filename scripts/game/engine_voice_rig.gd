@@ -120,3 +120,51 @@ static func attach(kart: KartBody) -> Object:
 	if player.is_inside_tree():
 		player.play()
 	return stream
+
+
+## Route the five audio tunables from a `KartTuning` into this voice.
+##
+## **This is the half of the registry that `KartTuning` deliberately cannot do.**
+## It knows how to push a vehicle constant, because `KartBody` has a setter for
+## each one; it does not know that `voice_unit_size` means an `AudioStreamPlayer3D`
+## property or that `noise_gain` means an atomic on a stream, and a registry that
+## learned both would be a registry that has to be edited every time the audio
+## graph changes. So it emits `tuning_changed` and the audio side subscribes.
+##
+## Without this call the audit tells a lie of exactly the kind the whole system
+## exists to prevent: `tuning.sh` reports `noise_gain` as moved while the synth
+## the driver is listening to is unchanged. That is worse than having no knob,
+## because the file would record a judgement made against a sound nobody heard.
+##
+## The three constants above stay as the defaults they always were —
+## `src/core/tuning.h` carries the same three values and the same reasoning, and
+## this file is where they are applied rather than a second owner of them.
+static func bind_tuning(tuning: Node, stream: Object, player: AudioStreamPlayer3D) -> void:
+	if tuning == null or player == null:
+		return
+	var apply := func(key: String, value: float, _owner: int) -> void:
+		match key:
+			"voice_gain":
+				if stream != null:
+					stream.set("gain", value)
+			"voice_unit_size":
+				player.unit_size = value
+			"voice_max_distance":
+				player.max_distance = value
+			"comb_depth":
+				if stream != null:
+					stream.set("comb_depth", value)
+			"noise_gain":
+				if stream != null:
+					stream.set("noise_gain", value)
+			# Every other key belongs to the vehicle or the controller and is
+			# applied by the registry itself. Not an error, and not silent either:
+			# falling through here is the normal case for nine of the fourteen.
+			_:
+				pass
+	tuning.tuning_changed.connect(apply)
+	# And once now, because the registry's own first push may already have happened
+	# — it is deferred out of `_ready` and this rig is attached from a scene's
+	# `_ready` too, so which came first is not something either side should have to
+	# know. Pushing again is idempotent.
+	tuning.apply_all()

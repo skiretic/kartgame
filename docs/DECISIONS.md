@@ -1649,12 +1649,225 @@ recorded because both are the shape of mistake ADR-0033 and issue #107 are about
    lock. Issue #32's mechanism engages, and it is not the cause of anything here.
 
 **What this does not settle.** 3.0 is arithmetic, not feel — the first drive after it
-reported "a bit more reasonable", which is not "right". The track carries a live knob
+reported "a bit more reasonable", which is not "right". The track carried a live knob
 on `[` and `]` and issue #159 holds it alongside every other constant that can only
 be set by driving. `steer_rate`'s 3.4 has never been judged by feel either, only
 recorded, and it interacts with the curve.
+
+*Superseded in mechanism, not in conclusion:* the `[` / `]` knob was a prototype of
+the wrong shape — one constant, two keys, no record of what it was overriding — and
+[ADR-0037](#adr-0037--tuning-is-an-audit-trail-that-happens-to-be-adjustable-and-a-preset-is-not-in-the-state-hash)
+replaced it with the tuning registry, where `steer_gamma` is one row among fourteen
+and is classified `Derived` with this ADR as its citation. Nothing above changes: the
+exponent is still 3.0, still arithmetic rather than feel, and still unjudged.
 
 And **issue #137 is unchanged.** The scrub is recontextualized rather than fixed:
 past 0.65 of lock the kart still departs, and at full lock it still ends up
 travelling backwards — `kept %` of -30.6. The curve makes 25 degrees harder to reach
 by accident and changes nothing about what happens on arrival.
+
+## ADR-0037 — Tuning is an audit trail that happens to be adjustable, and a preset is not in the state hash
+
+**Status.** Accepted. This builds ROADMAP M3b's last unbuilt bullet and issue
+[#159](https://github.com/skiretic/kartgame/issues/159)'s checklist, and it
+**constrains** [ADR-0033](#adr-0033--the-contact-boundary-measured-and-the-lever-arm-it-caught)
+rather than relaxing it: ADR-0033 refused to retune M3a's constants to restore a
+figure, and this is the machinery that makes the same refusal enforceable now that
+the constants are live.
+
+**Context.** About a dozen constants in this project can only be settled by
+driving or by listening, and until now every one of them needed a rebuild to
+change. "Judged by feel" was therefore, in practice, "whatever the first guess
+was" — issue #159 exists because that was true of `steer_rate`'s 3.4, which had
+never been judged at all, only recorded.
+
+The registry that landed carries fourteen, which is **more** than that checklist
+and deliberately so: it also holds constants that do have a source, because the
+contrast between the two is the thing being built. A registry containing only the
+guesses would read as a list of numbers it is fine to turn, which teaches the
+wrong lesson the first time somebody wants to turn something else.
+
+The obvious fix is a slider panel with a save button. That fix is
+`ARCHITECTURE.md` §19's *"vehicle tuning eats unbounded time"* risk, shipped.
+§19's mitigation is telemetry landing with the vehicle and A/B against a replay;
+it has nothing to say about a constant that has quietly stopped matching the paper
+it came from. So what is built is an **audit trail that happens to be adjustable**,
+and the four decisions below are what make it one rather than a settings file.
+`src/core/tuning.h` holds the vocabulary, the file format and the audit
+arithmetic, with no godot-cpp in it
+([ADR-0017](#adr-0017--srccore-is-compiled-without-godot-cpp)), and
+`src/tuning/tuning_registry.h` is the only thing between it and the engine.
+
+### 1. Four provenance classes, not `has_source: bool`
+
+Every tunable declares where its default came from, ordered most to least
+defensible: `Sourced` (an external authority — a published measurement, a
+manufacturer figure, a regulation), `Measured` (this repository measured it),
+`Derived` (arithmetic on top of those), `Unsourced` (a guess, with the guess
+labeled).
+
+A boolean was the obvious design and `docs/REFERENCES.md` is what kills it. Two
+rows of the table:
+
+- `frame_torsion` is **193.62 N·m/deg** because Fu and Wang measured a real
+  competition frame and published the number — WIT Trans. Built Env. Vol 91
+  (2007), 193,620 N·mm/deg. That is evidence about karts.
+- `max_lock` is **25° at the inner wheel** because REFERENCES.md §"Steering lock"
+  records that **no CIK or KZ source for a maximum steer angle was found at all**.
+  The figure is inherited from the bodywork clearance tables measured in issues
+  [#109](https://github.com/skiretic/kartgame/issues/109) and
+  [#110](https://github.com/skiretic/kartgame/issues/110) — this repository
+  measuring its own generated kart.
+
+A boolean files those in one bucket and calls both of them sourced. They are not
+the same claim. The second is only ever as good as this project's own geometry: if
+`params.py` moves a dimension, 25° moves with it, while Fu and Wang's number does
+not move for anything. Four classes can say that in the saved file, in the overlay
+and in a grep. One bit cannot say it anywhere.
+
+This generalizes an existing convention rather than inventing one.
+`src/core/kz_audio_reference.h` already carried half of it as four
+`*_MEASURED = false` flags — `LIMITER_CHATTER_MEASURED`,
+`SHIFT_TRANSIENT_MEASURED`, `SCRUB_SPECTRUM_MEASURED`, `WIND_SPECTRUM_MEASURED` —
+sitting beside the constants they qualify, for exactly this reason. What that file
+does for one subsystem's audio references, `Provenance` does for every tunable,
+with the two middle classes it was missing.
+
+Each row carries its citation **copied from the file the constant lives in**
+rather than restated, which is `ARCHITECTURE.md` §5 item 10 applied to a header: a
+second owner of a justification is how justifications rot.
+
+### 2. A preset is a diff against the defaults, not a full state
+
+A saved preset is a header and then **only the tunables that differ from their
+declared default**, in declaration order. Nothing else.
+
+The alternative — write all fourteen values every time — is what a settings file
+does, and it destroys the property the system exists for. Under a full state every
+preset looks the same shape whether it moved one number or all of them, and
+answering "what has been tuned" needs a tool, a copy of the defaults, and a
+decision about float equality. Under a diff:
+
+- an **empty** preset means nothing was tuned, and says so by being empty;
+- a **three-line** preset is the complete list of what was, with nothing to read
+  between the lines;
+- "what has been tuned away from its source, and by how much" is one `grep`,
+  because each line carries its own default, its delta and its provenance class in
+  a trailing comment.
+
+That is what makes a preset reviewable in a pull request rather than only
+runnable, and it is the direct answer to §19. The risk is not that somebody turns
+a knob. It is that nobody can afterwards enumerate which knobs were turned.
+
+The sparseness lives in the **file**. `TuningSet` in memory is always a complete
+configuration, one value per tunable, because a set that knew only its overrides
+could not answer "what is running" without also carrying the defaults it was built
+from. Both sides quantize to 1e-6 on the way in, so "is this at its default" is an
+integer comparison and a value nudged up and back down is default again rather
+than almost-default.
+
+A preset also names the defaults hash it was written against. One written before
+somebody moved a default still says what it meant — every line carries its own key
+and value — but it no longer means the same thing *relative* to the defaults, so
+it loads with a stated warning rather than a refusal.
+
+### 3. A defended default can be overridden, but explicitly and loudly
+
+`Sourced` and `Measured` defaults are **defended**: `set_value` and `nudge` refuse
+them and return the unchanged value until `acknowledge(id)` has been called for
+that one tunable. Once moved, it is written to the preset with a leading `!` and
+the citation it overrides:
+
+    ! max_lock = 0.523599  # default 0.436332, +0.087266 (measured) OVERRIDE: REFERENCES.md 'Steering lock': NO CIK or KZ source was found...
+
+The `!` is first on the line on purpose, so an override is visible in a diff hunk,
+in a grep, and in a terminal that has wrapped the comment off the right-hand edge.
+
+**The acknowledgement is per-tunable and per-session, and is never persisted.**
+The rejected design is a global "expert mode", and it is rejected on a prediction
+about how it would really be used: a global switch gets turned on in the first ten
+minutes of the first tuning session and then defends nothing for the rest of the
+project. A gate crossed once is not a gate. Fourteen gates, each crossed
+deliberately and all of them reset when the process exits, are.
+
+**A `Derived` default is deliberately not defended**, and this is the line the
+whole scheme turns on. A derivation is arithmetic *this project* did on top of
+other numbers — it is not evidence about the world, and defending it would protect
+the project's own reasoning as though it were a published measurement.
+`steer_gamma`'s 3.0 is four rows of arithmetic in
+[ADR-0036](#adr-0036--the-steering-curve-is-a-controller-property-and-steeringh-keeps-its-position),
+and that ADR closes by saying 3.0 is arithmetic rather than feel. It is the knob
+this entire system exists to let somebody turn. Defending it would have been the
+system defeating its own purpose on the first constant anybody reaches for.
+
+`reset_value` is never refused either. Putting a sourced number back where the
+source put it is not an override and must not need a ceremony.
+
+### 4. A preset does not enter `StateHash`. This is the decision M3b asked to have written down
+
+A preset changes the solver's constants, so two runs under different presets
+produce different states — that is the entire point of it. The tempting move is to
+mix the tuning into `StateHash` so a divergence is attributable. It is wrong, for
+the same reason `state_hash.h` gives for quantizing: **a hash answers one
+question, and a hash that answers two answers neither.**
+
+- `StateHash` asks *"did these two runs of the same configuration diverge?"* Mix
+  configuration in and every per-tick hash changes when an unrelated audio tunable
+  moves, and a mismatch can no longer distinguish "the physics diverged" from
+  "the config differed" — which are precisely the two things the harness exists to
+  tell apart.
+- `TuningSet::hash()` asks *"is this the configuration I think it is?"* One number
+  over the whole set, key and value both, so appending or renaming a tunable
+  changes the digest. Compared **once per run**, not once per tick.
+
+Two numbers, two questions, and **the gate is the pair of them**:
+`tools/verify/tuning.sh --check` round-trips presets and prints the
+defended-override count first, and `drive_probe.gd` and every §6.4 measurement
+assert `TuningSet::hash() == default_tuning_hash()` before recording a figure. A
+tuned run cannot be quietly written down as a reference figure, because the
+harness refuses to call it one.
+
+This is **stronger** than mixing, and the distinction is worth stating plainly
+because it is not obvious. Mixing would have made a tuned run produce a
+*different* hash. Different is not loud: a different hash is found later, by
+somebody comparing two runs and then working out which of two possible causes
+produced it. An assertion at defaults, checked before the figure is written, means
+a tuned run never reaches the table at all.
+
+### The text format is hand-rolled integer arithmetic, and that is not fussiness
+
+Values cross the file as six fixed decimals produced by digit-by-digit integer
+conversion rather than by `snprintf("%f")`, because **`%f` respects the C locale**
+and a decimal-comma machine would write `2,400000` — a file this parser rejects,
+produced by the same code that reads it. That failure appears on somebody else's
+machine and nowhere near here, which is the worst place a failure can live. The
+hex digests are written by hand for the same class of reason, already on the
+record: `KartStateHash::hex` pads by hand because GDScript's `String.pad_zeros`
+counts only *digit* characters and mangles any hex string that begins with a
+letter.
+
+Values are quantized on the way **in**, not on the way out, so the file is the
+truth: what a preset saves is exactly what it loads, and no float round-trips to a
+neighbor.
+
+### What this does not settle
+
+**No value is changed by this ADR.** Every default in the table is the number that
+was already in the file it cites; the rows exist so somebody can change them
+deliberately. Choosing the values is the driver's job, not the machine's, and
+`tools/verify/drive.sh` returns every §6.4 figure unmoved.
+
+**The acknowledgement is a speed bump, not a permission system.** It stops an
+absent-minded override and it records a deliberate one. It cannot stop somebody
+editing a preset file by hand and it is not meant to — the `!` marker and the
+defended-override count are what make the result visible afterwards, and
+visibility is the whole mechanism.
+
+**Three of issue #159's constants are still `constexpr` and not reachable live**,
+so the checklist and the table are not yet the same list. #159 stays open as a
+running checklist rather than a ticket that closes, and the rule is that a
+constant which gets a row in one gets a line in the other.
+
+**And the four feel-blocked tickets are still blocked.** #32, #38, #39 and #40
+have acceptance criteria written in a driver's language. A knob that can now be
+turned mid-session is a prerequisite for answering them, not an answer.

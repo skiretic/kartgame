@@ -581,6 +581,22 @@ public:
 	Tire &tire(int corner) { return tire_[corner]; }
 	const Tire &tire(int corner) const { return tire_[corner]; }
 
+	// The front steering geometry, after `configure()` has built it.
+	//
+	// Writable for the same reason `tire()` is, and with one extra caution that
+	// the tire accessor does not need: **`configure()` rebuilds this wholesale**
+	// from `kz_front_geometry()`, so anything written here is discarded by a
+	// later `configure()`. Nothing calls that after `_ready`, and the lazy guards
+	// in `step()` and `engage()` only fire when it has never run, but a caller
+	// that adds one has to re-apply its tuning afterwards.
+	//
+	// Nothing in `SteeringGeometry` is a cache: `solve_steering` reads `max_lock`
+	// and the rest directly on every call, so a value written here takes effect
+	// on the next substep with no refresh — unlike `Tire`, which caches where its
+	// curves peak and says so.
+	SteeringGeometry &steering() { return steering_; }
+	const SteeringGeometry &steering() const { return steering_; }
+
 	const MassProperties &mass_properties() const { return mass_properties_; }
 	const ChassisGeometry &chassis_geometry() const { return geometry_; }
 	const CornerSetup &corner_setup_for(int corner) const { return suspension_[corner].setup; }

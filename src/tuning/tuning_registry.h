@@ -7,6 +7,7 @@
 #include <godot_cpp/variant/array.hpp>
 #include <godot_cpp/variant/dictionary.hpp>
 #include <godot_cpp/variant/node_path.hpp>
+#include <godot_cpp/variant/packed_int32_array.hpp>
 #include <godot_cpp/variant/packed_string_array.hpp>
 #include <godot_cpp/variant/string.hpp>
 
@@ -64,6 +65,19 @@ namespace kartgame {
 // "expert mode" would be switched on once, in the first ten minutes, and would
 // then defend nothing for the rest of the project.
 //
+// **Loading a preset grants the acknowledgement rather than demanding it, and
+// that is a decision rather than a hole.** The gesture exists to stop a knob
+// from being turned absent-mindedly. A file is not absent-minded: a `!` line
+// naming the citation it overrides was written down, saved, and is visible in
+// every diff and every review of that file from then on. Demanding a second
+// ceremony at load time would only mean a preset that does not do what it says,
+// which is a worse failure than the one it would prevent.
+//
+// The two things that do follow from it are both handled: `load_preset` reports
+// how many defended overrides the file carried, and a defended entry whose line
+// is missing its `!` — a hand edit, or a file from an older build — is applied
+// but warned about and is written back with the marker.
+//
 // ## Determinism: this node never touches the state hash
 //
 // `core/tuning.h`'s header has the full argument. In one line: `StateHash` asks
@@ -80,6 +94,16 @@ protected:
 
 public:
 	KartTuning();
+
+	// The group `_ready` joins, so an overlay finds this node without the scene
+	// wiring a path — the mechanism `scripts/game/telemetry_panel.gd` already
+	// uses for `KartBody`.
+	//
+	// **Named here rather than only in the `.cpp`, because it is a two-file
+	// contract and this header is the one a GDScript author reads.** It was in
+	// the implementation alone for exactly one afternoon and the overlay guessed
+	// the wrong string from this header's prose.
+	static godot::String source_group();
 
 	void _ready() override;
 
@@ -139,6 +163,19 @@ public:
 	bool is_defended(int p_id) const;
 	bool is_acknowledged(int p_id) const;
 
+	// Whether the last `set_value` or `nudge` was refused for want of an
+	// acknowledgement.
+	//
+	// **This exists because a refusal and a clamp are indistinguishable without
+	// it.** Both return the value unchanged, so an overlay that wanted to say
+	// "refused" rather than "already at the end of its range" had to re-check
+	// `defended && !acknowledged` itself — which is the UI re-deriving the one
+	// rule this class is supposed to own, and the exact drift `core/tuning.h`
+	// keeps `is_defended` in one place to prevent.
+	//
+	// Cleared by the next accepted change, by `reset_value` and by `reset_all`.
+	bool last_change_refused() const;
+
 	// Unlock one defended tunable for this session. Prints the citation being
 	// overridden, at warning level, so the terminal carries a record of it even
 	// if the session never saves a preset.
@@ -192,7 +229,11 @@ public:
 	//     error (int)                  godot::Error, OK when ok
 	//     name (String)                the preset's own name, or ""
 	//     applied (int)                entries applied
+	//     applied_ids (PackedInt32Array)  which ones, so a caller can say what the
+	//                                  file changed rather than only how much
 	//     defended (int)               of those, how many overrode a defended default
+	//     defaults_hash (String)       the `defaults` header the file carried, or ""
+	//     defaults_match (bool)        whether it matches this build
 	//     warnings (PackedStringArray) unknown keys, clamped values, a defaults
 	//                                  hash that does not match this build
 	//
@@ -206,8 +247,20 @@ public:
 	// no file.
 	godot::Dictionary load_preset(const godot::String &p_path);
 
-	// The preset text, without a file. What `save_preset` would write.
+	// The preset text, without a file. What `save_preset` would write. Ends with a
+	// newline whenever it has a body, so appending a line to it is safe.
 	godot::String to_text(const godot::String &p_name) const;
+
+	// One tunable's preset line, or "" when it is at its default. The same
+	// formatter `to_text` uses, per entry, so a caller checking that a defended
+	// override carries its marker can assert on a line rather than searching the
+	// whole file for one containing a key — a search that is exact only for as
+	// long as no key is a prefix of another.
+	godot::String entry_text(int p_id) const;
+
+	// The grid every value snaps to, 1e-6. Served rather than restated, so a
+	// probe comparing two values does not become a second owner of the number.
+	static double quantum();
 
 	// Parse from text. Same contract as `load_preset`.
 	godot::Dictionary from_text(const godot::String &p_text);
@@ -245,6 +298,9 @@ private:
 	// Per-tunable, per-session, never persisted. See the header note on why this
 	// is not a global expert mode.
 	bool acknowledged_[kart::core::TUNABLE_COUNT] = {};
+
+	// See `last_change_refused`.
+	bool last_refused_ = false;
 
 	godot::NodePath vehicle_path_;
 };

@@ -218,6 +218,17 @@ public:
 	void set_peak_friction(double p_value);
 	double get_peak_friction() const;
 
+	// Maximum steer angle at the inner front wheel, radians. `get_steer_lock()`
+	// below reads the same number and is the read-out the HUD uses; this is the
+	// writable half, added for the tuning registry.
+	//
+	// **Defended** in `src/core/tuning.h`, and the definition says why: this
+	// figure is the angle the bodywork clearance tables in issues #109 and #110
+	// were measured at, not a regulation, so raising it steers the front wheels
+	// into geometry that was checked against it.
+	void set_max_lock(double p_radians);
+	double get_max_lock() const;
+
 	// --- lifecycle ------------------------------------------------------------
 
 	// Where `respawn()` puts the kart. Applied immediately, as M3a's did.

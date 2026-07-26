@@ -16,10 +16,16 @@
 //
 // ## What this is for, which is not "a settings file"
 //
-// Twelve constants in this project can only be set by driving or by listening.
+// A dozen constants in this project can only be set by driving or by listening.
 // Issue #159 is the running checklist of them, and until now each one needed a
 // rebuild to change, so "judged by feel" was in practice "whatever the first
 // guess was". This header is the machine that fixes that.
+//
+// The table below is **wider than that checklist**, and deliberately: it also
+// carries constants that *do* have a source, because the point is the contrast.
+// A registry holding only the guesses would be a list of things it is fine to
+// turn, which teaches exactly the wrong lesson the first time somebody wants to
+// turn something else.
 //
 // But `ARCHITECTURE.md` §19 names **unbounded vehicle tuning** as the live risk,
 // and ADR-0033 refused to retune M3a's constants rather than restore a pretty
@@ -248,6 +254,13 @@ struct Tunable {
 // Every citation below is copied from the file the constant lives in rather than
 // restated, which is `ARCHITECTURE.md` §5 item 10 applied to this header — a
 // second owner of a justification is how justifications rot.
+//
+// **The strings are pure ASCII, and that is a constraint rather than a style.**
+// They cross into Godot as `const char *`, which `godot::String` decodes as
+// Latin-1 rather than UTF-8 — so an em dash in a citation reaches the tuning
+// overlay as two garbage characters. It reached the audit output as `â` once,
+// which is how this is known. Comments in this file are prose and may say
+// whatever they like; anything inside quotes is ASCII.
 inline constexpr Tunable TUNABLES[TUNABLE_COUNT] = {
 	{
 			"peak_friction", "tire peak friction", "", "src/core/tire.h",
@@ -298,7 +311,7 @@ inline constexpr Tunable TUNABLES[TUNABLE_COUNT] = {
 			"src/core/vehicle.h",
 			180.0, 60.0, 400.0, 5.0, Provenance::Derived,
 			"vehicle.h: sized so the pedal reaches the front tire's limit at about "
-			"0.9 and past it at 1.0 — 1318 N per wheel against roughly 1380 N of "
+			"0.9 and past it at 1.0 -- 1318 N per wheel against roughly 1380 N of "
 			"tire. The 71/29 split is nine points rear-biased of the 80/20 that "
 			"would be optimal at 1.8 g.",
 			TuningOwner::Vehicle,
@@ -316,14 +329,14 @@ inline constexpr Tunable TUNABLES[TUNABLE_COUNT] = {
 			"steer_rate", "steering rate limit", "1/s", "src/core/vehicle.h",
 			3.4, 1.0, 12.0, 0.1, Provenance::Unsourced,
 			"Carried over from the M3a debug vehicle unchanged and never tuned by "
-			"feel, only recorded — issue #159. 3.4 is center to full lock in "
+			"feel, only recorded -- issue #159. 3.4 is center to full lock in "
 			"294 ms. It is the rate a driver's hands can actually move the wheel, "
 			"and it interacts with steer_gamma, so judge it after that one settles.",
 			TuningOwner::Vehicle,
 	},
 	{
 			"steer_gamma", "steering curve exponent", "", "src/vehicle/kart_body.h",
-			3.0, 1.0, 5.0, 0.1, Provenance::Derived,
+			3.0, 1.0, 6.0, 0.1, Provenance::Derived,
 			"ADR-0036's four rows. 3.0 puts the measured 100 km/h limit (0.065 of "
 			"lock) at 40% of stick travel instead of 6.5%, which is inside "
 			"project.godot's 0.15 deadzone. 1.0 is the exact linear mapping and is "
@@ -361,7 +374,7 @@ inline constexpr Tunable TUNABLES[TUNABLE_COUNT] = {
 			"comb_depth", "exhaust comb depth", "", "src/core/audio_state.h",
 			0.30, 0.0, 0.80, 0.01, Provenance::Derived,
 			"The smallest default landing inside the measured 1.6-2.6 dB RMS "
-			"ripple band, whose midpoint would be 0.34 — so there is a defensible "
+			"ripple band, whose midpoint would be 0.34 -- so there is a defensible "
 			"range rather than a point. tests/core/test_engine_synth.cpp prints "
 			"the depth-to-ripple table it was read off.",
 			TuningOwner::Audio,
@@ -369,7 +382,7 @@ inline constexpr Tunable TUNABLES[TUNABLE_COUNT] = {
 	{
 			"noise_gain", "noise layer gain", "", "src/core/audio_state.h",
 			0.12, 0.0, 0.60, 0.01, Provenance::Unsourced,
-			"No measurement at all — issue #159 names it as the clearest example "
+			"No measurement at all -- issue #159 names it as the clearest example "
 			"of a guess in this project. Listen for: too little and the note is a "
 			"synthesizer, too much and it stops being a two-stroke.",
 			TuningOwner::Audio,
@@ -447,16 +460,31 @@ public:
 	// Clamped to the declared range, quantized, stored, and returned — so a
 	// caller that shows the user what it set shows the truth rather than what it
 	// asked for.
+	//
+	// **Quantized first and clamped second, and the order is the whole
+	// correctness of it.** Clamping to the raw bound and then quantizing lets
+	// `llround` round back out of the range: `max_lock`'s maximum is
+	// 0.6981317008, which is 698131.7008 micro-units, which rounds to 698132 —
+	// 0.698132, three ten-millionths *above* the declared maximum. Small enough
+	// that no solver would notice and large enough that "a stored value is
+	// inside its bounds" would have been false for the four tunables whose
+	// bounds are not round numbers, and any test comparing a clamped value to
+	// `max_value` exactly would fail on them.
+	//
+	// Quantizing the bounds too means the range this class enforces is a range
+	// storable values actually live in.
 	double set(int id, double value) {
 		const Tunable &t = TUNABLES[id];
-		double clamped = std::isnan(value) ? t.default_value : value;
-		if (clamped < t.min_value) {
-			clamped = t.min_value;
+		const int64_t low = tuning_micro(t.min_value);
+		const int64_t high = tuning_micro(t.max_value);
+		int64_t micro = std::isnan(value) ? tuning_micro(t.default_value) : tuning_micro(value);
+		if (micro < low) {
+			micro = low;
 		}
-		if (clamped > t.max_value) {
-			clamped = t.max_value;
+		if (micro > high) {
+			micro = high;
 		}
-		value_[id] = tuning_quantize(clamped);
+		value_[id] = static_cast<double>(micro) / static_cast<double>(TUNING_SCALE);
 		return value_[id];
 	}
 

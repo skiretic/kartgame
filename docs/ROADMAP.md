@@ -172,8 +172,8 @@ The feel milestone. `VehicleBody3D` is deleted here.
 **Status: the boundary is built and the kart drives. It does not yet drive
 *well*, and what is wrong is now measured rather than suspected.**
 
-Every subsystem below exists as engine-free C++ under `src/core/`, held by 197
-test cases and 2,032,414 assertions that run in seconds with no engine at all.
+Every subsystem below exists as engine-free C++ under `src/core/`, held by 217
+test cases and 2,033,231 assertions that run in seconds with no engine at all.
 `src/vehicle/kart_body.{h,cpp}` is the `RigidBody3D` that raycasts, calls the
 solver and applies the forces; `scenes/game/proving_ground.tscn` drives it and
 `kart_debug_vehicle.gd` is deleted. The boundary measured clean — the kart settles
@@ -236,6 +236,25 @@ unmoved.
 than a ticket that closes, because "judged by feel" otherwise becomes "whatever the
 first guess was".
 
+**And that checklist is now data rather than prose, so the constants can be turned
+without a rebuild.** `src/core/tuning.h` carries fourteen tunables, each declaring
+its range, its step, the file its value lives in and — the part that matters —
+**where its default came from**, on a four-way scale rather than a boolean:
+`frame_torsion`'s 193.62 N·m/deg is a published measurement of a real frame,
+`max_lock`'s 25° is this repository measuring its own kart because no CIK or KZ
+source exists, `steer_gamma`'s 3.0 is arithmetic, and `noise_gain`'s 0.12 is a
+guess. A preset saves as a **diff against the defaults**, so an empty file means
+nothing was tuned and a three-line file is the complete list of what was; moving a
+default that has evidence behind it needs a per-tunable acknowledgement and is
+written with a leading `!` and the citation it overrode.
+[ADR-0037](DECISIONS.md#adr-0037--tuning-is-an-audit-trail-that-happens-to-be-adjustable-and-a-preset-is-not-in-the-state-hash)
+has the argument, including the determinism decision: a preset does **not** enter
+`StateHash` — that hash asks whether two runs of the same configuration diverged,
+and mixing configuration into it makes a mismatch un-diagnosable. `TuningSet::hash()`
+is a separate per-run fingerprint, and the probes assert it equals the default
+before recording any §6.4 figure. This is the risk `ARCHITECTURE.md` §19 names,
+answered with an audit trail rather than with a slider panel.
+
 **Blocked on being able to judge it by feel: #32, #38, #39, #40.** All four have
 acceptance criteria written in a driver's language — "visibly lifts", "requires
 clutch modulation", "lifting off in second decelerates hard", "demonstrably
@@ -262,10 +281,10 @@ than the scrub permits.
 - 240 Hz solver substepping inside the 120 Hz tick
 - Surface types with grip multipliers
 - **Telemetry ships with this milestone:** per-wheel load, slip angle, slip ratio, suspension travel, force vectors, RPM, torque, gear, clutch state — scrolling graphs
-- Tuning presets saving to disk in a diffable text format
+- [x] Tuning presets saving to disk in a diffable text format — a diff against the defaults, with each tunable's provenance and the citation any override moved away from ([ADR-0037](DECISIONS.md#adr-0037--tuning-is-an-audit-trail-that-happens-to-be-adjustable-and-a-preset-is-not-in-the-state-hash))
 - **Physics validation scenarios** (§6.4): acceleration run, constant-radius skidpad, braking test
 
-**Accept:** the kart is driveable and unmistakably not a car — the inside rear wheel visibly lifts in a corner and the kart rotates on it. Engine braking is felt on corner entry. Validation scenarios land inside the KZ reference ranges: ~140 km/h top speed, ~3.5 s to 100, **1.5–2.0 g sustained lateral** ([ADR-0034](DECISIONS.md#adr-0034--64s-lateral-band-was-a-peak-figure-being-read-as-a-sustained-one) split that from the 2.0–2.5 g transient-peak band), 1.5–2.0 g braking. Presets round-trip. No tire-force instability at any speed.
+**Accept:** the kart is driveable and unmistakably not a car — the inside rear wheel visibly lifts in a corner and the kart rotates on it. Engine braking is felt on corner entry. Validation scenarios land inside the KZ reference ranges: ~140 km/h top speed, ~3.5 s to 100, **1.5–2.0 g sustained lateral** ([ADR-0034](DECISIONS.md#adr-0034--64s-lateral-band-was-a-peak-figure-being-read-as-a-sustained-one) split that from the 2.0–2.5 g transient-peak band), 1.5–2.0 g braking. Presets round-trip — **measured by `tools/verify/tuning.sh --check`**, which saves, reloads and compares, and that is all it proves: the format is sound, and every value it carries is still the default nobody has driven against yet. No tire-force instability at any speed.
 
 Half of that is now measurable and measured. The other half — "unmistakably not a car", "felt on corner entry" — is a judgement a person makes at the wheel, and [#138](https://github.com/skiretic/kartgame/issues/138) records that the instruments to make it do not exist yet.
 

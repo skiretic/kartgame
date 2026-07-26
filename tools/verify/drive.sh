@@ -66,7 +66,7 @@ run_scenario() {
 FAILED=0
 for scenario in "${SCENARIOS[@]}"; do
 	FIRST="$(run_scenario "$scenario")"
-	echo "$FIRST" | grep -E '^(---|    |state-hash)'
+	echo "$FIRST" | grep -E '^(---|    |state-hash|tuning-hash)'
 
 	if [ "$ONCE" = "1" ]; then
 		continue

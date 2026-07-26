@@ -117,6 +117,26 @@ public:
 	void set_gain(double p_gain);
 	double get_gain() const;
 
+	// The two synth constants issue #159 lists as unsourced and that only an ear
+	// can settle: the exhaust comb depth and the broadband noise layer.
+	//
+	// **These widen the paragraph above rather than contradicting it**, and the
+	// distinction is the one `src/core/tuning.h` exists to hold. `comb_depth` is
+	// derived — 0.30 is the smallest default landing inside a measured 1.6-2.6 dB
+	// ripple band — and `noise_gain` has no measurement at all. Neither is a
+	// figure in `kz_audio_reference.h` that a scene would be overriding; both are
+	// guesses this project made, and the tuning registry is the disclosed place
+	// to move a guess. A scene that reached for `PIPE_LADDER_DB` would still be
+	// doing the thing the paragraph above forbids.
+	//
+	// Applied at the top of a mix block rather than through `configure()`, which
+	// clears the comb line and reseeds the noise RNG. See
+	// `EngineSynth::set_comb_depth`.
+	void set_comb_depth(double p_depth);
+	double get_comb_depth() const;
+	void set_noise_gain(double p_gain);
+	double get_noise_gain() const;
+
 	// What the audio thread is doing, for the HUD and for the telemetry panel.
 	//
 	// Every field is a counter the audio thread writes with relaxed ordering and
@@ -154,6 +174,12 @@ private:
 	// measured 213 of 960 physics ticks overlapping a mix, so "nobody is mixing
 	// right now" is never true.
 	std::atomic<double> _gain{ 0.0 };
+
+	// Seeded from `EngineAudioConfig`'s own defaults so that a stream nobody
+	// tunes sounds exactly as it did before these existed. A zero default here
+	// would have silently deleted the noise layer from every scene.
+	std::atomic<double> _comb_depth{ kart::core::EngineAudioConfig().comb_depth };
+	std::atomic<double> _noise_gain{ kart::core::EngineAudioConfig().noise_gain };
 
 	// --- what the audio thread reports back ---------------------------------
 	mutable std::atomic<int64_t> _mix_calls{ 0 };

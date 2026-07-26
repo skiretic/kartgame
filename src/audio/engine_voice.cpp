@@ -32,10 +32,18 @@ int64_t now_ns() {
 void EngineVoiceStream::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_gain", "gain"), &EngineVoiceStream::set_gain);
 	ClassDB::bind_method(D_METHOD("get_gain"), &EngineVoiceStream::get_gain);
+	ClassDB::bind_method(D_METHOD("set_comb_depth", "depth"), &EngineVoiceStream::set_comb_depth);
+	ClassDB::bind_method(D_METHOD("get_comb_depth"), &EngineVoiceStream::get_comb_depth);
+	ClassDB::bind_method(D_METHOD("set_noise_gain", "gain"), &EngineVoiceStream::set_noise_gain);
+	ClassDB::bind_method(D_METHOD("get_noise_gain"), &EngineVoiceStream::get_noise_gain);
 	ClassDB::bind_method(D_METHOD("voice_stats"), &EngineVoiceStream::voice_stats);
 	ClassDB::bind_method(D_METHOD("reset_stats"), &EngineVoiceStream::reset_stats);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "gain", PROPERTY_HINT_RANGE, "0.0,1.0,0.01"),
 			"set_gain", "get_gain");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "comb_depth", PROPERTY_HINT_RANGE, "0.0,0.8,0.01"),
+			"set_comb_depth", "get_comb_depth");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "noise_gain", PROPERTY_HINT_RANGE, "0.0,0.6,0.01"),
+			"set_noise_gain", "get_noise_gain");
 }
 
 void EngineVoiceStream::publish(const kart::core::EngineAudioInput &p_input) {
@@ -93,6 +101,23 @@ void EngineVoiceStream::set_gain(double p_gain) {
 
 double EngineVoiceStream::get_gain() const {
 	return _gain.load(std::memory_order_relaxed);
+}
+
+void EngineVoiceStream::set_comb_depth(double p_depth) {
+	_comb_depth.store(p_depth < 0.0 ? 0.0 : (p_depth > 1.0 ? 1.0 : p_depth),
+			std::memory_order_relaxed);
+}
+
+double EngineVoiceStream::get_comb_depth() const {
+	return _comb_depth.load(std::memory_order_relaxed);
+}
+
+void EngineVoiceStream::set_noise_gain(double p_gain) {
+	_noise_gain.store(p_gain < 0.0 ? 0.0 : p_gain, std::memory_order_relaxed);
+}
+
+double EngineVoiceStream::get_noise_gain() const {
+	return _noise_gain.load(std::memory_order_relaxed);
 }
 
 Dictionary EngineVoiceStream::voice_stats() const {
@@ -191,6 +216,8 @@ void EngineVoicePlayback::bind(const Ref<EngineVoiceStream> &p_stream, double p_
 	kart::core::EngineAudioConfig config;
 	if (_stream.is_valid()) {
 		config.gain = _stream->get_gain();
+		config.comb_depth = _stream->get_comb_depth();
+		config.noise_gain = _stream->get_noise_gain();
 	}
 	_synth.configure(config, _rate);
 	_last_good = kart::core::EngineAudioInput();
@@ -212,6 +239,26 @@ int32_t EngineVoicePlayback::_mix(AudioFrame *p_buffer, float p_rate_scale, int3
 			p_buffer[i].right = 0.0f;
 		}
 		return p_frames;
+	}
+
+	// The three live knobs, re-read every block.
+	//
+	// **This fixes a defect the tuning registry exposed rather than caused.**
+	// `bind()` above read `get_gain()` once and the synth kept that value
+	// forever, so `set_gain` after the voice started playing did nothing at all.
+	// Nothing noticed because `scripts/game/engine_voice_rig.gd` happens to set
+	// the gain before `play()`, so the one call that mattered landed on the right
+	// side of the ordering. A tuning overlay turning the volume knob mid-corner
+	// would have found it immediately, and the symptom would have been read as
+	// "the overlay does not work" rather than as this.
+	//
+	// Three relaxed atomic loads per block. ADR-0035 costed the seqlock read at
+	// 4.6 ns and 0.0013% of the budget; these are cheaper and there are three of
+	// them, so it stays far below anything the worst-block figure can see.
+	if (_stream.is_valid()) {
+		_synth.set_gain(_stream->get_gain());
+		_synth.set_comb_depth(_stream->get_comb_depth());
+		_synth.set_noise_gain(_stream->get_noise_gain());
 	}
 
 	// One seqlock read per block, which is the rate ADR-0035 costed at 4.6 ns and

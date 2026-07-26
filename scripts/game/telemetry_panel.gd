@@ -5,9 +5,15 @@ extends CanvasLayer
 ## as numbers and as scrolling graphs. Toggled with `debug_telemetry` (F3).
 ##
 ## **This ships with M3b, not after it.** `ARCHITECTURE.md` §19 names unbounded
-## vehicle tuning as a risk and names exactly one defense against it — telemetry
-## landing with the vehicle. A tuning question answered by feel is the risk
-## landing; the same question answered off a graph is not.
+## vehicle tuning as a risk, and telemetry landing with the vehicle was the first
+## defense against it. A tuning question answered by feel is the risk landing; the
+## same question answered off a graph is not.
+##
+## There are two defenses now, and they answer different halves. This panel says
+## *what the kart is doing*. `scripts/ui/tuning_panel.gd` and `KartTuning` say
+## *what has been changed to make it do that*, and where each of those constants
+## came from — ADR-0037. A graph alone cannot tell a driver that the number they
+## are admiring sits on top of an overridden published measurement.
 ##
 ## ## Adding it to a scene
 ##

@@ -116,11 +116,13 @@ struct ChassisGeometry {
 	// Fraction of the static load carried by the front axle. A KZ carries its
 	// engine outboard and behind the driver's hip.
 	//
-	// **This disagrees with `kart_debug_vehicle.gd`,** which places the center of
-	// mass 5% of the wheelbase behind the midpoint and so implies 0.45. 0.42 is
-	// the figure M3b's skidpad solution was built on. One of the two is wrong and
-	// the difference is worth about 0.03 g in where the inside rear lifts; it is
-	// reported rather than silently reconciled here.
+	// **This disagreed with the deleted `kart_debug_vehicle.gd`,** which placed
+	// the center of mass 5% of the wheelbase behind the midpoint and so implied
+	// 0.45. 0.42 is the figure M3b's skidpad solution was built on. The stand-in
+	// is gone and cannot be re-measured, so the disagreement is now a note on
+	// where this number came from rather than a live one: the difference was
+	// worth about 0.03 g in where the inside rear lifts, and it is reported
+	// rather than silently reconciled.
 	double front_mass_share = 0.42;
 
 	// Lateral position of each corner, meters, +X right. Godot's frame.

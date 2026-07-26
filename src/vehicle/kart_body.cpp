@@ -175,6 +175,10 @@ void KartBody::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "peak_friction"), "set_peak_friction",
 			"get_peak_friction");
 
+	ClassDB::bind_method(D_METHOD("set_max_lock", "radians"), &KartBody::set_max_lock);
+	ClassDB::bind_method(D_METHOD("get_max_lock"), &KartBody::get_max_lock);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "max_lock"), "set_max_lock", "get_max_lock");
+
 	// --- lifecycle ------------------------------------------------------------
 	ClassDB::bind_method(D_METHOD("set_spawn", "transform"), &KartBody::set_spawn);
 	ClassDB::bind_method(D_METHOD("get_spawn"), &KartBody::get_spawn);
@@ -799,6 +803,26 @@ void KartBody::set_peak_friction(double p_value) {
 
 double KartBody::get_peak_friction() const {
 	return vehicle_.tire(CORNER_FL).lateral.peak_friction;
+}
+
+void KartBody::set_max_lock(double p_radians) {
+	// Straight through to the geometry: `SteeringGeometry` caches nothing, so
+	// there is no counterpart to `Tire::refresh_peaks()` to forget here.
+	//
+	// This is one of the two **defended** tunables in `core/tuning.h`, and it is
+	// worth restating why at the place it is written rather than only in the
+	// table. `docs/REFERENCES.md` §"Steering lock" records that no CIK or KZ
+	// source for a maximum steer angle was found: 25 degrees is inherited from
+	// the bodywork clearance tables measured in issues #109 and #110, applied to
+	// the *inner* wheel so no front wheel ever exceeds the angle those clearances
+	// were measured at. Raising it past 25 degrees therefore does not merely
+	// change the feel — it steers the front wheels into bodywork that was checked
+	// against this number.
+	vehicle_.steering().max_lock = p_radians;
+}
+
+double KartBody::get_max_lock() const {
+	return vehicle_.steering().max_lock;
 }
 
 // --- lifecycle -----------------------------------------------------------------

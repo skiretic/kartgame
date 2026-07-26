@@ -2,6 +2,7 @@
 
 #include "core/tuning.h"
 
+#include <cmath>
 #include <cstring>
 
 // The tuning vocabulary is the thing that keeps ARCHITECTURE.md §19's unbounded
@@ -115,6 +116,37 @@ TEST_CASE("set clamps to the declared range and returns what it stored") {
 	CHECK(set.set(kart::core::TUNE_STEER_GAMMA, 99.0) == doctest::Approx(t.max_value));
 	CHECK(set.set(kart::core::TUNE_STEER_GAMMA, -99.0) == doctest::Approx(t.min_value));
 	CHECK(set.get(kart::core::TUNE_STEER_GAMMA) == doctest::Approx(t.min_value));
+}
+
+TEST_CASE("a stored value is never outside its declared range, to the last digit") {
+	// The order-of-operations bug this pins: clamping to the raw bound and then
+	// quantizing lets `llround` round back *out* of the range. `max_lock`'s
+	// maximum is 0.6981317008 = 698131.7008 micro-units, which rounds to 698132
+	// — above the declared maximum by three ten-millionths. Too small for any
+	// solver to notice and large enough to make "a stored value is inside its
+	// bounds" a false statement, on the four tunables whose bounds are not round
+	// numbers.
+	for (int id = 0; id < TUNABLE_COUNT; ++id) {
+		const auto &t = TUNABLES[id];
+		CAPTURE(t.key);
+		TuningSet set;
+		set.set(id, t.max_value + 1000.0);
+		CHECK(kart::core::tuning_micro(set.get(id)) <= kart::core::tuning_micro(t.max_value));
+		set.set(id, t.min_value - 1000.0);
+		CHECK(kart::core::tuning_micro(set.get(id)) >= kart::core::tuning_micro(t.min_value));
+
+		// And the clamp lands *on* the quantized bound rather than short of it,
+		// so the end of the range is reachable rather than merely approached.
+		set.set(id, t.max_value + 1000.0);
+		CHECK(kart::core::tuning_micro(set.get(id)) == kart::core::tuning_micro(t.max_value));
+	}
+}
+
+TEST_CASE("a NaN stores the default rather than poisoning the set") {
+	TuningSet set;
+	set.set(kart::core::TUNE_DRAG_AREA, std::nan(""));
+	CHECK(set.is_default(kart::core::TUNE_DRAG_AREA));
+	CHECK(set.hash() == kart::core::default_tuning_hash());
 }
 
 TEST_CASE("a nudge up and back down is default again, exactly") {

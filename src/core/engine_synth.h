@@ -321,6 +321,32 @@ public:
 		configure(EngineAudioConfig(), 48000.0);
 	}
 
+	// The two config knobs that can be moved **while the synth is running**.
+	//
+	// `configure()` cannot do this job. It clears the comb line and reseeds the
+	// noise RNG, which is correct when a voice is bound and is a click and a
+	// discontinuity when a knob moves — and worse, it is not an audio-thread call
+	// at all, because it fills three tables. These two set one scalar each and
+	// touch no state, so the audio thread applies them at the top of a block.
+	//
+	// Both are per-sample multipliers, so a change between two blocks is a step
+	// in a gain rather than in a phase. At the largest step either knob offers
+	// (0.01 of depth or of noise level, `core/tuning.h`'s declared step) that is
+	// far below where a level change becomes an audible click, and these are
+	// knobs a person turns while listening — the alternative, ramping them, would
+	// smooth a transition nobody can hear at a cost paid on the deadline.
+	//
+	// Deliberately not a general "apply this config": the rest of
+	// `EngineAudioConfig` sizes tables and cannot move without a reset, and a
+	// setter that quietly ignored half its argument is worse than not having one.
+	void set_comb_depth(double depth) { comb_depth_ = clamp01(depth); }
+	void set_noise_gain(double gain) { noise_gain_ = gain > 0.0 ? gain : 0.0; }
+	void set_gain(double gain) { gain_ = gain > 0.0 ? gain : 0.0; }
+
+	double comb_depth() const { return comb_depth_; }
+	double noise_gain() const { return noise_gain_; }
+	double gain() const { return gain_; }
+
 	// Size everything and clear it. Not an audio-thread call: it fills the sine
 	// table and the two ladder tables.
 	void configure(const EngineAudioConfig &config, double sample_rate) {

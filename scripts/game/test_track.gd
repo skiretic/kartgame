@@ -15,7 +15,10 @@ extends Node3D
 ##   --eye=x,y,z         park a camera here instead, and leave it there
 ##   --look=x,y,z        what the parked camera aims at (default: the grid)
 ##   --hud=true          the corner text overlay and the driving HUD
-##   --steer-gamma=3.0   the steering input curve, also live on `[` and `]`
+##   --steer-gamma=3.0   the steering input curve, through the tuning registry
+##   --tune=key=value[,key=value]
+##                       any tunable, by key. `tools/verify/tuning.sh` lists them
+##   --preset=path       load a saved preset before the first tick
 ##   --validate=false    run the O(n^2) self-intersection check and print it
 ##   --throttle=1 --steer=0.3 --brake=0
 ##                       drive the kart from arguments instead of from the input
@@ -152,10 +155,6 @@ const RESPAWN_QUIET_TICKS := 1
 ## acceptable here and would not be in `src/core/`.
 const FOLLOWABLE_LOCK := 0.065
 
-## How much `[` and `]` move the curve. 0.10 is about the smallest step that is
-## distinguishable in one corner; smaller and a driver cannot tell two presses apart.
-const GAMMA_STEP := 0.10
-
 var _args: Dictionary = {}
 var _layout: TrackLayout
 var _kart: KartBody
@@ -164,6 +163,8 @@ var _free: FreeCamera
 var _fixed: Camera3D
 var _hud: Label
 var _driving_hud: Control
+var _tuning: KartTuning
+var _tuning_panel: TuningPanel
 ## The `EngineVoiceStream` the kart is publishing into, or null where there is no
 ## audio device. Held so the HUD can read `voice_stats()` — the worst-block
 ## render figure is the one that sees a dropout, and a mean never will.
@@ -205,6 +206,7 @@ func _ready() -> void:
 	_build_ground()
 	_build_track()
 	_build_kart()
+	_build_tuning()
 	_build_cameras()
 	_build_hud()
 	# One line, and it is the whole of issue #43's integration: `KartBody::_ready`
@@ -686,6 +688,81 @@ func _parse_point(text: String, fallback: Vector3) -> Vector3:
 	return Vector3(float(parts[0]), float(parts[1]), float(parts[2]))
 
 
+## The tuning registry and its overlay. ROADMAP M3b's last bullet, ADR-0037.
+##
+## **This replaces the `[` / `]` prototype, and the prototype was the wrong shape
+## rather than merely small.** It moved one constant with two keys, wrote nothing
+## down about what it had moved, and — the part that matters — `steer_gamma` could
+## be a long way from 3.0 while every instrument in the scene still reported a kart
+## at its defaults. A session that found a good number left a line in a terminal
+## scrollback and nothing else.
+##
+## What replaces it answers the same question and three more: what is this number,
+## where does it live, where did it come from, and what have I moved away from its
+## source. `steer_gamma` is now one row of fourteen and is reached the same way as
+## every other one.
+func _build_tuning() -> void:
+	if _kart == null:
+		return
+	_tuning = KartTuning.new()
+	_tuning.name = "Tuning"
+	add_child(_tuning)
+	# After `add_child`, because the path is resolved relative to this node and the
+	# setter re-applies immediately once it is in the tree.
+	_tuning.set_vehicle_path(_tuning.get_path_to(_kart))
+
+	# The audio half. Null under every headless gate, where `EngineVoiceRig.attach`
+	# returns nothing because there is no audio device — so the five audio tunables
+	# simply have nobody listening, which is correct rather than broken.
+	var voice_player := _kart.get_node_or_null("EngineVoice") as AudioStreamPlayer3D
+	if voice_player != null:
+		EngineVoiceRig.bind_tuning(_tuning, _engine_voice, voice_player)
+
+	# `--steer-gamma=` still works and now goes through the registry, so a session
+	# started at a chosen curve reports itself as tuned instead of claiming to be at
+	# defaults. Any tunable can be set the same way: `--tune=key=value`, repeatable.
+	#
+	# The old code wrote `_kart.steer_gamma` directly. That was a second owner of the
+	# constant, and it is exactly the failure the audit exists to catch — the kart
+	# would have been tuned and `is_at_defaults()` would have said otherwise.
+	#
+	# Comma separated rather than a repeated flag, because `Cmdline` parses into a
+	# Dictionary and a second `--tune=` would silently replace the first.
+	if _args.has("steer-gamma"):
+		_apply_tuning_argument("steer_gamma", Cmdline.as_float(_args, "steer-gamma", 3.0))
+	var assignments := Cmdline.as_string(_args, "tune", "")
+	if assignments != "":
+		for assignment in assignments.split(",", false):
+			var pair := assignment.split("=", true, 1)
+			if pair.size() != 2:
+				push_error("--tune wants key=value[,key=value], got '%s'" % assignment)
+				continue
+			_apply_tuning_argument(pair[0].strip_edges(), float(pair[1]))
+
+	# And a whole preset, so a session can start from where the last one finished.
+	var preset := Cmdline.as_string(_args, "preset", "")
+	if preset != "":
+		var outcome: Dictionary = _tuning.load_preset(preset)
+		for warning in outcome.get("warnings", PackedStringArray()):
+			push_warning("preset: %s" % warning)
+		if not bool(outcome.get("ok", false)):
+			push_error("preset %s did not load" % preset)
+
+
+## One `--tune` assignment, with the acknowledgement handled the way the file
+## format handles it: a command line is written down and reproducible, so it is an
+## explicit override in the same sense a `!` line in a preset is. It is still
+## reported, loudly, by `acknowledge` itself.
+func _apply_tuning_argument(key: String, value: float) -> void:
+	var id: int = _tuning.id_of(key)
+	if id < 0:
+		push_error("no tunable named '%s' — run tools/verify/tuning.sh to list them" % key)
+		return
+	if _tuning.is_defended(id):
+		_tuning.acknowledge(id)
+	_tuning.set_value(id, value)
+
+
 func _build_hud() -> void:
 	if not Cmdline.as_bool(_args, "hud", true):
 		return
@@ -713,6 +790,12 @@ func _build_hud() -> void:
 	layer.add_child(_driving_hud)
 	if _kart != null:
 		_driving_hud.bind(_kart)
+
+	# The tuning overlay, on F2. It finds the registry through the `tuning_source`
+	# group the same way the telemetry panel finds the kart, so this is the whole
+	# integration and neither node learns the other exists.
+	if _tuning != null:
+		_tuning_panel = TuningPanel.attach(self)
 
 
 ## What the track is, printed once, so a driving session starts with the numbers
@@ -860,14 +943,20 @@ func _hud_text() -> String:
 		_kart.get_lateral_g(), _kart.get_longitudinal_g(),
 	])
 	lines.append("under the wheels  " + _surface_text)
-	# The steering curve, live, because it is judged by feel and the alternative is a
-	# rebuild per guess. `FOLLOWABLE_LOCK` is the measured 100 km/h limit — see
+	# The steering curve stays on this line even though the tuning overlay now owns
+	# every knob, because it is the one tunable whose *consequence* is a sentence
+	# rather than a number. `FOLLOWABLE_LOCK` is the measured 100 km/h limit — see
 	# `tests/core/test_vehicle.cpp` — so this reports what fraction of stick travel
 	# reaches it at the current gamma. At gamma 1 it is 6.5%, which is inside the
-	# 0.15 deadzone and is the whole reason this row exists.
+	# 0.15 deadzone and is the whole reason ADR-0036 exists.
 	var gamma: float = _kart.steer_gamma
-	lines.append("steer curve  gamma %.2f   [ / ] to change   the 100 km/h limit sits at %.0f%% of stick"
-		% [gamma, 100.0 * pow(FOLLOWABLE_LOCK, 1.0 / gamma)])
+	var tuned := ""
+	if _tuning != null and not _tuning.is_at_defaults():
+		tuned = "   TUNED: %d changed, %d defended" % [
+			_tuning.changed_count(), _tuning.defended_override_count(),
+		]
+	lines.append("steer curve  gamma %.2f   the 100 km/h limit sits at %.0f%% of stick%s"
+		% [gamma, 100.0 * pow(FOLLOWABLE_LOCK, 1.0 / gamma), tuned])
 	lines.append("physics %d Hz   frame %.1f fps   %s" % [
 		Engine.physics_ticks_per_second,
 		Engine.get_frames_per_second(),
@@ -875,44 +964,10 @@ func _hud_text() -> String:
 	])
 	lines.append(
 		"W/S throttle-brake  A/D steer  E/Q shift up-down  Shift clutch  "
-		+ "C look back  R respawn  V camera      F3 telemetry  F4 frustum  F5 physics"
+		+ "C look back  R respawn  V camera      F2 tuning  F3 telemetry  "
+		+ "F4 frustum  F5 physics"
 	)
 	return "\n".join(lines)
-
-
-## Live tuning for the steering curve, on `[` and `]`.
-##
-## **Here rather than in `project.godot`'s input map, and that is the unusual
-## choice.** Every other control in this scene is an action, because every other
-## control is something a driver uses and a pad can be bound to. This is a tuning
-## knob for one open question — what `steer_gamma` should be — and it is expected to
-## stop existing once the number is settled. An action would put it in the input map,
-## in the pad bindings, and in the list CLAUDE.md keeps of what every key does, all
-## for something with a shorter life than the milestone.
-##
-## It is on the HUD line above so it is not a secret, which is the actual rule that
-## matters: this project once shipped a milestone where the shift, clutch and
-## look-back keys existed and were documented nowhere, and the result was a driver
-## pressing E, getting nothing, and concluding the gearbox was broken.
-func _unhandled_key_input(event: InputEvent) -> void:
-	if _kart == null:
-		return
-	var key := event as InputEventKey
-	if key == null or not key.pressed or key.echo:
-		return
-	# The bracket keys, by physical position rather than by label, so a non-US
-	# layout gets the same two keys next to each other.
-	if key.physical_keycode == KEY_BRACKETLEFT:
-		_kart.steer_gamma = _kart.steer_gamma - GAMMA_STEP
-	elif key.physical_keycode == KEY_BRACKETRIGHT:
-		_kart.steer_gamma = _kart.steer_gamma + GAMMA_STEP
-	else:
-		return
-	# Printed as well as shown, so a session that found a good number leaves a
-	# record of it in the terminal rather than only on a HUD that is gone.
-	print("steer_gamma %.2f — the 100 km/h limit is at %.0f%% of stick travel"
-		% [_kart.steer_gamma, 100.0 * pow(FOLLOWABLE_LOCK, 1.0 / _kart.steer_gamma)])
-	get_viewport().set_input_as_handled()
 
 
 ## "FL asphalt  FR curb  RL asphalt  RR curb", from the solver's own ground query.

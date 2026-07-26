@@ -129,6 +129,70 @@ func _action_definitions() -> Dictionary:
 	actions["debug_camera"] = _action(DEADZONE_BUTTON, [_key(KEY_F4)])
 	actions["debug_physics_draw"] = _action(DEADZONE_BUTTON, [_key(KEY_F5)])
 
+	# --- Tuning --------------------------------------------------------------
+	#
+	# The overlay from ROADMAP M3b's last bullet, ADR-0037. These are real actions
+	# rather than raw keycodes read in a script, which is what the `[` / `]`
+	# prototype in `test_track.gd` did — that made two keys invisible to the input
+	# map, to the pad bindings, and to the list CLAUDE.md keeps of what every
+	# control does. The project has already shipped one milestone where the shift,
+	# clutch and look-back keys were documented nowhere and a driver concluded the
+	# gearbox was broken.
+	#
+	# **The d-pad, and only the d-pad, is on the pad.** Every other control on a
+	# DualSense is spent: both triggers are throttle and brake, both shoulders are
+	# the shifter, and all four face buttons plus Create and Options are bound
+	# above. The d-pad is the one surface left, and it is the right one anyway —
+	# four discrete directions is exactly a list and a value.
+	#
+	# The consequence is stated rather than hidden: **`tune_toggle` has no pad
+	# binding**, so a driver on a pad reaches over and presses F2 once to open the
+	# overlay, and then never touches the keyboard again. A chord would have been
+	# the alternative and it would have fired during a race.
+	#
+	# **The keyboard half is deliberately not the arrow keys, and that was found
+	# the hard way.** The arrows are the second binding on `throttle`, `brake`,
+	# `steer_left` and `steer_right`, and `KartBody::gather_input` reads those by
+	# **polling** `Input.get_action_strength` in `_physics_process` — not through
+	# the event queue. `set_input_as_handled()` does not touch the `Input`
+	# singleton, so an overlay that consumed the arrows would still have applied
+	# full right lock every time somebody held Right to sweep a value. The overlay
+	# would have looked correct and the kart would have driven into the grass.
+	#
+	# So: PageUp and PageDown move the selection, and `[` and `]` move the value.
+	# The brackets are the two keys the prototype in `test_track.gd` used for
+	# exactly this, which keeps the muscle memory and is now honest about what it
+	# does — the same two keys, moving whichever row is selected, through the
+	# registry that records it.
+	actions["tune_toggle"] = _action(DEADZONE_BUTTON, [_key(KEY_F2)])
+
+	actions["tune_prev"] = _action(DEADZONE_BUTTON, [
+		_joy_button(JOY_BUTTON_DPAD_UP),
+		_key(KEY_PAGEUP),
+	])
+
+	actions["tune_next"] = _action(DEADZONE_BUTTON, [
+		_joy_button(JOY_BUTTON_DPAD_DOWN),
+		_key(KEY_PAGEDOWN),
+	])
+
+	actions["tune_decrease"] = _action(DEADZONE_BUTTON, [
+		_joy_button(JOY_BUTTON_DPAD_LEFT),
+		_key(KEY_BRACKETLEFT),
+	])
+
+	actions["tune_increase"] = _action(DEADZONE_BUTTON, [
+		_joy_button(JOY_BUTTON_DPAD_RIGHT),
+		_key(KEY_BRACKETRIGHT),
+	])
+
+	# Keyboard only, all three. Resetting a constant, saving a preset and
+	# acknowledging a defended override are deliberate acts, and a deliberate act
+	# does not belong on a surface a thumb rests against.
+	actions["tune_reset"] = _action(DEADZONE_BUTTON, [_key(KEY_BACKSPACE)])
+	actions["tune_save"] = _action(DEADZONE_BUTTON, [_key(KEY_F6)])
+	actions["tune_unlock"] = _action(DEADZONE_BUTTON, [_key(KEY_U)])
+
 	return actions
 
 

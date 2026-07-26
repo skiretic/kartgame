@@ -5,6 +5,7 @@
 #include "kart_core.h"
 #include "kart_random.h"
 #include "kart_state_hash.h"
+#include "tuning/tuning_registry.h"
 #include "vehicle/kart_body.h"
 
 #include <gdextension_interface.h>
@@ -61,6 +62,14 @@ void initialize_kartgame_module(ModuleInitializationLevel p_level) {
 	// known to ClassDB before any stream can hand one back.
 	GDREGISTER_CLASS(kartgame::EngineVoicePlayback);
 	GDREGISTER_CLASS(kartgame::EngineVoiceStream);
+
+	// The tuning boundary. ROADMAP M3b, issue #159, ADR-0037.
+	//
+	// A Node and not a singleton, on purpose: nothing in this project is an
+	// autoload, and a globally reachable tuning registry would exist during
+	// `drive.sh` and be one edit away from a §6.4 figure measured under a preset
+	// that nothing recorded. A scene that wants tuning adds one.
+	GDREGISTER_CLASS(kartgame::KartTuning);
 }
 
 void uninitialize_kartgame_module(ModuleInitializationLevel p_level) {

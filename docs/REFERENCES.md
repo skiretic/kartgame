@@ -249,9 +249,14 @@ sources — that is what happened with the radiator in issue #116.
 - **Steering lock.** No source for a CIK or KZ maximum steer angle was found; the
   JETIR paper's 45.8° is for a slow kart with a very different job. **Assumed:
   25° at the inner wheel**, which is not really an assumption — it is inherited
-  from `scripts/game/kart_debug_vehicle.gd`, where it is the angle the bodywork
-  clearance tables in issues #109 and #110 were measured at. Applying it to the
-  *inner* wheel means no front wheel ever exceeds the measured figure.
+  from the deleted `scripts/game/kart_debug_vehicle.gd`, where it was the angle
+  the bodywork clearance tables in issues #109 and #110 were measured at.
+  Applying it to the *inner* wheel means no front wheel ever exceeds the
+  measured figure. It now lives in `src/core/steering.h` as
+  `geometry.max_lock`, and `src/core/tuning.h` classifies it as **measured**
+  rather than sourced for exactly the reason this entry gives: it is this
+  project measuring its own kart, not a regulation, so raising it steers the
+  front wheels into bodywork that was checked against it.
 - **Spindle arm length.** Taken from `tools/blender/kartlib/params.py`'s
   `stub_axle_length` (90 mm), which is the generated kart's own dimension rather
   than an independent source. It is the single most sensitive input to the wheel

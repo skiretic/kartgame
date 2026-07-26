@@ -265,6 +265,32 @@ func _attach() -> bool:
 	if _kart == null:
 		printerr("no Kart in the scene — is assets/generated/kart.glb built?")
 		return false
+	# **The §6.4 gate, and it belongs here rather than in the report.** Every
+	# figure this probe prints is quoted in ROADMAP M3b as a reference against a
+	# real KZ. A figure measured under a preset is not one, and the failure is
+	# silent in the worst way — the numbers still look plausible, they just
+	# describe a kart nobody built. ADR-0037 keeps the tuning out of `state-hash`
+	# for good reasons, so the tuning has to be checked separately, and this is
+	# where.
+	#
+	# Before `input_driver` is set, so a tuned scene aborts at tick 0 rather than
+	# after 1,200 ticks of simulation whose every number is inadmissible.
+	#
+	# **A scene with no registry passes.** It is running the compiled-in defaults
+	# by construction, which is exactly the state the gate wants, and requiring
+	# the node would make `drive.sh` depend on something it does not need. Found
+	# by group rather than by name because that is how the registry publishes
+	# itself — `KartTuning::source_group()`.
+	var registries := _root.get_tree().get_nodes_in_group("tuning_source")
+	for node in registries:
+		if not node.has_method("is_at_defaults") or node.is_at_defaults():
+			continue
+		printerr("the scene is tuned: %d changed, %d defended overridden, hash %s"
+			% [node.changed_count(), node.defended_override_count(), node.tuning_hash_hex()])
+		printerr("a §6.4 figure measured under a preset is not a reference figure.")
+		printerr("run tools/verify/tuning.sh to see what moved.")
+		return false
+
 	_kart.input_driver = _scripted_input
 	_previous_position = _kart.global_position
 	_previous_velocity = _kart.linear_velocity
@@ -533,5 +559,12 @@ func _report() -> void:
 	# The hash is the line `drive.sh` compares between two runs. Printed last and
 	# on its own, so a shell can grep for it without parsing the rest.
 	lines.append("state-hash %s" % _hash.hex())
+	# And the configuration these figures were measured under, on its own line.
+	# `_attach` already refused to run a tuned scene, so this can only say
+	# "default" — which is the point: a figure quoted from this output a year from
+	# now carries the tuning it was taken at, rather than the reader having to
+	# trust that the gate was in place on the day. Deliberately **not** folded into
+	# `state-hash`; ADR-0037 has why.
+	lines.append("tuning-hash default")
 	print("\n".join(lines))
 	quit(0)
