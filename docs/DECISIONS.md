@@ -1418,3 +1418,135 @@ geometry, so it escaped the rule — and it is the project's substitute ground
 truth, per ADR-0014. `git log -S` puts this band in the initial docs commit,
 written from prose in a planning session and never sourced. The rule wants
 widening to cover any externally-sourced constant, not just any generated shape.
+
+
+## ADR-0035 — The audio boundary, measured, and why the generator loses
+
+**Status.** Accepted. This is the measurement issue
+[#81](https://github.com/skiretic/kartgame/issues/81) needed before any of it
+could be built, and it **corrects `ARCHITECTURE.md` §12 and #81's own title**.
+
+**Context.** #81 is titled "AudioStreamGenerator fed from C++ DSP on the audio
+thread" and its third acceptance criterion is "no locks or allocation on the audio
+thread". Those name two different architectures:
+
+- **(a)** `AudioStreamGenerator` with `AudioStreamGeneratorPlayback::push_buffer`,
+  where a ring buffer is filled from some *other* thread, typically `_process`;
+- **(b)** a custom `AudioStream` / `AudioStreamPlayback` pair in the GDExtension
+  overriding `_mix`, which the audio server may or may not call off the main
+  thread.
+
+Under (a) there is no audio thread to have a lock on and criterion 3 is vacuous.
+This project's rule is that engine behavior is measured and not assumed — four M3a
+defects were all plausible-but-wrong assumed behavior — so
+`tools/verify/audio_probe.gd` asks the same way ADR-0032 and ADR-0033 do: one
+question per case, an analytic prediction printed beside every measurement.
+
+**The seven answers.**
+
+1. **`_mix` runs off the main thread, so (b) is real.** Main thread
+   `OS::get_thread_caller_id()` 1, `_mix` 22, distinct `std::this_thread::get_id()`
+   hashes, exactly one mixer thread. True under CoreAudio and under the headless
+   Dummy driver. Criterion 3 is load-bearing rather than vacuous.
+2. **Block size is one constant; regularity is a property of the driver.**
+   `p_frames` was **512 on every one of 684 calls** — min, median and max all 512,
+   one distinct value. CoreAudio interval: 11609.2 us median against an analytic
+   512/44100 = 11610.0, min 11495.7, max 11828.2. A block is **1.39 solver ticks**
+   at 120 Hz, so the synth must interpolate its state across roughly one and a
+   half ticks rather than holding it.
+3. **`buffer_length` is a request, not a setting.** Capacity is
+   `next_pow2(seconds * rate) - 1`, exact on all five sweep points: 0.02 gives
+   1023, 0.05 gives 4095, 0.10 gives 8191, 0.20 gives 16383, 0.50 gives 32767.
+   Asking for 0.10 s gets **0.1857 s**, 1.86x the latency named. Measured ring
+   latency 172.7 ms. `AudioServer.get_output_latency()` returns **0.000000** under
+   CoreAudio on 4.7.1/macOS, so the total is not readable from the engine at all.
+4. **`_mix` runs concurrently with `_physics_process`, and is never re-entrant
+   with itself.** 213 of 960 physics ticks overlapped a mix — 0.222 measured
+   against 0.211 analytic — and the serialized hypothesis predicts exactly 0.00000
+   on all three overlap statistics. `mix_reentrant` was **0** on every run. So the
+   transport constraint is single-writer / single-reader, not general mutual
+   exclusion.
+5. **The audio thread is 3.6x-6.3x slower than the main thread.** A 24-partial
+   `std::sin` stack: ~156 ns/frame offline, **576-1002 ns/frame inside `_mix`**. An
+   integer-only control shows 1.4x-2.5x, **paired** with the floating-point ratio
+   run for run (1.42 with 3.63, 2.50 with 6.28) — macOS is scheduling the mixer on
+   a different core each run, with floating point consistently about 2.5x worse
+   than integer on whichever one it lands on. This is why issue
+   [#155](https://github.com/skiretic/kartgame/issues/155) exists: §15's audio
+   budget is specified against main-thread time in a rendered frame, and audio
+   spends none of that.
+6. **The GDExtension `_mix` path survives registration and instantiation.** Three
+   classes register, `_instantiate_playback` is called, 684 mix calls per 8 s. No
+   `dyld4::callInitializer` crash: `ProbeStats` is namespace-scope but every member
+   is a `constexpr`-constructible `std::atomic`, so it is constant-initialized, and
+   every `String` and `StringName` is function-local — CLAUDE.md's trap, respected.
+7. **Nothing blocks before the first frame.** All seven `AudioServer` calls from
+   `_initialize` returned in 0-4 us and `ClassDB.instantiate` in 21-24 us. There is
+   no audio analogue of the `Viewport.set_measure_render_time` hang that
+   `shoot.sh` has to work around.
+
+**Decision: (b), a custom `AudioStreamPlayback` overriding `_mix`.**
+
+The number that decides it is **11.6 ms against 172.7 ms**. The generator's ring
+costs 172.7 ms of measured latency at Godot's own default `buffer_length`; the
+`_mix` path costs one 512-frame block. That is 15x on a channel §12 calls "a
+primary feel channel", and a kart's rev response arriving a sixth of a second late
+is not a feel channel at all.
+
+Secondary, and it would have been discovered the hard way: the generator underran
+**4-8 times before any deliberate stall**, invariant across a 6x change in ring
+size (0.05, 0.10 and 0.30 s gave 8, 4 and 8 skips). That pattern is a startup
+transient — the ring is empty at `play()` — rather than steady-state starvation,
+but it means (a) clicks on every start unless it is pre-filled.
+
+**The transport: a seqlock over `EngineAudioInput`, bounded retry.**
+
+`audio_state.h` says the struct is "publishable by value", which invites
+`std::atomic<EngineAudioInput>`. It must not be used: the struct is **72 bytes**
+and `std::atomic<EngineAudioInput>::is_always_lock_free` is **false**, so
+publishing by value takes a mutex out of libc++'s global table *inside `_mix`* —
+precisely what criterion 3 forbids. That is the measurement that chooses the
+transport.
+
+Measured seqlock: publish 3.5 ns, once per 120 Hz tick, 4.3e-5 % of a core; read
+4.6 ns, once per block, 0.0013 % of the budget. Under torture — continuous publish,
+2048 reads per block — **1,751,040 reads with 0 torn**, while an unsynchronized
+control tore **60,033 times**. At the honest rates both read zero, which is why the
+probe prints the analytic expectation beside the count: one tear per ~841,000
+reads, **0.37 per hour per kart**. Not never, which is the point of printing it.
+
+Retry must be **bounded** — the probe uses 64 — because an unbounded spin on the
+audio thread is a lock by another name. Counting "gave up" separately from "torn"
+mattered: merging them reported 1022 phantom torn reads.
+
+**What this corrects.**
+
+`ARCHITECTURE.md` §12 names `AudioStreamGenerator` as the mechanism. Measurement
+says that costs 15x the latency of the alternative, and #81's three acceptance
+criteria cannot all be met by the architecture its own title names: criterion 3
+only has meaning under (b), and criterion 1 — "no buffer underruns under load" — is
+already violated by (a) at startup with no load at all. Issue
+[#154](https://github.com/skiretic/kartgame/issues/154) carries the §12 amendment.
+
+**What this does not settle.** Whether the synth fits the budget once §15's row is
+restated. It currently does not — the 24-partial stack alone is 126-147% of the
+figure for one kart on the real audio thread, and 45% with a wavetable —
+[#152](https://github.com/skiretic/kartgame/issues/152) and
+[#155](https://github.com/skiretic/kartgame/issues/155) hold that. Also untouched:
+Godot's own mixing, bussing and 3D attenuation, and how many independent engine
+voices M7 needs.
+
+**Two surprises worth carrying forward.**
+
+**The headless Dummy audio driver invalidates any figure taken under it.** It calls
+`_mix` in bursts — median interval 166.9 us, maximum 98688.7 us — instead of on a
+deadline, runs its audio clock at 0.967 of wall-clock, and puts the mixer on an
+ordinary thread on an ordinary core, where the cost ratio is 1.0 against CoreAudio's
+3.6-6.3. Any cost or regularity number measured with `--headless` is wrong in
+**scale and in shape**. `audio_probe.sh` runs both drivers so the difference is on
+the record rather than in somebody's memory.
+
+**The optimizer ate the first seqlock benchmark**, which reported 0.0 ns — a number
+that reads as a very fast transport rather than as no transport at all. It needed
+an explicit `asm volatile` barrier. A benchmark that measures nothing looks exactly
+like a benchmark that measures something excellent.
