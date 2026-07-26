@@ -1,6 +1,7 @@
 #ifndef KARTGAME_AUDIO_ENGINE_VOICE_H
 #define KARTGAME_AUDIO_ENGINE_VOICE_H
 
+#include "audio/state_seqlock.h"
 #include "core/audio_state.h"
 #include "core/engine_synth.h"
 
@@ -33,19 +34,14 @@ namespace kartgame {
 //
 // Issue #81's title still names the losing architecture. ADR-0035 records why.
 //
-// ## The transport, and why it is not `std::atomic<EngineAudioInput>`
+// ## The transport
 //
-// `audio_state.h` says `EngineAudioInput` is "publishable by value", which invites
-// exactly that. It must not be used: the struct is 72 bytes,
-// `std::atomic<EngineAudioInput>::is_always_lock_free` is **false**, and so
-// publishing by value takes a mutex out of libc++'s global table *inside `_mix`* —
-// which is precisely what #81's third acceptance criterion forbids.
-//
-// So a seqlock, and the algorithm is lifted from `audio_probe.cpp` rather than
-// rewritten: measured 3.5 ns to publish and 4.6 ns to read, and under torture
-// 1,751,040 reads with **0 torn** while an unsynchronized control tore 60,033
-// times. The retry budget is bounded for the reason ADR-0035 gives — an unbounded
-// spin on the audio thread is a lock by another name.
+// A seqlock, and it now lives in `audio/state_seqlock.h` rather than here: issue
+// #84 added two more streams that need the identical transport, and three
+// hand-copied seqlocks is three places for the memory ordering to drift apart.
+// That header carries the full argument for why it is not
+// `std::atomic<EngineAudioInput>` and the measurements behind it. Nothing about
+// the algorithm changed in the move.
 //
 // ## Where the seqlock lives, and why not at namespace scope
 //
@@ -103,10 +99,11 @@ public:
 	void publish(const kart::core::EngineAudioInput &p_input);
 
 	// Read the published state. The audio-thread call. Returns false when the retry
-	// budget was exhausted, in which case `r_input` holds the last good snapshot
-	// this reader saw rather than a torn one — a repeated frame of engine state is
-	// inaudible, and a torn one is a partial's frequency stepping to a garbage
-	// value.
+	// budget was exhausted, leaving `r_input` untouched — the caller substitutes its
+	// own last good snapshot rather than rendering a torn one, and
+	// `EngineVoicePlayback::_last_good` is where that snapshot lives. A repeated
+	// frame of engine state is inaudible; a torn one is a partial's frequency
+	// stepping to a value no engine state ever had.
 	bool read(kart::core::EngineAudioInput &r_input) const;
 
 	// Overall output gain, linear. The one knob exposed to the scene, because it is
@@ -158,16 +155,8 @@ public:
 private:
 	friend class EngineVoicePlayback;
 
-	// --- the seqlock ---------------------------------------------------------
-	//
-	// Odd sequence means a write is in progress. A reader that sees an odd count, or
-	// a different count either side of the copy, retries.
-	//
-	// `mutable` because `read` is const — it is a read of published state, and a
-	// caller holding a `const Ref` should be able to do it. The atomics are the only
-	// things it touches.
-	mutable std::atomic<uint32_t> _seq{ 0 };
-	kart::core::EngineAudioInput _payload{};
+	// The transport. `audio/state_seqlock.h` owns the algorithm and the argument.
+	AudioStateSeqlock _state;
 
 	// Configuration the audio thread reads. Atomic rather than plain because the
 	// main thread writes them while `_mix` may be running: ADR-0035 answer 4
@@ -188,8 +177,6 @@ private:
 	mutable std::atomic<int64_t> _render_ns_worst{ 0 };
 	mutable std::atomic<int32_t> _worst_block_frames{ 0 };
 	mutable std::atomic<int32_t> _partials{ 0 };
-	mutable std::atomic<int64_t> _seq_gave_up{ 0 };
-	mutable std::atomic<int64_t> _seq_retries{ 0 };
 	mutable std::atomic<double> _mix_rate{ 0.0 };
 };
 

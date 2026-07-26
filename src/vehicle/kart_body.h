@@ -2,6 +2,7 @@
 #define KARTGAME_VEHICLE_KART_BODY_H
 
 #include "audio/engine_voice.h"
+#include "audio/noise_voice.h"
 #include "core/vehicle.h"
 #include "core/vehicle_state.h"
 
@@ -300,6 +301,21 @@ public:
 	void set_engine_voice_player(const godot::NodePath &p_path);
 	godot::NodePath get_engine_voice_player() const;
 
+	// The other two layers. Issue #84, and the same contract as above in every
+	// respect: empty is legal and silent, the path is resolved once, and the stream
+	// is held rather than looked up per tick.
+	//
+	// **Three paths and not one, because the three emitters are not in the same
+	// place.** The engine note comes from the mount 600 mm behind the driver's right
+	// ear, the scrub comes off four contact patches, and the wind is at the
+	// driver's head and is not a source in the world at all. `scrub_wind.h` has the
+	// argument; the consequence here is that a scene mounts three players and this
+	// class publishes the same `EngineAudioInput` to each.
+	void set_scrub_voice_player(const godot::NodePath &p_path);
+	godot::NodePath get_scrub_voice_player() const;
+	void set_wind_voice_player(const godot::NodePath &p_path);
+	godot::NodePath get_wind_voice_player() const;
+
 	// Exponent on the driver's steering input, before it becomes a lock fraction.
 	// 1.0 is linear — the mapping this class had, and the one a probe still uses.
 	//
@@ -336,6 +352,11 @@ public:
 	// three numbers would be a second owner, and the failure mode is silent: the
 	// engine note would drift away from the engine the day somebody moved the lump.
 	godot::Vector3 engine_mount_position() const;
+
+	// Middle of the rear axle, on the ground, in the body frame. Where the scrub
+	// emitter goes -- one source for a four-corner mean, so it belongs between the
+	// wheels rather than at one of them.
+	godot::Vector3 rear_axle_position() const;
 
 	// The front wheels' actual steer angle at full input, radians — `steering.h`
 	// owns it and the HUD used to read a GDScript constant for it.
@@ -413,6 +434,12 @@ private:
 	// second for nothing.
 	void resolve_engine_voice();
 
+	// The same for the two noise layers. One function, because the only thing that
+	// differs is which path and which reference, and two near-identical copies of
+	// the warning text is how one of them ends up naming the wrong property.
+	void resolve_noise_voice(const godot::NodePath &p_path, godot::Ref<NoiseVoiceStream> &r_stream,
+			const char *p_property);
+
 	// Shape the driver's raw steering input. Identity when `steer_gamma_` is 1.
 	double steering_curve(double p_input) const;
 
@@ -467,6 +494,10 @@ private:
 
 	godot::NodePath engine_voice_path_;
 	godot::Ref<EngineVoiceStream> engine_voice_;
+	godot::NodePath scrub_voice_path_;
+	godot::Ref<NoiseVoiceStream> scrub_voice_;
+	godot::NodePath wind_voice_path_;
+	godot::Ref<NoiseVoiceStream> wind_voice_;
 
 	// What was served to the solver last tick, per corner: the latch's storage and
 	// the debug-draw getters' source.

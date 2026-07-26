@@ -146,6 +146,40 @@ unused**; see `docs/REFERENCES.md` for why a 125 cc scooter is the least
 representative file in the set despite being the only one that matches a KZ's
 displacement.
 
+### Tire scrub — issue #84
+
+The tire-scrub band in `src/core/kz_audio_reference.h` was measured off these
+four. **All CC0 1.0**, so no attribution is legally required and it is recorded
+anyway, because provenance is the thing that makes a measurement checkable.
+`tools/assets/fetch_scrub_audio.sh` pulls them, verifies the hashes, and drops
+them in a gitignored path — nothing here is committed.
+
+| File | Source | Author | License | SHA-256 (first 16) |
+|---|---|---|---|---|
+| [`fs71736`](https://freesound.org/s/71736/) | Chrysler LHS tire squeal 01, Rode NTG2 into a Zoom H4 | audible-edge | **CC0 1.0** | `13d94db3651156da` |
+| [`fs71737`](https://freesound.org/s/71737/) | Chrysler LHS tire squeal 02, same car and session | audible-edge | **CC0 1.0** | `43d890acfcb57798` |
+| [`fs71740`](https://freesound.org/s/71740/) | Nissan Maxima standing burnout, same recordist | audible-edge | **CC0 1.0** | `20aeb47e6c8bc493` |
+| [`fs173931`](https://freesound.org/s/173931/) | Indoor electric kart track — the **negative control**, no engine anywhere in it | JohnsonBrandEditing | **CC0 1.0** | `e1b445779c92e195` |
+
+The truncation to sixteen hex characters matches the tables above; the full
+digests are in `docs/REFERENCES.md` and in the fetch script, which is what
+actually verifies them.
+
+**Two sets of recordings were measured and deliberately not fetched or shipped,
+and the reasons are worth keeping.** `fs481668` and `fs481678` are marked CC0 on
+Freesound but are described by the uploader as transfers of Hollywood optical and
+magnetic effects from the 1930s to the 1960s: a CC0 mark applied by a re-uploader
+to third-party archival material is not a license. `fs233558`, `fs536769` and
+`fs237312` are short library screeches with no stated provenance, gear or
+vehicle. All five were measured for corroboration and appear in REFERENCES.md's
+table marked unusable; none is fetched by the script and none contributed a
+number to the header.
+
+Three published sources are cited for this work as text rather than as assets —
+Transport Infrastructure Ireland's CPX tables, Brown and Gordon (2011) and Lower
+et al. (1994). Full citations are in `docs/REFERENCES.md`; nothing was copied
+from them beyond figures transcribed with their uncertainty stated.
+
 ---
 
 ## Sources used

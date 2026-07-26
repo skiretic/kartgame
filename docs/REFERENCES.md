@@ -1101,12 +1101,15 @@ different artifact entirely and is **not represented anywhere in this corpus**.
    kart, and none is measured or sourced here. The shift *ratios* are measured;
    what a shift sounds like is not.
 
-9. **Nothing was measured about tire scrub or wind.** §12 specifies both as
-   filtered noise driven by slip and speed. No recording in this corpus isolates
-   either — every one of them has an engine running over the top of it. Those two
-   remain entirely unsourced, and §12's claim that scrub "falls straight out of
-   §6 for free" is about the *modulation*, not about the filter shape, which
-   nobody has measured.
+9. **Nothing was measured about tire scrub or wind** *in the engine corpus*. §12
+   specifies both as filtered noise driven by slip and speed. No recording in the
+   twelve-file engine corpus isolates either — every one of them has an engine
+   running over the top of it, and §12's claim that scrub "falls straight out of
+   §6 for free" is about the *modulation*, not about the filter shape. A separate
+   sourcing pass for issue #84 went after both and is written up under **Tire
+   scrub and wind** below. Read that section, not this item, for what is now
+   measured: it changes the scrub answer and it does not change the wind answer as
+   much as it looks.
 
 10. **Almost everything here is lossy, and all of it was analyzed as mono.** Ogg
    Vorbis for the Commons files, mp3 previews for the Freesound ones; only the
@@ -1117,6 +1120,279 @@ different artifact entirely and is **not represented anywhere in this corpus**.
    and its ground reflection — and only the quantities explicitly separated from
    the recording geometry (the D-9's τ, and the ladder shapes, which are stable
    across quarters) survive that. Absolute levels do not, and none is quoted.
+
+## Tire scrub and wind — §12, issue #84
+
+`src/core/kz_audio_reference.h` carries `SCRUB_SPECTRUM_MEASURED = false` and
+`WIND_SPECTRUM_MEASURED = false`. This section is the sourcing pass that went
+after both. It reaches **two different answers**, and the difference matters more
+than either number:
+
+- **Scrub timbre: measured, on rubber that is not a kart's.** Eight recordings
+  were analyzed, three of them license-clean original field recordings. They agree
+  on a band. Nothing in the band was measured on a kart slick.
+- **Wind timbre: not measured, but published band levels at stated speeds were
+  found.** No usable recording of on-vehicle wind at a known speed exists under an
+  acceptable license. What exists is a peer-reviewed open-access figure of
+  one-third-octave levels at seven road speeds under a motorcycle helmet, and it
+  is transcribed below with its speed law.
+
+### What was listened to
+
+All candidates came from Openverse's index of Freesound (`cdn.freesound.org/
+previews/…-hq.mp3`, public and lossy) plus Wikimedia Commons. Commons has
+**nothing**: `tire squeal`, `tyre squeal`, `skid sound`, `drift car`,
+`electric kart`, `burnout tires` and `car skidding` in the File namespace return
+either zero audio or unrelated radio-traffic and folk-music files.
+
+| Recording | What it is | License | Usable |
+| --- | --- | --- | --- |
+| `fs71736` Chrysler LHS tire squeal 01 | 1996 3.5 L V6 Chrysler LHS taking hard corners, recorded from outside on a Rode NTG2 into a Zoom H4, original 96 kHz / 24-bit mono | **CC0** | **yes** |
+| `fs71737` Chrysler LHS tire squeal 02 | same car, same session, same rig | **CC0** | **yes** |
+| `fs71740` Nissan Maxima burnout | same recordist, standing burnout | **CC0** | **yes** |
+| `fs173931` Electric Go-Karts, indoor | camcorder audio at an indoor electric kart track — **the only engine-free vehicle recording found** | **CC0** | as a negative result only |
+| `fs481668` / `fs481678` "Old Auto Tire Skid" | 1930s–60s Hollywood optical and mag effects transferred by USC Cinema, re-uploaded as CC0 | **ambiguous** | **no** — measured for corroboration, not shippable |
+| `fs233558` "[SFX] car screech 2", `fs536769` "Tire.ogg", `fs237312` "Llantas rechinando" | short library-style screeches, no stated provenance or gear | CC0 as marked | **no** — provenance unknown, obviously edited |
+| `fs165075` "citroen race screeching tires" | trackside race recording | CC0 | **no** — see the measurement below |
+| `fs82267` "Wind-inside car" | Tascam DR-100 inside a car — **in a storm, parked** | CC0 | **no** — no vehicle speed, no vehicle motion |
+| `fs189629` "Indoor Go-Kart" | indoor kart session, engines audible | CC0 | no |
+
+The four that a fetch script would pull, with the SHA-256 of the preview that was
+actually analyzed:
+
+| Short name | URL | SHA-256 of the analyzed preview |
+| --- | --- | --- |
+| `fs71736` | `https://freesound.org/s/71736/`, preview `https://cdn.freesound.org/previews/71/71736_995351-hq.mp3` | `13d94db3651156da567c71bc6e7eed62db5db08d173c97f00752b54a43cf081f` |
+| `fs71737` | `https://freesound.org/s/71737/`, preview `…/71/71737_995351-hq.mp3` | `43d890acfcb577988d7d8c9594a534e7893bca7757527cff613e3809288cc408` |
+| `fs71740` | `https://freesound.org/s/71740/`, preview `…/71/71740_995351-hq.mp3` | `20aeb47e6c8bc49376123030edc1cd174feb56a8e452c99bb84b32b639e3437d` |
+| `fs173931` | `https://freesound.org/s/173931/`, preview `…/173/173931_3229685-hq.mp3` | `e1b445779c92e195f95c1a4fecdfc4bd20d3186ef8a843ed3a8454c16298a9e8` |
+
+Those hashes pin **the lossy preview**, which is what was measured; they are not
+the hashes of the CC0 originals and must not be quoted as if they were.
+
+`fs165075` is the instructive failure. It is a race recording and it should have
+been the best of them; background-subtracted it peaks in the **157 Hz** third
+octave with a centroid of 570 Hz, which is an engine, not a tire. A recording
+being *of* motorsport does not make it a recording of a tire.
+
+### How the scrub was separated from the engine
+
+Every candidate with a car in it has an engine running. The separation is a
+two-population power subtraction rather than a filter, so that it can be stated
+and checked:
+
+1. STFT, 8192-point Hann, 50% overlap, mono, 48 kHz.
+2. Rank every frame by its power in **400–4000 Hz**.
+3. Take the loudest quartile as the event population and the quietest quartile of
+   the same file as the background.
+4. Subtract the mean background power spectrum from the mean event power spectrum,
+   clamped at zero, and band it into third octaves.
+
+The check that it worked is that the background population lands where an engine
+belongs and the event population does not: for `fs71736` the background peaks in
+the **62–79 Hz** third octaves and the event peaks at **1000 Hz**; for `fs71740`
+the background peaks at 198 Hz and the event at 1587 Hz. The subtraction is
+removing an engine, and it is removing all of it that a single microphone can
+remove.
+
+### The scrub band, measured
+
+Background-subtracted third-octave spectra. "Width" is the span within 10 dB of
+the peak band; the slopes are least-squares fits in dB per octave over the octave
+below the peak and the two octaves above it.
+
+| Recording | Peak 1/3-oct | −10 dB band | Slope below | Slope above | Centroid | Narrowband prominence |
+| --- | --- | --- | --- | --- | --- | --- |
+| `fs71736` Chrysler 01 | **1000 Hz** | 794–1260 (0.67 oct) | +9.0 dB/oct | −14.3 dB/oct | 1077 Hz | 13.6 dB median, 21.4 p90 |
+| `fs71737` Chrysler 02 | **1000 Hz** | 794–2520 (1.67 oct) | +9.7 | −14.0 | 1268 Hz | 15.6, 21.1 |
+| `fs71740` Maxima burnout | **1587 Hz** | 1260–2000 (0.67 oct) | +11.2 | −6.7 | 1815 Hz | 20.1, 22.6 |
+| `fs481668` Hollywood skid | 1260 Hz | 794–3175 (2.00 oct) | +11.4 | −10.1 | 1536 Hz | 19.9, 24.2 |
+| `fs481678` Hollywood skid seq. | 1000 Hz | 500–5040 (3.33 oct) | +9.0 | −3.0 | 1572 Hz | 13.0, 17.6 |
+| `fs536769` library | 1587 Hz | 1000–2000 (1.00 oct) | +13.6 | −9.2 | 1761 Hz | 23.7, 24.5 |
+| `fs233558` library | 2000 Hz | 1587–2520 (0.67 oct) | +14.3 | −9.5 | 2281 Hz | 28.0, 29.8 |
+| `fs237312` library | 2520 Hz | 630–5040 (3.00 oct) | +5.6 | −11.4 | 2378 Hz | 19.0, 26.0 |
+| **median, all eight** | **1424 Hz** | 1.33 oct | **+10.4** | **−9.8** | | |
+| **median, the three CC0 originals** | **1000 Hz** | 0.67 oct | +9.7 | −14.0 | | |
+
+"Narrowband prominence" is the strongest single FFT bin in 400–4000 Hz measured
+against a third-octave-wide running mean of the same frame's log spectrum. It is
+13–28 dB on every file. **Scrub is not broadband noise with a gentle tilt.** It is
+a narrow, strongly peaked band, and on the two Chryslers **39–53% of all
+200–8000 Hz energy sits within ±1/10 octave of the peak**.
+
+Two more measured facts about the time structure, from tracking that narrowband
+peak frame by frame (8192-point FFT, 43 ms hop, detection threshold 12 dB of
+prominence in 600–4000 Hz):
+
+- Squeal is **intermittent, in short events**: 32 and 33 separate events in the
+  two Chrysler files, **median duration 85 ms**, longest 0.85 s and 1.45 s.
+- The peak frequency **moves within an event and between events**: p10 to p90 is
+  989–3600 Hz on `fs71736` and 938–3551 Hz on `fs71737`, against medians near
+  2000 Hz. A fixed-frequency resonator will not sound like this.
+
+### The engine-free recording, and why it is a negative result
+
+`fs173931` is an indoor electric kart track: no engine anywhere in the file. It is
+the only recording found that removes the confound entirely, and it does not
+contain a usable scrub spectrum.
+
+- Background-subtracted, its loud-frame spectrum peaks at **397 Hz** with a
+  centroid of 1332 Hz. That is a room and a motor, not a tire.
+- The narrowband peak tracker fires on **1115 of 1149 frames (97%)**, in 30 runs
+  with one lasting 10.67 s. A tone that is present 97% of the time is machinery,
+  not stick-slip; the Chryslers fire on 64% and 68% of frames in events with a
+  median length of 85 ms.
+- Its content stops at **9.1 kHz** — camcorder audio through a 192 kbps mp3.
+
+Indoor karting runs on painted or sealed concrete, not asphalt, with rental hard
+compound tires. Even if a squeal had been isolated in it, the surface is wrong.
+
+### Bandwidth ceilings, because they limit the tails above
+
+Measured as the highest frequency still within 40 dB of the file's own 1–2 kHz
+mean level:
+
+| File | Ceiling | File | Ceiling |
+| --- | --- | --- | --- |
+| `fs71736` Chrysler 01 | 12.8 kHz | `fs71740` Maxima | 18.7 kHz |
+| `fs71737` Chrysler 02 | 10.7 kHz | `fs481668` Hollywood skid | **7.2 kHz** |
+| `fs173931` electric kart | 9.1 kHz | `fs481678` Hollywood seq. | 9.7 kHz |
+
+The Hollywood files' steep high-frequency roll-off is **an optical soundtrack from
+the 1930s–60s**, not a property of a tire. Their −10.1 and −3.0 dB/oct upper
+slopes are contaminated by that and are why they are corroboration only. The
+Chryslers' upper slope of −14 dB/oct is above the codec ceiling for a decade of
+frequency below it and is real.
+
+### Published band data
+
+Two published sources give band levels against speed. Both are cited to the exact
+table or figure because neither was measured here.
+
+**Rolling noise, CPX (ISO 11819-2).** Transport Infrastructure Ireland,
+*Common Noise Assessment Methods in Europe (CNOSSOS-EU): Interim Road Surface
+Correction Factors for National Roads in Ireland*, TII Publications RE-ENV-07006,
+October 2022, **Table 4.1**. Octave-band CPX levels for the P (car) tire at the
+70 km/h reference speed, with the speed coefficient b_P from the fit
+`L = L_ref + b·log10(v/v_ref)`:
+
+| Surface | 250 Hz | 500 Hz | 1 kHz | 2 kHz | 4 kHz | b_P |
+| --- | --- | --- | --- | --- | --- | --- |
+| HRA | 85.5 | 93.2 | 99.0 | 90.1 | 81.6 | 36.3 |
+| SMA 14 | 82.7 | 91.1 | 97.7 | 89.0 | 79.7 | 35.7 |
+| SMA 10 | 77.0 | 86.6 | 95.6 | 89.7 | 80.7 | 35.8 |
+| **CNOSSOS reference surface** | **75.9** | **85.7** | **95.5** | **90.5** | **81.3** | **30** |
+
+Read as a shape, the reference surface is a band peaked at 1 kHz sitting −19.6 dB
+at 250 Hz, −9.8 at 500, −5.0 at 2 k and −14.2 at 4 k. **b = 30 dB per decade of
+speed means acoustic power ∝ v³**, and a rougher surface steepens it to ~36.
+The 63, 125 and 8000 Hz bands are blank in the source: the report says CPX data
+did not support them and argues (its §4.3) that setting them to zero is wrong.
+
+**Wind noise at the ear, at seven stated road speeds.** C. H. Brown and M. S.
+Gordon, "Motorcycle Helmet Noise and Active Noise Reduction", *The Open Acoustics
+Journal* **4**, 14–24 (2011), open access, **Figure 3**. Neumann KU-100 dummy head
+with embedded binaural microphones inside a half helmet on a Kawasaki EX500,
+speedometer GPS-checked to better than 4%, one-third octaves from 50 Hz to
+10 kHz. Transcribed off the figure to the nearest gridline, so **±2 dB**:
+
+| km/h | 50 | 63 | 80 | 100 | 125 | 160 | 200 | 250 | 315 | 400 | 500 | 630 | 800 | 1 k | 1.25 k | 1.6 k | 2 k | 2.5 k | 3.15 k | 4 k | 5 k | 6.3 k | 8 k | 10 k |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 60 | 101 | 100 | 98 | 98 | 97 | 95 | 92 | 89 | 86 | 83 | 80 | 77 | 73 | 69 | 66 | 63 | 59 | 56 | 52 | 50 | 48 | 46 | 45 | 43 |
+| 100 | 105 | 107 | 107 | 107 | 106 | 106 | 105 | 103 | 100 | 97 | 94 | 92 | 89 | 85 | 81 | 77 | 73 | 70 | 66 | 62 | 60 | 60 | 60 | 57 |
+| 120 | 105 | 106 | 107 | 108 | 108 | 107 | 108 | 107 | 103 | 101 | 97 | 95 | 92 | 89 | 86 | 82 | 78 | 74 | 70 | 66 | 64 | 62 | 63 | 60 |
+
+Three things in it are load-bearing, and all three are stated in the paper's own
+text as well as visible in the figure, which is why they are trusted over the
+transcription:
+
+- **The shape is a low plateau and a −10 dB/octave slide.** The paper: "noise
+  levels tended to decrease at a rate of about 10 dB per octave in the range of
+  250 Hz to 8 kHz". The transcription gives −9 dB/oct over 250 Hz–1 kHz and
+  −11.5 over 1–4 kHz at 120 km/h.
+- **The plateau is at 100–200 Hz and it climbs with speed.** At 120 km/h the
+  paper names 108 dB at the 100, 125 and 200 Hz thirds and states every one of the
+  ten bands from 50 to 400 Hz exceeds 100 dB.
+- **The speed law is about +18 dB per doubling.** The paper: "uniformly from
+  200 Hz to 10,000 Hz, the noise level increased about 20 dB as velocity was
+  incremented from 60 km/h to 120 km/h". The transcription gives 16–20 dB across
+  that range. Independently, M. C. Lower, D. W. Hurst, A. R. Claughton and
+  A. Thomas, "Sources and levels of noise under motorcyclists' helmets", *Proc.
+  Institute of Acoustics* **16**(2), 319–325 (1994), §4.7, measured on the open
+  road "an average rate of increase in noise levels of **15.5 dB per doubling of
+  speed**, for speeds above approximately 25 m/s", over 78–90 dB(A) at 13 m/s to
+  114–116 dB(A) at 54 m/s. 15.5 to 20 dB per doubling brackets the v⁶ dipole law
+  (18 dB per doubling) from both sides.
+
+The same 1994 paper is also the reason not to model wind as a property of the
+helmet: it found the dominant source was the turbulent shear layer at the edge of
+the **windscreen's** wake striking the rider, that airflow over the helmet shell
+was not a major source, and that a helmet's noise ranking reverses depending on
+screen height. A kart has no windscreen and the driver's head is in clean flow
+over a low bodywork line, so the *level* is not transferable at all. The
+*spectral shape* — broad, low-frequency dominated, −10 dB/octave above 250 Hz —
+is the part with a physical argument behind it.
+
+### What could not be sourced, continuing the list above
+
+11. **No kart tire was measured, and the scrub band may not transfer.** Every
+    scrub number above came off passenger-car radials on public roads. A KZ runs
+    5-inch-wide 10-inch slicks with no tread pattern at high pressure on a much
+    stiffer carcass. Squeal frequency is set by tread-block stick-slip and by tire
+    structural resonances, and both scale with the tire, so a kart's band is
+    **plausibly higher and possibly narrower** — plausibly, which is the word §5
+    item 10 exists to forbid. What is defensible is that the band is peaked, not
+    flat; that it is one to two octaves wide; that it sits somewhere in
+    1–2.5 kHz; and that the peak moves with slip rather than standing still.
+    Anything more specific than that is a tunable.
+
+12. **The three usable scrub recordings share one recordist and one session.**
+    `fs71736`, `fs71737` and `fs71740` are all by the same Freesound user on the
+    same day with the same rig, so the two cars are not two independent
+    measurements of a microphone chain. The five corroborating files that
+    disagree with them by up to 1.3 octaves are the ones whose provenance is
+    unusable. Both halves of that sentence are the problem.
+
+13. **Every scrub file was analyzed from a lossy mp3 preview.** The Chrysler
+    originals are 96 kHz / 24-bit WAV and Freesound serves those only to accounts.
+    Ceilings are tabulated above; the upper slopes are lower bounds on how fast
+    the real thing falls, never upper bounds. Anything that ships should fetch the
+    original WAV.
+
+14. **No recording of wind at a known speed was found at all.** Searched: Commons
+    File namespace and Openverse for `wind noise`, `helmet wind`, `cycling wind`,
+    `motorcycle wind noise`, `convertible wind`, `car interior wind`,
+    `wind buffeting`, `wind in helmet`, `bicycle helmet wind`,
+    `wind rush car window open`. Everything returned is weather. The one
+    on-vehicle hit, `fs82267` "Wind-inside car", is a parked car in a storm — its
+    spectrum is flat within 3 dB from 60 Hz to 3 kHz and then falls at about
+    −3 dB/oct, which is a storm and not an airspeed. **A spectrum without a speed
+    cannot be scaled and was not used.**
+
+15. **The wind figures are a motorcycle half-helmet, not a kart cockpit.** Wrong
+    helmet type, wrong flow field, wrong body, and at 0–120 km/h against a kart's
+    30–160. The paper itself says the sub-250 Hz content at 20 km/h is engine, not
+    wind, and that wind only dominates from 40 km/h up, so the low-speed rows
+    should not be read as a wind spectrum at all.
+
+16. **CPX rolling noise is not scrub.** Table 4.1 describes a tire rolling
+    straight ahead on a textured surface — air pumping and tread impact — not
+    stick-slip under a slip angle. That its reference shape happens to be a 1 kHz
+    peak with roughly ±10 dB/octave skirts, which is close to what the scrub
+    measurement produced, is a **coincidence of two different mechanisms landing
+    in the same band** and must not be presented as one confirming the other. Its
+    value here is the speed law (b = 30 dB/decade, power ∝ v³) and the fact that
+    it is a *band*, both of which are properly sourced.
+
+17. **The slip-angle dependence is still unsourced.** §12 needs scrub to be driven
+    by slip, and the measurement above gives no slip axis: nothing in these
+    recordings has a slip angle attached to it. The secondary literature says
+    amplitude near 1 kHz rises with slip angle and that additional peaks near 2
+    and 3 kHz appear past roughly 6 degrees, which agrees with the p90 of 3.5 kHz
+    measured on the Chryslers, but it was read off search-result summaries of
+    paywalled SAE work rather than off a table, so **it is not sourced and is not
+    written into the header**. Getting it properly needs a paper with a
+    slip-angle-versus-spectrum figure, and none was found open access.
 
 ### The scripts
 
@@ -1129,6 +1405,14 @@ analytic-envelope autocorrelation, the spacing test and the synthetic generator;
 `final_measure.py` the throttle split and the gearshift detector. If these numbers
 are ever challenged, the probes are the place to start: they are the only part
 that can be checked without re-downloading anything.
+
+The scrub and wind pass adds three more, same arrangement: `an.py` holds the
+ffmpeg decode, the third-octave bank, the centroid and the spectral flatness;
+`squeal.py` the loud-quartile / quiet-quartile power subtraction and the
+narrowband-prominence measure; `shape.py` the peak, the −10 dB width and the two
+slope fits. `seg.py` prints a per-frame timeline and is only a debugging aid.
+Every number in the scrub tables comes out of `squeal.py` and `shape.py` run over
+the mp3 previews, which are re-fetchable from the URLs in the table.
 
 ## Driving HUD — issue #73
 

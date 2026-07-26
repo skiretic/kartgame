@@ -18,28 +18,43 @@
 //
 // ## What is sourced here and what is not, stated before the code
 //
-// `kz_audio::SCRUB_SPECTRUM_MEASURED` and `kz_audio::WIND_SPECTRUM_MEASURED` are
-// both false and `docs/REFERENCES.md` records the search behind them. So this
-// file is split down the middle on purpose, and the split is the design:
+// **The drive is solver truth.** `EngineAudioInput::scrub` is the mean of the four
+// corners' slip angles normalized against the tire's own peak, computed in
+// `kart_body.cpp` from `WheelTelemetry`. `speed_ms` is road speed. `surface` is
+// the `SurfaceType` a wheel is actually on, and `surface.h`'s `roughness` column
+// exists for this file by name — its comment says so. None of that is invented.
 //
-//   **The drive is solver truth.** `EngineAudioInput::scrub` is the mean of the
-//   four corners' slip angles normalized against the tire's own peak, computed in
-//   `kart_body.cpp` from `WheelTelemetry`. `speed_ms` is road speed. `surface` is
-//   the `SurfaceType` a wheel is actually on, and `surface.h`'s `roughness` column
-//   exists for this file by name — its comment says so. None of that is invented.
+// **The timbre is measured on the wrong objects, and every number says which.**
+// This file was first written when both spectrum flags were false and everything
+// below was a labeled guess. Issue #84's sourcing pass then measured a scrub band
+// off three CC0 field recordings and found published wind band levels at stated
+// speeds, so `kz_audio_reference.h` now carries both — with the caveats attached,
+// because the scrub was measured on **passenger-car radials** and the wind under a
+// **motorcycle helmet**. `docs/REFERENCES.md` §"Tire scrub and wind" has the
+// corpus, the separation method and seven numbered reasons to be careful.
 //
-//   **The timbre is not.** Center frequency, bandwidth, the wind cutoff, the
-//   speed exponent: no recording in this project's corpus isolates a tire or the
-//   airflow from an engine running over the top of it. §5 item 10 forbids
-//   inventing a spectrum and calling it sourced, so every number in
-//   `scrub_wind_tuning` below is a declared guess and every one of them is a row
-//   in `core/tuning.h` marked `Provenance::Unsourced`, adjustable on F2 from the
-//   first drive.
+// So the defaults below are derived from a measurement of a different object
+// rather than guessed, and `core/tuning.h` classifies them `Provenance::Derived`
+// rather than `Unsourced` or `Measured`. Derived is not defended, which is the
+// point: they still have to be turned by ear, and F2 turns them from the first
+// drive.
 //
 // The consequence a reader should take away: **a wrong number in this file is a
 // knob somebody has not turned yet, not a defect.** A wrong number in
-// `kz_audio_reference.h` would be a defect. That is the whole reason the two
-// files are separate.
+// `kz_audio_reference.h` would be a defect. That is the whole reason the two files
+// are separate — and the transfer between them, car tire to kart slick, is where
+// the weak joint now lives rather than in the absence of any number at all.
+//
+// ## What is measured and still not built
+//
+// A real squeal is **intermittent**: 32 and 33 separate events in the two Chrysler
+// recordings, median 85 ms, with the peak frequency moving 989-3600 Hz p10 to p90.
+// This layer is continuous. `kz_audio::SCRUB_EVENT_MEDIAN_S` records the number
+// and nothing reads it; issue #161 owns the event model. It is not built here
+// because an event model needs a stick-slip onset criterion and inventing one on
+// top of a four-corner mean would be a mechanism nobody measured — which is the
+// same rule that kept this whole file from existing until somebody went and
+// measured a band.
 //
 // ## Why two classes and not one
 //
@@ -77,17 +92,81 @@ namespace scrub_wind_tuning {
 
 // --- scrub ----------------------------------------------------------------------
 
-// Where the scrub band sits on a smooth surface, Hz, and how narrow it is.
+// Where the scrub band sits on a smooth surface, Hz.
 //
-// **Unsourced.** Stick-slip of a tread band is a resonance, so a band-pass rather
-// than a shelf is the right *shape* whatever the numbers are — that much follows
-// from the mechanism and not from a measurement. The center and the Q do not.
+// `kz_audio::SCRUB_PEAK_HZ`, named rather than retyped — the reference header owns
+// the number and the argument, this file owns what is done with it. Measured on
+// passenger-car radials; a kart slick is plausibly higher and "plausibly" is the
+// word §5 item 10 exists to forbid, so the transfer is a knob.
 //
 // Listen for: too high and it is a whistle rather than a squeal; too low and it
-// disappears under the engine's own noise layer. Too much Q and it rings like a
-// sine on every corner; too little and it stops being distinguishable from wind.
-inline constexpr double SCRUB_CENTER_HZ = 900.0;
-inline constexpr double SCRUB_Q = 2.4;
+// disappears under the engine's own noise layer.
+inline constexpr double SCRUB_CENTER_HZ = kz_audio::SCRUB_PEAK_HZ;
+
+// Q of the band-pass section, derived from the measured -10 dB width.
+//
+// For a two-pole band-pass the -10 dB points satisfy `1 + Q^2 x^2 = 10` where
+// `x = f/f0 - f0/f`, so
+//
+//     Q = 3 / (2^(W/2) - 2^(-W/2))
+//
+// with W the width in octaves. At `kz_audio::SCRUB_WIDTH_OCT` = 0.67 that is
+// 3 / 0.46862 = **6.402**. `band_q_for_width_oct` computes it rather than
+// restating it, so the two cannot drift, and
+// `tests/core/test_scrub_wind.cpp` measures the realized width back out of the
+// filter and compares it against the recordings' figure.
+//
+// The measured width is an **upper** bound on one event's width — the spectra are
+// aggregates over events whose peak moves 989-3600 Hz — so this Q is a lower
+// bound. Listen for: too much rings like a sine on every corner, too little stops
+// being distinguishable from wind.
+//
+// A function and not a constant, deliberately: `std::pow` is not usable in a
+// constant expression here, and a namespace-scope `double` with a dynamic
+// initializer would run inside `dlopen` — harmless for arithmetic, but CLAUDE.md's
+// `dyld4::callInitializer` trap is close enough to it that the habit is not worth
+// forming. `ScrubWindConfig` calls this from a member initializer, which runs at
+// construction like any other object's.
+inline double band_q_for_width_oct(double width_oct) {
+	const double half = width_oct * 0.5;
+	const double x = std::pow(2.0, half) - std::pow(2.0, -half);
+	if (x <= 0.0) {
+		return 1.0;
+	}
+	return 3.0 / x;
+}
+
+// The band is **asymmetric**, and a band-pass on its own cannot be.
+//
+// `kz_audio::SCRUB_SLOPE_BELOW_DB_OCT` and `SCRUB_SLOPE_ABOVE_DB_OCT` are +9.7 and
+// -14.0, fitted over the octave below the peak and the two octaves above it. Over
+// those same spans a single two-pole band-pass gives +7.9 / -8.0 — symmetric, and
+// short of the upper slope by 6 dB/octave. Two cascaded band-passes give
+// +15.6 / -16.0, which overshoots both. Neither shape can be asymmetric at all,
+// because a band-pass is not.
+//
+// A one-pole low-pass **at the band center** is flat below it and adds 6 dB/octave
+// above it, so it steepens the upper skirt and leaves the lower one alone. That is
+// the asymmetry the recordings show, and it is the whole reason this constant
+// exists. Measured through the shipped filter:
+//
+//     structure                          peak    width    below    above
+//     1 x BP(Q=6.40)                     1000    0.667    +7.91    -8.03
+//     2 x BP(Q=3.14)                     1000    0.668   +15.59   -15.97
+//     BP(Q=6.40) + one-pole LP at f0     1000    0.674    +7.21   -13.28    <-
+//     recordings                                  0.67    +9.70   -14.00
+//
+// **The lower skirt is still 2.5 dB/octave short and that is left alone
+// deliberately.** Closing it needs a third stage fitted to three recordings of two
+// passenger cars, analyzed from lossy previews, by one recordist in one session,
+// of a tire this project does not use. That is false precision, and §5 item 10's
+// spirit cuts against it as hard as it cuts against inventing the number in the
+// first place.
+//
+// As a multiple of the band center rather than a frequency, so that moving
+// `scrub_center_hz` on F2 carries the shape with it instead of turning the band
+// into a different filter at one end of its range.
+inline constexpr double SCRUB_TILT_LP_RATIO = 1.0;
 
 // Where the band moves to on a fully rough surface — `Surface::roughness` of 1.
 // Interpolated linearly against that column, which is dimensionless by design so
@@ -160,10 +239,30 @@ inline constexpr double WIND_CUTOFF_FLOOR_HZ = 90.0;
 //
 // 38 m/s is 137 km/h — the measured top speed, so unity is flat out.
 //
+// **The exponent is now 3.0 and the story of how it got there is the useful part.**
+// This constant was 2.0 and its comment said, at length, that an aeroacoustic
+// dipole radiates with U^6 for an amplitude exponent of 3, that 3 is what a first
+// guess reaches for, and that naming the dipole law here would be exactly the
+// plausible-sounding intuition §5 item 10 exists to stop. So 2.0 was carried as an
+// admitted guess instead.
+//
+// Then the sourcing pass found the published figures. Brown and Gordon measured
+// about 20 dB per doubling of road speed under a helmet and Lower et al. measured
+// 15.5 dB per doubling on the open road; `kz_audio::WIND_DB_PER_SPEED_DOUBLING`
+// takes 18, and 18.06 dB per doubling *is* an amplitude exponent of 3. The refusal
+// was correct and so was the number it refused — what changed is that it is cited
+// now, and 2.0 was measurably too quiet at speed by 6 dB per doubling.
+//
 // Listen for: wind that masks the engine anywhere in the range is wrong, #84 says
 // so explicitly. Wind that is inaudible at the end of the straight is also wrong.
 inline constexpr double WIND_REFERENCE_SPEED_MS = 38.0;
-inline constexpr double WIND_SPEED_EXPONENT = 2.0;
+
+// Amplitude exponent from a measured dB-per-doubling, because `20*log10(2^n) = n *
+// 6.0206` and stating 3.0 without the conversion is how a reader ends up unable to
+// check it against the paper.
+inline double wind_exponent_for_db_per_doubling(double db) {
+	return db / (20.0 * std::log10(2.0));
+}
 
 // --- both -----------------------------------------------------------------------
 
@@ -262,6 +361,28 @@ struct ScrubWindConfig {
 	// something**, and it is blocked on this file existing.
 	double scrub_gain = 0.30;
 	double wind_gain = 0.20;
+
+	// And the timbre, every field defaulted from the constant above it.
+	//
+	// **The namespace stays the single owner of the numbers and the reasoning; this
+	// is a runtime copy of them.** ADR-0037's registry needs a value it can move
+	// while the kart is driving, and a `constexpr` cannot be moved without a
+	// rebuild — which is precisely the state issue #159 exists because of, where
+	// "judged by feel" meant "whatever the first guess was" for want of a knob.
+	//
+	// Not every constant in `scrub_wind_tuning` is here. The ones that are are the
+	// ones whose comment says *listen for* something; the rest — the rough-surface
+	// band, the wind cutoff floor, the drive smoothing — are shape rather than
+	// character, and adding a row for each would turn the overlay into a synth
+	// editor and bury the eight that matter.
+	double scrub_center_hz = scrub_wind_tuning::SCRUB_CENTER_HZ;
+	double scrub_q = scrub_wind_tuning::band_q_for_width_oct(kz_audio::SCRUB_WIDTH_OCT);
+	double scrub_gamma = scrub_wind_tuning::SCRUB_GAMMA;
+	double scrub_full_speed_ms = scrub_wind_tuning::SCRUB_FULL_SPEED_MS;
+	double wind_cutoff_hz_per_ms = scrub_wind_tuning::WIND_CUTOFF_HZ_PER_MS;
+	double wind_speed_exponent =
+			scrub_wind_tuning::wind_exponent_for_db_per_doubling(
+					kz_audio::WIND_DB_PER_SPEED_DOUBLING);
 };
 
 // Tire scrub: band-passed noise, modulated by slip, weighted by road speed,
@@ -281,14 +402,31 @@ public:
 		reset();
 	}
 
-	// The one knob that moves while the synth runs, for the same reason
-	// `EngineSynth::set_noise_gain` is: it is a per-sample multiplier, so a change
-	// between blocks is a step in a gain and not in a phase.
+	// The knobs that move while the synth runs.
+	//
+	// Safe on the audio thread where `configure` is not, and the distinction is the
+	// same one `EngineSynth::set_comb_depth` draws: `configure` resets the filter
+	// and reseeds the PRNG, which is correct when a voice is bound and is a click
+	// and a discontinuity when a knob moves. These copy scalars and touch no state.
+	//
+	// The gain is a per-sample multiplier, so a change between blocks is a step in a
+	// level; the rest are read once per block on the way into a coefficient, so a
+	// change between blocks is a step in a filter that this form is well behaved
+	// under. Neither is ramped, for the reason `EngineSynth` gives: at the step
+	// sizes `core/tuning.h` declares, a person turning a knob while listening cannot
+	// hear the transition, and smoothing it would be cost paid on the deadline for
+	// nothing.
 	void set_gain(double gain) { config_.scrub_gain = gain > 0.0 ? gain : 0.0; }
 	double gain() const { return config_.scrub_gain; }
 
+	void set_tuning(const ScrubWindConfig &config) {
+		config_ = config;
+		set_gain(config.scrub_gain);
+	}
+
 	void reset() {
 		filter_.reset();
+		tilt_ = 0.0;
 		rng_.reseed(0, scrub_wind_tuning::SCRUB_STREAM);
 		level_ = 0.0;
 	}
@@ -306,19 +444,23 @@ public:
 		// Surface first: it sets where the band sits, and it is a per-block update.
 		const Surface &surf = surface(input_.surface);
 		const double rough = surf.roughness < 0.0 ? 0.0 : (surf.roughness > 1.0 ? 1.0 : surf.roughness);
-		const double center = scrub_wind_tuning::SCRUB_CENTER_HZ +
-				rough * (scrub_wind_tuning::SCRUB_ROUGH_CENTER_HZ - scrub_wind_tuning::SCRUB_CENTER_HZ);
-		const double q = scrub_wind_tuning::SCRUB_Q +
-				rough * (scrub_wind_tuning::SCRUB_ROUGH_Q - scrub_wind_tuning::SCRUB_Q);
+		const double center = config_.scrub_center_hz +
+				rough * (scrub_wind_tuning::SCRUB_ROUGH_CENTER_HZ - config_.scrub_center_hz);
+		const double q = config_.scrub_q +
+				rough * (scrub_wind_tuning::SCRUB_ROUGH_Q - config_.scrub_q);
 		filter_.set(center, q, sample_rate_);
+		// The tilt that makes the band asymmetric. See SCRUB_TILT_LP_RATIO.
+		const double tilt_alpha = one_pole_alpha(
+				center * scrub_wind_tuning::SCRUB_TILT_LP_RATIO, sample_rate_);
 
 		// The target level. Drive shaped by gamma, times the speed weight the
 		// dissipated-power argument requires, times the layer gain.
 		double drive = input_.scrub;
 		drive = drive < 0.0 ? 0.0 : (drive > 1.0 ? 1.0 : drive);
-		const double shaped = std::pow(drive, scrub_wind_tuning::SCRUB_GAMMA);
+		const double shaped = std::pow(drive, config_.scrub_gamma);
 
-		double speed_weight = input_.speed_ms / scrub_wind_tuning::SCRUB_FULL_SPEED_MS;
+		double speed_weight = input_.speed_ms /
+				(config_.scrub_full_speed_ms > 1e-6 ? config_.scrub_full_speed_ms : 1e-6);
 		speed_weight = speed_weight < 0.0 ? 0.0 : (speed_weight > 1.0 ? 1.0 : speed_weight);
 
 		const double target = shaped * speed_weight * config_.scrub_gain;
@@ -333,7 +475,11 @@ public:
 			double lp = 0.0;
 			double bp = 0.0;
 			filter_.process(white, lp, bp);
-			out[i] = static_cast<float>(bp * level_);
+			// The tilt. Flat below the band center, -6 dB/octave above it, which is
+			// the asymmetry `kz_audio::SCRUB_SLOPE_*` measured and which no
+			// band-pass can produce on its own. Two multiply-adds.
+			tilt_ += (bp - tilt_) * tilt_alpha;
+			out[i] = static_cast<float>(tilt_ * level_);
 		}
 	}
 
@@ -350,12 +496,21 @@ private:
 		return a > 1.0 ? 1.0 : a;
 	}
 
+	static double one_pole_alpha(double corner_hz, double sample_rate) {
+		if (corner_hz <= 0.0) {
+			return 1.0;
+		}
+		const double alpha = 1.0 - std::exp(-2.0 * PI * corner_hz / sample_rate);
+		return alpha > 1.0 ? 1.0 : alpha;
+	}
+
 	ScrubWindConfig config_{};
 	EngineAudioInput input_{};
 	Svf filter_{};
 	Pcg32 rng_{ 0, scrub_wind_tuning::SCRUB_STREAM };
 	double sample_rate_ = 48000.0;
 	double level_ = 0.0;
+	double tilt_ = 0.0;
 };
 
 // Wind: low-passed noise whose corner and level both rise with road speed.
@@ -376,6 +531,12 @@ public:
 	void set_gain(double gain) { config_.wind_gain = gain > 0.0 ? gain : 0.0; }
 	double gain() const { return config_.wind_gain; }
 
+	// Same contract as `ScrubSynth::set_tuning`: audio-thread safe, no reset.
+	void set_tuning(const ScrubWindConfig &config) {
+		config_ = config;
+		set_gain(config.wind_gain);
+	}
+
 	void reset() {
 		filter_.reset();
 		rng_.reseed(0, scrub_wind_tuning::WIND_STREAM);
@@ -393,15 +554,14 @@ public:
 		speed = speed < 0.0 ? 0.0 : speed;
 
 		const double cutoff = scrub_wind_tuning::WIND_CUTOFF_FLOOR_HZ +
-				scrub_wind_tuning::WIND_CUTOFF_HZ_PER_MS * speed;
+				config_.wind_cutoff_hz_per_ms * speed;
 		// A gentle Q. The corner is a spectral slope and not a resonance: a peak
 		// here would read as a whistle at one specific speed, which is a defect that
 		// only shows up while driving.
 		filter_.set(cutoff, 0.707, sample_rate_);
 
 		const double ratio = speed / scrub_wind_tuning::WIND_REFERENCE_SPEED_MS;
-		const double target = std::pow(ratio, scrub_wind_tuning::WIND_SPEED_EXPONENT) *
-				config_.wind_gain;
+		const double target = std::pow(ratio, config_.wind_speed_exponent) * config_.wind_gain;
 
 		// Ramped across the block only. Wind has no per-corner dropout to smooth —
 		// road speed is continuous by construction — so the extra one-pole the scrub

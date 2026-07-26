@@ -121,7 +121,14 @@ void KartBody::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_engine_voice_player", "path"),
 			&KartBody::set_engine_voice_player);
 	ClassDB::bind_method(D_METHOD("get_engine_voice_player"), &KartBody::get_engine_voice_player);
+	ClassDB::bind_method(D_METHOD("set_scrub_voice_player", "path"),
+			&KartBody::set_scrub_voice_player);
+	ClassDB::bind_method(D_METHOD("get_scrub_voice_player"), &KartBody::get_scrub_voice_player);
+	ClassDB::bind_method(D_METHOD("set_wind_voice_player", "path"),
+			&KartBody::set_wind_voice_player);
+	ClassDB::bind_method(D_METHOD("get_wind_voice_player"), &KartBody::get_wind_voice_player);
 	ClassDB::bind_method(D_METHOD("engine_mount_position"), &KartBody::engine_mount_position);
+	ClassDB::bind_method(D_METHOD("rear_axle_position"), &KartBody::rear_axle_position);
 
 	ClassDB::bind_method(D_METHOD("set_steer_gamma", "gamma"), &KartBody::set_steer_gamma);
 	ClassDB::bind_method(D_METHOD("get_steer_gamma"), &KartBody::get_steer_gamma);
@@ -130,6 +137,12 @@ void KartBody::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "engine_voice_player", PROPERTY_HINT_NODE_PATH_VALID_TYPES,
 						"AudioStreamPlayer3D,AudioStreamPlayer"),
 			"set_engine_voice_player", "get_engine_voice_player");
+	ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "scrub_voice_player", PROPERTY_HINT_NODE_PATH_VALID_TYPES,
+						"AudioStreamPlayer3D,AudioStreamPlayer"),
+			"set_scrub_voice_player", "get_scrub_voice_player");
+	ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "wind_voice_player", PROPERTY_HINT_NODE_PATH_VALID_TYPES,
+						"AudioStreamPlayer3D,AudioStreamPlayer"),
+			"set_wind_voice_player", "get_wind_voice_player");
 
 	ClassDB::bind_method(D_METHOD("set_jacking_enabled", "enabled"),
 			&KartBody::set_jacking_enabled);
@@ -350,6 +363,8 @@ void KartBody::_ready() {
 	}
 
 	resolve_engine_voice();
+	resolve_noise_voice(scrub_voice_path_, scrub_voice_, "scrub_voice_player");
+	resolve_noise_voice(wind_voice_path_, wind_voice_, "wind_voice_player");
 
 	wall_start_usec_ = Time::get_singleton()->get_ticks_usec();
 	tick_count_ = 0;
@@ -688,6 +703,28 @@ NodePath KartBody::get_engine_voice_player() const {
 	return engine_voice_path_;
 }
 
+void KartBody::set_scrub_voice_player(const NodePath &p_path) {
+	scrub_voice_path_ = p_path;
+	if (is_inside_tree()) {
+		resolve_noise_voice(scrub_voice_path_, scrub_voice_, "scrub_voice_player");
+	}
+}
+
+NodePath KartBody::get_scrub_voice_player() const {
+	return scrub_voice_path_;
+}
+
+void KartBody::set_wind_voice_player(const NodePath &p_path) {
+	wind_voice_path_ = p_path;
+	if (is_inside_tree()) {
+		resolve_noise_voice(wind_voice_path_, wind_voice_, "wind_voice_player");
+	}
+}
+
+NodePath KartBody::get_wind_voice_player() const {
+	return wind_voice_path_;
+}
+
 double KartBody::steering_curve(double p_input) const {
 	const double clamped = clamp_signed_one(p_input);
 	if (steer_gamma_ <= 1.0) {
@@ -724,6 +761,23 @@ Vector3 KartBody::engine_mount_position() const {
 			"KartBody: chassis.h's lump table has no row named 'engine'. The engine "
 			"note has nowhere to come from.");
 	return Vector3();
+}
+
+// Where the scrub emitter goes: the middle of the rear axle, on the ground.
+//
+// From `chassis.h`'s own `REAR_AXLE_Z` rather than from a number in a scene, for
+// the reason `engine_mount_position` gives — the lump table is edited and a scene
+// holding its own copy of a dimension is a copy that stops matching the solver.
+//
+// **One emitter for four contact patches, and the position is the compromise that
+// admits it.** `publish_engine_audio` takes the mean of the four corners' slip
+// angles and says why; a single sound source for that mean belongs between the
+// wheels rather than at one of them. At the rear rather than the middle because
+// the rear is where a kart's slide starts and where a driver's attention is.
+Vector3 KartBody::rear_axle_position() const {
+	// Blender +Y forward maps to Godot -Z, and `chassis.h` already works in the
+	// Godot convention: negative Z is forward, so the rear axle is the positive one.
+	return Vector3(0.0f, 0.0f, static_cast<real_t>(kart::core::kz::REAR_AXLE_Z));
 }
 
 void KartBody::set_jacking_enabled(bool p_enabled) {
@@ -909,6 +963,49 @@ void KartBody::resolve_engine_voice() {
 	}
 }
 
+void KartBody::resolve_noise_voice(const NodePath &p_path, Ref<NoiseVoiceStream> &r_stream,
+		const char *p_property) {
+	r_stream.unref();
+	if (p_path.is_empty()) {
+		return;
+	}
+
+	Node *node = get_node_or_null(p_path);
+	if (node == nullptr) {
+		UtilityFunctions::push_warning(
+				"KartBody: ", p_property, " '", p_path,
+				"' resolves to nothing. That layer will be silent.");
+		return;
+	}
+
+	// Both player types, for the reason `resolve_engine_voice` gives -- and here the
+	// plain player is not a concession to probes but the production case: the wind
+	// layer is at the driver's head and must not be spatialized at all, so it is
+	// mounted on an `AudioStreamPlayer` while the scrub is on an
+	// `AudioStreamPlayer3D` at the kart.
+	Ref<AudioStream> stream;
+	if (AudioStreamPlayer3D *player_3d = Object::cast_to<AudioStreamPlayer3D>(node)) {
+		stream = player_3d->get_stream();
+	} else if (AudioStreamPlayer *player = Object::cast_to<AudioStreamPlayer>(node)) {
+		stream = player->get_stream();
+	} else {
+		UtilityFunctions::push_warning(
+				"KartBody: ", p_property, " '", p_path, "' is a ", node->get_class(),
+				", not an AudioStreamPlayer3D or AudioStreamPlayer. That layer will be silent.");
+		return;
+	}
+
+	r_stream = stream;
+	if (r_stream.is_null()) {
+		// Loudly, because this failure has no other symptom: a player whose stream is
+		// the wrong resource plays happily and silently.
+		UtilityFunctions::push_warning(
+				"KartBody: '", p_path, "' has no NoiseVoiceStream. Its stream is ",
+				stream.is_null() ? String("empty") : stream->get_class(),
+				". That layer will be silent, and nothing else will report it.");
+	}
+}
+
 // One tick of engine state, published through the stream's seqlock.
 //
 // **This is the only place `VehicleTelemetry` becomes `EngineAudioInput`.**
@@ -920,7 +1017,11 @@ void KartBody::resolve_engine_voice() {
 // property that matters — the reverse, an audio thread waiting on physics, is what
 // the seqlock's bounded retry handles.
 void KartBody::publish_engine_audio() {
-	if (engine_voice_.is_null()) {
+	// Any one of the three is reason enough to build the struct. A scene with only
+	// a scrub layer -- a replay viewer, a probe -- is legal, and requiring the
+	// engine voice to exist before the tires could be heard would be a coupling
+	// nothing asked for.
+	if (engine_voice_.is_null() && scrub_voice_.is_null() && wind_voice_.is_null()) {
 		return;
 	}
 
@@ -1004,7 +1105,19 @@ void KartBody::publish_engine_audio() {
 		}
 	}
 
-	engine_voice_->publish(audio);
+	// The same struct to all three. `noise_voice.h` says why they share a payload
+	// rather than each getting its own: the fields are computed once here, and a
+	// second payload type would be a second place for the aggregation rule above to
+	// be restated.
+	if (engine_voice_.is_valid()) {
+		engine_voice_->publish(audio);
+	}
+	if (scrub_voice_.is_valid()) {
+		scrub_voice_->publish(audio);
+	}
+	if (wind_voice_.is_valid()) {
+		wind_voice_->publish(audio);
+	}
 }
 
 // --- read-out -------------------------------------------------------------------

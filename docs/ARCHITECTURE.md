@@ -360,8 +360,8 @@ For meshes (Hunyuan3D, TRELLIS, Stable Fast 3D), assume a retopology pass in Ble
 Racing audio is a primary feel channel, not decoration.
 
 - **Engine note synthesized live**, not sampled. `AudioStreamGenerator` fed from C++: harmonic stack with fundamental driven by RPM, per-harmonic gain envelopes shaped by load, noise layer, comb-filtered exhaust resonance. Sample sets always give themselves away at transitions; synthesis does not.
-- **Tire scrub:** filtered noise modulated by slip magnitude — falls straight out of §6 for free.
-- **Wind:** speed-driven filtered noise.
+- **Tire scrub:** filtered noise modulated by slip magnitude. **The modulation falls out of §6 for free; the timbre did not.** Slip angle per corner and road speed are solver truth, but the filter shape needed a sourcing pass of its own — eight recordings and three papers — and what it produced is a band measured on passenger-car tires, not kart slicks. `docs/REFERENCES.md` §"Tire scrub and wind" and issue #84. This line read "falls straight out of §6 for free" without qualification for two milestones and that half of it was never true.
+- **Wind:** speed-driven filtered noise, brighter as well as louder with speed — turbulent noise peaks at a Strouhal frequency, so the spectral corner moves. Published band levels at stated road speeds, under a motorcycle helmet rather than in a kart.
 - **Surface-dependent** impacts and rolling.
 - Godot's built-in 3D audio for attenuation, Doppler, and panning.
 

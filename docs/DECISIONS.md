@@ -1657,6 +1657,7 @@ recorded, and it interacts with the curve.
 *Superseded in mechanism, not in conclusion:* the `[` / `]` knob was a prototype of
 the wrong shape — one constant, two keys, no record of what it was overriding — and
 [ADR-0037](#adr-0037--tuning-is-an-audit-trail-that-happens-to-be-adjustable-and-a-preset-is-not-in-the-state-hash)
+[ADR-0038](#adr-0038--the-scrub-band-is-measured-on-the-wrong-tire-and-saying-so-is-the-whole-design)
 replaced it with the tuning registry, where `steer_gamma` is one row among fourteen
 and is classified `Derived` with this ADR as its citation. Nothing above changes: the
 exponent is still 3.0, still arithmetic rather than feel, and still unjudged.
@@ -1871,3 +1872,180 @@ constant which gets a row in one gets a line in the other.
 **And the four feel-blocked tickets are still blocked.** #32, #38, #39 and #40
 have acceptance criteria written in a driver's language. A knob that can now be
 turned mid-session is a prerequisite for answering them, not an answer.
+
+## ADR-0038 — The scrub band is measured on the wrong tire, and saying so is the whole design
+
+**Status.** Accepted. Builds ROADMAP M8's "tire scrub from slip magnitude, wind
+from speed" and issue
+[#84](https://github.com/skiretic/kartgame/issues/84). It **extends**
+[ADR-0037](#adr-0037--tuning-is-an-audit-trail-that-happens-to-be-adjustable-and-a-preset-is-not-in-the-state-hash)'s
+provenance vocabulary rather than using it as written, and the extension is the
+first decision below.
+
+**Context.** `src/core/kz_audio_reference.h` carried
+`SCRUB_SPECTRUM_MEASURED = false` and `WIND_SPECTRUM_MEASURED = false` for two
+milestones, and `engine_synth.h` carried a `static_assert` that deliberately left
+`EngineAudioInput::scrub` and `::speed_ms` unread because of them. `ARCHITECTURE.md`
+§5 item 10 forbids modelling a real thing from memory or from prose, and a filter
+shape is exactly the kind of thing a session invents from a plausible-sounding
+intuition. So #84 could not be built the way #82's engine note was — that had four
+hash-pinned recordings behind it and this had none.
+
+The work therefore started with a sourcing pass whose entire job was to find one,
+running concurrently with the layer structure and the drive signals, which do not
+depend on it: slip magnitude per corner and road speed are solver truth and are
+sourced regardless.
+
+**It found something, and what it found is more awkward than either "yes" or
+"no".** Eight recordings were analyzed, three of them license-clean CC0 field
+recordings of rubber scrubbing on asphalt, separated from their engines by a
+two-population power subtraction whose check is that the background population
+lands on an engine and the event population does not. They agree on a band. Every
+one of them is a **passenger-car radial** — 1996 Chrysler LHS, Nissan Maxima — and
+a KZ runs 5-inch 10-inch slicks with no tread pattern at high pressure on a much
+stiffer carcass. The only engine-free vehicle recording found, an indoor electric
+kart track, turned out to be a negative result: its tone is present in 97% of
+frames, which is a room and a motor. For wind, **no usable recording exists at
+all** — the one on-vehicle hit is a parked car in a storm, which has no airspeed
+and cannot be scaled — and what exists instead is a peer-reviewed open-access
+figure of one-third-octave levels at seven road speeds under a **motorcycle
+helmet**.
+
+`docs/REFERENCES.md` §"Tire scrub and wind" has the corpus, the method, the
+per-file tables and seven numbered reasons to be careful.
+
+### 1. Two flags per quantity, because Sourced and Measured can disagree about one
+
+ADR-0037 established four provenance classes precisely because
+`has_source: bool` files "Fu and Wang measured a real competition frame" and "this
+repository measured its own generated kart" in the same bucket. The same argument
+recurses one level down, and the header is where it has to be answered:
+
+```
+inline constexpr bool SCRUB_SPECTRUM_MEASURED = true;
+inline constexpr bool SCRUB_MEASURED_ON_KART_TIRE = false;
+
+inline constexpr bool WIND_SPECTRUM_MEASURED = false;
+inline constexpr bool WIND_SPECTRUM_SOURCED = true;
+```
+
+A spectrum *was* measured, to the same standard the engine ladders meet, and it is
+**not a measurement of the object the game simulates**. One boolean cannot hold
+that. For wind the two flags disagree in the other direction: this repository
+measured nothing and an external authority published something, which is
+ADR-0037's Sourced-versus-Measured distinction applied to a single quantity for
+the first time in this codebase.
+
+The registry rows follow from the flags rather than from a judgement call.
+`scrub_center_hz`, `scrub_q` and `wind_speed_exponent` are `Provenance::Derived` —
+arithmetic on a measurement of a different object — and Derived is **not
+defended**, so they can still be turned by ear on F2 without an acknowledgement.
+Classifying them `Measured` would have defended a number taken off a Chrysler.
+
+### 2. The measurement changed the filter's *structure*, not just its constants
+
+This is the part that would have been missed by treating the sourcing pass as a
+source of numbers to paste in.
+
+The recordings give slopes of **+9.7 and −14.0 dB per octave**, fitted over the
+octave below the peak and the two octaves above it. A two-pole band-pass is
+symmetric by construction. Measured over those same spans the candidates are:
+
+| structure | peak | width | below | above |
+| --- | --- | --- | --- | --- |
+| 1 × BP(Q=6.40) | 1000 | 0.667 | +7.91 | −8.03 |
+| 2 × BP(Q=3.14) | 1000 | 0.668 | +15.59 | −15.97 |
+| **BP(Q=6.40) + one-pole LP at f0** | **1000** | **0.674** | **+7.21** | **−13.28** |
+| the recordings | | 0.67 | +9.70 | −14.00 |
+
+One section is 6 dB/octave short on the upper skirt. Two cascaded sections
+overshoot both. Neither can be asymmetric at all. A one-pole low-pass **at the band
+center** is flat below it and adds 6 dB/octave above it, which is the asymmetry the
+recordings show and is the only one of the three that reproduces it.
+
+**The lower skirt is knowingly left 2.5 dB/octave short.** Closing it needs a third
+stage fitted to three recordings of two passenger cars, from lossy previews, by one
+recordist in one session, of a tire this project does not use. That is false
+precision, and §5 item 10's spirit cuts against it as hard as it cuts against
+inventing the number. `tests/core/test_scrub_wind.cpp` asserts the asymmetry exists
+with the right sign, the upper skirt to within 1 dB/octave, and the lower one as a
+bound so that a change making it worse is caught.
+
+### 3. The number the file originally refused to use turned out to be right
+
+`WIND_SPEED_EXPONENT` was 2.0, and its comment argued at length that an
+aeroacoustic dipole radiates with U⁶ for an amplitude exponent of 3, that 3 is what
+a first guess reaches for, and that naming the dipole law would be exactly the
+plausible-sounding intuition §5 item 10 exists to stop.
+
+Brown and Gordon (2011) measured about 20 dB per doubling of road speed under a
+helmet; Lower et al. (1994) measured 15.5 dB per doubling on the open road.
+18.06 dB per doubling **is** an amplitude exponent of 3. The refusal was correct
+and so was the number it refused — and 2.0 was quietly 6 dB per doubling too quiet
+at speed. What changed is that it is cited now. That is the rule working, not the
+rule being wrong: an uncited 3.0 and a cited 3.0 are different claims even when
+they are the same float.
+
+### 4. Three emitters, because they are not in the same place
+
+Scrub is an `AudioStreamPlayer3D` at the rear axle: M8's acceptance criterion is
+that opponents are locatable by ear, and a tire is where the kart is. Wind is a
+plain `AudioStreamPlayer` — it is at the driver's head, it is not a source in the
+world, and attenuating or Doppler-shifting it would be nonsense. There is one of it
+and never twelve.
+
+One class serves both with a `layer` property, because that difference is entirely
+in how a scene mounts them. Separating them at the *mixer* rather than summing them
+in the synth is also what issue
+[#160](https://github.com/skiretic/kartgame/issues/160) needs: turning one layer
+off must not require re-judging the others.
+
+The seqlock moved to `src/audio/state_seqlock.h` on the way, because three
+hand-copied copies of a transport is three places for the memory ordering to drift.
+Nothing about the algorithm changed.
+
+### 5. Cost was measured before the layers reached a scene
+
+[#152](https://github.com/skiretic/kartgame/issues/152) records the harmonic stack
+at **74.76% of real time for twelve voices**, which is M7's grid and is not a
+budget with room in it. `tools/verify/scrub_cost_probe.gd` runs both layers inside
+a real CoreAudio `_mix`, in two passes so that "what did scrub add" is answerable
+separately from "what does the player's kart cost":
+
+| | ns/frame |
+| --- | --- |
+| one engine voice, worst (quoted) | 1412.8 |
+| one scrub layer, worst | 15.2 |
+| the one wind layer, by difference | 19.5 |
+| twelve scrub layers (M7) | 0.805% of real time |
+
+Whatever M7 does about voice culling, it is not about this file. The probe's
+`silent` cell is deliberately among the most expensive of the five, which is the
+check that nothing short-circuits when the drive is zero — a layer that were cheap
+exactly when nobody is listening would be the wrong shape.
+
+**The wind pass doubles as the noise floor**, and that was not designed in.
+`WindSynth` never reads `surface`, so its `fast corner grass` and
+`fast corner asphalt` cells execute identical code; whatever they differ by bounds
+how much of the scrub column's spread can be real. One run came back with 15%
+between two cells running the same instructions.
+
+### What this does not settle
+
+**The layer is continuous and a real squeal is not.** The same recordings give 32
+and 33 discrete events, median 85 ms, with the peak frequency moving 989–3600 Hz.
+`kz_audio::SCRUB_EVENT_MEDIAN_S` records it and nothing reads it. Issue
+[#161](https://github.com/skiretic/kartgame/issues/161) owns the event model, and
+it is not built here because an event model needs a stick-slip onset criterion and
+inventing one on top of a four-corner mean would be a mechanism nobody measured —
+which is the rule that kept this whole file from existing until somebody went and
+measured a band.
+
+**The slip-angle axis is still unsourced.** §12 needs scrub driven by slip and
+nothing in these recordings has a slip angle attached to it. REFERENCES.md item 17
+records what the secondary literature claims and why it did not reach the header:
+it came off search-result summaries of paywalled SAE work rather than off a table.
+
+**Nothing has been judged by ear.** All thirteen audio rows in the registry are
+placeholders in the sense `VOICE_GAIN`'s 0.18 is, #160 owns the mixing pass, and
+#159's checklist has grown by eight.

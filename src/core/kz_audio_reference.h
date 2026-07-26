@@ -340,14 +340,120 @@ inline constexpr bool LIMITER_CHATTER_MEASURED = false;
 inline constexpr double SHIFT_TRANSIENT_S = 0.045;
 inline constexpr bool SHIFT_TRANSIENT_MEASURED = false;
 
-// Tire scrub and wind. **Entirely unsourced.** §12 specifies both as filtered
-// noise driven by slip and speed; no recording in the corpus isolates either,
-// because every one has an engine running over the top of it. §12's claim that
-// scrub "falls straight out of §6 for free" is about the *modulation* — which is
-// true, `WheelTelemetry::slip_angle` and `slip_ratio` are right there — and not
-// about the filter shape, which nobody has measured.
-inline constexpr bool SCRUB_SPECTRUM_MEASURED = false;
+// --- Tire scrub -----------------------------------------------------------------
+//
+// **Measured, and on the wrong rubber.** This entry said "entirely unsourced" for
+// two milestones and that is no longer true: issue #84's sourcing pass found three
+// license-clean CC0 field recordings of rubber scrubbing on asphalt, separated the
+// squeal from the engine by a stated two-population power subtraction, and
+// measured a band. `docs/REFERENCES.md` §"Tire scrub and wind" has the corpus, the
+// method, the per-file table and seven numbered reasons to be careful with it.
+//
+// **Every recording is a passenger-car radial.** A KZ runs 5-inch 10-inch slicks,
+// no tread pattern, high pressure, stiff carcass; squeal frequency is set by
+// tread-block stick-slip and carcass resonance and both scale with the tire. So
+// the *shape* is measured and the *transfer to a kart* is not, which is why
+// `SCRUB_MEASURED_ON_KART_TIRE` sits below and is false. The two flags together
+// say what one boolean could not, which is the same argument ADR-0037 makes for
+// having four provenance classes instead of `has_source: bool`.
+
+// Peak of the band, Hz. The median over the three CC0 originals; the two Chrysler
+// files both land exactly here and the Maxima burnout is at 1587.
+inline constexpr double SCRUB_PEAK_HZ = 1000.0;
+
+// Width of the band within 10 dB of the peak, in octaves. Median over the same
+// three: 0.67, 1.67 and 0.67.
+//
+// **This is an upper bound on the width of one squeal, not a measurement of it.**
+// The spectra are aggregates over many events whose peak frequency moves — p10 to
+// p90 is 989-3600 Hz on one file — and aggregating a moving narrow peak widens the
+// apparent band. A single event is at least this narrow and probably narrower.
+inline constexpr double SCRUB_WIDTH_OCT = 0.67;
+
+// Least-squares slopes in dB per octave, over the octave below the peak and the
+// two octaves above it. Medians over the three CC0 originals.
+//
+// **These are what forced a design change rather than a constant change.** A
+// single two-pole band-pass has +/-6 dB/octave asymptotes and structurally cannot
+// produce +9.7 and -14.0, so `scrub_wind.h` cascades two sections for +/-12 —
+// which brackets the measurement instead of falling half as fast as it.
+//
+// The upper slope is a lower bound on how fast the real thing falls: every file
+// was analyzed from a lossy mp3 preview. The Chryslers' codec ceilings are 12.8
+// and 10.7 kHz, a decade of frequency above where this fit ends, so this
+// particular figure is not contaminated by it.
+inline constexpr double SCRUB_SLOPE_BELOW_DB_OCT = 9.7;
+inline constexpr double SCRUB_SLOPE_ABOVE_DB_OCT = -14.0;
+
+// Median duration of one squeal event, seconds, from a narrowband peak tracker at
+// a 43 ms hop. 32 and 33 events in the two Chrysler files, longest 0.85 and 1.45 s,
+// present in 64% and 68% of frames.
+//
+// **Nothing reads this yet and that is a known gap, not an oversight.** §12
+// specifies scrub as filtered noise modulated by slip and the layer that ships is
+// exactly that — continuous. The measurement says a real squeal is intermittent,
+// and the engine-free negative control makes the point from the other side: the
+// electric kart recording's tone is present in 97% of frames and is a room and a
+// motor rather than stick-slip. Issue #161 owns building an event model; it is not
+// built here because an event model needs a stick-slip onset criterion, and
+// inventing one on top of a four-corner mean would be a mechanism nobody measured.
+inline constexpr double SCRUB_EVENT_MEDIAN_S = 0.085;
+
+inline constexpr bool SCRUB_SPECTRUM_MEASURED = true;
+inline constexpr bool SCRUB_MEASURED_ON_KART_TIRE = false;
+
+// --- Wind -----------------------------------------------------------------------
+//
+// **Not measured here; published, and on a motorcycle.** No recording of
+// on-vehicle wind at a *stated speed* exists under an acceptable license — the
+// search is listed in REFERENCES.md item 14 and the one on-vehicle hit turned out
+// to be a parked car in a storm, which has no airspeed and therefore cannot be
+// scaled.
+//
+// What was found instead is peer-reviewed and open access: Brown and Gordon, "Motorcycle
+// Helmet Noise and Active Noise Reduction", The Open Acoustics Journal 4, 14-24
+// (2011), Figure 3 — a Neumann KU-100 dummy head in a half helmet on a Kawasaki
+// EX500, one-third octaves at seven GPS-checked road speeds. Corroborated on the
+// speed law by Lower et al., Proc. Institute of Acoustics 16(2), 319-325 (1994).
+//
+// Hence two flags rather than one: `WIND_SPECTRUM_MEASURED` stays **false**
+// because this repository measured nothing, and `WIND_SPECTRUM_SOURCED` is true
+// because an external authority published it. That is precisely ADR-0037's
+// Sourced-versus-Measured distinction, and this is the first place in the codebase
+// where the two disagree about the same quantity.
+//
+// **The level does not transfer and must not be used.** Lower et al. found the
+// dominant source was the turbulent shear layer off the *windscreen's* wake
+// striking the rider, and that a helmet's noise ranking reverses with screen
+// height. A kart has no windscreen. The shape and the speed law are the
+// transferable parts, and both have a physical argument under them.
+
+// Slope above the plateau, dB per octave. The paper's own text: "levels tended to
+// decrease at a rate of about 10 dB per octave in the range of 250 Hz to 8 kHz",
+// and the transcribed figure gives -9 over 250 Hz-1 kHz and -11.5 over 1-4 kHz.
+inline constexpr double WIND_SLOPE_DB_PER_OCT = -10.0;
+
+// Where the low plateau sits, Hz. At 120 km/h the paper names 108 dB at the 100,
+// 125 and 200 Hz thirds and states every band from 50 to 400 Hz exceeds 100 dB.
+inline constexpr double WIND_PLATEAU_HZ = 150.0;
+
+// How much louder wind gets per doubling of road speed, dB.
+//
+// Brown and Gordon: "uniformly from 200 Hz to 10,000 Hz, the noise level increased
+// about 20 dB as velocity was incremented from 60 km/h to 120 km/h", and the
+// transcribed rows give 16-20 dB across that range. Lower et al. §4.7 measured
+// **15.5 dB per doubling** on the open road above ~25 m/s. 15.5 to 20 brackets the
+// v^6 aeroacoustic dipole law, which is 18.06 dB per doubling, from both sides.
+//
+// 18 is taken as the figure. Note what that means for `scrub_wind.h`: an amplitude
+// exponent of 3.0, which is exactly the dipole number that file originally
+// **refused** to use on the grounds that it was a plausible-sounding intuition
+// rather than a measurement. The refusal was right and the number was right; the
+// difference is that it is now cited.
+inline constexpr double WIND_DB_PER_SPEED_DOUBLING = 18.0;
+
 inline constexpr bool WIND_SPECTRUM_MEASURED = false;
+inline constexpr bool WIND_SPECTRUM_SOURCED = true;
 
 } // namespace kart::core::kz_audio
 

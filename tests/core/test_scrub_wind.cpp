@@ -3,6 +3,7 @@
 #include "core/audio_state.h"
 #include "core/scrub_wind.h"
 #include "core/surface.h"
+#include "core/tuning.h"
 
 #include <cmath>
 #include <string>
@@ -120,11 +121,14 @@ double tone_magnitude(const std::vector<float> &samples, double freq_hz, double 
 // with a realized Q of 10.2, against 900 Hz and 2.4 asked for; measured this way
 // it reads what the coefficients say.
 std::vector<double> svf_response(double cutoff, double q, const std::vector<double> &probes,
-		bool bandpass) {
+		bool bandpass, bool tilt = false) {
 	std::vector<double> magnitudes;
 	magnitudes.reserve(probes.size());
+	const double tilt_alpha = 1.0 - std::exp(-2.0 * kart::core::PI * cutoff *
+			tuning::SCRUB_TILT_LP_RATIO / SAMPLE_RATE);
 	for (const double f : probes) {
 		Svf filter;
+		double tilt_state = 0.0;
 		filter.set(cutoff, q, SAMPLE_RATE);
 		// Long enough that a Q of a few has rung down its transient — 4,800 samples
 		// is 100 ms — and then a whole number of cycles is not needed because the
@@ -137,7 +141,11 @@ std::vector<double> svf_response(double cutoff, double q, const std::vector<doub
 			double lp = 0.0;
 			double bp = 0.0;
 			filter.process(std::sin(phase), lp, bp);
-			const double y = bandpass ? bp : lp;
+			double y = bandpass ? bp : lp;
+			if (tilt) {
+				tilt_state += (y - tilt_state) * tilt_alpha;
+				y = tilt_state;
+			}
 			if (i >= settle) {
 				peak = std::fabs(y) > peak ? std::fabs(y) : peak;
 			}
@@ -246,18 +254,26 @@ TEST_CASE("scrub level rises with slip and with speed, and saturates where it sa
 			<< half << " " << full << " " << past);
 }
 
-TEST_CASE("the scrub band is where the coefficients were asked to put it") {
-	// This is the test that separates "the constant is wrong" from "the filter is
-	// wrong", and the distinction matters more here than anywhere else in the
-	// audio path: every spectral number in `scrub_wind.h` is an admitted guess, so
-	// the only thing a test can hold is that turning the knob moves the sound to
-	// where the knob says.
-	const double center = tuning::SCRUB_CENTER_HZ;
+TEST_CASE("the scrub band reproduces the width and the skirts that were measured") {
+	// This is the test that ties the code to `docs/REFERENCES.md`, and it is a
+	// different test from the one that was here before the sourcing pass. Then, the
+	// constants were admitted guesses and all a test could hold was that the filter
+	// landed where the knob said. Now `kz_audio::SCRUB_PEAK_HZ`, `SCRUB_WIDTH_OCT`
+	// and the two slopes are measured numbers off three CC0 recordings, so the
+	// question is whether the filter that ships actually reproduces them.
+	//
+	// **The cascade is the finding.** One two-pole band-pass asymptotes at
+	// +/-6 dB/octave and the measurement is +9.7 and -14.0, so a single section
+	// falls at less than half the measured rate whatever its Q is set to. Two
+	// identical sections give +/-12 and bracket both. This test is what says so.
+	const double center = kart::core::kz_audio::SCRUB_PEAK_HZ;
+	const double q = tuning::band_q_for_width_oct(kart::core::kz_audio::SCRUB_WIDTH_OCT);
+
 	std::vector<double> probes;
-	for (double f = 100.0; f < 6000.0; f *= 1.05) {
+	for (double f = 60.0; f < 12000.0; f *= 1.02) {
 		probes.push_back(f);
 	}
-	const std::vector<double> mags = svf_response(center, tuning::SCRUB_Q, probes, true);
+	const std::vector<double> mags = svf_response(center, q, probes, true, true);
 
 	int peak = 0;
 	for (size_t i = 1; i < mags.size(); ++i) {
@@ -266,43 +282,98 @@ TEST_CASE("the scrub band is where the coefficients were asked to put it") {
 		}
 	}
 	const double measured_center = probes[peak];
-	MESSAGE("scrub band asked for " << center << " Hz, peak measured at "
-			<< measured_center << " Hz");
-	// One probe step is 5%, so 12% is a little over two steps of tolerance.
+	MESSAGE("scrub band peak: asked " << center << " Hz, measured " << measured_center << " Hz");
 	CHECK(relative_error(measured_center, center) < 0.01);
 
-	// -3 dB points, and hence the realized Q. A band-pass at Q has its half-power
-	// bandwidth at f0/Q, so this asserts the resonance knob does what it claims.
-	//
-	// **Interpolated between the bracketing probes rather than snapped to one.**
-	// Taking the first probe at or below half power steps *past* the crossing
-	// every time, so the bandwidth comes out systematically wide and the Q
-	// systematically low — measured 2.03 against 2.4 that way, which reads exactly
-	// like a filter defect and is not one. The grid is 5% per step and the error
-	// was 15%, in the direction the bias predicts.
-	const double half_power = mags[peak] * 0.70794578; // -3 dB
-	auto crossing = [&](int from, int direction) {
-		int i = from;
-		while (i > 0 && i + 1 < static_cast<int>(mags.size()) && mags[i] > half_power) {
+	// Interpolated between the bracketing probes rather than snapped to one. Taking
+	// the first probe past the crossing biases the width wide every time; on a 5%
+	// grid that was 15% of the answer, in the direction the bias predicts.
+	auto crossing = [&](double target, int direction) {
+		int i = peak;
+		while (i > 0 && i + 1 < static_cast<int>(mags.size()) && mags[i] > target) {
 			i += direction;
 		}
-		// `i` is the first probe below half power and `i - direction` the last one
-		// above it. Linear in log f against log magnitude, which is the natural
-		// space for a filter skirt.
 		const int prev = i - direction;
 		const double m0 = std::log(mags[prev]);
 		const double m1 = std::log(mags[i]);
 		const double f0 = std::log(probes[prev]);
 		const double f1 = std::log(probes[i]);
-		const double t = (std::log(half_power) - m0) / (m1 - m0);
+		const double t = (std::log(target) - m0) / (m1 - m0);
 		return std::exp(f0 + t * (f1 - f0));
 	};
-	const double lower = crossing(peak, -1);
-	const double upper = crossing(peak, +1);
-	const double realized_q = measured_center / (upper - lower);
-	MESSAGE("-3 dB points " << lower << " .. " << upper << " Hz, realized Q "
-			<< realized_q << " against " << tuning::SCRUB_Q << " asked for");
-	CHECK(relative_error(realized_q, tuning::SCRUB_Q) < 0.02);
+
+	// The -10 dB width, in octaves, against the number measured off the recordings.
+	const double minus_10 = mags[peak] * 0.31622777;
+	const double lower = crossing(minus_10, -1);
+	const double upper = crossing(minus_10, +1);
+	const double width_oct = std::log2(upper / lower);
+	MESSAGE("-10 dB band " << lower << " .. " << upper << " Hz = " << width_oct
+			<< " octaves, against " << kart::core::kz_audio::SCRUB_WIDTH_OCT << " measured");
+	CHECK(relative_error(width_oct, kart::core::kz_audio::SCRUB_WIDTH_OCT) < 0.02);
+
+	// The skirts, over the same spans the recordings were fitted over: the octave
+	// below the peak and the two octaves above it.
+	auto db_at = [&](double f) {
+		const std::vector<double> one = svf_response(center, q, { f }, true, true);
+		return 20.0 * std::log10(one[0] / mags[peak]);
+	};
+
+	const double below_slope = db_at(center / 2.0) - db_at(center / 4.0);
+	const double above_slope = db_at(center * 4.0) - db_at(center * 2.0);
+	MESSAGE("skirts: " << below_slope << " dB/oct below, " << above_slope
+			<< " above; the recordings gave "
+			<< kart::core::kz_audio::SCRUB_SLOPE_BELOW_DB_OCT << " and "
+			<< kart::core::kz_audio::SCRUB_SLOPE_ABOVE_DB_OCT);
+
+	// **The band is asymmetric and that is the point of the tilt.** A band-pass on
+	// its own is symmetric by construction, so the two skirts would be equal and
+	// the upper one would be 6 dB/octave short of the measurement. This asserts the
+	// asymmetry exists and has the sign the recordings show.
+	CHECK(-above_slope > below_slope + 3.0);
+
+	// The upper skirt against the measurement. Within 1 dB/octave.
+	CHECK(std::fabs(above_slope - kart::core::kz_audio::SCRUB_SLOPE_ABOVE_DB_OCT) < 1.0);
+
+	// The lower skirt is knowingly about 2.5 dB/octave short of +9.7, and
+	// `SCRUB_TILT_LP_RATIO`'s comment says why closing it would be over-fitting
+	// three recordings of two passenger cars to a tire this project does not use.
+	// Asserted as a bound rather than left unstated, so that a change which made it
+	// worse would be caught.
+	CHECK(below_slope > 6.5);
+	CHECK(below_slope < kart::core::kz_audio::SCRUB_SLOPE_BELOW_DB_OCT);
+}
+
+TEST_CASE("the shipped defaults are the arithmetic on the measurement, not a retype") {
+	// `core/tuning.h`'s table has to hold literals — `Tunable` is `constexpr` and
+	// `std::pow` is not usable in one — so the two derived audio defaults are
+	// numbers written out by hand next to a citation explaining where they came
+	// from. That is exactly the "second owner of a justification" this project
+	// warns about, and the answer is to enforce the relationship rather than trust
+	// the comment.
+	const double q = tuning::band_q_for_width_oct(kart::core::kz_audio::SCRUB_WIDTH_OCT);
+	MESSAGE("band_q_for_width_oct(" << kart::core::kz_audio::SCRUB_WIDTH_OCT << ") = " << q
+			<< ", tuning.h carries " << kart::core::TUNABLES[kart::core::TUNE_SCRUB_Q].default_value);
+	CHECK(relative_error(kart::core::TUNABLES[kart::core::TUNE_SCRUB_Q].default_value, q) < 0.001);
+
+	const double n = tuning::wind_exponent_for_db_per_doubling(
+			kart::core::kz_audio::WIND_DB_PER_SPEED_DOUBLING);
+	MESSAGE(kart::core::kz_audio::WIND_DB_PER_SPEED_DOUBLING << " dB per doubling = exponent "
+			<< n << ", tuning.h carries "
+			<< kart::core::TUNABLES[kart::core::TUNE_WIND_SPEED_EXPONENT].default_value);
+	CHECK(relative_error(kart::core::TUNABLES[kart::core::TUNE_WIND_SPEED_EXPONENT].default_value, n)
+			< 0.005);
+
+	// And the center, which is a plain copy rather than arithmetic — checked anyway,
+	// because a plain copy is the easiest kind to let drift.
+	CHECK(kart::core::TUNABLES[kart::core::TUNE_SCRUB_CENTER_HZ].default_value ==
+			kart::core::kz_audio::SCRUB_PEAK_HZ);
+
+	// The config a scene gets with no tuning at all must agree with the table, or
+	// the overlay would open showing a value the synth is not using.
+	const ScrubWindConfig defaults;
+	CHECK(relative_error(defaults.scrub_q, q) < 1e-12);
+	CHECK(relative_error(defaults.wind_speed_exponent, n) < 1e-12);
+	CHECK(defaults.scrub_center_hz == kart::core::kz_audio::SCRUB_PEAK_HZ);
 }
 
 TEST_CASE("a rough surface moves the scrub band down and widens it") {
@@ -525,19 +596,34 @@ TEST_CASE("the layer gains are the only thing a scene may move") {
 	CHECK(settled_rms(synth, state) == 0.0);
 }
 
-TEST_CASE("the sourcing flags are still false, and this file is why that is fine") {
-	// The tripwire. `engine_synth.h` carries the mirror image of this assert and
-	// says why: if somebody measures a spectrum, the constants in `scrub_wind.h`
-	// stop being guesses and every `Provenance::Unsourced` row in `core/tuning.h`
-	// that cites this file becomes wrong.
+TEST_CASE("the sourcing state is what every citation in this layer assumes") {
+	// The tripwire, rewritten now that the sourcing pass has landed. It used to
+	// assert both flags were false; the scrub flag is now true and the wind flag is
+	// still false with a separate `WIND_SPECTRUM_SOURCED` beside it, because this
+	// repository measured a scrub band and did not measure any wind.
 	//
-	// A static_assert would be the stronger form and is deliberately not used here:
-	// this file must keep compiling while somebody is in the middle of doing that
-	// work. A failing CHECK with this message is the right amount of friction.
-	CHECK_MESSAGE(!kart::core::kz_audio::SCRUB_SPECTRUM_MEASURED,
-			"a scrub spectrum was measured: scrub_wind_tuning's SCRUB_* constants and "
-			"their core/tuning.h rows are still marked Unsourced and now lie");
+	// What this guards is the pair of caveats every citation in `core/tuning.h`
+	// rests on. `scrub_center_hz` and `scrub_q` are classified `Derived` rather than
+	// `Measured` **only** because the recordings are passenger-car radials. If
+	// somebody measures a kart slick, those rows become `Measured`, become defended,
+	// and the citations stop being true — and this is the check that says so.
+	//
+	// A `CHECK` and not a `static_assert`: this file has to keep compiling while
+	// somebody is in the middle of doing that work.
+	CHECK_MESSAGE(kart::core::kz_audio::SCRUB_SPECTRUM_MEASURED,
+			"the scrub spectrum flag went back to false: scrub_wind.h derives its "
+			"band from SCRUB_PEAK_HZ and SCRUB_WIDTH_OCT and core/tuning.h cites "
+			"the recordings, so both would now be citing nothing");
+	CHECK_MESSAGE(!kart::core::kz_audio::SCRUB_MEASURED_ON_KART_TIRE,
+			"a kart tire was measured: core/tuning.h classifies scrub_center_hz and "
+			"scrub_q as Derived specifically because the corpus is passenger-car "
+			"radials. They should be Measured now, which also makes them defended");
 	CHECK_MESSAGE(!kart::core::kz_audio::WIND_SPECTRUM_MEASURED,
-			"a wind spectrum was measured: scrub_wind_tuning's WIND_* constants and "
-			"their core/tuning.h rows are still marked Unsourced and now lie");
+			"a wind spectrum was measured here: WIND_DB_PER_SPEED_DOUBLING and the "
+			"slope are currently transcribed from two published motorcycle papers, "
+			"and their citations say so");
+	CHECK_MESSAGE(kart::core::kz_audio::WIND_SPECTRUM_SOURCED,
+			"the wind sourcing was withdrawn: wind_speed_exponent's 3.0 is 18 dB per "
+			"doubling from Brown and Gordon and Lower et al., and without them it is "
+			"the bare dipole guess scrub_wind.h originally refused to make");
 }

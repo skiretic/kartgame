@@ -169,6 +169,8 @@ var _tuning_panel: TuningPanel
 ## audio device. Held so the HUD can read `voice_stats()` — the worst-block
 ## render figure is the one that sees a dropout, and a mean never will.
 var _engine_voice: Object
+var _scrub_voice: Object
+var _wind_voice: Object
 
 var _physics_draw: PhysicsDraw
 var _camera_mode := "chase"
@@ -523,6 +525,12 @@ func _build_kart() -> void:
 	# The engine note, at the engine. Null under every headless gate, which have no
 	# audio device and must not need one — see `engine_voice_rig.gd`.
 	_engine_voice = EngineVoiceRig.attach(_kart)
+	# Tire scrub and wind. Issue #84. Three emitters, because the three are not in
+	# the same place: the note at the engine mount, the scrub at the rear axle, and
+	# the wind at the driver's head and not in the world at all.
+	var noise: Array = EngineVoiceRig.attach_noise(_kart)
+	_scrub_voice = noise[0]
+	_wind_voice = noise[1]
 
 	# So a session can start at a chosen curve instead of dialing back to it, and so
 	# that whatever value the brackets settle on is reproducible from a command.
@@ -712,11 +720,12 @@ func _build_tuning() -> void:
 	_tuning.set_vehicle_path(_tuning.get_path_to(_kart))
 
 	# The audio half. Null under every headless gate, where `EngineVoiceRig.attach`
-	# returns nothing because there is no audio device — so the five audio tunables
-	# simply have nobody listening, which is correct rather than broken.
+	# returns nothing because there is no audio device — so the thirteen audio
+	# tunables simply have nobody listening, which is correct rather than broken.
 	var voice_player := _kart.get_node_or_null("EngineVoice") as AudioStreamPlayer3D
 	if voice_player != null:
-		EngineVoiceRig.bind_tuning(_tuning, _engine_voice, voice_player)
+		EngineVoiceRig.bind_tuning(_tuning, _engine_voice, voice_player,
+				_scrub_voice, _wind_voice)
 
 	# `--steer-gamma=` still works and now goes through the registry, so a session
 	# started at a chosen curve reports itself as tuned instead of claiming to be at

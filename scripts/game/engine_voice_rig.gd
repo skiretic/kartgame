@@ -1,7 +1,8 @@
 class_name EngineVoiceRig
 extends RefCounted
 
-## The kart's engine note, mounted where the engine is. Issues #81, #82.
+## The kart's voice: the engine note, the tire scrub and the wind. Issues #81,
+## #82, #84.
 ##
 ## `src/audio/engine_voice.h` is the synthesizer's join to Godot's mixer and
 ## `src/core/engine_synth.h` is the synthesizer. This file is the *scene's* half of
@@ -26,8 +27,18 @@ extends RefCounted
 ## Nothing. Every number in this file is a tunable and says so, which is the
 ## distinction `kz_audio_reference.h` spends its header on. The spectral constants
 ## are sourced and live there; how loud the thing is and how fast it falls off with
-## distance are mixing decisions with no recording behind them. Issue #83 owns the
-## mixing pass, and this is the placeholder it will replace.
+## distance are mixing decisions with no recording behind them. **Issue #160** owns
+## the mixing pass, and this is the placeholder it will replace — #83 is shift and
+## clutch sounds and never owned it, which #160 exists to correct.
+##
+## ## Three emitters, and the wind one is not in the world
+##
+## The engine note is an `AudioStreamPlayer3D` at the engine mount. The scrub is an
+## `AudioStreamPlayer3D` at the kart, because M8's acceptance criterion is that an
+## opponent is locatable by ear and a tire is where the kart is. **The wind is a
+## plain `AudioStreamPlayer`** — it is at the driver's head, it is not a source in
+## the world, and attenuating or Doppler-shifting it would be nonsense. That is
+## also why there is one of it and never twelve.
 ##
 ## The one number here that is *not* arbitrary is the position, and it is not a
 ## number in this file at all — `KartBody.engine_mount_position()` serves it from
@@ -62,6 +73,29 @@ const MAX_DISTANCE := 150.0
 ## two volume controls in series is how a channel ends up mixed by whichever one
 ## somebody found first.
 const VOLUME_DB := 0.0
+
+## The two noise layers' gains, linear.
+##
+## **Placeholders in exactly the sense `VOICE_GAIN` is**, and the three of them are
+## the whole of what issue #160 has to settle. `src/core/tuning.h` carries the same
+## two values with the same reasoning and F2 moves them from the first drive; this
+## file is where they are applied rather than a second owner of them.
+const SCRUB_GAIN := 0.30
+const WIND_GAIN := 0.20
+
+## Where the scrub emitter sits, and how it falls off.
+##
+## At the middle of the rear axle rather than at any one contact patch: there is one
+## scrub layer for four corners — `kart_body.cpp` takes the mean of the four slip
+## angles and says why — so placing it at one wheel would put the sound of all four
+## in the wrong place three quarters of the time.
+##
+## A smaller unit size than the engine's, deliberately. The engine has to stay
+## audible across a field; scrub is the cue that tells you *your* tires are going,
+## and one that carried as far as the engine would make somebody else's slide sound
+## like yours.
+const SCRUB_UNIT_SIZE := 2.0
+const SCRUB_MAX_DISTANCE := 60.0
 
 ## Build the voice, parent it to the kart, and point the kart at it.
 ##
@@ -122,6 +156,64 @@ static func attach(kart: KartBody) -> Object:
 	return stream
 
 
+## Build the two noise layers and point the kart at them. Issue #84.
+##
+## Returns `[scrub_stream, wind_stream]`, either of which may be null, so a caller
+## can read `voice_stats()` for the HUD. Separate from `attach` rather than folded
+## into it because a scene may legitimately want the engine and not these — the
+## turntable and the look scenes do — and because the failure of one layer to
+## register should not take the engine note with it.
+static func attach_noise(kart: KartBody) -> Array:
+	if kart == null:
+		return [null, null]
+	# Absent rather than broken, same as `attach`: `drive.sh` runs under the Dummy
+	# driver and `tests/run.sh` has no engine at all.
+	if not ClassDB.class_exists("NoiseVoiceStream"):
+		return [null, null]
+
+	# LAYER_SCRUB = 0, LAYER_WIND = 1. Named through the property rather than by
+	# integer at each call site would be better, but `ClassDB.instantiate` hands back
+	# an `Object` and the enum is only reachable through the class. The C++ side
+	# clamps anything that is not 1 to scrub, so a wrong value here is a scrub layer
+	# in the wrong place and not undefined behavior.
+	var scrub_stream: AudioStream = ClassDB.instantiate("NoiseVoiceStream")
+	var wind_stream: AudioStream = ClassDB.instantiate("NoiseVoiceStream")
+	if scrub_stream == null or wind_stream == null:
+		return [null, null]
+	scrub_stream.set("layer", 0)
+	scrub_stream.set("gain", SCRUB_GAIN)
+	wind_stream.set("layer", 1)
+	wind_stream.set("gain", WIND_GAIN)
+
+	var scrub_player := AudioStreamPlayer3D.new()
+	scrub_player.name = "ScrubVoice"
+	scrub_player.stream = scrub_stream
+	scrub_player.volume_db = VOLUME_DB
+	scrub_player.unit_size = SCRUB_UNIT_SIZE
+	scrub_player.max_distance = SCRUB_MAX_DISTANCE
+	scrub_player.position = kart.rear_axle_position()
+	kart.add_child(scrub_player)
+	scrub_player.autoplay = true
+	if scrub_player.is_inside_tree():
+		scrub_player.play()
+
+	# Not an `AudioStreamPlayer3D`, and not parented to the kart either. Wind is what
+	# the driver hears, not what the world emits; a 3D player would attenuate it with
+	# the chase camera's distance, which is exactly backwards.
+	var wind_player := AudioStreamPlayer.new()
+	wind_player.name = "WindVoice"
+	wind_player.stream = wind_stream
+	wind_player.volume_db = VOLUME_DB
+	kart.add_child(wind_player)
+	wind_player.autoplay = true
+	if wind_player.is_inside_tree():
+		wind_player.play()
+
+	kart.scrub_voice_player = NodePath("ScrubVoice")
+	kart.wind_voice_player = NodePath("WindVoice")
+	return [scrub_stream, wind_stream]
+
+
 ## Route the five audio tunables from a `KartTuning` into this voice.
 ##
 ## **This is the half of the registry that `KartTuning` deliberately cannot do.**
@@ -139,7 +231,8 @@ static func attach(kart: KartBody) -> Object:
 ## The three constants above stay as the defaults they always were —
 ## `src/core/tuning.h` carries the same three values and the same reasoning, and
 ## this file is where they are applied rather than a second owner of them.
-static func bind_tuning(tuning: Node, stream: Object, player: AudioStreamPlayer3D) -> void:
+static func bind_tuning(tuning: Node, stream: Object, player: AudioStreamPlayer3D,
+		scrub_stream: Object = null, wind_stream: Object = null) -> void:
 	if tuning == null or player == null:
 		return
 	var apply := func(key: String, value: float, _owner: int) -> void:
@@ -157,9 +250,25 @@ static func bind_tuning(tuning: Node, stream: Object, player: AudioStreamPlayer3
 			"noise_gain":
 				if stream != null:
 					stream.set("noise_gain", value)
+			# Issue #84's eight. The two gains land on the streams; the six spectral
+			# rows land on the C++ config, which the playback re-reads every mix
+			# block — see `NoiseVoiceStream::set_tuning_*`.
+			"scrub_gain":
+				if scrub_stream != null:
+					scrub_stream.set("gain", value)
+			"wind_gain":
+				if wind_stream != null:
+					wind_stream.set("gain", value)
+			"scrub_center_hz", "scrub_q", "scrub_gamma", "scrub_full_speed":
+				if scrub_stream != null:
+					scrub_stream.set(key, value)
+			"wind_cutoff_per_ms", "wind_speed_exponent":
+				if wind_stream != null:
+					wind_stream.set(key, value)
 			# Every other key belongs to the vehicle or the controller and is
 			# applied by the registry itself. Not an error, and not silent either:
-			# falling through here is the normal case for nine of the fourteen.
+			# falling through here is the normal case for the nine that are not
+			# audio at all.
 			_:
 				pass
 	tuning.tuning_changed.connect(apply)

@@ -281,6 +281,13 @@ func _report() -> void:
 	_lines.append("    the coefficient update is once per block. A large spread here would")
 	_lines.append("    mean scrub_wind.h is doing per-sample work it did not intend to.")
 	_lines.append("")
+	_lines.append("    **The wind pass is the control, and read it before believing a spread.**")
+	_lines.append("    WindSynth never reads `surface` at all, so its `fast corner grass` cell")
+	_lines.append("    is by construction the same arithmetic as its `fast corner asphalt` one.")
+	_lines.append("    Whatever those two differ by is measurement noise on this machine, and")
+	_lines.append("    it bounds how much of the scrub column's spread can be real. Runs have")
+	_lines.append("    come back with 15% between two cells that execute identical code.")
+	_lines.append("")
 
 	# The budget, which is the reason the probe exists. #152's twelve-voice figure
 	# is what this lands on top of.

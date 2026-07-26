@@ -92,17 +92,26 @@
 //
 // Tire scrub and wind. §12 specifies both, and `EngineAudioInput` carries `scrub`
 // and `speed_ms` for them, and **both fields are read by nothing in this file.**
-// `kz_audio::SCRUB_SPECTRUM_MEASURED` and `kz_audio::WIND_SPECTRUM_MEASURED` are
-// false: no recording in the corpus isolates either layer, so their filter shapes
-// would have to be invented, and §5 item 10 is the rule that says do not. The
-// modulation is free and the spectrum is not, and a layer with a made-up spectrum
-// is indistinguishable from a measured one six months later.
-static_assert(!kart::core::kz_audio::SCRUB_SPECTRUM_MEASURED &&
-				!kart::core::kz_audio::WIND_SPECTRUM_MEASURED,
-		"someone measured a scrub or wind spectrum; engine_synth.h deliberately "
-		"leaves EngineAudioInput::scrub and ::speed_ms unread because nothing "
-		"constrained those filters, and this assert exists so that flipping the "
-		"flag brings you here instead of leaving the fields silently ignored");
+// They are read by `core/scrub_wind.h`, which is a separate synthesizer feeding
+// separate players — scrub positional on the kart, wind non-positional at the
+// driver's head — because the two layers have to be separable at the mixer and a
+// class rendering all three into one buffer could not be.
+//
+// **This paragraph used to be a refusal and it is now a division of labor**, which
+// is worth stating because the refusal is the more instructive half. For two
+// milestones both spectrum flags in `kz_audio_reference.h` were false, nothing in
+// this project's corpus isolated either layer, and building them here would have
+// meant inventing a filter shape — §5 item 10 is the rule that says do not, and a
+// layer with a made-up spectrum is indistinguishable from a measured one six
+// months later. Issue #84's sourcing pass then went and measured one. The assert
+// below fired when that flag flipped, which is exactly what it was for.
+static_assert(kart::core::kz_audio::SCRUB_SPECTRUM_MEASURED &&
+				!kart::core::kz_audio::SCRUB_MEASURED_ON_KART_TIRE,
+		"the scrub sourcing state changed: core/scrub_wind.h derives its band from "
+		"kz_audio::SCRUB_PEAK_HZ and SCRUB_WIDTH_OCT, and core/tuning.h classifies "
+		"those rows Derived specifically because the measurement is on a passenger "
+		"car radial. If a kart tire was measured, both of those have to change and "
+		"this assert exists so that flipping the flag brings you here");
 
 namespace kart::core {
 

@@ -199,6 +199,14 @@ enum TunableId : int {
 	TUNE_VOICE_MAX_DISTANCE,
 	TUNE_COMB_DEPTH,
 	TUNE_NOISE_GAIN,
+	TUNE_SCRUB_GAIN,
+	TUNE_SCRUB_CENTER_HZ,
+	TUNE_SCRUB_Q,
+	TUNE_SCRUB_GAMMA,
+	TUNE_SCRUB_FULL_SPEED,
+	TUNE_WIND_GAIN,
+	TUNE_WIND_CUTOFF_PER_MS,
+	TUNE_WIND_SPEED_EXPONENT,
 
 	TUNABLE_COUNT,
 };
@@ -385,6 +393,101 @@ inline constexpr Tunable TUNABLES[TUNABLE_COUNT] = {
 			"No measurement at all -- issue #159 names it as the clearest example "
 			"of a guess in this project. Listen for: too little and the note is a "
 			"synthesizer, too much and it stops being a two-stroke.",
+			TuningOwner::Audio,
+	},
+
+	// Issue #84's two layers. **Eight rows and every one of them Unsourced**, which
+	// is not an accident and is the reason they are in this table at all.
+	//
+	// docs/REFERENCES.md records the search: no recording in this project's corpus
+	// isolates a tire or the airflow from an engine running over the top of it, and
+	// ARCHITECTURE.md §5 item 10 forbids inventing a spectrum and calling it
+	// sourced. So the timbre of both layers is a guess, the guess is labeled, and
+	// the labeling is what turns it into a knob somebody can turn on F2 from the
+	// first drive instead of a number nobody wrote down.
+	//
+	// The *drive* -- slip angle per corner, road speed, surface -- has no row here
+	// because it is solver truth and there is nothing to tune about it. That
+	// asymmetry is the whole shape of #84 and this block is where it shows.
+	{
+			"scrub_gain", "tire scrub gain", "", "src/core/scrub_wind.h",
+			0.30, 0.0, 1.00, 0.01, Provenance::Unsourced,
+			"A placeholder in the sense voice_gain is: set so a first drive cannot "
+			"be painful, with nothing yet to be loud relative to. Issue #160 owns "
+			"the mixing pass. Listen for: scrub has to signal grip loss before the "
+			"visuals do, and it cannot do that under the engine.",
+			TuningOwner::Audio,
+	},
+	{
+			"scrub_center_hz", "scrub band center", "Hz", "src/core/scrub_wind.h",
+			1000.0, 200.0, 4000.0, 25.0, Provenance::Derived,
+			"kz_audio::SCRUB_PEAK_HZ, the median peak over three CC0 field "
+			"recordings of rubber scrubbing on asphalt -- REFERENCES.md has the "
+			"corpus and the separation method. Derived and not Measured because "
+			"every one is a passenger-car radial and a kart slick is a different "
+			"tire; the transfer is what you are turning. Listen for: too high is a "
+			"whistle rather than a squeal.",
+			TuningOwner::Audio,
+	},
+	{
+			"scrub_q", "scrub band Q", "", "src/core/scrub_wind.h",
+			6.402, 0.30, 20.00, 0.10, Provenance::Derived,
+			"From the measured 0.67 octave -10 dB width: 3 / (2^(W/2) - 2^(-W/2)). "
+			"test_scrub_wind.cpp measures the width back out of the shipped filter "
+			"and asserts this value against the formula, so the two cannot drift. "
+			"The recordings aggregate events whose peak moves, so the width is an "
+			"upper bound and this Q is a lower one. Listen for: too much rings like "
+			"a sine on every corner.",
+			TuningOwner::Audio,
+	},
+	{
+			"scrub_gamma", "scrub onset shaping", "", "src/core/scrub_wind.h",
+			1.60, 0.40, 4.00, 0.05, Provenance::Unsourced,
+			"Exponent on the 0..1 slip drive, and the knob #84's acceptance "
+			"criterion turns on. Below 1 the layer is audible from the first degree "
+			"of slip; above 1 it stays quiet until the tire is genuinely past its "
+			"peak. Listen for: earlier warning against a layer that is always on "
+			"and therefore signals nothing.",
+			TuningOwner::Audio,
+	},
+	{
+			"scrub_full_speed", "scrub full-level speed", "m/s", "src/core/scrub_wind.h",
+			12.00, 2.00, 40.00, 0.50, Provenance::Unsourced,
+			"Where the speed ramp saturates. That there IS a ramp is derived -- "
+			"radiated power follows dissipated power, which is force times slip "
+			"velocity, so a stationary kart is silent whatever its slip angle. "
+			"Listen for: a low-speed spin as loud as a 100 km/h slide means this is "
+			"too low.",
+			TuningOwner::Audio,
+	},
+	{
+			"wind_gain", "wind layer gain", "", "src/core/scrub_wind.h",
+			0.20, 0.0, 1.00, 0.01, Provenance::Unsourced,
+			"Placeholder, same as scrub_gain, and #160 owns it. Listen for: #84 "
+			"says explicitly that wind masking the engine anywhere in the range is "
+			"wrong, and so is wind that is inaudible at the end of the straight.",
+			TuningOwner::Audio,
+	},
+	{
+			"wind_cutoff_per_ms", "wind cutoff per speed", "Hz s/m",
+			"src/core/scrub_wind.h",
+			26.00, 2.00, 120.00, 1.00, Provenance::Unsourced,
+			"Turbulent noise peaks at a Strouhal frequency f = St*U/L, so the "
+			"corner moves with speed and wind gets brighter rather than only "
+			"louder. The proportionality is derived; St and L folded into one "
+			"number are not. Listen for: character that does not change between a "
+			"hairpin exit and the end of the straight means this is too small.",
+			TuningOwner::Audio,
+	},
+	{
+			"wind_speed_exponent", "wind level exponent", "", "src/core/scrub_wind.h",
+			3.00, 0.50, 5.00, 0.10, Provenance::Derived,
+			"Level goes as (speed / 38 m/s) ^ this, and 18 dB per doubling is an "
+			"exponent of 3. Brown and Gordon 2011 measured ~20 dB/doubling under a "
+			"helmet and Lower et al. 1994 measured 15.5 on the open road; "
+			"kz_audio::WIND_DB_PER_SPEED_DOUBLING takes 18. Derived because both "
+			"are motorcycles and a kart has no windscreen, which is what set the "
+			"level in the 1994 paper.",
 			TuningOwner::Audio,
 	},
 };

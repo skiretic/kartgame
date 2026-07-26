@@ -2,6 +2,7 @@
 
 #include "audio/audio_probe.h"
 #include "audio/engine_voice.h"
+#include "audio/noise_voice.h"
 #include "kart_core.h"
 #include "kart_random.h"
 #include "kart_state_hash.h"
@@ -62,6 +63,16 @@ void initialize_kartgame_module(ModuleInitializationLevel p_level) {
 	// known to ClassDB before any stream can hand one back.
 	GDREGISTER_CLASS(kartgame::EngineVoicePlayback);
 	GDREGISTER_CLASS(kartgame::EngineVoiceStream);
+
+	// Tire scrub and wind. Issue #84, §12.
+	//
+	// One class for both layers, with a `layer` property — the difference between
+	// them is entirely in how a scene mounts them, scrub on an `AudioStreamPlayer3D`
+	// at the kart and wind on a plain `AudioStreamPlayer` at the driver's head.
+	// Same registration-order rule as above and the same silent failure if it is
+	// forgotten.
+	GDREGISTER_CLASS(kartgame::NoiseVoicePlayback);
+	GDREGISTER_CLASS(kartgame::NoiseVoiceStream);
 
 	// The tuning boundary. ROADMAP M3b, issue #159, ADR-0037.
 	//

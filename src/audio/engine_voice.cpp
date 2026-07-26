@@ -12,13 +12,6 @@ namespace kartgame {
 
 namespace {
 
-// How many times a seqlock read may retry before giving up and repeating the last
-// good snapshot. 64, matching the probe: far more than a 120 Hz writer can force,
-// and bounded because an unbounded spin on the audio thread is a lock by another
-// name. ADR-0035 counted "gave up" separately from "torn" for the same reason this
-// file does — merging them reported 1022 phantom torn reads.
-constexpr int64_t SEQ_RETRY_BUDGET = 64;
-
 int64_t now_ns() {
 	return std::chrono::duration_cast<std::chrono::nanoseconds>(
 			std::chrono::steady_clock::now().time_since_epoch())
@@ -47,52 +40,11 @@ void EngineVoiceStream::_bind_methods() {
 }
 
 void EngineVoiceStream::publish(const kart::core::EngineAudioInput &p_input) {
-	// Enter the write: the counter goes odd, and the release ordering means no
-	// reader can observe the odd counter *after* observing a byte of the payload
-	// written below it.
-	const uint32_t start = _seq.load(std::memory_order_relaxed);
-	_seq.store(start + 1u, std::memory_order_release);
-	std::atomic_thread_fence(std::memory_order_release);
-
-	_payload = p_input;
-
-	// Leave the write. The fence before this store is what makes the payload
-	// visible to a reader that then sees an even, unchanged counter.
-	std::atomic_thread_fence(std::memory_order_release);
-	_seq.store(start + 2u, std::memory_order_release);
+	_state.publish(p_input);
 }
 
 bool EngineVoiceStream::read(kart::core::EngineAudioInput &r_input) const {
-	int64_t retries = 0;
-	for (;;) {
-		const uint32_t first = _seq.load(std::memory_order_acquire);
-		if ((first & 1u) != 0u) {
-			// A write is in progress. Nothing to do but look again.
-			++retries;
-			if (retries > SEQ_RETRY_BUDGET) {
-				break;
-			}
-			continue;
-		}
-		// `memcpy` rather than assignment, deliberately: the source is being written
-		// concurrently, so this is a racy read by construction and the validation
-		// below is what makes it safe. A struct assignment would be the same machine
-		// code with a stronger implication about it.
-		std::memcpy(&r_input, &_payload, sizeof(r_input));
-		std::atomic_thread_fence(std::memory_order_acquire);
-		const uint32_t second = _seq.load(std::memory_order_relaxed);
-		if (first == second) {
-			_seq_retries.fetch_add(retries, std::memory_order_relaxed);
-			return true;
-		}
-		++retries;
-		if (retries > SEQ_RETRY_BUDGET) {
-			break;
-		}
-	}
-	_seq_retries.fetch_add(retries, std::memory_order_relaxed);
-	_seq_gave_up.fetch_add(1, std::memory_order_relaxed);
-	return false;
+	return _state.read(r_input);
 }
 
 void EngineVoiceStream::set_gain(double p_gain) {
@@ -132,8 +84,8 @@ Dictionary EngineVoiceStream::voice_stats() const {
 	d["mix_calls"] = calls;
 	d["partials"] = _partials.load(std::memory_order_relaxed);
 	d["mix_rate"] = rate;
-	d["seq_gave_up"] = _seq_gave_up.load(std::memory_order_relaxed);
-	d["seq_retries"] = _seq_retries.load(std::memory_order_relaxed);
+	d["seq_gave_up"] = _state.gave_up();
+	d["seq_retries"] = _state.retries();
 
 	// Per frame, because the block size is the device's choice and the frame period
 	// is the deadline's unit.
@@ -168,8 +120,7 @@ void EngineVoiceStream::reset_stats() {
 	_render_frames_total.store(0, std::memory_order_relaxed);
 	_render_ns_worst.store(0, std::memory_order_relaxed);
 	_worst_block_frames.store(0, std::memory_order_relaxed);
-	_seq_gave_up.store(0, std::memory_order_relaxed);
-	_seq_retries.store(0, std::memory_order_relaxed);
+	_state.reset_counters();
 }
 
 Ref<AudioStreamPlayback> EngineVoiceStream::_instantiate_playback() const {

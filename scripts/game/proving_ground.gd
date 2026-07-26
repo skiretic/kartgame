@@ -118,6 +118,8 @@ var _driving_hud: Control
 ## audio device. Held so the HUD can read `voice_stats()` — the worst-block
 ## render figure is the one that sees a dropout, and a mean never will.
 var _engine_voice: Object
+var _scrub_voice: Object
+var _wind_voice: Object
 
 var _physics_draw: PhysicsDraw
 var _camera_mode := "chase"
@@ -453,6 +455,12 @@ func _build_kart() -> void:
 	# The engine note, at the engine. Null under every headless gate, which have no
 	# audio device and must not need one — see `engine_voice_rig.gd`.
 	_engine_voice = EngineVoiceRig.attach(_kart)
+	# Tire scrub and wind. Issue #84. Three emitters, because the three are not in
+	# the same place: the note at the engine mount, the scrub at the rear axle, and
+	# the wind at the driver's head and not in the world at all.
+	var noise: Array = EngineVoiceRig.attach_noise(_kart)
+	_scrub_voice = noise[0]
+	_wind_voice = noise[1]
 
 	_physics_draw = PhysicsDraw.new()
 	_physics_draw.name = "PhysicsDraw"
