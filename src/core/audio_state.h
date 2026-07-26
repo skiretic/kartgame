@@ -1,6 +1,8 @@
 #ifndef KART_CORE_AUDIO_STATE_H
 #define KART_CORE_AUDIO_STATE_H
 
+#include "core/kz_audio_reference.h"
+
 // The vocabulary the vehicle solver and the audio synthesizer share.
 //
 // `vehicle_state.h` is the same idea for the physics boundary and says why at
@@ -141,19 +143,36 @@ struct EngineAudioConfig {
 	// is not part of that budget, it is just the volume.
 	double gain = 0.35;
 
-	// Where the harmonic stack stops filling, Hz. Defaults to
-	// `kz_audio::STACK_CEILING_HZ`, which is a tunable and says so.
-	double stack_ceiling_hz = 8000.0;
+	// Where the harmonic stack stops filling, Hz. A tunable, and
+	// `kz_audio::STACK_CEILING_HZ` says so at length.
+	//
+	// **Named rather than retyped.** These three defaults used to be literals with
+	// comments saying which constant they matched, which is precisely the drift
+	// `kz_reference.h`'s own header warns about — "duplicating them into a test
+	// file is how they drift". Including the reference header costs nothing; both
+	// are header-only constants with no godot-cpp.
+	double stack_ceiling_hz = kz_audio::STACK_CEILING_HZ;
 
-	// Comb delay, seconds. Defaults to `kz_audio::COMB_DELAY_MEASURED_S`, which is
-	// a **lower bound measured on a 50 cc pipe** and not a KZ figure. A caller
-	// raising it is doing the right thing; a caller treating the default as
-	// established is not.
-	double comb_delay_s = 0.00142;
+	// Comb delay, seconds. A **lower bound measured on a 50 cc pipe** and not a KZ
+	// figure. A caller raising it is doing the right thing; a caller treating the
+	// default as established is not.
+	double comb_delay_s = kz_audio::COMB_DELAY_MEASURED_S;
 
 	// Comb depth, 0..1. The measured ripple is 1.6-2.6 dB RMS, which is a gentle
 	// filter and nothing like the deep metallic comb a first guess reaches for.
-	double comb_depth = 0.25;
+	//
+	// 0.30 rather than 0.25, because 0.25 was a guess that landed just outside the
+	// band it was supposed to sit in. Measured through the synth's own comb
+	// (feed-forward, normalized by 1/(1+d), fractional delay), depth against
+	// realized ripple in dB RMS:
+	//
+	//     0.20 -> 1.22    0.25 -> 1.53    0.30 -> 1.85    0.35 -> 2.16
+	//     0.40 -> 2.49    0.45 -> 2.81
+	//
+	// 0.30 is the smallest default that lands inside 1.6-2.6. The band's midpoint
+	// is 0.34. `tests/core/test_engine_synth.cpp` prints that table, so this is
+	// evidence rather than a claim.
+	double comb_depth = 0.30;
 
 	// Broadband noise layer, linear, relative to the harmonic stack.
 	double noise_gain = 0.12;

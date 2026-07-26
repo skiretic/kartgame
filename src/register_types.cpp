@@ -1,5 +1,6 @@
 #include "register_types.h"
 
+#include "audio/audio_probe.h"
 #include "kart_core.h"
 #include "kart_random.h"
 #include "kart_state_hash.h"
@@ -35,6 +36,17 @@ void initialize_kartgame_module(ModuleInitializationLevel p_level) {
 	// and hands it the mesh and collision shape this class deliberately does not
 	// own. ROADMAP M3b, issues #30 and #31.
 	GDREGISTER_CLASS(kartgame::KartBody);
+
+	// The M8 audio boundary probe. Issue #81, ADR-0035.
+	//
+	// All three are registered even though only `AudioProbe` is ever constructed
+	// from GDScript: `AudioProbeStream::_instantiate_playback` returns an
+	// `AudioProbePlayback`, and an unregistered class has no virtual bindings, so
+	// Godot would call the base `_mix` and the probe would measure nothing while
+	// looking like it worked.
+	GDREGISTER_CLASS(kartgame::AudioProbePlayback);
+	GDREGISTER_CLASS(kartgame::AudioProbeStream);
+	GDREGISTER_CLASS(kartgame::AudioProbe);
 }
 
 void uninitialize_kartgame_module(ModuleInitializationLevel p_level) {

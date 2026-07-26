@@ -161,14 +161,60 @@ inline constexpr double ONPIPE_LADDER_DB[LADDER_POINTS] = {
 	0.0, 3.5, 5.5, 5.5, 9.5, 10.3, 9.6, 9.3, 7.5, 6.2, 5.9, 4.9
 };
 
-// Fitted decay, dB per doubling of harmonic number. Carried separately from the
-// ladders because it is what the fit actually established and the ladders are the
-// samples it was fitted through; a caller extrapolating past h24 must use this and
-// not the last two table entries.
-inline constexpr double DECAY_DB_PER_DOUBLING_PIPE = -2.95; // D-7 and Colibri, mean
-inline constexpr double DECAY_DB_PER_DOUBLING_ONPIPE = -0.4; // D-9
-inline constexpr double DECAY_DB_PER_DOUBLING_MUFFLER = -6.7; // chainsaw, the control
-inline constexpr double DECAY_DB_PER_DOUBLING_ONE_OVER_N = -6.02; // what a synth defaults to
+// Decay, dB per doubling of harmonic number — and **there are two of these and
+// they disagree**, which is stated here rather than resolved by picking one.
+//
+// `REFERENCES.md`'s engine-audio section publishes a fitted slope beside each
+// ladder. Least squares of the tabulated ladders above against log2(h), over the
+// twelve indices actually tabulated:
+//
+//     table       published    fit of this table    endpoint, h24/log2(24)
+//     PIPE          -2.95           -1.92                  -1.97
+//     D-7           -2.70           -1.95                  -2.03
+//     Colibri       -3.20           -1.89                  -1.92
+//     D-9           -0.40           +1.04                  +1.07
+//     Chainsaw      -6.70           -6.20                  -5.76
+//
+// Every table's least-squares fit agrees with its own endpoint slope to about
+// 0.1 dB, so the **tables are internally consistent**; it is the published slopes
+// that do not describe them. The likeliest explanation is that the published fits
+// were taken over the full contiguous h1-h24 data, where eighteen of twenty-four
+// points sit in the falling upper half, while `LADDER_INDEX` thins to six points
+// below h6 and six above and so re-weights the fit.
+//
+// **That explanation does not cover the D-9, whose two figures differ in sign.**
+// A ladder whose h24 sits 4.9 dB *above* its h1 cannot fit a negative slope by
+// any weighting. Either the published -0.4 or the tabulated +4.9 is wrong, and it
+// cannot be settled from here: `REFERENCES.md` records that the analysis scripts
+// live in a session scratchpad rather than in this repository, so there is
+// nothing to re-run. Filed rather than guessed.
+//
+// **The conclusion the whole section rests on is unaffected, and is strengthened.**
+// The claim is that a racing two-stroke's stack is far flatter than a muffler's,
+// and that a synthesizer's default 1/n is a chainsaw. On the published figures
+// that gap is 2.3 dB per doubling; on the tables it is 4.3, and the on-pipe ladder
+// does not decay at all. Nothing about "build it on the default and it sounds like
+// a chainsaw" depends on which set is right.
+//
+// The constants below are **the fits of the tables**, because they are what a
+// caller extrapolating past h24 needs: using the published slope instead puts a
+// 1.0 dB per doubling kink at h24 in the pipe ladder and 1.4 in the on-pipe one,
+// which is a discontinuity in a curve whose whole job is to be smooth. The
+// published figures are carried beside them so the disagreement stays visible.
+inline constexpr double DECAY_DB_PER_DOUBLING_PIPE = -1.92; // fit of PIPE_LADDER_DB
+inline constexpr double DECAY_DB_PER_DOUBLING_ONPIPE = 1.04; // fit of ONPIPE_LADDER_DB
+inline constexpr double DECAY_DB_PER_DOUBLING_MUFFLER = -6.20; // fit of CHAINSAW_LADDER_DB
+
+// What `REFERENCES.md` publishes. Not used by the synth; here so the two numbers
+// sit side by side and a reader cannot find one without the other.
+inline constexpr double DECAY_PUBLISHED_PIPE = -2.95;
+inline constexpr double DECAY_PUBLISHED_ONPIPE = -0.4;
+inline constexpr double DECAY_PUBLISHED_MUFFLER = -6.7;
+
+// Exact, and the only figure here that is arithmetic rather than measurement:
+// 20*log10(1/2) is what a 1/n stack does per doubling. This is the thing not to
+// sound like, and it sits within 0.2 dB of the measured chainsaw.
+inline constexpr double DECAY_DB_PER_DOUBLING_ONE_OVER_N = -6.02;
 
 // How far up the stack partials were measured to stand clear of the noise floor.
 //
