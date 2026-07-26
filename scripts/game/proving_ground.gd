@@ -468,6 +468,12 @@ func _build_kart() -> void:
 	# and only one of the two mixes was ever judged.
 	EngineVoiceRig.attach_listener(_kart)
 
+	# `--auto-shift=off` starts in the manual box, so a session that is about the
+	# gearbox does not begin by reaching for a key. Defaults to the assist's own
+	# default rather than to a literal, so this flag cannot become a second owner
+	# of what "on" means.
+	_kart.auto_shift = Cmdline.as_bool(_args, "auto-shift", _kart.auto_shift)
+
 	_physics_draw = PhysicsDraw.new()
 	_physics_draw.name = "PhysicsDraw"
 	add_child(_physics_draw)
@@ -692,6 +698,19 @@ func _build_hud() -> void:
 func _process(_delta: float) -> void:
 	if Input.is_action_just_pressed(&"camera_cycle"):
 		_set_camera_mode(_next_camera_mode())
+	# The gearbox. `drivetrain.h` defaults `auto_shift` on and until now **nothing
+	# could turn it off** — no key, no pad button, no command-line flag, no registry
+	# row — so R1 and L1 fired `request_shift_up` into an assist that immediately
+	# shifted again on its own, and the box read as automatic. Issue #40's "assists
+	# off" was never reachable from the game.
+	#
+	# Auto-shift only, and auto-clutch deliberately left alone: `project.godot`
+	# binds the clutch to a **button** rather than an axis, because a DualSense's
+	# two triggers are already throttle and brake. An unassisted launch needs clutch
+	# modulation (#38) and a digital clutch cannot supply it, so "assists off" on a
+	# pad would be a mode nobody can drive away in.
+	if _kart != null and Input.is_action_just_pressed(&"auto_shift_toggle"):
+		_kart.auto_shift = not _kart.auto_shift
 	# `look_back` has been bound in `project.godot` and printed in this HUD since
 	# M3a, and until now **nothing read it** — C and Triangle did nothing at all.
 	# That is the exact failure CLAUDE.md's driving section opens with, one level
@@ -823,9 +842,14 @@ func _next_camera_mode() -> String:
 ## moving.
 func _hud_text() -> String:
 	var lines: Array[String] = []
-	lines.append("%5.1f km/h   gear %d   %5.0f rpm   %d/4 wheels down   camera: %s" % [
-		_kart.speed_ms * 3.6, _kart.get_gear(), _kart.get_engine_rpm(),
-		_kart.wheels_on_ground, _camera_mode,
+	# The gearbox mode is on the glance line rather than the telemetry panel because
+	# it changes what the driver's own hands do. Without it, "the box is automatic"
+	# and "I have auto-shift on" are the same observation and only one of them is a
+	# bug report.
+	lines.append("%5.1f km/h   gear %d%s   %5.0f rpm   %d/4 wheels down   camera: %s" % [
+		_kart.speed_ms * 3.6, _kart.get_gear(),
+		" auto" if _kart.auto_shift else " MANUAL",
+		_kart.get_engine_rpm(), _kart.wheels_on_ground, _camera_mode,
 	])
 	lines.append("throttle %.2f  brake %.2f  steer %+.2f (%+.1f deg)   %+.2f lat  %+.2f long g" % [
 		_kart.throttle_input, _kart.brake_input, _kart.steer_input,
@@ -847,7 +871,7 @@ func _hud_text() -> String:
 	# `debug_*` actions: F3, F4, F5.
 	lines.append(
 		"W/S throttle-brake  A/D steer  E/Q shift up-down  Shift clutch  "
-		+ "C look back  R respawn  V camera (chase/cockpit/free)"
+		+ "C look back  R respawn  V camera (chase/cockpit/free)  G auto-shift"
 	)
 	lines.append("F3 telemetry  F4 freeze frustum  F5 physics draw")
 	return "\n".join(lines)
