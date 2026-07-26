@@ -2,7 +2,11 @@
 
 A physically-grounded KZ shifter kart racing sim. Free, open source, built in the open.
 
-**Status: M2, the Blender pipeline.** The C++ extension builds and loads on macOS, Windows, and Linux. Look development is done — physical sun, AgX, baked GI, motion blur. A KZ kart is generated from a parameter block in Blender and imports into Godot at exact scale, byte-identically between runs. No vehicle physics yet. See [`docs/ROADMAP.md`](docs/ROADMAP.md) for what is being built and in what order.
+**Status: M3b, the vehicle.** The C++ extension builds and loads on macOS, Windows, and Linux. Look development is done — physical sun, AgX, baked GI, motion blur. A KZ kart is generated from a parameter block in Blender and imports into Godot at exact scale, byte-identically between runs.
+
+The vehicle solver is engine-free C++ under `src/core/`, held by 180 test cases and 266,816 assertions that run in seconds with no engine at all, and it now drives: `src/vehicle/kart_body.cpp` is the `RigidBody3D` that casts the suspension rays, calls the solver and applies the forces. The kart settles within 2 µm of its predicted rest height and its static corner loads sum to `m·g` to 0.02 N.
+
+It does not yet drive *well*, and that is recorded rather than smoothed over — past a quarter of steering lock it scrubs off most of its speed ([#137](https://github.com/skiretic/kartgame/issues/137)), and the judgements the milestone turns on cannot be made without engine sound and a driving HUD ([#138](https://github.com/skiretic/kartgame/issues/138)). See [`docs/ROADMAP.md`](docs/ROADMAP.md) for what is being built and in what order, and [`docs/DECISIONS.md`](docs/DECISIONS.md) for what earlier sessions got wrong.
 
 ---
 
@@ -15,7 +19,7 @@ Everything else follows from taking that seriously:
 - Per-wheel suspension raycasts, Pacejka-style tire model, load-sensitive grip, emergent weight transfer
 - 6-speed sequential gearbox, clutch, heavy two-stroke engine braking, ~45 hp at 13,000 rpm
 - Solver substepping at 240 Hz inside a 120 Hz fixed tick
-- Validated against real KZ performance figures — ~140 km/h, ~3.5 s to 100 km/h, 2.0–2.5 g lateral — as an automated test suite, not by feel
+- Validated against real KZ performance figures — ~140 km/h, ~3.5 s to 100 km/h, 1.5–2.0 g sustained lateral against 2.0–2.5 g transient — as an automated test suite, not by feel. Those two lateral bands were one band for two milestones, until it turned out its upper half described a state the kart physically cannot hold: it tips at 2.43 g ([ADR-0034](docs/DECISIONS.md))
 
 Plus a cockpit view, deterministic replays and ghosts, generated tracks and karts, and AI that drives through the same input path a human does.
 
