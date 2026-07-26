@@ -172,8 +172,8 @@ The feel milestone. `VehicleBody3D` is deleted here.
 **Status: the boundary is built and the kart drives. It does not yet drive
 *well*, and what is wrong is now measured rather than suspected.**
 
-Every subsystem below exists as engine-free C++ under `src/core/`, held by 180
-test cases and 266,816 assertions that run in seconds with no engine at all.
+Every subsystem below exists as engine-free C++ under `src/core/`, held by 197
+test cases and 2,032,414 assertions that run in seconds with no engine at all.
 `src/vehicle/kart_body.{h,cpp}` is the `RigidBody3D` that raycasts, calls the
 solver and applies the forces; `scenes/game/proving_ground.tscn` drives it and
 `kart_debug_vehicle.gd` is deleted. The boundary measured clean — the kart settles
@@ -210,6 +210,31 @@ of #139 and #42 — a wheel placed on a curb reads `curb` and stands 15 mm highe
 and threshold braking measures 1.156 g on asphalt against 0.286 g on grass.
 Measured by `scripts/track/track_probe.gd`. What is still open is #139's
 tunneling half, which needs repeated crossings and a cost measurement.
+
+**The engine note landed, so the sequencing problem #138 named is closed.** The
+synth is joined to the kart — `src/audio/engine_voice.{h,cpp}`, a seqlock, and an
+`AudioStreamPlayer3D` at `chassis.h`'s own engine lump — and the cost was measured on
+the real CoreAudio thread before it was built: **6.23% of real time at the worst
+operating point, worst block 11.06%**, where the worst case is *idle* rather than the
+rev limit, because the stack fills to a frequency ceiling and so has 191 partials at
+2,000 rpm against 33 at the soft cut. Twelve voices would be 74.76% and M7 wants
+twelve karts, which is recorded in `engine_voice.h` rather than solved. #82's four
+acceptance criteria are all judged by ear and none has been judged yet.
+
+**And the first drive found something no gate could have.** "You barely touch the
+steering and it goes way out of control" measured out as this: at 100 km/h the
+tightest radius the kart can hold is 37.5 m — **0.065 of lock, 1.62 degrees** — while
+`project.godot`'s steer deadzone is 0.15, so the entire followable range sat *inside
+the deadzone* and no stick position produced a corner the kart could hold.
+[ADR-0036](DECISIONS.md#adr-0036--the-steering-curve-is-a-controller-property-and-steeringh-keeps-its-position)
+has the fix and why it is a controller property rather than a change to
+`steering.h`'s position. The vehicle is untouched and all four `drive.sh` figures are
+unmoved.
+
+**Every constant that can only be set by driving now has one home**, issue
+[#159](https://github.com/skiretic/kartgame/issues/159) — a running checklist rather
+than a ticket that closes, because "judged by feel" otherwise becomes "whatever the
+first guess was".
 
 **Blocked on being able to judge it by feel: #32, #38, #39, #40.** All four have
 acceptance criteria written in a driver's language — "visibly lifts", "requires

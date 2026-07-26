@@ -1550,3 +1550,111 @@ the record rather than in somebody's memory.
 that reads as a very fast transport rather than as no transport at all. It needed
 an explicit `asm volatile` barrier. A benchmark that measures nothing looks exactly
 like a benchmark that measures something excellent.
+
+
+## ADR-0036 — The steering curve is a controller property, and `steering.h` keeps its position
+
+**Status.** Accepted. This **qualifies** [ADR-0031](#adr-0031--the-m3a-vehicle-applies-its-own-forces-in-newtons)'s
+removal of M3a's `STEER_SPEED_FALLOFF` rather than reversing it, and it comes from
+a driving report rather than from a gate.
+
+**Context.** The first session driving `scenes/game/test_track.tscn` produced one
+sentence: *"you barely touch the steering and it goes way out of control."*
+
+That is a feel report, and this project's rule is that a feel report becomes a
+measurement before it becomes a change. The measurement is a new case in
+`tests/core/test_vehicle.cpp` — a steering **step** at 100 km/h, which nothing here
+had measured, because `steady_corner` averages the last second of a six-second hold
+and discards anything that departed. A kart that snaps on turn-in and a kart that
+turns in cleanly produce the *same row* in that table.
+
+    input radius m  asked g yaw/Ack pk slip deg   kept %  IR load  stable
+     0.05    48.67     1.62     0.483     1.01     96.9    356.4     yes
+     0.20    12.55     6.27     0.478     6.37     95.6    134.3     yes
+     0.50     5.29    14.88     0.322    18.25     91.1     56.8     yes
+     0.60     4.47    17.60     0.283    25.06     80.6      0.0     yes
+     0.70     3.88    20.26     0.258    40.39     66.8      0.0      NO
+     0.75     3.65    21.58     1.487    71.70     15.7      0.0      NO
+     1.00     2.80    28.06    33.825   160.31    -30.6      0.0      NO
+
+**The decisive number is a pair of them, and neither is about the vehicle.**
+
+At 100 km/h the tightest radius this kart can hold is `v^2 / (2.10 g)` = **37.5 m**,
+which Ackermann puts at **0.065 of lock — 1.62 degrees**. And `project.godot` sets
+the steer actions' **deadzone to 0.15**, while Godot's `get_action_strength` returns
+the raw axis value above the deadzone with no rescaling.
+
+So the smallest steering input a stick could physically produce was 0.15 of lock,
+asking **4.8 g**. *The entire followable steering range was inside the deadzone.*
+There was no stick position that produced a corner the kart could hold: the driver
+got zero steering or a slide. That is not a difficult kart. It is an unreachable
+one.
+
+**Decision: `steer_gamma`, an exponent on the driver's input, default 3.0, applied
+in `KartBody::gather_input` and nowhere else.**
+
+    stick   lock    inner deg  radius m  asked g
+     0.15   0.0034      0.08    713.57     0.11   the deadzone edge, was 4.8 g
+     0.40   0.0640      1.60     38.14     2.06   the 100 km/h limit
+     0.62   0.2383      5.96     10.61     7.41   Turn 2's 11 m hairpin
+     1.00   1.0000     25.00      2.80    28.06   full lock, unchanged
+
+The exponent is chosen from the second row — it puts the fastest corner on the track
+at 40% of stick travel, where a thumb has resolution, instead of at 6.5% where it
+has none. The third row is the check that it did not overshoot: a curve that made
+fast corners comfortable by pushing the hairpin past the end of the stick would have
+traded one unreachable corner for another.
+
+**Why this does not contradict `steering.h`, which is the whole point.**
+
+`src/core/steering.h` deleted M3a's `STEER_SPEED_FALLOFF` and argues that a real
+kart's high-speed stability must be **emergent from caster and Ackermann** rather
+than manufactured by an input aid. `drive_probe.gd`'s header restates it: full lock
+now genuinely is full lock.
+
+That argument is about **the vehicle**, and it survives untouched. The kart's
+response to a given lock is identical at every speed, nothing in `src/core/` can see
+`steer_gamma`, and the solver is not told that a fast kart should steer less. What
+changed is the map from a thumb to a lock angle — and the geometry makes that map
+the problem rather than the vehicle: a 1.05 m wheelbase needs 1.62 degrees for a
+37.5 m corner, and a real driver places 1.62 degrees using **900 degrees of wheel
+rotation** against a stick's 15 mm.
+
+The rejected alternative is scaling `max_lock` down with speed. It is more drivable
+and it is the thing `steering.h` forbids, because it makes the vehicle lie about what
+it would do. If it is ever wanted it belongs beside auto-clutch and auto-shift as a
+disclosed assist that #40 can switch off, not inside the steering solver.
+
+**The curve is applied to the human path only, and the split is verified rather than
+asserted.** `gather_input`'s `input_driver_` branch — what `drive_probe.gd`,
+`track_probe.gd` and every still command drive through — is untouched. Those callers
+pass **lock** fractions with a recorded sweep table attached to them, and curving
+them would silently rewrite every figure in `drive_probe.gd`'s header and in ROADMAP
+M3b while the results still looked plausible. A scripted run asks for a steering
+angle; a driver asks for a stick position. `tools/verify/drive.sh` returns all four
+scenarios with every §6.4 figure unmoved, which is the evidence that the two paths
+really are separate.
+
+`steer_gamma = 1.0` collapses them exactly.
+
+**Two readings of the measurement were wrong before the `asked g` column existed**,
+recorded because both are the shape of mistake ADR-0033 and issue #107 are about:
+
+1. *"The kart does not rotate."* `yaw/Ack` below 1 is a grip-limited vehicle running
+   wide. At 100 km/h **every** row in the sweep asks for more than 2.10 g, so the
+   response is correct and the demand was the anomaly. A symptom was read as a
+   defect because the demand was not printed beside it.
+2. *"The solid rear axle is fighting the yaw because the inside rear never lifts."*
+   The `IR load` column shows the inside rear reaching exactly 0.0 N from 0.60 of
+   lock. Issue #32's mechanism engages, and it is not the cause of anything here.
+
+**What this does not settle.** 3.0 is arithmetic, not feel — the first drive after it
+reported "a bit more reasonable", which is not "right". The track carries a live knob
+on `[` and `]` and issue #159 holds it alongside every other constant that can only
+be set by driving. `steer_rate`'s 3.4 has never been judged by feel either, only
+recorded, and it interacts with the curve.
+
+And **issue #137 is unchanged.** The scrub is recontextualized rather than fixed:
+past 0.65 of lock the kart still departs, and at full lock it still ends up
+travelling backwards — `kept %` of -30.6. The curve makes 25 degrees harder to reach
+by accident and changes nothing about what happens on arrival.
