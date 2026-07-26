@@ -51,7 +51,7 @@ extends RefCounted
 ## chosen for headroom in an offline render rather than for a kart in a scene. Low
 ## enough here that the first drive cannot be painful; #83 sets it properly against
 ## the other layers, which do not exist yet.
-const VOICE_GAIN := 0.18
+const VOICE_GAIN := 0.30
 
 ## Distance in meters at which the note is at full volume, and the model it falls
 ## off by beyond that.
@@ -81,7 +81,7 @@ const VOLUME_DB := 0.0
 ## two values with the same reasoning and F2 moves them from the first drive; this
 ## file is where they are applied rather than a second owner of them.
 const SCRUB_GAIN := 0.45
-const WIND_GAIN := 0.20
+const WIND_GAIN := 0.12
 
 ## Where the scrub emitter sits, and how it falls off.
 ##

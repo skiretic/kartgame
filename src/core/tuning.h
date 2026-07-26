@@ -354,9 +354,11 @@ inline constexpr Tunable TUNABLES[TUNABLE_COUNT] = {
 	},
 	{
 			"voice_gain", "engine voice gain", "", "scripts/game/engine_voice_rig.gd",
-			0.18, 0.0, 1.0, 0.01, Provenance::Unsourced,
-			"Deliberately low so the first drive could not be painful. Set against "
-			"the other layers once they exist; issue #83 owns the mixing pass.",
+			0.30, 0.0, 1.0, 0.01, Provenance::Unsourced,
+			"0.30 after the first drive judged 0.18 as too quiet against the scrub "
+			"and wind layers -- the first time it had anything to be set against at "
+			"all, which is what 0.18 was waiting for. Issue #160 owns the mixing "
+			"pass (#83 is shift and clutch sounds).",
 			TuningOwner::Audio,
 	},
 	{
@@ -463,10 +465,11 @@ inline constexpr Tunable TUNABLES[TUNABLE_COUNT] = {
 	},
 	{
 			"wind_gain", "wind layer gain", "", "src/core/scrub_wind.h",
-			0.20, 0.0, 1.00, 0.01, Provenance::Unsourced,
-			"Placeholder, same as scrub_gain, and #160 owns it. Listen for: #84 "
-			"says explicitly that wind masking the engine anywhere in the range is "
-			"wrong, and so is wind that is inaudible at the end of the straight.",
+			0.12, 0.0, 1.00, 0.01, Provenance::Unsourced,
+			"0.12 after the first drive judged 0.20 as too noisy against the engine. "
+			"#160 owns the pass this belongs to. Listen for: #84 says explicitly "
+			"that wind masking the engine anywhere in the range is wrong, and so is "
+			"wind that is inaudible at the end of the straight.",
 			TuningOwner::Audio,
 	},
 	{

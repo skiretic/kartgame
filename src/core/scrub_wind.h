@@ -408,7 +408,7 @@ struct ScrubWindConfig {
 	// with nothing yet to be low relative to. **Issue #160 owns making these mean
 	// something**, and it is blocked on this file existing.
 	double scrub_gain = 0.45;
-	double wind_gain = 0.20;
+	double wind_gain = 0.12;
 
 	// And the timbre, every field defaulted from the constant above it.
 	//
