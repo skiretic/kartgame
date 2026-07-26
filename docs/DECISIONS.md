@@ -2049,3 +2049,200 @@ it came off search-result summaries of paywalled SAE work rather than off a tabl
 **Nothing has been judged by ear.** All thirteen audio rows in the registry are
 placeholders in the sense `VOICE_GAIN`'s 0.18 is, #160 owns the mixing pass, and
 #159's checklist has grown by eight.
+
+## ADR-0039 — The master level is a bus, because three gains in series had no owner
+
+**Status.** Accepted. Closes the measurement half of issue
+[#160](https://github.com/skiretic/kartgame/issues/160) and unblocks the two
+acceptance items of [#84](https://github.com/skiretic/kartgame/issues/84) that
+were waiting on it. Extends
+[ADR-0038](#adr-0038--the-scrub-band-is-measured-on-the-wrong-tire-and-saying-so-is-the-whole-design)
+and settles the item
+[ADR-0035](#adr-0035--the-audio-boundary-measured-and-why-the-generator-loses)
+explicitly left open: "Godot's own mixing, bussing and 3D attenuation".
+
+**Context.** The driver's report was not a balance complaint. It was:
+
+> it could be the wind seems so loud because i have to turn the volume so high to
+> actually hear the engine at even what i consider still too low
+
+`e7b0eaa` had just set three gains against each other — `voice_gain` 0.18 to 0.30,
+`wind_gain` 0.20 to 0.12, `scrub_gain` held at 0.45 — which is a ratio pass run
+against a path that was under-level. Adjusting the ratio between two layers that
+are both too quiet cannot fix a level, and the system volume was making up the
+difference for all of them, wind included.
+
+#160 named four things to measure before touching a gain. All four are measured
+now, by two paths that never met: `tests/core/test_synth_headroom.cpp` in pure
+C++ with no engine at all, and `tools/verify/audio_level_probe.gd` inside a real
+CoreAudio mix. Where they overlap they agree to within 0.5 dB, which is the only
+reason any of the numbers below are quoted as facts.
+
+### 1. The prime suspect was innocent, and naming it early nearly cost the session
+
+#160 predicted the loss was Godot's 3D attenuation: `UNIT_SIZE = 3.0` with the
+listener at the chase camera, "a listener at 6 m is already at 0.5 of unit gain
+and at 10 m is at 0.3". The arithmetic is right. It describes a distance the
+chase camera is not at.
+
+`chase_camera.gd` has `ARM_LENGTH = 3.4` and `ARM_HEIGHT = 1.05`, so the listener
+sits **3.56 m** from the kart origin. Measured against Godot's own inverse-distance
+law, clamped above at the `max_db` property's default of +3.0 dB:
+
+| listener at | total dBFS | predicted | delta |
+| --- | --- | --- | --- |
+| 0.52 m (driver's head) | -0.04 | -0.19 | +0.15 |
+| 3.00 m (`unit_size`) | -3.18 | -3.19 | +0.01 |
+| **3.56 m (chase camera)** | **-4.71** | -4.67 | -0.03 |
+| 10.00 m | -14.07 | -13.65 | -0.42 |
+| 150.00 m (`max_distance`) | silence | -37.17 | — |
+
+The law is exactly what the documentation says out to 6 m, diverges past 20 m as
+the `max_distance` rolloff takes over, and cuts to silence at the cutoff. **The
+chase camera costs 1.53 dB.** The near field is flat — 0.52 m, 1.0 m and 2.0 m are
+the same level, because `max_db` clamps everything inside `unit_size`.
+
+So attenuation is worth 1.53 dB of a 15-20 dB problem. Had the first move been to
+raise `UNIT_SIZE`, it would have made no measurable difference and the session
+would have concluded the synth was broken.
+
+### 2. Two things nobody had measured at all, and one of them is in every scene
+
+**The listener is whichever `Camera3D` is current.** `scripts/game/` contains no
+`AudioListener3D`. Measured both ways: with the camera as listener the level swings
+**20.7 dB** between 1 m and 20 m; with an `AudioListener3D` made current at the
+emitter it is flat at every distance, to 0.00 dB. The second half is what makes
+this actionable — the fix is one node, not a redesign.
+
+The consequence is worse than the loudness. The cockpit view and the chase view
+were hearing **two different mixes**, and every judgement ever made was made on
+one of them. A mix that changes when the driver presses V is not a mix that can be
+tuned, and this repository had been tuning it.
+
+**`attenuation_filter_cutoff_hz` defaults to 5000 Hz, with
+`attenuation_filter_db` at -24, and `engine_voice_rig.gd` never set either.**
+Swept with sines, against the same player with the filter opened to 20.5 kHz:
+
+| | 1 kHz | 4 kHz | 8 kHz | 12 kHz |
+| --- | --- | --- | --- | --- |
+| at 3.56 m | +0.16 | -1.22 | **-8.99** | -8.97 |
+| at 20.00 m | +1.19 | -16.44 | -31.38 | -41.67 |
+
+Every 3D emitter in this project has been low-passed since the engine note was
+written. It is distance-scaled, so moving the listener to the driver's head
+removes most of it for the player's own kart while leaving it for opponents —
+which is the behavior a distance cue should have. **Left at its default
+deliberately**, now that it is a measured default rather than an unexamined one.
+
+**A positional player costs 3.19 dB against a non-positional one** at the same
+gain and at unit distance, measured. ADR-0038 section 4 put the engine and scrub
+on `AudioStreamPlayer3D` and the wind on a plain `AudioStreamPlayer` for reasons
+that remain correct — so the wind layer was collecting 3.19 dB that nothing in
+its gain, its speed law or its filter accounts for.
+
+### 3. There is no headroom hiding inside the synth, and that is the load-bearing finding
+
+The tempting story was that `engine_synth.h` normalizes its harmonic stack by the
+**sum of partial amplitudes** rather than by power, so the RMS falls as roughly
+`1/sqrt(N)` and a conservative constant could be raised. The first half is true and
+larger than expected — the normalization costs **17.8 to 24.4 dB** of RMS across
+the rev range. The conclusion drawn from it is false.
+
+The partials start at phase zero and stay harmonically related, so they **do**
+re-align once per fundamental period. Measured `peak / sum(a_i)` is **0.60 to
+0.73**, not the few percent a random-phase sum would give. The bound is nearly
+tight. At `gain = 1.0` the loudest cell peaks at **-0.70 dBFS and is already
+1.24 dB inside the soft-clip knee** — `gain = 1.0` clips.
+
+**So `voice_gain` holds 9.03 dB and no more**, and what is under it is a 15-20 dB
+crest factor that is a property of a phase-aligned harmonic stack, not a number
+anybody chose. No multiplication recovers it. That is why the master is not at the
+stream: a master that lives where the clip knee lives has to fight it.
+
+While measuring it, `engine_synth.h:246-252`'s claim that the stack "is bounded by
+that level analytically" so that "only the unmeasured state layers stacking up can
+reach the knee" was shown false — `ONPIPE_LEVEL_DB` puts the level at 1.4125, so
+the analytic bound is 1.41 and the reasoning only holds for `gain <= 0.708`.
+
+### 4. The decision: one bus, and the layer gains become balance
+
+    Master
+      +- Kart          master_gain_db = +9.5    <- the only level
+           +- EngineVoice   voice_gain 0.30     <- balance
+           +- ScrubVoice    scrub_gain 0.035
+           +- WindVoice     wind_gain  0.20
+
+`master_gain_db` is a registry row like any other, so F2 moves it and `tuning.sh`
+audits it. That is the direct answer to #160's own drift note: the three gains
+lived in `core/tuning.h`, `engine_voice_rig.gd` and the synth, and nothing owned
+the sum.
+
+The bus is built in code rather than as a `.tres` bus layout. A bus layout is a
+binary resource that no reviewer can read in a diff, and this project's entire
+audit story is that a number sits next to the argument for it.
+
+**And the listener moves to the driver's head**, served by
+`KartBody::driver_head_position()` from `chassis.h`'s lump table — a calibrated
+position that will move when issue #107's seat geometry closes, which is exactly
+why it is served rather than typed into a scene. Worth 4.5 dB, and worth more than
+that for making the mix independent of the camera.
+
+Measured end to end afterward, through the real bus chain:
+
+| at the listener | before | after |
+| --- | --- | --- |
+| engine note | -33.08 dBFS | **-18.64 dBFS**, peak -4.60 |
+| scrub, full slip | +16.3 dB re engine | -3.1 dB re engine |
+| wind, 30 m/s | -6.8 dB re engine | -10.3 dB re engine |
+
+### 5. Two layer gains moved on measurement rather than by ear
+
+**`scrub_gain` 0.45 -> 0.035.** Full-slip scrub sat **16.7 dB** (core) and
+**16.3 dB** (in-engine) *above* the engine note, and peaked at **1.052** — past
+full scale, in the shipped configuration, today — `ScrubSynth` wrote its output
+with no clamp where `EngineSynth` has `soft_clip`, and over a longer window the
+peak is worse still, 1.25 to 1.34 depending on surface. 22 dB down leaves a
+full-slip slide **3.1 dB under the engine at the listener** and 10.9 dB under it
+from the chase camera. The 22 dB is measured; whether 3 dB is the right warning
+margin is a preference and is owed an ear.
+
+The clamp landed anyway, because a layer whose only protection is a gain nobody
+has judged yet is not protected. It is `EngineSynth`'s own `soft_clip` and
+`SOFT_CLIP_THRESHOLD` rather than a second idea of what a ceiling is, and it went
+on `WindSynth` too. At the shipped gains it is idle, which is what a safety net
+should be; the test that proves it is still wired turns both gains to the top of
+their own F2 ranges and shows the output still cannot leave full scale.
+
+**`wind_gain` 0.12 -> 0.030, and the plan for this one was wrong.** The intent was
+to revert `e7b0eaa`'s 0.20 -> 0.12, because that change was made on a drive where
+the engine was 15-20 dB under level and so measured too much wind where there was
+too little of everything else. Then the wind chain was normalized by its own
+filter's RMS gain — the defect `193d507` fixed for scrub and missed here — and
+**that made the layer 13 to 20 dB louder at the same gain**, most at low speed,
+because the excess is exactly the 2.5 dB per doubling the un-normalized two-pole
+was contributing. 0.12 after the fix is *louder than the engine*.
+
+So the number moved down rather than up, and it is not a judgement changing: the
+layer moved underneath it. 0.030 puts wind 10.3 dB under the engine at 30 m/s,
+which is roughly where 0.12 sat before. The same fix took the realized slope from
+20.0-20.7 dB per doubling to **18.02 against a sourced 18.0**, and stopped
+`wind_cutoff_per_ms` moving the level — winding that knob across its full F2 range
+used to change the layer's RMS by a factor of 5.2, and now moves it 0.73%.
+
+### What this does not settle
+
+**Nothing here has been judged by ear.** Every figure above is a measurement and
+the mix is a judgement. `master_gain_db`, the 6 dB scrub margin and `wind_gain`
+are all on #159's checklist and all three are what the next drive is for.
+
+**The crest factor is the real loudness ceiling.** Reducing it means dispersing
+partial phase across the stack, which changes the note's timbre and therefore
+re-opens #82's acceptance criterion. That is a separate ticket and a separate
+drive, and it is the only change that buys loudness rather than moving where the
+ceiling sits.
+
+**`look_back` was bound in `project.godot` and printed in both HUDs since M3a and
+nothing read it.** C and Triangle did nothing at all. The cockpit rig implements
+it; the chase rig's own look-back is separate work with its own issue. It is the
+failure CLAUDE.md's driving section opens with, one level worse — the key was
+advertised rather than merely omitted.

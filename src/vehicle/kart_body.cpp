@@ -129,6 +129,7 @@ void KartBody::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_wind_voice_player"), &KartBody::get_wind_voice_player);
 	ClassDB::bind_method(D_METHOD("engine_mount_position"), &KartBody::engine_mount_position);
 	ClassDB::bind_method(D_METHOD("rear_axle_position"), &KartBody::rear_axle_position);
+	ClassDB::bind_method(D_METHOD("driver_head_position"), &KartBody::driver_head_position);
 
 	ClassDB::bind_method(D_METHOD("set_steer_gamma", "gamma"), &KartBody::set_steer_gamma);
 	ClassDB::bind_method(D_METHOD("get_steer_gamma"), &KartBody::get_steer_gamma);
@@ -744,23 +745,31 @@ double KartBody::get_steer_gamma() const {
 	return steer_gamma_;
 }
 
-Vector3 KartBody::engine_mount_position() const {
-	// Looked up by name rather than by index. The table is edited — the lead ballast
-	// was added to it after the fact, and issue #107's calibration moved four driver
-	// rows — and an index would silently start pointing at the exhaust.
+// One lump's position, by name.
+//
+// Looked up by name rather than by index. The table is edited — the lead ballast
+// was added to it after the fact, and issue #107's calibration moved four driver
+// rows — and an index would silently start pointing at the exhaust.
+//
+// A missing row is reported and not silently (0,0,0), which is a legal-looking
+// position at the kart's origin — on the floor, on the centerline — and for the
+// engine would sound like the motor had been moved into the driver's lap. The
+// caller passes what it is for so the message says which emitter lost its home.
+static Vector3 lump_position(const char *p_name, const char *p_purpose) {
 	for (int index = 0; index < kart::core::kz::KART_LUMP_COUNT; ++index) {
 		const kart::core::MassLump &lump = kart::core::kz::KART_LUMPS[index];
-		if (lump.name != nullptr && std::strcmp(lump.name, "engine") == 0) {
+		if (lump.name != nullptr && std::strcmp(lump.name, p_name) == 0) {
 			return to_godot(lump.position);
 		}
 	}
-	// Not silently (0,0,0), which is a legal-looking position at the kart's origin —
-	// on the floor, on the centerline — and would sound like the engine had been
-	// moved into the driver's lap.
 	UtilityFunctions::push_error(
-			"KartBody: chassis.h's lump table has no row named 'engine'. The engine "
-			"note has nowhere to come from.");
+			String("KartBody: chassis.h's lump table has no row named '") + p_name +
+			"'. " + p_purpose);
 	return Vector3();
+}
+
+Vector3 KartBody::engine_mount_position() const {
+	return lump_position("engine", "The engine note has nowhere to come from.");
 }
 
 // Where the scrub emitter goes: the middle of the rear axle, on the ground.
@@ -778,6 +787,18 @@ Vector3 KartBody::rear_axle_position() const {
 	// Blender +Y forward maps to Godot -Z, and `chassis.h` already works in the
 	// Godot convention: negative Z is forward, so the rear axle is the positive one.
 	return Vector3(0.0f, 0.0f, static_cast<real_t>(kart::core::kz::REAR_AXLE_Z));
+}
+
+// Where the listener goes, and where a cockpit camera sits. Issue #160.
+//
+// The head lump's center, not an eye point. An eye offset would be a number with
+// no source: `chassis.h` has a 260 mm helmet box and nothing inside it, and §5
+// item 10 is explicit that a real dimension is pulled from a reference rather than
+// reasoned out. The center of the helmet is wrong for a camera by a few
+// centimeters and is right for a listener, which is the load-bearing use.
+Vector3 KartBody::driver_head_position() const {
+	return lump_position("driver head and helmet",
+			"The listener and the cockpit camera have nowhere to sit.");
 }
 
 void KartBody::set_jacking_enabled(bool p_enabled) {

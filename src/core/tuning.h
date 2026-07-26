@@ -194,6 +194,7 @@ enum TunableId : int {
 	TUNE_BRAKE_TORQUE_REAR,
 	TUNE_STEER_RATE,
 	TUNE_STEER_GAMMA,
+	TUNE_MASTER_GAIN_DB,
 	TUNE_VOICE_GAIN,
 	TUNE_VOICE_UNIT_SIZE,
 	TUNE_VOICE_MAX_DISTANCE,
@@ -353,12 +354,26 @@ inline constexpr Tunable TUNABLES[TUNABLE_COUNT] = {
 			TuningOwner::Controller,
 	},
 	{
+			"master_gain_db", "kart bus master", "dB",
+			"scripts/game/engine_voice_rig.gd",
+			9.5, -24.0, 18.0, 0.5, Provenance::Unsourced,
+			"The master, and the only one. Measured in a real mix by "
+			"audio_level_probe.gd: the engine reaches the listener at -33.08 dBFS "
+			"where a primary voice wants about -19. voice_gain cannot supply that "
+			"-- at 1.0 the synth peaks at -0.70 dBFS, inside its soft-clip knee. "
+			"ADR-0039. Listen for: raising a layer gain to hear the engine means "
+			"this is low.",
+			TuningOwner::Audio,
+	},
+	{
 			"voice_gain", "engine voice gain", "", "scripts/game/engine_voice_rig.gd",
 			0.30, 0.0, 1.0, 0.01, Provenance::Unsourced,
 			"0.30 after the first drive judged 0.18 as too quiet against the scrub "
 			"and wind layers -- the first time it had anything to be set against at "
 			"all, which is what 0.18 was waiting for. Issue #160 owns the mixing "
-			"pass (#83 is shift and clutch sounds).",
+			"pass (#83 is shift and clutch sounds). Left where it is by the level "
+			"pass: what was wrong was the master, not the balance between this and "
+			"the engine's own headroom.",
 			TuningOwner::Audio,
 	},
 	{
@@ -413,12 +428,13 @@ inline constexpr Tunable TUNABLES[TUNABLE_COUNT] = {
 	// asymmetry is the whole shape of #84 and this block is where it shows.
 	{
 			"scrub_gain", "tire scrub gain", "", "src/core/scrub_wind.h",
-			0.45, 0.0, 2.00, 0.01, Provenance::Unsourced,
-			"Now a real level: the band-pass chain's white-noise RMS is divided back "
-			"out, so this no longer moves when scrub_q does. 0.30 before that fix "
-			"was really 0.13 against an engine voice at 0.18, and the first drive "
-			"reported it as inaudible. Listen for: scrub has to signal grip loss "
-			"before the visuals do, and it cannot do that under the engine.",
+			0.035, 0.0, 2.00, 0.005, Provenance::Unsourced,
+			"A real level since the chain's white-noise RMS was divided out, so it "
+			"no longer moves when scrub_q does. 0.45 overshot: measured two ways, "
+			"full-slip scrub sat 16.3-16.7 dB above the engine and it "
+			"peaked at 1.25-1.34, past full scale. 0.035 is 22 dB down, leaving it "
+			"3.1 dB under the engine at the listener. Whether 3 dB is the right "
+			"warning margin is owed an ear. ADR-0039.",
 			TuningOwner::Audio,
 	},
 	{
@@ -465,11 +481,13 @@ inline constexpr Tunable TUNABLES[TUNABLE_COUNT] = {
 	},
 	{
 			"wind_gain", "wind layer gain", "", "src/core/scrub_wind.h",
-			0.12, 0.0, 1.00, 0.01, Provenance::Unsourced,
-			"0.12 after the first drive judged 0.20 as too noisy against the engine. "
-			"#160 owns the pass this belongs to. Listen for: #84 says explicitly "
-			"that wind masking the engine anywhere in the range is wrong, and so is "
-			"wind that is inaudible at the end of the straight.",
+			0.030, 0.0, 1.00, 0.005, Provenance::Unsourced,
+			"Not a judgement changing -- the layer moved under the number. "
+			"Normalizing the wind chain by its filter's RMS gain made it 13-20 dB "
+			"louder at the same gain, so 0.12 now sits above the engine. 0.030 puts "
+			"it about 10 dB under at 30 m/s. Same fix took 20.5 dB per doubling to "
+			"18.02 against a sourced 18. ADR-0039. Listen for: wind must not mask "
+			"the engine, or vanish at speed.",
 			TuningOwner::Audio,
 	},
 	{

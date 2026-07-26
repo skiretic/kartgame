@@ -358,6 +358,24 @@ public:
 	// wheels rather than at one of them.
 	godot::Vector3 rear_axle_position() const;
 
+	// The driver's head, in the body frame, meters. Served from the same lump table
+	// and for the same reason as `engine_mount_position`.
+	//
+	// **This is where the listener goes**, and issue #160 is why it exists. Godot
+	// falls back to the current `Camera3D` when no `AudioListener3D` is current,
+	// which was measured: the level swings 20.7 dB as the chase camera moves from
+	// 1 m to 20 m, and an explicit listener pins it flat at every distance. With the
+	// listener on the camera, the cockpit view and the chase view hear two different
+	// mixes and only one of them was ever judged by ear.
+	//
+	// `chassis.h` puts "driver head and helmet" at (0.000, 0.560, 0.128). That is a
+	// calibrated position rather than a measured one -- the header explains that the
+	// driver's fore-aft position is solved for from anthropometric segment fractions
+	// because issue #107 leaves the seat geometry untrustworthy -- so it will move
+	// when #107 closes. Serving it means the listener moves with it instead of a
+	// scene holding a stale copy.
+	godot::Vector3 driver_head_position() const;
+
 	// The front wheels' actual steer angle at full input, radians — `steering.h`
 	// owns it and the HUD used to read a GDScript constant for it.
 	double get_steer_lock() const;

@@ -45,12 +45,44 @@ extends RefCounted
 ## `chassis.h`'s lump table, so the emitter cannot drift away from the 20 kg the
 ## solver is carrying.
 
+## The bus the whole kart is mixed on, and the master level on it. Issue #160.
+##
+## **This is the only master level, and that is the point.** #160 records the
+## symptom as "I have to turn the system volume up so high to hear the engine" and
+## then records the cause of *that*: the three gains below were spread across the
+## stream, the player and the synth, each chosen in isolation, with nothing owning
+## the sum. Adjusting the ratio between two layers that are both under-level cannot
+## fix a level, and `e7b0eaa` tried.
+##
+## Measured through a real CoreAudio mix by `tools/verify/audio_level_probe.gd`,
+## which is the file that turned this from an argument into a number:
+##
+##     engine note at the chase camera        -33.08 dBFS
+##     engine note at the driver's head       -28.6  dBFS
+##     a primary voice wants about            -19    dBFS
+##
+## **The synth cannot supply the difference.** At `gain = 1.0` it peaks at
+## -0.70 dBFS and is already inside its own soft-clip knee, so `VOICE_GAIN` has
+## 9.03 dB in it and no more -- and the 15-20 dB of crest factor under that is a
+## phase-aligned harmonic stack, not a conservative constant, so no multiplication
+## recovers it. A bus can carry the level without fighting a clip knee that exists
+## for a good reason.
+##
+## Both figures are `master_gain_db` in `src/core/tuning.h`, which is the row F2
+## moves and `tuning.sh` audits. The constants here are its defaults, the way
+## `VOICE_GAIN` is `voice_gain`'s.
+const KART_BUS := "Kart"
+const MASTER_GAIN_DB := 9.5
+
 ## Overall synth gain, linear, before the player's own volume and attenuation.
 ##
 ## **A tunable.** `EngineAudioConfig::gain` defaults to 0.35 and that default was
 ## chosen for headroom in an offline render rather than for a kart in a scene. Low
-## enough here that the first drive cannot be painful; #83 sets it properly against
-## the other layers, which do not exist yet.
+## enough here that the first drive cannot be painful.
+##
+## Left at 0.30 by #160's level pass, deliberately. What was wrong was the master,
+## and raising this instead would have spent the synth's remaining 9 dB of peak
+## margin on a problem that is 15-20 dB wide.
 const VOICE_GAIN := 0.30
 
 ## Distance in meters at which the note is at full volume, and the model it falls
@@ -74,14 +106,33 @@ const MAX_DISTANCE := 150.0
 ## somebody found first.
 const VOLUME_DB := 0.0
 
-## The two noise layers' gains, linear.
+## The two noise layers' gains, linear. **Balance, not level** -- `MASTER_GAIN_DB`
+## owns the level now, which is the split #160 asked for.
 ##
-## **Placeholders in exactly the sense `VOICE_GAIN` is**, and the three of them are
-## the whole of what issue #160 has to settle. `src/core/tuning.h` carries the same
-## two values with the same reasoning and F2 moves them from the first drive; this
-## file is where they are applied rather than a second owner of them.
-const SCRUB_GAIN := 0.45
-const WIND_GAIN := 0.12
+## `src/core/tuning.h` carries the same two values with the same reasoning and F2
+## moves them from the first drive; this file is where they are applied rather than
+## a second owner of them.
+##
+## Both moved on measurement rather than by ear, and the two measurements were
+## taken by paths that never met -- pure C++ with no engine, and a real CoreAudio
+## mix:
+##
+##   * **scrub 0.45 -> 0.035.** Full-slip scrub sat 16.7 dB (core) and 16.3 dB
+##     (in-engine) *above* the engine note, and peaked at 1.052, past full scale.
+##     22 dB down puts a full-lock slide about 6 dB under the engine. The 6 dB is a
+##     preference and is owed an ear; the 22 is not.
+##   * **wind 0.12 -> 0.030**, and this one is not a judgement changing. The plan
+##     was to revert `e7b0eaa`'s 0.20 -> 0.12 once the master was right, because
+##     that change was made on a drive where the engine was 15-20 dB under level
+##     and so measured too much wind where there was too little of everything
+##     else. Then the wind layer was normalized by its own filter's RMS gain --
+##     the defect `193d507` had already fixed for scrub and missed here -- and
+##     that made it **13 to 20 dB louder at the same gain**, most at low speed,
+##     because it is the 2.5 dB per doubling the un-normalized filter was adding.
+##     0.12 after the fix is louder than the engine. 0.030 puts it about 10 dB
+##     under at 30 m/s, which is roughly where 0.12 sat before.
+const SCRUB_GAIN := 0.035
+const WIND_GAIN := 0.030
 
 ## Where the scrub emitter sits, and how it falls off.
 ##
@@ -96,6 +147,74 @@ const WIND_GAIN := 0.12
 ## like yours.
 const SCRUB_UNIT_SIZE := 2.0
 const SCRUB_MAX_DISTANCE := 60.0
+
+## Make sure the kart bus exists, and return its name.
+##
+## Created in code rather than in a `.tres` bus layout, because a bus layout is a
+## binary resource that no reviewer can read in a diff and this project's whole
+## audit story is that a number is readable next to the argument for it. It is also
+## idempotent, which matters: two scenes and four probes call this, and
+## `AudioServer`'s bus list survives a scene change.
+##
+## Falls back to Master rather than erroring if the bus cannot be made. A kart that
+## is 9.5 dB quiet is a bad mix; a kart that is silent because a bus was missing is
+## a bug report about the synth.
+static func ensure_bus() -> String:
+	var index := AudioServer.get_bus_index(KART_BUS)
+	if index < 0:
+		index = AudioServer.bus_count
+		AudioServer.add_bus(index)
+		AudioServer.set_bus_name(index, KART_BUS)
+		AudioServer.set_bus_send(index, "Master")
+	if AudioServer.get_bus_index(KART_BUS) < 0:
+		push_warning("EngineVoiceRig: could not create the '%s' bus; using Master."
+			% KART_BUS)
+		return "Master"
+	AudioServer.set_bus_volume_db(index, MASTER_GAIN_DB)
+	return KART_BUS
+
+
+## Put the listener at the driver's head and make it current. Issue #160.
+##
+## **Without this the listener is whichever `Camera3D` is current**, which was
+## measured rather than assumed: `tools/verify/audio_level_probe.gd` moves the
+## camera with the emitter fixed and the level swings 20.7 dB between 1 m and 20 m,
+## then makes an `AudioListener3D` current and the level is flat at every distance.
+##
+## Three things follow from that, and only the first is about loudness:
+##
+##   1. The chase camera sits 3.56 m back, which costs 1.53 dB against unit
+##      distance. The driver's head is 0.52 m from the engine mount, inside the
+##      `max_db` clamp Godot applies at +3.0 dB, so moving the listener there is
+##      worth 4.5 dB and is the only part of #160's deficit available for free.
+##   2. **The cockpit view and the chase view otherwise hear two different mixes**,
+##      and every judgement made so far was made on one of them. A mix that changes
+##      when you press V is not a mix that can be tuned.
+##   3. The wind layer is a plain `AudioStreamPlayer` at the driver's head already
+##      (ADR-0038 section 4). With the listener on a camera three meters behind the
+##      kart, the wind was at the driver's head and the ears were not.
+##
+## The position is served by `KartBody` from `chassis.h`'s lump table rather than
+## typed here, so it moves when issue #107's seat calibration does.
+static func attach_listener(kart: KartBody) -> AudioListener3D:
+	if kart == null:
+		return null
+	var listener := AudioListener3D.new()
+	listener.name = "DriverEars"
+	listener.position = kart.driver_head_position()
+	kart.add_child(listener)
+	# Both, and this is the same class of trap as `autoplay` below. `make_current`
+	# on a node that is not yet in the tree does nothing, and a node parented during
+	# a `--script` main loop's `_initialize` is exactly that case -- CLAUDE.md's
+	# trap list records it and `shoot.gd`, `drive_probe.gd` and this file's own
+	# `attach` all work around it. The deferred call lands after the node has
+	# entered the tree whichever way it got there, and calling it twice is
+	# idempotent.
+	if listener.is_inside_tree():
+		listener.make_current()
+	listener.call_deferred("make_current")
+	return listener
+
 
 ## Build the voice, parent it to the kart, and point the kart at it.
 ##
@@ -120,6 +239,7 @@ static func attach(kart: KartBody) -> Object:
 	var player := AudioStreamPlayer3D.new()
 	player.name = "EngineVoice"
 	player.stream = stream
+	player.bus = ensure_bus()
 	player.volume_db = VOLUME_DB
 	player.unit_size = UNIT_SIZE
 	player.max_distance = MAX_DISTANCE
@@ -185,9 +305,12 @@ static func attach_noise(kart: KartBody) -> Array:
 	wind_stream.set("layer", 1)
 	wind_stream.set("gain", WIND_GAIN)
 
+	var bus := ensure_bus()
+
 	var scrub_player := AudioStreamPlayer3D.new()
 	scrub_player.name = "ScrubVoice"
 	scrub_player.stream = scrub_stream
+	scrub_player.bus = bus
 	scrub_player.volume_db = VOLUME_DB
 	scrub_player.unit_size = SCRUB_UNIT_SIZE
 	scrub_player.max_distance = SCRUB_MAX_DISTANCE
@@ -203,6 +326,7 @@ static func attach_noise(kart: KartBody) -> Array:
 	var wind_player := AudioStreamPlayer.new()
 	wind_player.name = "WindVoice"
 	wind_player.stream = wind_stream
+	wind_player.bus = bus
 	wind_player.volume_db = VOLUME_DB
 	kart.add_child(wind_player)
 	wind_player.autoplay = true
@@ -237,6 +361,13 @@ static func bind_tuning(tuning: Node, stream: Object, player: AudioStreamPlayer3
 		return
 	var apply := func(key: String, value: float, _owner: int) -> void:
 		match key:
+			# The master, and the one row here that is not a property of a node or a
+			# stream. It is a bus volume, which is exactly why the registry cannot
+			# push it itself -- see this function's own header.
+			"master_gain_db":
+				var index := AudioServer.get_bus_index(KART_BUS)
+				if index >= 0:
+					AudioServer.set_bus_volume_db(index, value)
 			"voice_gain":
 				if stream != null:
 					stream.set("gain", value)
