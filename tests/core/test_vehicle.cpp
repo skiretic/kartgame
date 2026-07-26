@@ -1699,6 +1699,148 @@ TEST_CASE("grounded covers the tick, so a corner that produced force never repor
 	CHECK(loaded_ticks > 100);
 }
 
+TEST_CASE("grounded, tire_contact and lift are three questions and answer consistently") {
+	// **Issue #136.** The ticket reported `grounded` and `lift` contradicting each
+	// other on a straight-line accel run: three wheels down, nothing off the
+	// ground. They were not contradicting each other. They are two different
+	// predicates and neither had been written down, so the third — `tire_contact`
+	// — did not exist to explain the gap between them. `vehicle_state.h` now
+	// carries the definition; this pins it through the solver, the way the case
+	// above pins #134's.
+	//
+	// What is asserted at the tick level, and what deliberately is not:
+	//
+	//     grounded  =>  tire_contact                     always
+	//     !tire_contact  =>  no load and no force        follows, via #134
+	//     lift > 0  =>  !grounded                        **NOT** a tick invariant
+	//
+	// The third holds inside a substep and not across a tick, and the reason is the
+	// combiners rather than a defect: `lift` is a mean and `grounded` is an OR, so
+	// a corner that was loaded on the first substep and clear on the second reports
+	// a positive mean lift beside a true `grounded`. Both statements are true of
+	// that tick. Asserting the implication would be asserting that a wheel cannot
+	// leave the ground mid-tick.
+	SUBCASE("driven over dips, the trio never contradicts itself") {
+		Rig rig;
+		rig.configure();
+		rig.settle();
+		rig.vehicle.engage(4, 18.0);
+		rig.linear_velocity = -rig.basis_z * 18.0;
+
+		DriverInput input;
+		input.throttle = 0.6;
+		input.steer = 0.05;
+
+		int loaded = 0;
+		int touching_unloaded = 0;
+		int touching_mid_tick = 0;
+		int clear = 0;
+		double most_lift = 0.0;
+		for (int tick = 0; tick < 600; ++tick) {
+			rig.ground_height = tick % 60 < 12 ? -0.03 : 0.0;
+			rig.step(input);
+			REQUIRE(rig.finite());
+
+			for (int corner = 0; corner < CORNER_COUNT; ++corner) {
+				const WheelTelemetry &wheel = rig.vehicle.telemetry().wheel[corner];
+				if (wheel.grounded) {
+					// The implication that makes the pair readable: a corner cannot
+					// carry load without touching the road. It survives the substep
+					// combiners because both are an OR — an AND on this one would
+					// break it exactly when a wheel leaves the ground mid-tick.
+					CHECK(wheel.tire_contact);
+					++loaded;
+					continue;
+				}
+				// Not carrying anything, so #134's invariant applies whichever of the
+				// two reasons it is.
+				CHECK(wheel.normal_load == doctest::Approx(0.0));
+				CHECK(wheel.force.length() < 1e-9);
+				if (wheel.tire_contact) {
+					// The state the ticket saw: still on the road, carrying nothing,
+					// with no daylight to report. The damper took the spring force.
+					//
+					// Counted in two buckets rather than asserted to be one, and the
+					// split is the combiners again. `tire_contact` is an OR and `lift`
+					// is a mean, so a corner that touched on the first substep and was
+					// clear on the second reports contact beside a positive mean lift.
+					// Both halves of that are true of the tick. This is the same
+					// arithmetic that makes `lift > 0 => !grounded` a substep statement
+					// and not a tick one, and writing it down here is cheaper than
+					// having someone rediscover it from a failing assertion.
+					if (wheel.lift > 0.0) {
+						++touching_mid_tick;
+					} else {
+						++touching_unloaded;
+					}
+				} else {
+					++clear;
+					most_lift = wheel.lift > most_lift ? wheel.lift : most_lift;
+				}
+			}
+		}
+
+		MESSAGE("dips at 18 m/s: " << loaded << " loaded corner-ticks, " << touching_unloaded
+									<< " touching and carrying nothing, " << touching_mid_tick
+									<< " that left the road mid-tick, " << clear
+									<< " with the spring at full droop; largest lift "
+									<< most_lift * 1000.0 << " mm");
+		// Both of the two ways to be ungrounded have to occur, or the case has
+		// checked one branch and claimed both.
+		CHECK(loaded > 100);
+		CHECK(touching_unloaded > 0);
+		CHECK(clear > 0);
+	}
+
+	SUBCASE("a kart in the air reports lift on every corner, not zero") {
+		// **The half of #136 the ticket did not have.** `lift_height` returned zero
+		// whenever the ray missed, and a kart with all four wheels off the ground is
+		// exactly four missed rays — so the one state that is unambiguously "off the
+		// ground" read as the most ordinary one, and the panel drew "all four down"
+		// for a kart in flight.
+		//
+		// A miss cannot say how high; it can say how low it is not. The ray is cast
+		// `RAY_MARGIN` past the free length, so that margin is the bound, and it is
+		// the range issue #32 wants the lift reported over in the first place.
+		Rig rig;
+		rig.configure();
+		rig.settle();
+		rig.vehicle.engage(4, 20.0);
+		rig.linear_velocity = -rig.basis_z * 20.0 + Vec3(0.0, 4.0, 0.0);
+		rig.com_position.y += 1.0;
+
+		DriverInput input;
+		input.throttle = 1.0;
+
+		int flying_ticks = 0;
+		double least_lift = 1.0e9;
+		for (int tick = 0; tick < 60; ++tick) {
+			rig.step(input);
+			REQUIRE(rig.finite());
+
+			bool any_contact = false;
+			for (int corner = 0; corner < CORNER_COUNT; ++corner) {
+				any_contact = any_contact || rig.vehicle.telemetry().wheel[corner].tire_contact;
+			}
+			if (any_contact) {
+				continue;
+			}
+			++flying_ticks;
+			for (int corner = 0; corner < CORNER_COUNT; ++corner) {
+				const WheelTelemetry &wheel = rig.vehicle.telemetry().wheel[corner];
+				CHECK_FALSE(wheel.grounded);
+				// Not "greater than a millimeter". The bound is the ray margin
+				// exactly, on every corner, because every substep of the tick missed.
+				CHECK(wheel.lift == doctest::Approx(0.100).epsilon(1e-12));
+				least_lift = wheel.lift < least_lift ? wheel.lift : least_lift;
+			}
+		}
+		MESSAGE("launched: " << flying_ticks << " ticks with no corner touching, "
+							 << "smallest reported lift " << least_lift * 1000.0 << " mm");
+		CHECK(flying_ticks > 10);
+	}
+}
+
 TEST_CASE("time_ratio is a sentinel, because the solver cannot honestly fill it in") {
 	// `time_ratio` is simulated seconds per wall-clock second. ADR-0033 finding 7:
 	// `max_physics_steps_per_frame` clamps and does not bank, so under a frame-rate

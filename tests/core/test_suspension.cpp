@@ -339,6 +339,9 @@ TEST_CASE("a wheel off the ground carries nothing and reports how far off it is"
 	WheelContact contact;
 	contact.hit = true;
 	contact.normal = Vec3(0.0, 1.0, 0.0);
+	// What a `KartVehicle` corner casts: the unloaded radius plus a 100 mm margin.
+	// Only read on the miss path, and the subcase below is what it is for.
+	contact.cast_length = corner.setup.free_length() + 0.100;
 	CornerState state;
 
 	// Exactly at full droop the force is zero, not negative.
@@ -346,19 +349,165 @@ TEST_CASE("a wheel off the ground carries nothing and reports how far off it is"
 	corner.step(contact, 0.0, state);
 	CHECK(state.normal_force == doctest::Approx(0.0));
 	CHECK_FALSE(state.grounded);
+	// At the boundary the spring has nothing left, so the tire is not touching
+	// either — and the lift is zero because there is not a millimeter of daylight
+	// under it yet. This is the one point where the two agree on zero.
+	CHECK_FALSE(state.tire_contact);
 	CHECK(corner.lift_height(contact, state) == doctest::Approx(0.0));
 
 	// 20 mm past it, which is what issue #32's inside rear should look like.
 	contact.ray_length = corner.setup.free_length() + 0.020;
 	corner.step(contact, 0.0, state);
 	CHECK(state.normal_force == doctest::Approx(0.0));
+	CHECK_FALSE(state.tire_contact);
 	CHECK(corner.lift_height(contact, state) == doctest::Approx(0.020).epsilon(1e-12));
 
-	// And the ray missing entirely.
+	// And the ray missing entirely. **The lift is the margin, not zero** — issue
+	// #136's second half. The ray was cast 100 mm past the free length and found
+	// nothing, so the tire is at least that far clear, and reporting zero for it
+	// made a kart in flight read as a kart on the ground.
 	contact.hit = false;
 	corner.step(contact, 0.0, state);
 	CHECK(state.normal_force == doctest::Approx(0.0));
 	CHECK_FALSE(state.grounded);
+	CHECK_FALSE(state.tire_contact);
+	CHECK(corner.lift_height(contact, state) == doctest::Approx(0.100).epsilon(1e-12));
+
+	// Jacking moves the free length, and the bound moves with it: a corner the
+	// steering has pushed 5 mm further down has 5 mm less of guaranteed daylight.
+	state.geometric_offset = 0.005;
+	corner.step(contact, 0.0, state);
+	CHECK(corner.lift_height(contact, state) == doctest::Approx(0.095).epsilon(1e-12));
+
+	// A caller that never filled `cast_length` gets zero, which is the old
+	// behavior and is pinned so that it is a stated cost of the field's default
+	// rather than a surprise. `KartVehicle::step` fills it; a hand-built contact
+	// has to.
+	WheelContact unset;
+	unset.hit = false;
+	CornerState fresh;
+	corner.step(unset, 0.0, fresh);
+	CHECK(corner.lift_height(unset, fresh) == doctest::Approx(0.0));
+}
+
+TEST_CASE("the rebound damper can unload a tire that is still on the road") {
+	// **Issue #136's mechanism**, which the ticket did not have: `grounded` and
+	// `lift` were reported as contradicting each other, and they do not. They are
+	// two different predicates, and `vehicle_state.h` now says which is which.
+	//
+	// Nothing here is a defect. Rebound damping is deliberately the higher of the
+	// two rates — a wheel unloaded in a corner must not pump itself back down
+	// before the corner is over, issue #32 — and this is what that costs: a corner
+	// with 1.6 mm of tire deflection still under it carries 174 N of spring, and
+	// its 1776 N per m/s of rebound cancels that at 98 mm/s of extension. The tire
+	// is on the road, carrying nothing, with no daylight under it to report.
+	const ChassisGeometry geometry;
+	CornerSuspension corner;
+	corner.setup = corner_setup(geometry, CORNER_FL);
+
+	WheelContact contact;
+	contact.hit = true;
+	contact.normal = Vec3(0.0, 1.0, 0.0);
+	contact.cast_length = corner.setup.free_length() + 0.100;
+	// The state the ticket reported at accel tick 363: 1.755 mm of extension out
+	// of 3.4 mm of static deflection, so 1.645 mm of spring left.
+	contact.ray_length = corner.setup.rest_length + 0.001755;
+	const double deflection = corner.setup.max_droop - 0.001755;
+	const double spring = corner.setup.spring_rate * deflection;
+	const double cancels_at = spring / corner.setup.rebound_damping;
+
+	char line[240];
+	std::snprintf(line, sizeof(line),
+			"  front corner at %.3f mm of remaining deflection: %.1f N of spring,"
+			" cancelled by %.1f mm/s of extension against %.0f N/(m/s) of rebound",
+			deflection * 1000.0, spring, cancels_at * 1000.0, corner.setup.rebound_damping);
+	MESSAGE(line);
+	// A tenth of a meter per second. Nothing about that is exotic; it is a kart
+	// riding over a seam.
+	CHECK(cancels_at < 0.11);
+
+	CornerState state;
+	// Standing still, the corner carries the spring and is grounded.
+	corner.step(contact, 0.0, state);
+	CHECK(state.normal_force == doctest::Approx(spring).epsilon(1e-12));
+	CHECK(state.grounded);
+	CHECK(state.tire_contact);
+	CHECK(corner.lift_height(contact, state) == doctest::Approx(0.0));
+
+	// Extending a hair slower than the cancelling speed: still carrying, barely.
+	corner.step(contact, -cancels_at * 0.99, state);
+	CHECK(state.normal_force > 0.0);
+	CHECK(state.grounded);
+
+	// And a hair faster. **This is the read-out the ticket called a
+	// contradiction**: no load, not grounded, and zero lift because the tire has
+	// not left the ground — it is being held down by geometry and let go by the
+	// damper.
+	corner.step(contact, -cancels_at * 1.01, state);
+	CHECK(state.normal_force == doctest::Approx(0.0));
+	CHECK_FALSE(state.grounded);
+	CHECK(state.tire_contact);
+	CHECK(corner.lift_height(contact, state) == doctest::Approx(0.0));
+}
+
+TEST_CASE("a touching tire has no lift, and a lifted one is not touching") {
+	// The invariants the three fields rest on, swept rather than argued:
+	//
+	//     lift > 0      =>  !tire_contact   (on the hit path)
+	//     tire_contact  =>  lift == 0
+	//     grounded      =>  tire_contact
+	//
+	// The first two are one statement written twice and are **not** quite an "if
+	// and only if": at exactly the free length the spring has run out and the tire
+	// has not yet left, so `tire_contact` is false with `lift` still zero. That is
+	// a single ray length out of a continuum and it is the reason this is stated
+	// as two implications rather than as an equivalence — an equivalence would be
+	// a test that fails on one sample in fifty thousand and looks like noise.
+	//
+	// The third is one-way on purpose: the case above is the wheel that touches
+	// and carries nothing, and it is several percent of this sweep.
+	const ChassisGeometry geometry;
+	for (const int which : { CORNER_FL, CORNER_RL }) {
+		CornerSuspension corner;
+		corner.setup = corner_setup(geometry, which);
+
+		WheelContact contact;
+		contact.hit = true;
+		contact.normal = Vec3(0.0, 1.0, 0.0);
+		contact.cast_length = corner.setup.free_length() + 0.100;
+
+		int unloaded_in_contact = 0;
+		int samples = 0;
+		for (int i = -200; i <= 200; ++i) {
+			contact.ray_length = corner.setup.free_length() + i * 2.0e-4;
+			for (int j = -60; j <= 60; ++j) {
+				CornerState state;
+				corner.step(contact, j * 0.02, state);
+				const double lift = corner.lift_height(contact, state);
+				++samples;
+				if (lift > 0.0) {
+					CHECK_FALSE(state.tire_contact);
+				}
+				if (state.tire_contact) {
+					CHECK(lift == doctest::Approx(0.0));
+				}
+				if (state.grounded) {
+					CHECK(state.tire_contact);
+					CHECK(lift == doctest::Approx(0.0));
+				} else if (state.tire_contact) {
+					++unloaded_in_contact;
+				}
+			}
+		}
+		char line[200];
+		std::snprintf(line, sizeof(line),
+				"  corner %d: %d of %d sampled states are touching and carrying nothing",
+				which, unloaded_in_contact, samples);
+		MESSAGE(line);
+		// The state is not a corner case to be waved away — it is a large region of
+		// the corner's state space, which is why it needed a name.
+		CHECK(unloaded_in_contact > samples / 100);
+	}
 }
 
 TEST_CASE("the normal force is never negative, at any velocity") {

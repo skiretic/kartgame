@@ -189,7 +189,26 @@ var _distance := 0.0
 var _peak_lift := [0.0, 0.0, 0.0, 0.0]
 var _previous_velocity := Vector3.ZERO
 var _previous_position := Vector3.ZERO
+
+## Three counts, not one, because they are three different questions. Issue #136
+## was filed on this report printing "wheels down 3 minimum" beside "peak lift
+## 0.0 mm" on all four corners, with nothing on the page to say how both could be
+## true at once.
+##
+##   * `_wheels_down_min` counts wheels **carrying load** (`grounded`), which is
+##     what the solver zeroes a corner's force from.
+##   * `_wheels_touching_min` counts wheels **on the road** (`tire_contact`),
+##     loaded or not. The gap between the two is the rebound damper cancelling the
+##     spring on a tire that never left the ground — measured at 98.2 mm/s of
+##     extension on the front corner, which is real damper behavior and not a
+##     defect.
+##   * `_peak_lift` is meters of daylight, and is now a **lower bound** rather
+##     than zero when the ray missed entirely.
+##
+## With all three printed there is no wheel state that has no reading, which is
+## what #136 was actually about.
 var _wheels_down_min := 4
+var _wheels_touching_min := 4
 
 ## Set once the skidpad's entry speed is reached; see `_scripted_input`. Latched
 ## rather than recomputed, so a kart that scrubs speed off in the corner does not
@@ -350,9 +369,20 @@ func _sample(delta: float) -> void:
 		# the first fraction of a second reports four wheels a long way off the
 		# ground and that is the spawn rather than any behavior of the kart.
 		var wheels: Array = _kart.telemetry().get("wheel", [])
-		for corner in mini(wheels.size(), _peak_lift.size()):
+		var touching := 0
+		for corner in wheels.size():
 			var wheel: Dictionary = wheels[corner]
-			_peak_lift[corner] = maxf(float(_peak_lift[corner]), float(wheel.get("lift", 0.0)))
+			var lift := float(wheel.get("lift", 0.0))
+			if corner < _peak_lift.size():
+				_peak_lift[corner] = maxf(float(_peak_lift[corner]), lift)
+			# Defaulted from `lift` rather than to false, so an extension built
+			# before `tire_contact` was published still reports something true
+			# instead of four wheels in the air: "no daylight under the tire" is
+			# what contact means on every path except a tick the wheel left
+			# part-way through.
+			if bool(wheel.get("tire_contact", lift <= 0.0)):
+				touching += 1
+		_wheels_touching_min = mini(_wheels_touching_min, touching)
 	# Roll, so that a kart which tipped over is reported as having tipped over
 	# rather than as having pulled a spectacular lateral g on its way past
 	# vertical. Measured from the body's up axis against the world's, which stays
@@ -477,10 +507,19 @@ func _report() -> void:
 		lines.append("    settled circle  %8.2f m radius at %.1f km/h" % [
 			radius, KartCore.ms_to_kmh(steady_speed),
 		])
-	lines.append("    wheels down     %8d minimum after settling" % _wheels_down_min)
+	lines.append("    wheels down     %8d minimum after settling   (carrying load)" %
+			_wheels_down_min)
+	lines.append("    wheels touching %8d minimum after settling   (tire on the road)" %
+			_wheels_touching_min)
 	# Issue #32, per corner, in millimeters. The order is `CORNER_COUNT` order —
 	# FL, FR, RL, RR — which is `chassis_flex.h`'s and therefore the same order the
 	# telemetry panel's columns are in.
+	#
+	# A **lower bound** for any corner whose ray missed entirely: the cast reaches
+	# only 100 mm past the free length, so a wheel high in the air reports 100 mm
+	# and not its true height. `suspension.h`'s `lift_height` says so at length.
+	# It used to report zero there, which is how a kart in mid-flight showed four
+	# wheels down — issue #136's worse half.
 	lines.append("    peak lift mm    %8.1f FL %7.1f FR %7.1f RL %7.1f RR" % [
 		float(_peak_lift[0]) * 1000.0, float(_peak_lift[1]) * 1000.0,
 		float(_peak_lift[2]) * 1000.0, float(_peak_lift[3]) * 1000.0,

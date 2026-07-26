@@ -143,19 +143,71 @@ struct VehicleForces {
 // occurred at neither end. It cannot wrap: it is `atan2(-lateral, reference)`
 // with a strictly positive second argument, so it lives in (-pi/2, pi/2) and the
 // mean of two of them is between them.
+//
+// ## Three fields describe the wheel's relationship with the road, and they are
+// ## three different questions
+//
+// Issue #136 was filed because two of them looked like they contradicted each
+// other. They did not — nobody had written down which question each one answers,
+// so a reader was free to assume they answered the same one. They are:
+//
+//     grounded      the tire is **carrying load**   (normal_force > 0)
+//     tire_contact  the tire is **touching**        (the spring has travel left)
+//     lift          how far the tire is **clear of the ground**, meters
+//
+// and the only relation between them, at the tick level, is
+//
+//     grounded == true  =>  tire_contact == true
+//
+// which holds by construction; see the two flags' own notes below for why the
+// substep combiner preserves it.
+//
+// **The state that looked like a contradiction is `grounded` false with
+// `tire_contact` true and `lift` zero, and it is a damper doing its job.**
+// `suspension.h` splits bump and rebound damping and the rebound rate is
+// deliberately the higher of the two, because a wheel that has been unloaded in a
+// corner must not pump itself back down before the corner is over — issue #32.
+// The front corner carries 360 N on 3.4 mm of tire deflection and its rebound
+// damping is 1776 N per m/s, so at 1.6 mm of remaining deflection the 174 N of
+// spring force is cancelled by **98 mm/s** of extension. The tire is still on the
+// road; it is carrying nothing; and `lift` is correctly zero because there is no
+// daylight under it. That is a real state on a real kart and it is not a defect to
+// be tuned away. It is now reportable rather than inferable, which is the whole of
+// what #136 fixed.
+//
+// **The consumer's rule.** "This wheel is not working" is `!grounded` — that is
+// the flag the solver itself uses to zero the force, so it is the one the panel's
+// banner and the wheel count key off. `lift` is the number issue #32 is judged on
+// and it is a *distance*, not a state: a wheel can be doing nothing with `lift`
+// exactly zero.
 struct WheelTelemetry {
 	// All doubles below are the mean over the tick's substeps.
 	double normal_load = 0.0; // N
 	double slip_angle = 0.0; // rad
 	double slip_ratio = 0.0; // dimensionless
 	double suspension_travel = 0.0; // m, positive compressed
-	double lift = 0.0; // m off the ground, zero when loaded
+
+	// Daylight under the tire, meters, measured along the suspension ray.
+	// Positive means the tire is clear of the ground; zero means it is touching,
+	// whether or not it is carrying anything.
+	//
+	// **A lower bound and not an exact height whenever the ray missed.** A ray is
+	// only cast as far as `KartVehicle::ray_length` — the wheel radius plus a
+	// 100 mm margin — so a corner that finds no ground reports the whole of what
+	// is known, which is that the tire is at least the margin clear. It used to
+	// report zero for that case, so a kart in flight read as "all four down" on
+	// every corner (issue #136). A miss is not ambiguous by the time it arrives
+	// here: ADR-0033 finding 4's buried wheel is latched into a hit by the Godot
+	// boundary, so a miss reaching the solver means the ground is genuinely not
+	// there.
+	double lift = 0.0;
+
 	double utilization = 0.0; // fraction of the friction ellipse in use
 	double steer_angle = 0.0; // rad
 	Vec3 force; // world, N, what this tire produced
 
-	// True if the corner was grounded on **any** substep — the one field that
-	// cannot be averaged, so it is an OR rather than a mean.
+	// True if the corner was carrying load on **any** substep — one of the two
+	// fields that cannot be averaged, so it is an OR rather than a mean.
 	//
 	// The alternative, the last substep's value, breaks the only invariant this
 	// flag has: a wheel that extends past its free length on the second substep
@@ -164,10 +216,30 @@ struct WheelTelemetry {
 	//
 	//     grounded == false  =>  normal_load == 0 and force == 0
 	//
-	// holds by construction. One way only: `suspension.h` sets its own flag from
-	// `normal_force > 0`, so a wheel just touching is grounded and carrying
-	// nothing.
+	// holds by construction. **One way only**, and `tire_contact` below is where
+	// the other direction went: `suspension.h` sets its own flag from
+	// `normal_force > 0`, so a tire the rebound damper has unloaded is on the road
+	// with this false, and reading it as "the wheel is in the air" is the misread
+	// issue #136 was filed about.
 	bool grounded = false;
+
+	// True if the tire was touching the road on **any** substep: the spring still
+	// had travel left, whether or not the corner produced any force with it.
+	//
+	// The negation is the useful reading and it is exact — `!tire_contact` means
+	// **the spring is at full droop**, either because the tire ran out of
+	// deflection or because the ray found no ground at all. `lift` then says which
+	// and by how much.
+	//
+	// **An OR across the substeps, like `grounded` and for its sake.** Per substep
+	// `suspension.h` gives `normal_force > 0 => deflection > 0`, so grounded
+	// implies contact there; OR-ing both keeps that implication at the tick level,
+	// where an AND would not — a corner loaded on the first substep and clear on
+	// the second would report `grounded` true and `tire_contact` false, which is
+	// the same class of read-out-that-contradicts-itself #136 was filed about. A
+	// mean is not available and would be meaningless if it were: "the tire was
+	// half touching" describes nothing.
+	bool tire_contact = false;
 };
 
 // The value `VehicleTelemetry::time_ratio` carries until something that can see a

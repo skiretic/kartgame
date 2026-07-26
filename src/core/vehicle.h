@@ -404,6 +404,13 @@ public:
 		for (int corner = 0; corner < CORNER_COUNT; ++corner) {
 			contact_[corner].hit = contacts[corner].hit;
 			contact_[corner].ray_length = contacts[corner].distance;
+			// How far the query looked, which is the only thing a miss reports.
+			// `suspension.h`'s `lift_height` turns it into "the tire is at least
+			// this far clear" instead of the zero it used to return for a kart in
+			// mid-air — issue #136. Filled here rather than left to the boundary
+			// because this file owns `ray_length(corner)` and a second copy of it
+			// arriving through `GroundQuery` is a second copy that could disagree.
+			contact_[corner].cast_length = ray_length(corner);
 			contact_[corner].surface_grip = contacts[corner].surface_grip;
 			// A missed ray still needs *a* normal for the frames below. Nothing
 			// is applied at a corner that missed, so the value only has to be
@@ -493,6 +500,13 @@ public:
 	// is 100 mm, which is the range issue #32 wants the inside-rear lift reported
 	// over — it is judged in centimeters. Beyond it the corner is airborne and the
 	// exact number stops mattering.
+	//
+	// It is also the number a miss reports, which is the second thing this
+	// constant now decides: past the margin `lift_height` has no measurement, so it
+	// hands back the margin itself as the lower bound rather than the zero that
+	// made a kart in flight read as a kart on the road. Issue #136. Raising the
+	// margin therefore costs one more raycast meter and buys a longer honest lift
+	// range; there is no third effect to check.
 	double ray_length(int corner) const { return wheel_radius(corner) + RAY_MARGIN; }
 
 	// The **unloaded** tire radius, which is what a wheel mesh is that big and
@@ -702,6 +716,11 @@ private:
 			wheel.steer_angle = steer_angle[corner];
 			wheel.suspension_travel = corner_state_[corner].compression;
 			wheel.grounded = corner_state_[corner].grounded && contact_[corner].hit;
+			// Carrying load, touching, and how far clear — three questions, and
+			// `vehicle_state.h` is where they are defined. The only implication
+			// between them is `grounded => tire_contact`, which holds here because
+			// `suspension.h` cannot set `normal_force > 0` without deflection left.
+			wheel.tire_contact = corner_state_[corner].tire_contact;
 			wheel.lift = suspension_[corner].lift_height(contact_[corner], corner_state_[corner]);
 
 			const double radius = rolling_radius(corner);
@@ -1052,8 +1071,11 @@ private:
 	// on both paths through the corner loop — and this is the only place that knows
 	// there is more than one substep.
 	//
-	// `grounded` is the one field that is an OR rather than a sum, because a bool
-	// has no mean. `vehicle_state.h` has the invariant that choice preserves.
+	// `grounded` and `tire_contact` are the two fields that are an OR rather than a
+	// sum, because a bool has no mean. `vehicle_state.h` has the invariants that
+	// choice preserves — in particular they are OR-ed **together**: OR-ing one and
+	// AND-ing the other would let a tick report a corner that carried load without
+	// touching the ground.
 	void accumulate_wheel_telemetry() {
 		for (int corner = 0; corner < CORNER_COUNT; ++corner) {
 			const WheelTelemetry &wheel = telemetry_.wheel[corner];
@@ -1067,6 +1089,7 @@ private:
 			sum.steer_angle += wheel.steer_angle;
 			sum.force += wheel.force;
 			sum.grounded = sum.grounded || wheel.grounded;
+			sum.tire_contact = sum.tire_contact || wheel.tire_contact;
 		}
 	}
 
@@ -1095,6 +1118,7 @@ private:
 			wheel.steer_angle = tick.steer_angle * inverse;
 			wheel.force = tick.force * inverse;
 			wheel.grounded = tick.grounded;
+			wheel.tire_contact = tick.tire_contact;
 		}
 
 		Vec3 sum = total.central_force + gravity * mass_properties_.mass;

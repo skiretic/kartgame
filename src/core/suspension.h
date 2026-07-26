@@ -95,6 +95,19 @@ inline constexpr int CORNER_COUNT = 4;
 struct WheelContact {
 	bool hit = false;
 	double ray_length = 0.0; // mount point to contact, meters
+
+	// How far the ray was cast, meters. Read **only when `hit` is false**, and
+	// then it is the whole of what a miss tells you: there is no ground within
+	// this distance of the mount, so the tire is at least `cast_length` less the
+	// free length clear of it. `lift_height` reports that bound rather than zero.
+	//
+	// A caller that leaves this at zero gets a lift of zero for a miss, which is
+	// exactly the read-out issue #136 was filed about — a kart in flight
+	// reporting no lift on any corner. `KartVehicle::step` fills it from
+	// `ray_length(corner)`; a test or a probe that builds a `WheelContact` by hand
+	// has to fill it too, and `tests/core/test_suspension.cpp` pins both halves.
+	double cast_length = 0.0;
+
 	Vec3 normal; // world frame, unit
 	double surface_grip = 1.0;
 };
@@ -178,7 +191,14 @@ struct CornerState {
 	double velocity = 0.0; // m/s of compression, positive compressing
 	double geometric_offset = 0.0; // meters, from steering jacking; positive lifts the chassis
 	double normal_force = 0.0; // N, never negative — a tire cannot pull
-	bool grounded = false;
+	bool grounded = false; // carrying load: `normal_force > 0`
+
+	// The tire is touching: the spring has travel left, whether or not the corner
+	// produced any force with it. `grounded` implies this and not the other way
+	// round — the rebound damper can cancel the spring on a tire that is still on
+	// the road, which is the state issue #136 found nobody had named.
+	// `vehicle_state.h`'s `WheelTelemetry` has the three-way definition.
+	bool tire_contact = false;
 };
 
 // One corner's spring, damper and travel limits.
@@ -233,6 +253,7 @@ public:
 			state.compression = -setup.max_droop + state.geometric_offset;
 			state.normal_force = 0.0;
 			state.grounded = false;
+			state.tire_contact = false;
 			return;
 		}
 
@@ -248,8 +269,14 @@ public:
 		if (deflection <= 0.0) {
 			state.normal_force = 0.0;
 			state.grounded = false;
+			state.tire_contact = false;
 			return;
 		}
+		// Past this line the spring has travel left, so the tire is on the road.
+		// Whether it *carries* anything is decided at the bottom, after the damper
+		// has had its say — and the damper can take all of it. See
+		// `vehicle_state.h`'s `WheelTelemetry`, which owns the definition.
+		state.tire_contact = true;
 
 		double force = setup.spring_rate * deflection;
 
@@ -285,11 +312,28 @@ public:
 	//
 	// The number issue #32 is judged on is in centimeters, and this is what
 	// reports it. Positive means airborne.
+	//
+	// Exactly `max(0, -deflection)` on the hit path, so it is the same quantity
+	// `step` decides `tire_contact` from and the two cannot disagree: a positive
+	// lift is a negative deflection is a corner that produced no force.
+	//
+	// **A miss reports a lower bound, not zero.** The ray was `cast_length` long
+	// and found nothing, so the tire is at least that far past its free length
+	// clear of the ground. Returning zero — which this did until issue #136 —
+	// makes the one unambiguous case, a kart with all four wheels in the air, read
+	// as the most ordinary one. The bound is not an estimate and never overstates:
+	// it is the largest gap the query is able to rule out, and the true height is
+	// anything from that to the top of the jump. A miss is also not the ambiguous
+	// case ADR-0033 finding 4 warns about by the time it reaches here — a buried
+	// wheel is latched into a *hit* by the Godot boundary, precisely so that this
+	// file may read a miss as "there is no ground there".
 	double lift_height(const WheelContact &contact, const CornerState &state) const {
+		const double free = setup.free_length() + state.geometric_offset;
 		if (!contact.hit) {
-			return 0.0; // Unbounded; the ray did not reach the ground.
+			const double least = contact.cast_length - free;
+			return least > 0.0 ? least : 0.0;
 		}
-		const double gap = contact.ray_length - (setup.free_length() + state.geometric_offset);
+		const double gap = contact.ray_length - free;
 		return gap > 0.0 ? gap : 0.0;
 	}
 };

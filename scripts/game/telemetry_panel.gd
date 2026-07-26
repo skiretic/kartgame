@@ -44,11 +44,12 @@ extends CanvasLayer
 ##             "slip_angle": float,         # rad
 ##             "slip_ratio": float,         # dimensionless
 ##             "suspension_travel": float,  # m, positive compressed
-##             "lift": float,               # m off the ground
+##             "lift": float,               # m of daylight under the tire
 ##             "utilization": float,        # fraction of the friction ellipse
 ##             "steer_angle": float,        # rad
 ##             "force": Vector3,            # world, N
-##             "grounded": bool,
+##             "grounded": bool,            # carrying load
+##             "tire_contact": bool,        # touching, loaded or not
 ##         } ],
 ##         "engine_rpm": float, "engine_torque": float, "axle_torque": float,
 ##         "axle_speed": float, "gear": int, "clutch_slip": float,
@@ -60,6 +61,26 @@ extends CanvasLayer
 ## Every key is read with a default, so a publisher that is missing one draws a
 ## zero rather than crashing. An empty Dictionary means "no vehicle yet" and the
 ## panel says so once instead of spamming.
+##
+## ## The three wheel-state fields, because two of them used to look like a
+## ## contradiction
+##
+## `vehicle_state.h` owns the definitions and this panel is the reason they were
+## written down (issue #136). `grounded` is **carrying load**, `tire_contact` is
+## **touching**, and `lift` is **how far clear of the ground**. A tire held down by
+## geometry while its rebound damper cancels the spring is grounded false, contact
+## true, lift zero — nothing is wrong with the kart and nothing is wrong with the
+## read-out. So the banner and the wheel table's state row key off `grounded`,
+## which is the flag the solver itself uses to zero the corner's force, and never
+## off `lift`, which is a distance and not a state. The lift row's own coloring
+## still keys off `lift`, because that row is the distance.
+##
+## `tire_contact` is the one key whose default is not the zero value: it falls back
+## to "no daylight under the tire", `lift <= LIFT_VISIBLE_M`, because a boundary
+## that has not published the key yet would otherwise draw every unloaded wheel as
+## airborne — which is the exact misreading #136 is about, arriving by a different
+## route. `lift` is a lower bound rather than an exact height when the wheel's ray
+## missed, so a banner reading "+100 mm" means at least that far.
 ##
 ## ## It never writes
 ##
@@ -713,28 +734,48 @@ func _draw_strip() -> void:
 ## the ground is the thing ARCHITECTURE.md §6 says the whole vehicle model exists
 ## to produce — with no differential, that wheel lift *is* the differential — so
 ## the panel says so in words, per wheel, in millimeters, the instant it happens.
+##
+## **Keyed off `grounded`, not off `lift`** — issue #136. `lift` is how far clear
+## the tire is and it is legitimately zero for a wheel the solver is carrying no
+## load on, so a banner keyed off it stayed silent for exactly the wheel it exists
+## to shout about. `grounded` is the flag the solver zeroes the corner force from,
+## which makes it the one that answers "is this wheel doing anything".
+##
+## The two ways to be ungrounded read differently and are labeled differently: a
+## wheel with daylight under it gets its height in millimeters, and one still on
+## the road with its spring cancelled gets the word. Same box, same color, so the
+## thing that changes on the panel is the fact and not the furniture.
 func _draw_lift_banner(from_x: float) -> void:
 	var wheels: Array = _sample.get("wheel", [])
-	var airborne := PackedStringArray()
-	var worst := 0.0
+	var unloaded := PackedStringArray()
+	var any_clear := false
 	for index in WHEEL_COUNT:
 		if index >= wheels.size():
 			continue
 		var wheel: Dictionary = wheels[index]
+		if bool(wheel.get("grounded", false)):
+			continue
 		var lift := float(wheel.get("lift", 0.0))
 		if lift > LIFT_VISIBLE_M:
-			airborne.append("%s +%.0f mm" % [WHEEL_CODES[index], lift * 1000.0])
-			worst = maxf(worst, lift)
+			# A lower bound when the wheel's ray found no ground at all, which is
+			# the whole of what a miss can honestly say. See the header.
+			unloaded.append("%s +%.0f mm" % [WHEEL_CODES[index], lift * 1000.0])
+			any_clear = true
+		else:
+			unloaded.append("%s unloaded" % WHEEL_CODES[index])
 
 	var x := maxf(from_x, _canvas.size.x - 430.0)
-	if airborne.is_empty():
+	if unloaded.is_empty():
 		_text(Vector2(x, 34.0), "all four down", FONT_SIZE_BODY, COLOR_DIM)
 	else:
 		var banner := Rect2(x - 8.0, 8.0, _canvas.size.x - x, STRIP_HEIGHT - 32.0)
 		_target.draw_rect(banner, Color(COLOR_CHASSIS.r, COLOR_CHASSIS.g, COLOR_CHASSIS.b, 0.20))
 		_target.draw_rect(banner, COLOR_CHASSIS, false, 2.0)
-		_text(Vector2(x, 32.0), "WHEEL OFF THE GROUND", FONT_SIZE_TITLE, COLOR_CHASSIS)
-		_text(Vector2(x, 54.0), " ".join(airborne), FONT_SIZE_BODY, COLOR_TEXT)
+		# The title says which of the two it is, because "off the ground" is a
+		# claim about geometry and a cancelled spring is not one.
+		var title := "WHEEL OFF THE GROUND" if any_clear else "WHEEL CARRYING NO LOAD"
+		_text(Vector2(x, 32.0), title, FONT_SIZE_TITLE, COLOR_CHASSIS)
+		_text(Vector2(x, 54.0), " ".join(unloaded), FONT_SIZE_BODY, COLOR_TEXT)
 
 	# The peak holds after touchdown, because the moment a driver looks at the
 	# panel is the moment after the kart came back down.
@@ -789,22 +830,36 @@ func _draw_wheel_table() -> void:
 		var wheel: Dictionary = wheels[index] if index < wheels.size() else {}
 		var force: Vector3 = wheel.get("force", Vector3.ZERO)
 		var grounded := bool(wheel.get("grounded", false))
+		var lift := float(wheel.get("lift", 0.0))
+		# Defaulted from `lift` rather than to false, because false is a claim and
+		# this is not: with `lift` honest about a missed ray, "no daylight under the
+		# tire" is what contact means on every path but a tick the wheel left
+		# part-way through. A publisher that has not been taught the key still draws
+		# the right word.
+		var touching := bool(wheel.get("tire_contact", lift <= LIFT_VISIBLE_M))
+		# The row that resolves issue #136 where the reader is already looking.
+		# "NO" alone left two very different states — a tire held down with its
+		# spring cancelled by the rebound damper, and a wheel genuinely in the air
+		# — looking identical, and the ticket was filed because they are not.
+		var grounded_text := "yes"
+		if not grounded:
+			grounded_text = "NO (touching)" if touching else "NO (airborne)"
 		var values := PackedStringArray([
 			"%.0f" % float(wheel.get("normal_load", 0.0)),
 			"%+.2f" % rad_to_deg(float(wheel.get("slip_angle", 0.0))),
 			"%+.3f" % float(wheel.get("slip_ratio", 0.0)),
 			"%.3f" % float(wheel.get("utilization", 0.0)),
 			"%+.2f" % (float(wheel.get("suspension_travel", 0.0)) * 1000.0),
-			"%.1f" % (float(wheel.get("lift", 0.0)) * 1000.0),
+			"%.1f" % (lift * 1000.0),
 			"%+.2f" % rad_to_deg(float(wheel.get("steer_angle", 0.0))),
 			"%.0f  (%.0f, %.0f, %.0f)" % [force.length(), force.x, force.y, force.z],
-			"yes" if grounded else "NO",
+			grounded_text,
 		])
 		for row in values.size():
 			var value_color := COLOR_TEXT
 			if row == 3 and float(wheel.get("utilization", 0.0)) > 1.0:
 				value_color = COLOR_ALERT # sliding
-			if row == 5 and float(wheel.get("lift", 0.0)) > LIFT_VISIBLE_M:
+			if row == 5 and lift > LIFT_VISIBLE_M:
 				value_color = COLOR_CHASSIS
 			if row == 8 and not grounded:
 				value_color = COLOR_CHASSIS
@@ -1033,11 +1088,17 @@ func _demo_sample(tick: int) -> Dictionary:
 
 		# The inside rear leaves the ground at high lateral load, which is the
 		# behavior the whole vehicle model exists to produce.
+		#
+		# On the way there it passes through the state issue #136 was filed about:
+		# unloaded while still touching, because the spring has been cancelled and
+		# not because the tire has left the road. Generated on purpose — it is the
+		# banner path the ticket found nothing was exercising, and a demo that skips
+		# straight from loaded to airborne is a demo that would have hidden the bug.
 		var lift := 0.0
 		var inside_rear := (not front) and (left if lateral < 0.0 else not left)
 		if inside_rear and absf(lateral) > 1.45:
 			lift = (absf(lateral) - 1.45) * 0.075
-		if lift > 0.0:
+		if lift > 0.0 or (inside_rear and absf(lateral) > 1.30):
 			load = 0.0
 		load = maxf(load, 0.0)
 
@@ -1071,6 +1132,9 @@ func _demo_sample(tick: int) -> Dictionary:
 			"steer_angle": deg_to_rad(lateral * 4.0) if front else 0.0,
 			"force": Vector3(load * lateral * 0.4, -load, load * longitudinal * 0.35),
 			"grounded": load > 0.0,
+			# Touching whenever there is no daylight under the tire, which is what
+			# the solver reports and is one-way weaker than `grounded`.
+			"tire_contact": lift <= 0.0,
 		})
 
 	# A 6-speed sequential with a shift every 1.5 s, wrapping back to first.
