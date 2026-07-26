@@ -800,9 +800,16 @@ private:
 			// contact integrated explicitly at a fixed step.
 			//
 			// It costs nothing where it does not bind, and it binds only below
-			// about 1.4 m/s of slip velocity. In a steady 2 g corner the lateral
-			// slip velocity is around 2 m/s and the cap is twenty times the tire's
-			// own peak.
+			// about 1.4 m/s of slip velocity.
+			//
+			// **The figure this comment used to quote for a real corner was wrong
+			// and the conclusion survives it.** It said "in a steady 2 g corner the
+			// lateral slip velocity is around 2 m/s". Measured in a steady 1.88 g
+			// corner by `tests/core/test_scrub_energy.cpp`, it is **3.45 m/s at the
+			// rears and 6.18-6.49 m/s at the fronts**, and 12.2 m/s at 0.60 of lock.
+			// So the headroom is about 6x rather than 20x at the front — still far
+			// from binding, which is what the paragraph was for, but a number
+			// somebody could have checked against and found to disagree.
 			const double corner_mass = mass_properties_.mass * 0.25;
 			const double lateral_cap =
 					SLIP_CONVERGENCE_FRACTION * corner_mass * std::fabs(lateral_speed) / h;
