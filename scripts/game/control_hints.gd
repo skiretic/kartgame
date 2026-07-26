@@ -52,12 +52,21 @@ extends RefCounted
 ## Throttle, brake and steer are analog and the clutch is not, because both
 ## triggers are spent — `ARCHITECTURE.md` §6.3's assists exist partly to cover
 ## that, and #38 is the launch it makes hard.
+## Shifts on the face buttons and the clutch on a shoulder, which is the driver's
+## own layout rather than the default this shipped with. It puts both shift
+## directions under the right thumb where a sequential box wants them, and moves
+## the clutch to a finger that is not doing anything else.
+##
+## The auto-shift toggle went to **R3** when Cross was taken. It is a mode switch
+## rather than a control, so it wants the button least likely to be hit by
+## accident, and the right stick is not read anywhere in this project. **L1 is
+## deliberately unbound** and is the free one if something needs a home.
 const PAD_LINE := (
-	"R2 throttle  L2 brake  Left stick steer  R1/L1 shift up-down  "
-	+ "Square clutch  Triangle look back  Circle respawn"
+	"R2 throttle  L2 brake  Left stick steer  Square shift up  Cross shift down  "
+	+ "R1 clutch  Triangle look back  Circle respawn"
 )
 const PAD_LINE_2 := (
-	"Cross auto-shift on-off  Create camera (chase/cockpit/free)  Options pause"
+	"R3 auto-shift on-off  Create camera (chase/cockpit/free)  Options pause"
 )
 
 ## The keyboard list. The debug keys have no pad binding at all, so they are
