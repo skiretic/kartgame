@@ -122,6 +122,11 @@ void KartBody::_bind_methods() {
 			&KartBody::set_engine_voice_player);
 	ClassDB::bind_method(D_METHOD("get_engine_voice_player"), &KartBody::get_engine_voice_player);
 	ClassDB::bind_method(D_METHOD("engine_mount_position"), &KartBody::engine_mount_position);
+
+	ClassDB::bind_method(D_METHOD("set_steer_gamma", "gamma"), &KartBody::set_steer_gamma);
+	ClassDB::bind_method(D_METHOD("get_steer_gamma"), &KartBody::get_steer_gamma);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "steer_gamma", PROPERTY_HINT_RANGE, "1.0,6.0,0.05"),
+			"set_steer_gamma", "get_steer_gamma");
 	ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "engine_voice_player", PROPERTY_HINT_NODE_PATH_VALID_TYPES,
 						"AudioStreamPlayer3D,AudioStreamPlayer"),
 			"set_engine_voice_player", "get_engine_voice_player");
@@ -560,8 +565,23 @@ DriverInput KartBody::gather_input() {
 		Input *map = Input::get_singleton();
 		input.throttle = map->get_action_strength(ACTION_THROTTLE);
 		input.brake = map->get_action_strength(ACTION_BRAKE);
-		input.steer = map->get_action_strength(ACTION_STEER_LEFT) -
-				map->get_action_strength(ACTION_STEER_RIGHT);
+		// **The steering curve, and it is applied here and nowhere else.**
+		//
+		// Deliberately not in the `input_driver_` branch above. That branch is what
+		// `drive_probe.gd`, `track_probe.gd` and every still command drive through, and
+		// their `--lock=` and `--steer=` arguments are *lock* fractions with a recorded
+		// sweep table attached to them. Curving those would silently rewrite every
+		// figure in `drive_probe.gd`'s header and in ROADMAP M3b, and the measurements
+		// would still look plausible. A scripted run asks for a steering angle; a
+		// driver asks for a stick position. They are not the same request.
+		//
+		// This is the one asymmetry between a scripted run and a driven one, which is a
+		// real cost — `gather_input`'s own comment above says the shared rate limit is
+		// "what makes a scripted run and a driven one the same experiment". They remain
+		// the same experiment at the same *lock*, and `steer_gamma = 1.0` collapses the
+		// two exactly.
+		input.steer = steering_curve(map->get_action_strength(ACTION_STEER_LEFT) -
+				map->get_action_strength(ACTION_STEER_RIGHT));
 		input.clutch = map->get_action_strength(ACTION_CLUTCH);
 		// Edges, not levels. `is_action_just_pressed` is evaluated against the
 		// physics frame when it is called from one, so a held button produces one
@@ -662,6 +682,25 @@ void KartBody::set_engine_voice_player(const NodePath &p_path) {
 
 NodePath KartBody::get_engine_voice_player() const {
 	return engine_voice_path_;
+}
+
+double KartBody::steering_curve(double p_input) const {
+	const double clamped = clamp_signed_one(p_input);
+	if (steer_gamma_ <= 1.0) {
+		return clamped;
+	}
+	// Sign preserved and the exponent applied to the magnitude, so the curve is
+	// symmetric and `std::pow` never sees a negative base.
+	const double magnitude = std::pow(std::fabs(clamped), steer_gamma_);
+	return clamped < 0.0 ? -magnitude : magnitude;
+}
+
+void KartBody::set_steer_gamma(double p_gamma) {
+	steer_gamma_ = p_gamma < 1.0 ? 1.0 : (p_gamma > 6.0 ? 6.0 : p_gamma);
+}
+
+double KartBody::get_steer_gamma() const {
+	return steer_gamma_;
 }
 
 Vector3 KartBody::engine_mount_position() const {

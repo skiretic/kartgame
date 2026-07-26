@@ -15,6 +15,7 @@ extends Node3D
 ##   --eye=x,y,z         park a camera here instead, and leave it there
 ##   --look=x,y,z        what the parked camera aims at (default: the grid)
 ##   --hud=true          the corner text overlay and the driving HUD
+##   --steer-gamma=3.0   the steering input curve, also live on `[` and `]`
 ##   --validate=false    run the O(n^2) self-intersection check and print it
 ##   --throttle=1 --steer=0.3 --brake=0
 ##                       drive the kart from arguments instead of from the input
@@ -140,6 +141,20 @@ const WHEEL_PIVOT_NAMES: PackedStringArray = [
 ## Ticks to leave the kart's `_physics_process` switched off after a respawn.
 ## Issue #132; see `_respawn()`.
 const RESPAWN_QUIET_TICKS := 1
+
+## The largest steering input at 100 km/h whose geometric radius asks for no more
+## lateral g than the kart can actually make: **0.065 of lock, 1.62 degrees**.
+##
+## Measured by `tests/core/test_vehicle.cpp`'s steering-step case, and duplicated
+## here for a HUD row rather than derived, because deriving it needs the tire's peak
+## friction and the Ackermann solver and this is a text label. If it drifts, the row
+## reports a percentage that is wrong and nothing else breaks — which is why it is
+## acceptable here and would not be in `src/core/`.
+const FOLLOWABLE_LOCK := 0.065
+
+## How much `[` and `]` move the curve. 0.10 is about the smallest step that is
+## distinguishable in one corner; smaller and a driver cannot tell two presses apart.
+const GAMMA_STEP := 0.10
 
 var _args: Dictionary = {}
 var _layout: TrackLayout
@@ -507,6 +522,10 @@ func _build_kart() -> void:
 	# audio device and must not need one — see `engine_voice_rig.gd`.
 	_engine_voice = EngineVoiceRig.attach(_kart)
 
+	# So a session can start at a chosen curve instead of dialing back to it, and so
+	# that whatever value the brackets settle on is reproducible from a command.
+	_kart.steer_gamma = Cmdline.as_float(_args, "steer-gamma", _kart.steer_gamma)
+
 	_physics_draw = PhysicsDraw.new()
 	_physics_draw.name = "PhysicsDraw"
 	add_child(_physics_draw)
@@ -841,6 +860,14 @@ func _hud_text() -> String:
 		_kart.get_lateral_g(), _kart.get_longitudinal_g(),
 	])
 	lines.append("under the wheels  " + _surface_text)
+	# The steering curve, live, because it is judged by feel and the alternative is a
+	# rebuild per guess. `FOLLOWABLE_LOCK` is the measured 100 km/h limit — see
+	# `tests/core/test_vehicle.cpp` — so this reports what fraction of stick travel
+	# reaches it at the current gamma. At gamma 1 it is 6.5%, which is inside the
+	# 0.15 deadzone and is the whole reason this row exists.
+	var gamma: float = _kart.steer_gamma
+	lines.append("steer curve  gamma %.2f   [ / ] to change   the 100 km/h limit sits at %.0f%% of stick"
+		% [gamma, 100.0 * pow(FOLLOWABLE_LOCK, 1.0 / gamma)])
 	lines.append("physics %d Hz   frame %.1f fps   %s" % [
 		Engine.physics_ticks_per_second,
 		Engine.get_frames_per_second(),
@@ -851,6 +878,41 @@ func _hud_text() -> String:
 		+ "C look back  R respawn  V camera      F3 telemetry  F4 frustum  F5 physics"
 	)
 	return "\n".join(lines)
+
+
+## Live tuning for the steering curve, on `[` and `]`.
+##
+## **Here rather than in `project.godot`'s input map, and that is the unusual
+## choice.** Every other control in this scene is an action, because every other
+## control is something a driver uses and a pad can be bound to. This is a tuning
+## knob for one open question — what `steer_gamma` should be — and it is expected to
+## stop existing once the number is settled. An action would put it in the input map,
+## in the pad bindings, and in the list CLAUDE.md keeps of what every key does, all
+## for something with a shorter life than the milestone.
+##
+## It is on the HUD line above so it is not a secret, which is the actual rule that
+## matters: this project once shipped a milestone where the shift, clutch and
+## look-back keys existed and were documented nowhere, and the result was a driver
+## pressing E, getting nothing, and concluding the gearbox was broken.
+func _unhandled_key_input(event: InputEvent) -> void:
+	if _kart == null:
+		return
+	var key := event as InputEventKey
+	if key == null or not key.pressed or key.echo:
+		return
+	# The bracket keys, by physical position rather than by label, so a non-US
+	# layout gets the same two keys next to each other.
+	if key.physical_keycode == KEY_BRACKETLEFT:
+		_kart.steer_gamma = _kart.steer_gamma - GAMMA_STEP
+	elif key.physical_keycode == KEY_BRACKETRIGHT:
+		_kart.steer_gamma = _kart.steer_gamma + GAMMA_STEP
+	else:
+		return
+	# Printed as well as shown, so a session that found a good number leaves a
+	# record of it in the terminal rather than only on a HUD that is gone.
+	print("steer_gamma %.2f — the 100 km/h limit is at %.0f%% of stick travel"
+		% [_kart.steer_gamma, 100.0 * pow(FOLLOWABLE_LOCK, 1.0 / _kart.steer_gamma)])
+	get_viewport().set_input_as_handled()
 
 
 ## "FL asphalt  FR curb  RL asphalt  RR curb", from the solver's own ground query.

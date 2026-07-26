@@ -289,6 +289,32 @@ public:
 	void set_engine_voice_player(const godot::NodePath &p_path);
 	godot::NodePath get_engine_voice_player() const;
 
+	// Exponent on the driver's steering input, before it becomes a lock fraction.
+	// 1.0 is linear — the mapping this class had, and the one a probe still uses.
+	//
+	// **This is a controller property, not a vehicle property, and the difference is
+	// the whole justification for it.** `src/core/steering.h` deliberately removed
+	// M3a's `STEER_SPEED_FALLOFF` and argues that a kart's high-speed stability must
+	// be emergent from caster and Ackermann rather than from an input aid. That
+	// argument is about the vehicle and it is untouched here: the kart's response to
+	// a given lock is not altered, at any speed, and nothing in `src/core/` can see
+	// this number.
+	//
+	// What it fixes is a measurement, not a feeling. `tests/core/test_vehicle.cpp`'s
+	// steering-step sweep: at 100 km/h the tightest radius this kart can hold is
+	// 37.5 m, which is **0.065 of lock, 1.62 degrees**. Every input above that asks
+	// for more lateral g than the tires make — 0.20 of lock demands 6.3 g — so the
+	// kart slides, however gently the driver got there.
+	//
+	// And `project.godot` sets the steer actions' **deadzone to 0.15**, while Godot's
+	// `get_action_strength` returns the raw value above the deadzone with no
+	// rescaling. So the smallest input a stick can produce is 0.15 of lock, and the
+	// entire followable range at 100 km/h is *inside the deadzone* — there is no
+	// stick position that produces a corner the kart can hold. That is not a
+	// difficult car. It is an unreachable one.
+	void set_steer_gamma(double p_gamma);
+	double get_steer_gamma() const;
+
 	// Where the engine sits in the body's own frame, meters. The place to put the
 	// emitter, served rather than retyped.
 	//
@@ -376,6 +402,9 @@ private:
 	// second for nothing.
 	void resolve_engine_voice();
 
+	// Shape the driver's raw steering input. Identity when `steer_gamma_` is 1.
+	double steering_curve(double p_input) const;
+
 	// Map this tick's `VehicleTelemetry` onto `EngineAudioInput` and publish it.
 	// The only place that mapping exists. See the definition for why `load` is not
 	// `throttle`.
@@ -395,6 +424,35 @@ private:
 	static constexpr double SCRUB_REFERENCE_SLIP_RAD = 0.20;
 
 	kart::core::KartVehicle vehicle_;
+
+	// The steering curve's exponent. See `set_steer_gamma` for why this is a
+	// controller property and does not contradict `steering.h`.
+	//
+	// **3.0, and every one of the four numbers below is why.** With `x^3`, against the
+	// measured 0.065-of-lock limit at 100 km/h and `project.godot`'s 0.15 deadzone:
+	//
+	//     stick   lock    inner deg  radius m  asked g   what it is
+	//      0.15   0.0034      0.08    713.57     0.11    the deadzone edge
+	//      0.40   0.0640      1.60     38.14     2.06    the 100 km/h limit
+	//      0.62   0.2383      5.96     10.61     7.41    Turn 2's 11 m hairpin
+	//      1.00   1.0000     25.00      2.80    28.06    full lock, still there
+	//
+	// The exponent is chosen from the second row: it puts the fastest corner on the
+	// track at 40% of stick travel, which is where a thumb has resolution, instead of
+	// at 6.5% where it has none. The first row is the fix — the deadzone edge asked
+	// 4.8 g before the curve and asks 0.11 g after it, so the smallest input a stick
+	// can make is now a corner instead of a slide. The third row is the check that it
+	// did not overshoot: a curve that made fast corners comfortable by pushing the
+	// hairpin past the end of the stick would have traded one unreachable corner for
+	// another.
+	//
+	// Those five columns are printed by `tests/core/test_vehicle.cpp`'s steering-step
+	// case, which is where they were measured rather than computed in this comment.
+	//
+	// Tunable because it is judged by feel and this is a first estimate from
+	// arithmetic. 1.0 restores the linear mapping exactly, which is what #40's
+	// "assists off" wants and what makes a driven run comparable with a scripted one.
+	double steer_gamma_ = 3.0;
 
 	godot::NodePath engine_voice_path_;
 	godot::Ref<EngineVoiceStream> engine_voice_;

@@ -973,6 +973,248 @@ TEST_CASE("the skidpad, and whether the dynamic answer agrees with the quasi-sta
 	CHECK(lift_g == doctest::Approx(corrected).epsilon(0.25));
 }
 
+TEST_CASE("how much steering it takes to lose it at speed, which is issue #137's other half") {
+	// **This measures a transient, and every other cornering test here measures a
+	// steady state.** That is the whole reason it exists.
+	//
+	// The steady-state sweep above reports the *best* g each steering angle can hold
+	// and discards anything that departed — `Steady::stable` throws away runs past 30
+	// degrees of body slip. So a kart that snaps on the way in and a kart that turns
+	// in cleanly produce the *same* row in that table, because the table only ever
+	// looks at the last second of a six-second hold.
+	//
+	// A driver's report does not work that way. "You barely touch the steering and it
+	// goes way out of control" is a statement about the first half second after an
+	// input, at a speed nobody holds a skidpad at. So this applies a step and watches
+	// what happens next.
+	//
+	// The number to read is `yaw/Ack`: measured yaw rate over the rate the steering
+	// geometry commands at that speed and lock. Below 1 the kart is understeering and
+	// running wide of where it is pointed. Above 1 it is rotating faster than the
+	// front wheels asked for, which is the rear axle giving up, and it is a departure
+	// rather than a corner however much lateral g it happens to be making.
+	//
+	// **Speed is held.** A step input at constant throttle sheds speed while it
+	// rotates, and then the yaw ratio is partly a report about the speed loss — which
+	// is exactly the protocol confound that made the solver-only and through-Godot
+	// lock sweeps look like they disagreed by 14x when they agree to 3%. Held speed
+	// isolates the yaw response, and the throttle it costs is reported.
+	const SteeringGeometry steering = kz_front_geometry();
+
+	// 100 km/h: the approach speed to Turn 1 and Turn 3 on the test track, and about
+	// where a driver first notices the kart is nervous. Not the top speed, because a
+	// step input at 140 km/h is a question about the limit and this is a question
+	// about ordinary driving.
+	const double entry_ms = 100.0 / 3.6;
+
+	std::printf("\n    a steering step at %.0f km/h, held for 2 s\n", ms_to_kmh(entry_ms));
+	std::printf("    yaw/Ack < 1 runs wide, > 1 is the rear leaving. peak is the worst tick.\n");
+	// `asked g` is `v^2/r` for the radius that steering angle geometrically describes,
+	// and it is the column that makes the rest of the table readable.
+	//
+	// **A first version of this test omitted it and the table was misread.** Every
+	// `yaw/Ack` below 1 looks like a kart refusing to rotate, and at a fixed 100 km/h
+	// it is nothing of the kind: 25 degrees of lock is a 2.8 m radius, which at this
+	// speed asks for 28 g. The kart is not under-rotating, it is being asked for a
+	// radius no tire can hold, and it runs wide because that is what a grip-limited
+	// vehicle does. Printing the demand beside the response is the difference between
+	// a diagnosis and an accusation.
+	const double capable_g = Tire().lateral.peak_friction;
+	std::printf("    %6s %8s %8s %9s %8s %8s %8s %7s\n", "input", "radius m", "asked g",
+			"yaw/Ack pk", "slip deg", "kept %", "IR load", "stable");
+
+	double first_departure = -1.0;
+	double last_settled = 0.0;
+	// Fine between 0.50 and 0.75, because that is where the cliff is and a 0.25-wide
+	// step across it reports a cliff without saying how sharp it is.
+	for (double input : { 0.05, 0.10, 0.20, 0.30, 0.40, 0.50, 0.55, 0.60, 0.65, 0.70, 0.75, 1.00 }) {
+		Rig rig;
+		rig.configure();
+		rig.settle();
+		// Fifth gear at 27.8 m/s keeps the engine inside its powerband, so the speed
+		// hold is not fighting a rev limiter or an engine off the pipe.
+		rig.vehicle.engage(5, entry_ms);
+		rig.linear_velocity = -rig.basis_z * entry_ms;
+
+		const double inner = steering.max_lock * input;
+		const double radius = turn_radius(steering, inner, ackermann_outer_angle(steering, inner));
+
+		SpeedHold hold;
+		hold.target = entry_ms;
+
+		// Half a second straight first, so the step is applied to a kart that has
+		// settled at speed rather than to one still recovering from `engage`.
+		for (int tick = 0; tick < 60; ++tick) {
+			DriverInput straight;
+			hold.apply(straight, rig.forward_speed());
+			rig.step(straight);
+		}
+
+		double peak_ratio = 0.0;
+		double peak_slip = 0.0;
+		double end_ratio = 0.0;
+		// The mechanism under test. A locked rear axle cannot let the inside rear turn
+		// slower than the outside, so the only way this kart is *allowed* to rotate is
+		// for the inside rear to stop carrying load — issue #32's lift. If these two
+		// columns show a loaded inside rear right through the slide, the axle is
+		// fighting every attempt to yaw and that is the cause rather than the tires.
+		double min_inside_rear = 1e9;
+		double peak_lift_mm = 0.0;
+		bool finite = true;
+		// **The step is instantaneous in intent and rate limited in fact.**
+		// `vehicle.h`'s `steer_rate` of 3.4 reaches full lock in 294 ms, so the
+		// solver's own limiter shapes the input exactly as it does for a driver's
+		// hand — or for a keyboard, which asks for full lock the instant it is
+		// pressed. Nothing here softens it further.
+		for (int tick = 0; tick < 240; ++tick) {
+			DriverInput step;
+			step.steer = input;
+			hold.apply(step, rig.forward_speed());
+			rig.step(step);
+			if (!rig.finite()) {
+				finite = false;
+				break;
+			}
+
+			const double speed = rig.forward_speed();
+			const double kinematic = radius > 0.0 ? speed / radius : 0.0;
+			const double ratio = kinematic > 0.0 ? std::fabs(rig.yaw_rate()) / kinematic : 0.0;
+			const double slip = std::fabs(std::atan2(rig.linear_velocity.dot(rig.basis_x),
+					-rig.linear_velocity.dot(rig.basis_z)));
+			if (ratio > peak_ratio) {
+				peak_ratio = ratio;
+			}
+			if (slip > peak_slip) {
+				peak_slip = slip;
+			}
+			// Turning left, so the inside rear is RL. Sampled after the first tenth of
+			// a second, because the step's own load transfer takes that long to arrive
+			// and the standing load before it is not what is being asked about.
+			if (tick > 12) {
+				const WheelTelemetry &inside_rear = rig.vehicle.telemetry().wheel[CORNER_RL];
+				if (inside_rear.normal_load < min_inside_rear) {
+					min_inside_rear = inside_rear.normal_load;
+				}
+				if (inside_rear.lift * 1000.0 > peak_lift_mm) {
+					peak_lift_mm = inside_rear.lift * 1000.0;
+				}
+			}
+			// The last twenty ticks, so "where it ended up" is not one noisy sample.
+			if (tick >= 220) {
+				end_ratio += ratio * 0.05;
+			}
+		}
+
+		const double kept = 100.0 * rig.forward_speed() / entry_ms;
+		// 30 degrees of body slip is `steady_corner`'s own cutoff for "no longer
+		// following the circle", reused so the two tests mean the same thing by it.
+		const bool stable = finite && peak_slip < 0.52;
+		const double asked_g = radius > 0.0 ? (entry_ms * entry_ms) / (radius * G) : 0.0;
+		std::printf("    %6.2f %8.2f %8.2f %9.3f %8.2f %8.1f %8.1f %7s\n", input, radius, asked_g,
+				peak_ratio, peak_slip * 180.0 / PI, kept,
+				min_inside_rear < 1e8 ? min_inside_rear : 0.0, stable ? "yes" : "NO");
+		(void)end_ratio;
+		(void)peak_lift_mm;
+
+		if (stable && peak_ratio <= 1.0) {
+			last_settled = input;
+		}
+		if (first_departure < 0.0 && (!stable || peak_ratio > 1.0)) {
+			first_departure = input;
+		}
+	}
+
+	// **The number that explains the driver's report**, and it is a statement about
+	// the input mapping rather than about the tires.
+	//
+	// The largest steering input whose geometric radius asks for no more lateral g
+	// than the kart can actually make. Beyond it the kart is sliding by definition,
+	// however gently the driver got there — so this is the whole of the steering range
+	// that produces cornering rather than scrub, at this speed.
+	//
+	// The mapping from input to lock is linear and `steering.h` deliberately has no
+	// speed falloff: it argues that a real kart's high-speed stability is emergent
+	// from caster and Ackermann rather than an input aid, which is true of the
+	// *vehicle* and says nothing about the *controller*. A real driver has 900 degrees
+	// of wheel rotation to place 1.4 degrees of lock with. A gamepad stick has about
+	// 15 mm, and a keyboard has a key.
+	const double followable_radius = (entry_ms * entry_ms) / (capable_g * G);
+	double followable_input = 0.0;
+	for (double probe = 0.005; probe <= 1.0; probe += 0.005) {
+		const double inner = steering.max_lock * probe;
+		const double radius = turn_radius(steering, inner, ackermann_outer_angle(steering, inner));
+		if (radius >= followable_radius) {
+			followable_input = probe;
+		}
+	}
+
+	std::printf("\n    the usable band at %.0f km/h\n", ms_to_kmh(entry_ms));
+	std::printf("      %-48s %6.2f g\n", "the best lateral g this kart makes anywhere", capable_g);
+	std::printf("      %-48s %6.1f m\n", "so the tightest radius it can hold here is",
+			followable_radius);
+	std::printf("      %-48s %6.3f of lock, %.2f deg\n", "which is an input of", followable_input,
+			steering.max_lock * followable_input * 180.0 / PI);
+	std::printf("      %-48s %6.2f\n", "largest input that does not depart", last_settled);
+	std::printf("      %-48s %6.2f\n", "smallest input that departs", first_departure);
+	if (followable_input > 0.0) {
+		// The two numbers a driver's hands actually feel. `steer_rate` 3.4 reaches full
+		// lock in 1/3.4 s, so a digital input passes the followable limit after this
+		// long — and a stick has to be placed inside this fraction of its travel.
+		std::printf("\n      %-48s %6.0f ms of held key\n", "the followable range is reached in",
+				1000.0 * followable_input / 3.4);
+		std::printf("      %-48s %6.1f %% of stick travel\n", "and occupies", 100.0 * followable_input);
+	}
+
+	// --- and what the driver's thumb actually reaches ------------------------
+	//
+	// The rows above are *lock* fractions. A driver does not have those; a driver has
+	// a stick position, and `KartBody::steering_curve` maps one to the other. This
+	// table is that mapping, so the numbers in `kart_body.h`'s justification for
+	// `steer_gamma_` are measured here rather than computed by hand in a comment.
+	//
+	// **`STEER_GAMMA` is duplicated from `kart_body.h` and that is a real drift
+	// risk**, stated rather than hidden: `src/vehicle/kart_body.h` needs godot-cpp and
+	// `tests/run.sh` compiles with `src/` as its only include path, on purpose
+	// (ADR-0017), so this file cannot see the real constant. If the two disagree, this
+	// table describes a curve nobody is driving.
+	const double STEER_GAMMA = 3.0;
+	const double DEADZONE = 0.15; // project.godot, steer_left / steer_right
+
+	std::printf("\n    what the stick reaches, through KartBody's x^%.1f curve\n", STEER_GAMMA);
+	std::printf("    deadzone %.2f: below this the stick produces exactly nothing\n", DEADZONE);
+	std::printf("    %7s %8s %9s %9s %8s\n", "stick", "lock", "inner deg", "radius m", "asked g");
+	for (double stick : { DEADZONE, 0.25, 0.40, 0.55, 0.62, 0.80, 1.00 }) {
+		const double lock = std::pow(stick, STEER_GAMMA);
+		const double inner = steering.max_lock * lock;
+		const double radius = turn_radius(steering, inner, ackermann_outer_angle(steering, inner));
+		const double asked_g = radius > 0.0 ? (entry_ms * entry_ms) / (radius * G) : 0.0;
+		std::printf("    %7.2f %8.4f %9.2f %9.2f %8.2f\n", stick, lock, inner * 180.0 / PI, radius,
+				asked_g);
+	}
+
+	// The two claims the curve is chosen to satisfy, asserted rather than eyeballed.
+	//
+	// 1. The deadzone edge must land *inside* what the kart can hold at this speed.
+	//    Before the curve it did not — 0.15 of lock asks 4.8 g — and that is the whole
+	//    defect: the first input a stick can produce was already a slide.
+	const double edge_lock = std::pow(DEADZONE, STEER_GAMMA);
+	const double edge_inner = steering.max_lock * edge_lock;
+	const double edge_radius =
+			turn_radius(steering, edge_inner, ackermann_outer_angle(steering, edge_inner));
+	const double edge_asked_g = (entry_ms * entry_ms) / (edge_radius * G);
+	std::printf("\n      %-48s %6.2f g against %.2f capable\n",
+			"the deadzone edge now asks for", edge_asked_g, capable_g);
+	CHECK(edge_asked_g < capable_g);
+
+	// 2. Full lock must still be reachable, or the curve has traded the fast corners
+	//    for the hairpin and Turn 2 becomes untakeable instead of Turn 1.
+	CHECK(std::pow(1.0, STEER_GAMMA) == doctest::Approx(1.0));
+
+	// The mechanism has to be present: there must *be* a departure somewhere, or the
+	// kart is a train and #137 is not about steering at all.
+	CHECK(first_departure > 0.0);
+}
+
 TEST_CASE("the kart turning right is not the kart turning left") {
 	// `chassis.h` says a validation scenario that only ever turns one way measures
 	// one of two karts, because 27 kg of powertrain hangs off the right and puts
