@@ -344,7 +344,7 @@ inline constexpr Tunable TUNABLES[TUNABLE_COUNT] = {
 			TuningOwner::Vehicle,
 	},
 	{
-			"steer_gamma", "steering curve exponent", "", "src/vehicle/kart_body.h",
+			"steer_gamma", "steering curve exponent", "", "src/vehicle/player_driver.h",
 			3.0, 1.0, 6.0, 0.1, Provenance::Derived,
 			"ADR-0036's four rows. 3.0 puts the measured 100 km/h limit (0.065 of "
 			"lock) at 40% of stick travel instead of 6.5%, which is inside "
@@ -734,6 +734,46 @@ inline int format_value(double value, char *out, int cap) {
 	return written;
 }
 
+// A plain integer, base ten, no padding. `ticks 108000`, `entries 8`,
+// `driver_number 101`.
+//
+// It lives here rather than in each format that needs one because it did not,
+// briefly, and three files grew a private copy: the replay header, the ghost
+// header and the profile all needed to write a count and `format_value` writes
+// six decimals. Same reason `format_value` is here — `snprintf("%d")` would
+// actually be locale-safe for an integer, but a format whose numbers come from
+// two different renderers is a format with two sets of edge cases.
+//
+// Negated in unsigned space so `INT64_MIN` does not overflow on the way out.
+inline int format_int(int64_t value, char *out, int cap) {
+	if (out == nullptr || cap < 2) {
+		return -1;
+	}
+	const bool negative = value < 0;
+	uint64_t magnitude = negative ? (~static_cast<uint64_t>(value) + 1ULL)
+								  : static_cast<uint64_t>(value);
+	char digits[24];
+	int count = 0;
+	do {
+		digits[count++] = static_cast<char>('0' + static_cast<int>(magnitude % 10ULL));
+		magnitude /= 10ULL;
+	} while (magnitude != 0ULL && count < 24);
+
+	const int length = count + (negative ? 1 : 0);
+	if (length + 1 > cap) {
+		return -1;
+	}
+	int written = 0;
+	if (negative) {
+		out[written++] = '-';
+	}
+	for (int i = count - 1; i >= 0; --i) {
+		out[written++] = digits[i];
+	}
+	out[written] = '\0';
+	return written;
+}
+
 // "0x8f1c4a2b6d0e7391", sixteen digits, always. Written by hand rather than with
 // `%016llx` for consistency with the above, and because CLAUDE.md records that
 // GDScript's `pad_zeros` gets exactly this wrong on the other side of the wire.
@@ -907,7 +947,15 @@ struct ParsedLine {
 };
 
 // Parse one line. Never allocates, never reads past `len`, and treats a `#`
-// anywhere outside a header's text as the start of a comment.
+// **anywhere** as the start of a comment, including inside a header's text.
+//
+// This comment used to say "anywhere outside a header's text", which is not what
+// the code does and never was: the trailing comment is stripped before the line is
+// classified, so `name hair#pin` is a header whose text is `hair` and
+// `name #private` is a header whose text is empty. Two separate readers found the
+// wrong sentence before anyone found the consequence, which is that
+// `KartTuning::to_text` has to sanitize `#` out of a preset name the same way it
+// sanitizes a newline.
 //
 // A malformed entry returns `Invalid` rather than being skipped. A preset that
 // half-loaded would be a kart tuned to something nobody wrote down.

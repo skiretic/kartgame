@@ -109,6 +109,9 @@ const SURFACE_GRASS := 2
 
 var _args: Dictionary = {}
 var _kart: KartBody
+## The human at the controls. ADR-0040: `KartBody` no longer reads the `Input`
+## singleton, so without this node the kart coasts and the pad does nothing.
+var _driver: PlayerDriver
 var _chase: ChaseCamera
 var _free: FreeCamera
 var _cockpit: CockpitCamera
@@ -452,6 +455,17 @@ func _build_kart() -> void:
 				+ "run tools/blender/genkart.sh"
 			)
 	add_child(_kart)
+
+	# The driver. ADR-0040 turned the input arrow around: the body is *handed* one
+	# tick of intent instead of fetching it from the `Input` singleton, so a scene
+	# with no driver node is a kart nobody can drive. It is a child of this node
+	# rather than of the kart because it is not part of the vehicle — the same kart
+	# takes an `AIDriver` or a `ReplayDriver` in its place at M6 and M7 — and its
+	# physics priority puts it ahead of the body whatever the tree says.
+	_driver = PlayerDriver.new()
+	_driver.name = "Driver"
+	add_child(_driver)
+	_driver.kart_path = _driver.get_path_to(_kart)
 
 	# The engine note, at the engine. Null under every headless gate, which have no
 	# audio device and must not need one — see `engine_voice_rig.gd`.
@@ -805,17 +819,20 @@ func _set_camera_mode(mode: String) -> void:
 	_camera_mode = mode if mode in ["free", "cockpit"] else "chase"
 	if _camera_mode == "free":
 		_free.take_over(_cockpit.camera if previous == "cockpit" else _chase.camera)
-		# The kart keeps simulating but stops reading input, because the flight
-		# camera reuses the drive keys. Freezing the body instead would make the
-		# free camera a different experiment from the one being debugged.
-		_kart.set_process_input_enabled(false)
+		# The kart keeps simulating but the driver stops reading the pad, because the
+		# flight camera reuses the drive keys. Freezing the body instead would make
+		# the free camera a different experiment from the one being debugged.
+		#
+		# The driver keeps *pushing* — neutral — rather than going quiet, so
+		# `KartBody`'s freshness check stays satisfied. See `player_driver.h`.
+		_driver.enabled = false
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 		return
 	if _camera_mode == "cockpit":
 		_cockpit.make_current()
 	else:
 		_chase.camera.current = true
-	_kart.set_process_input_enabled(true)
+	_driver.enabled = true
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 
 

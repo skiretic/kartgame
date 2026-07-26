@@ -8,6 +8,7 @@
 #include "kart_state_hash.h"
 #include "tuning/tuning_registry.h"
 #include "vehicle/kart_body.h"
+#include "vehicle/player_driver.h"
 
 #include <gdextension_interface.h>
 
@@ -39,6 +40,13 @@ void initialize_kartgame_module(ModuleInitializationLevel p_level) {
 	// and hands it the mesh and collision shape this class deliberately does not
 	// own. ROADMAP M3b, issues #30 and #31.
 	GDREGISTER_CLASS(kartgame::KartBody);
+
+	// The human at the controls. ADR-0040: `KartBody` no longer reads the `Input`
+	// singleton, so a scene with no driver node is a kart that coasts. That is why
+	// this is registered beside the body rather than left to a later milestone —
+	// the two are one wiring change and shipping half of it is a game that cannot
+	// be driven.
+	GDREGISTER_CLASS(kartgame::PlayerDriver);
 
 	// The M8 audio boundary probe. Issue #81, ADR-0035.
 	//

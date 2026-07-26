@@ -14,6 +14,8 @@
 #include <godot_cpp/variant/transform3d.hpp>
 #include <godot_cpp/variant/vector3.hpp>
 
+#include <cstdint>
+
 namespace kartgame {
 
 // The boundary. ROADMAP M3b, issues #30 and #31.
@@ -145,15 +147,48 @@ public:
 	void _physics_process(double p_delta) override;
 
 	// --- driver input ---------------------------------------------------------
-
-	// A `Callable` returning one tick of driver intent, or an invalid Callable to
-	// read the input map instead.
 	//
-	// This is M3a's shape, kept deliberately: `tools/verify/drive_probe.gd`'s
-	// scenarios are open-loop functions of the tick number, and a "set the axes and
-	// hold them" API would make every scenario push values across the boundary
-	// itself for no gain. `tools/shots/shoot.gd`'s constant-throttle still is the
-	// same mechanism with a lambda that ignores the tick.
+	// **This class does not read `Input` and must never read it again.** ADR-0040:
+	// a node that fetches global input cannot be told to stop, so anything upstream
+	// of it — a menu, a pause, an overlay, a replay — has no authority over it. The
+	// symptom that proved it was the tuning overlay, which cannot use the arrow keys
+	// because they are the second binding on throttle, brake and steer and
+	// `set_input_as_handled` cannot reach a singleton poll.
+	//
+	// Input arrives one of two ways and there is no third:
+	//
+	//   * `set_input` — a driver node hands over one tick of intent. `PlayerDriver`
+	//     is the one that exists; `AIDriver`, `ReplayDriver` and `GhostDriver` fill
+	//     the same struct at M6 and M7.
+	//   * `input_driver` — a `Callable` that is asked for one tick of intent.
+
+	// Hand this body one tick of driver intent, stamped with the physics tick the
+	// producer filled it on.
+	//
+	// **The tick is a required argument rather than a field on `DriverInput`, and
+	// that is a deliberate deviation from ADR-0040's wording.** The ADR says the
+	// struct carries the tick. Two reasons it does not: `DriverInput` is passed
+	// straight into `KartVehicle::step`, so a field the solver must ignore is a
+	// field that eventually gets hashed by accident and moves every recorded state
+	// hash in the project; and a struct field defaults to zero and can be forgotten,
+	// where a required argument cannot be.
+	//
+	// Not bound to GDScript. Every producer this file anticipates is C++ or reaches
+	// the body through `input_driver` below, and a bound `push_input(Dictionary)`
+	// that nothing calls is an advertised API with no reader — which is the failure
+	// this project keeps having in its input layer, one level up.
+	void set_input(const kart::core::DriverInput &p_input, uint64_t p_tick);
+
+	// A `Callable` returning one tick of driver intent, or an invalid Callable.
+	//
+	// This is M3a's shape, kept deliberately, and ADR-0040 does not remove it:
+	// `tools/verify/drive_probe.gd`'s scenarios are open-loop functions of the tick
+	// number, and a "set the axes and hold them" API would make every scenario push
+	// values across the boundary itself for no gain. `tools/shots/shoot.gd`'s
+	// constant-throttle still is the same mechanism with a lambda that ignores the
+	// tick. The arrow ADR-0040 objects to is the one that reached the *global*
+	// `Input` singleton; an injected producer, pulled or pushed, is already under
+	// the caller's authority.
 	//
 	// The Dictionary it returns is read with defaults, so M3a's three keys still
 	// work unchanged:
@@ -164,14 +199,28 @@ public:
 	// `shift_up` and `shift_down` are **edges** here as everywhere else — true for
 	// exactly the tick the request is made. `vehicle_state.h` says why: a level
 	// makes a held button shift once per tick through the whole gearbox.
+	//
+	// **A valid Callable wins over pushed input, and that was measured rather than
+	// chosen.** With the push taking precedence, every `drive.sh` scenario ran to
+	// the same state hash and 0.2 m of travel: the scene's `PlayerDriver` was
+	// pushing the neutral input of a keyboard nobody was touching, and the
+	// scenario's Callable was never consulted. A Callable is only ever assigned
+	// deliberately, so it is the explicit override.
 	void set_input_driver(const godot::Callable &p_driver);
 	godot::Callable get_input_driver() const;
 
-	// Stop reading the input map without detaching the body. The free camera turns
-	// this off so the kart keeps simulating while WASD flies the camera; it has no
-	// effect when `input_driver` is valid, because that path never touches `Input`.
-	void set_process_input_enabled(bool p_enabled);
-	bool is_process_input_enabled() const;
+	// How many ticks have consumed neutral input because what was pushed was stale.
+	//
+	// ADR-0040's one failure mode: a producer that does not run, or runs after the
+	// body in tree order, leaves the vehicle consuming last tick's input, and *that
+	// reads as a physics bug*. Neutral rather than held-last is deliberate — holding
+	// the last input means a crashed AI drives into a wall at full throttle, and it
+	// means a divergence between two runs is invisible in the hash for as long as
+	// the throttle agrees either way.
+	//
+	// The node says so once on the console. This counter is how a gate asserts it,
+	// because "it printed a warning" is not something a headless run can check.
+	uint64_t get_stale_input_ticks() const;
 
 	// Latch a shift request from code, for a UI button or a test. Consumed and
 	// cleared by the next tick, so a caller cannot lose one by asking between
@@ -316,31 +365,13 @@ public:
 	void set_wind_voice_player(const godot::NodePath &p_path);
 	godot::NodePath get_wind_voice_player() const;
 
-	// Exponent on the driver's steering input, before it becomes a lock fraction.
-	// 1.0 is linear — the mapping this class had, and the one a probe still uses.
-	//
-	// **This is a controller property, not a vehicle property, and the difference is
-	// the whole justification for it.** `src/core/steering.h` deliberately removed
-	// M3a's `STEER_SPEED_FALLOFF` and argues that a kart's high-speed stability must
-	// be emergent from caster and Ackermann rather than from an input aid. That
-	// argument is about the vehicle and it is untouched here: the kart's response to
-	// a given lock is not altered, at any speed, and nothing in `src/core/` can see
-	// this number.
-	//
-	// What it fixes is a measurement, not a feeling. `tests/core/test_vehicle.cpp`'s
-	// steering-step sweep: at 100 km/h the tightest radius this kart can hold is
-	// 37.5 m, which is **0.065 of lock, 1.62 degrees**. Every input above that asks
-	// for more lateral g than the tires make — 0.20 of lock demands 6.3 g — so the
-	// kart slides, however gently the driver got there.
-	//
-	// And `project.godot` sets the steer actions' **deadzone to 0.15**, while Godot's
-	// `get_action_strength` returns the raw value above the deadzone with no
-	// rescaling. So the smallest input a stick can produce is 0.15 of lock, and the
-	// entire followable range at 100 km/h is *inside the deadzone* — there is no
-	// stick position that produces a corner the kart can hold. That is not a
-	// difficult car. It is an unreachable one.
-	void set_steer_gamma(double p_gamma);
-	double get_steer_gamma() const;
+	// **The steering curve used to live here and now lives on `PlayerDriver`.**
+	// ADR-0036 said it was a controller property and gave the derivation;
+	// ADR-0040 moved the code to match, because the curve belongs to whichever
+	// producer is holding a stick and means nothing to a replay or an AI. The
+	// derivation, the deadzone arithmetic and the 100 km/h sweep it is anchored on
+	// are all in `src/vehicle/player_driver.h`, which is also where `tuning.h`'s
+	// `steer_gamma` row now points.
 
 	// Where the engine sits in the body's own frame, meters. The place to put the
 	// emitter, served rather than retyped.
@@ -439,7 +470,8 @@ private:
 	// the latch, in this frame's world transform.
 	void query_ground(kart::core::GroundQuery r_contacts[kart::core::CORNER_COUNT]);
 
-	// The `input_driver` Callable, or the input map. Consumes the latched edges.
+	// This tick's input: what was pushed if it is current, otherwise the
+	// `input_driver` Callable, otherwise neutral. Consumes the latched edges.
 	kart::core::DriverInput gather_input();
 
 	// This body's pose and motion, in `vehicle_state.h`'s vocabulary.
@@ -457,9 +489,6 @@ private:
 	// the warning text is how one of them ends up naming the wrong property.
 	void resolve_noise_voice(const godot::NodePath &p_path, godot::Ref<NoiseVoiceStream> &r_stream,
 			const char *p_property);
-
-	// Shape the driver's raw steering input. Identity when `steer_gamma_` is 1.
-	double steering_curve(double p_input) const;
 
 	// Map this tick's `VehicleTelemetry` onto `EngineAudioInput` and publish it.
 	// The only place that mapping exists. See the definition for why `load` is not
@@ -480,35 +509,6 @@ private:
 	static constexpr double SCRUB_REFERENCE_SLIP_RAD = 0.20;
 
 	kart::core::KartVehicle vehicle_;
-
-	// The steering curve's exponent. See `set_steer_gamma` for why this is a
-	// controller property and does not contradict `steering.h`.
-	//
-	// **3.0, and every one of the four numbers below is why.** With `x^3`, against the
-	// measured 0.065-of-lock limit at 100 km/h and `project.godot`'s 0.15 deadzone:
-	//
-	//     stick   lock    inner deg  radius m  asked g   what it is
-	//      0.15   0.0034      0.08    713.57     0.11    the deadzone edge
-	//      0.40   0.0640      1.60     38.14     2.06    the 100 km/h limit
-	//      0.62   0.2383      5.96     10.61     7.41    Turn 2's 11 m hairpin
-	//      1.00   1.0000     25.00      2.80    28.06    full lock, still there
-	//
-	// The exponent is chosen from the second row: it puts the fastest corner on the
-	// track at 40% of stick travel, which is where a thumb has resolution, instead of
-	// at 6.5% where it has none. The first row is the fix — the deadzone edge asked
-	// 4.8 g before the curve and asks 0.11 g after it, so the smallest input a stick
-	// can make is now a corner instead of a slide. The third row is the check that it
-	// did not overshoot: a curve that made fast corners comfortable by pushing the
-	// hairpin past the end of the stick would have traded one unreachable corner for
-	// another.
-	//
-	// Those five columns are printed by `tests/core/test_vehicle.cpp`'s steering-step
-	// case, which is where they were measured rather than computed in this comment.
-	//
-	// Tunable because it is judged by feel and this is a first estimate from
-	// arithmetic. 1.0 restores the linear mapping exactly, which is what #40's
-	// "assists off" wants and what makes a driven run comparable with a scripted one.
-	double steer_gamma_ = 3.0;
 
 	godot::NodePath engine_voice_path_;
 	godot::Ref<EngineVoiceStream> engine_voice_;
@@ -532,9 +532,19 @@ private:
 	CornerContact contact_[kart::core::CORNER_COUNT];
 
 	godot::Callable input_driver_;
-	bool process_input_enabled_ = true;
 	bool shift_up_pending_ = false;
 	bool shift_down_pending_ = false;
+
+	// What a driver node last handed over, and the tick it stamped it with.
+	//
+	// `NO_TICK` rather than 0, because 0 is a real physics frame — the first one —
+	// and a sentinel that collides with a legal value is a freshness check that
+	// passes once for free at exactly the moment a scene is starting up.
+	static constexpr uint64_t NO_TICK = UINT64_MAX;
+	kart::core::DriverInput pushed_input_;
+	uint64_t pushed_tick_ = NO_TICK;
+	bool warned_stale_input_ = false;
+	uint64_t stale_input_ticks_ = 0;
 
 	// The last input actually handed to the solver, for the HUD getters above.
 	kart::core::DriverInput last_input_;

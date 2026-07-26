@@ -8,7 +8,6 @@
 #include <godot_cpp/classes/audio_stream_player3d.hpp>
 #include <godot_cpp/classes/collision_shape3d.hpp>
 #include <godot_cpp/classes/engine.hpp>
-#include <godot_cpp/classes/input.hpp>
 #include <godot_cpp/classes/physics_direct_space_state3d.hpp>
 #include <godot_cpp/classes/physics_material.hpp>
 #include <godot_cpp/classes/physics_ray_query_parameters3d.hpp>
@@ -100,11 +99,7 @@ void KartBody::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::CALLABLE, "input_driver"), "set_input_driver",
 			"get_input_driver");
 
-	ClassDB::bind_method(D_METHOD("set_process_input_enabled", "enabled"),
-			&KartBody::set_process_input_enabled);
-	ClassDB::bind_method(D_METHOD("is_process_input_enabled"), &KartBody::is_process_input_enabled);
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "process_input_enabled"),
-			"set_process_input_enabled", "is_process_input_enabled");
+	ClassDB::bind_method(D_METHOD("get_stale_input_ticks"), &KartBody::get_stale_input_ticks);
 
 	ClassDB::bind_method(D_METHOD("request_shift_up"), &KartBody::request_shift_up);
 	ClassDB::bind_method(D_METHOD("request_shift_down"), &KartBody::request_shift_down);
@@ -131,10 +126,6 @@ void KartBody::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("rear_axle_position"), &KartBody::rear_axle_position);
 	ClassDB::bind_method(D_METHOD("driver_head_position"), &KartBody::driver_head_position);
 
-	ClassDB::bind_method(D_METHOD("set_steer_gamma", "gamma"), &KartBody::set_steer_gamma);
-	ClassDB::bind_method(D_METHOD("get_steer_gamma"), &KartBody::get_steer_gamma);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "steer_gamma", PROPERTY_HINT_RANGE, "1.0,6.0,0.05"),
-			"set_steer_gamma", "get_steer_gamma");
 	ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "engine_voice_player", PROPERTY_HINT_NODE_PATH_VALID_TYPES,
 						"AudioStreamPlayer3D,AudioStreamPlayer"),
 			"set_engine_voice_player", "get_engine_voice_player");
@@ -554,18 +545,22 @@ DriverInput KartBody::gather_input() {
 	static const StringName KEY_SHIFT_UP("shift_up");
 	static const StringName KEY_SHIFT_DOWN("shift_down");
 
-	// The input map actions. `shift_up` and `shift_down` are read as edges — see
-	// below.
-	static const StringName ACTION_THROTTLE("throttle");
-	static const StringName ACTION_BRAKE("brake");
-	static const StringName ACTION_STEER_LEFT("steer_left");
-	static const StringName ACTION_STEER_RIGHT("steer_right");
-	static const StringName ACTION_CLUTCH("clutch");
-	static const StringName ACTION_SHIFT_UP("shift_up");
-	static const StringName ACTION_SHIFT_DOWN("shift_down");
-
 	DriverInput input;
 
+	// **The Callable wins when there is one, and that ordering is a decision.**
+	//
+	// An `input_driver` is only ever assigned deliberately, by a probe or by a
+	// still command; a `PlayerDriver` is scene furniture that every driveable scene
+	// builds. Ordering it the other way round is not a style preference — it was
+	// measured. With the pushed input taking precedence, `drive.sh` ran all six
+	// scenarios to an identical state hash of `f2159f215039a647` and 0.2 m of
+	// travel, because the driver node was pushing the neutral input of a keyboard
+	// nobody was touching and the scenario's Callable was never consulted. Six
+	// scenarios agreeing perfectly is what a determinism gate looks like when it
+	// has stopped measuring anything.
+	//
+	// So a scripted producer is an explicit override of whatever the scene wired,
+	// and the driver node goes on pushing into a value that is ignored.
 	if (input_driver_.is_valid()) {
 		const Variant answer = input_driver_.call();
 		if (answer.get_type() == Variant::DICTIONARY) {
@@ -581,38 +576,41 @@ DriverInput KartBody::gather_input() {
 			input.shift_up = static_cast<bool>(values.get(KEY_SHIFT_UP, false));
 			input.shift_down = static_cast<bool>(values.get(KEY_SHIFT_DOWN, false));
 		}
-	} else if (process_input_enabled_) {
-		Input *map = Input::get_singleton();
-		input.throttle = map->get_action_strength(ACTION_THROTTLE);
-		input.brake = map->get_action_strength(ACTION_BRAKE);
-		// **The steering curve, and it is applied here and nowhere else.**
+	} else if (pushed_tick_ != NO_TICK) {
+		// **Pushed input, and only if it is this tick's.** ADR-0040's freshness rule:
+		// a producer that does not run, or that runs after this body in tree order,
+		// would otherwise leave the solver consuming last tick's intent, and that
+		// reads as a physics bug rather than as a wiring bug.
 		//
-		// Deliberately not in the `input_driver_` branch above. That branch is what
-		// `drive_probe.gd`, `track_probe.gd` and every still command drive through, and
-		// their `--lock=` and `--steer=` arguments are *lock* fractions with a recorded
-		// sweep table attached to them. Curving those would silently rewrite every
-		// figure in `drive_probe.gd`'s header and in ROADMAP M3b, and the measurements
-		// would still look plausible. A scripted run asks for a steering angle; a
-		// driver asks for a stick position. They are not the same request.
-		//
-		// This is the one asymmetry between a scripted run and a driven one, which is a
-		// real cost — `gather_input`'s own comment above says the shared rate limit is
-		// "what makes a scripted run and a driven one the same experiment". They remain
-		// the same experiment at the same *lock*, and `steer_gamma = 1.0` collapses the
-		// two exactly.
-		input.steer = steering_curve(map->get_action_strength(ACTION_STEER_LEFT) -
-				map->get_action_strength(ACTION_STEER_RIGHT));
-		input.clutch = map->get_action_strength(ACTION_CLUTCH);
-		// Edges, not levels. `is_action_just_pressed` is evaluated against the
-		// physics frame when it is called from one, so a held button produces one
-		// request and not one per tick — which `vehicle_state.h` says is the
-		// difference between a shift and a sweep through the whole gearbox.
-		input.shift_up = map->is_action_just_pressed(ACTION_SHIFT_UP);
-		input.shift_down = map->is_action_just_pressed(ACTION_SHIFT_DOWN);
+		// `PlayerDriver` sets its physics priority ahead of this node's so tree order
+		// cannot decide it. The check below is what makes that a fact rather than a
+		// hope.
+		const uint64_t tick = godot::Engine::get_singleton()->get_physics_frames();
+		if (pushed_tick_ == tick) {
+			input = pushed_input_;
+		} else {
+			// Neutral, not held-last. Holding the last input means a crashed producer
+			// drives into a wall at full throttle, and it means a divergence between
+			// two runs stays invisible in the state hash for as long as the throttle
+			// happens to agree either way.
+			++stale_input_ticks_;
+			if (!warned_stale_input_) {
+				warned_stale_input_ = true;
+				WARN_PRINT(vformat("KartBody '%s': input was stamped tick %d and this is "
+								   "tick %d, so this tick and any like it run on neutral "
+								   "input. A driver node is disabled, gone, or running "
+								   "after the body. ADR-0040.",
+						get_name(), static_cast<int64_t>(pushed_tick_),
+						static_cast<int64_t>(tick)));
+			}
+		}
 	}
-	// The remaining case — no driver Callable and input disabled — leaves every
-	// axis at zero, which is what the free camera wants: the kart keeps
-	// simulating and coasts while WASD flies the camera.
+	// The remaining case — nothing pushed and no Callable — leaves every axis at
+	// zero. That is a kart on track with no driver attached: it keeps simulating
+	// and coasts, which is exactly what a free camera or a scene that has not
+	// wired a `PlayerDriver` yet gets. It is silent on purpose, because "no
+	// producer at all" is a scene setup a person can see, where "a producer that
+	// went stale" is not.
 
 	// A latched request survives whichever path ran, so a caller that asked
 	// between two physics ticks cannot lose one. Consumed here, once.
@@ -648,6 +646,11 @@ BodyState KartBody::read_body_state() const {
 
 // --- driver input --------------------------------------------------------------
 
+void KartBody::set_input(const DriverInput &p_input, uint64_t p_tick) {
+	pushed_input_ = p_input;
+	pushed_tick_ = p_tick;
+}
+
 void KartBody::set_input_driver(const Callable &p_driver) {
 	input_driver_ = p_driver;
 }
@@ -656,12 +659,8 @@ Callable KartBody::get_input_driver() const {
 	return input_driver_;
 }
 
-void KartBody::set_process_input_enabled(bool p_enabled) {
-	process_input_enabled_ = p_enabled;
-}
-
-bool KartBody::is_process_input_enabled() const {
-	return process_input_enabled_;
+uint64_t KartBody::get_stale_input_ticks() const {
+	return stale_input_ticks_;
 }
 
 void KartBody::request_shift_up() {
@@ -724,25 +723,6 @@ void KartBody::set_wind_voice_player(const NodePath &p_path) {
 
 NodePath KartBody::get_wind_voice_player() const {
 	return wind_voice_path_;
-}
-
-double KartBody::steering_curve(double p_input) const {
-	const double clamped = clamp_signed_one(p_input);
-	if (steer_gamma_ <= 1.0) {
-		return clamped;
-	}
-	// Sign preserved and the exponent applied to the magnitude, so the curve is
-	// symmetric and `std::pow` never sees a negative base.
-	const double magnitude = std::pow(std::fabs(clamped), steer_gamma_);
-	return clamped < 0.0 ? -magnitude : magnitude;
-}
-
-void KartBody::set_steer_gamma(double p_gamma) {
-	steer_gamma_ = p_gamma < 1.0 ? 1.0 : (p_gamma > 6.0 ? 6.0 : p_gamma);
-}
-
-double KartBody::get_steer_gamma() const {
-	return steer_gamma_;
 }
 
 // One lump's position, by name.

@@ -28,12 +28,31 @@
 
 namespace kart::core {
 
-// One tick of driver intent, in the units the input map produces.
+// One tick of driver intent.
 //
 // Shift requests are edges rather than levels: they are true for exactly the
 // tick the button went down. A level would make a held button shift once per
 // tick through the whole gearbox, which is what the first version of every
 // sequential gearbox does.
+//
+// ## `steer` is a lock fraction, and that only became unambiguous at ADR-0040
+//
+// It used to mean two things. `KartBody` filled this struct from two branches: a
+// scripted `input_driver` assigned a **lock fraction**, and the `Input` singleton
+// branch assigned `steering_curve()` of a **stick position**. The file called that
+// "the one asymmetry between a scripted run and a driven one" and it was one, but
+// it also meant the same stored number described two different steering angles
+// depending on who filled it — which a replay records and cannot recover from.
+// ADR-0040 moved the curve out to `PlayerDriver`, so every producer now hands over
+// a lock fraction and the stick lives entirely upstream of this struct.
+//
+// ## A recorder taps what the solver was given, not what a producer sent
+//
+// `KartBody` ORs its latched `request_shift_up` / `request_shift_down` into this
+// struct *after* the producer has been read, so a recorder listening to the
+// producer drops a shift the live run acted on — a divergence with no visible
+// cause. `KartBody::get_*_input` and its own `last_input_` are what the solver
+// actually consumed, and that is the tap point.
 struct DriverInput {
 	double throttle = 0.0; // 0..1
 	double brake = 0.0; // 0..1

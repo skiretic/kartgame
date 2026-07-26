@@ -158,6 +158,8 @@ const FOLLOWABLE_LOCK := 0.065
 var _args: Dictionary = {}
 var _layout: TrackLayout
 var _kart: KartBody
+## The human at the controls. ADR-0040, and `proving_ground.gd` builds the same one.
+var _driver: PlayerDriver
 var _chase: ChaseCamera
 var _cockpit: CockpitCamera
 var _free: FreeCamera
@@ -523,6 +525,14 @@ func _build_kart() -> void:
 			)
 	add_child(_kart)
 
+	# The driver. ADR-0040: the body is handed its input rather than fetching it, so
+	# a scene without this node is a kart nobody can drive. `proving_ground.gd` has
+	# the longer note.
+	_driver = PlayerDriver.new()
+	_driver.name = "Driver"
+	add_child(_driver)
+	_driver.kart_path = _driver.get_path_to(_kart)
+
 	# The engine note, at the engine. Null under every headless gate, which have no
 	# audio device and must not need one — see `engine_voice_rig.gd`.
 	_engine_voice = EngineVoiceRig.attach(_kart)
@@ -544,9 +554,13 @@ func _build_kart() -> void:
 	# of what "on" means.
 	_kart.auto_shift = Cmdline.as_bool(_args, "auto-shift", _kart.auto_shift)
 
-	# So a session can start at a chosen curve instead of dialing back to it, and so
-	# that whatever value the brackets settle on is reproducible from a command.
-	_kart.steer_gamma = Cmdline.as_float(_args, "steer-gamma", _kart.steer_gamma)
+	# `--steer-gamma` is **not** applied here. It used to be, in the line this
+	# comment replaces, and that line was the second owner of the constant that
+	# `_build_tuning`'s own comment forty lines down complains about: it wrote the
+	# value straight onto the kart where the audit could not see it, and then
+	# `_build_tuning` applied the same number again through the registry. The
+	# registry is the only owner. ADR-0040 forced the issue by moving the curve onto
+	# `PlayerDriver`, where there is no property here to write.
 
 	_physics_draw = PhysicsDraw.new()
 	_physics_draw.name = "PhysicsDraw"
@@ -745,6 +759,12 @@ func _build_tuning() -> void:
 	# After `add_child`, because the path is resolved relative to this node and the
 	# setter re-applies immediately once it is in the tree.
 	_tuning.set_vehicle_path(_tuning.get_path_to(_kart))
+	# And the controller half. `steer_gamma` is `TuningOwner::Controller` and the
+	# registry deliberately does not know how to reach a driver node, so the driver
+	# subscribes instead — the same way every audio consumer does. Without this line
+	# the overlay's steering row moves a number nothing reads.
+	if _driver != null:
+		_driver.tuning_path = _driver.get_path_to(_tuning)
 
 	# The audio half. Null under every headless gate, where `EngineVoiceRig.attach`
 	# returns nothing because there is no audio device — so the thirteen audio
@@ -986,16 +1006,17 @@ func _set_camera_mode(mode: String) -> void:
 	_camera_mode = mode if mode in ["free", "cockpit"] else "chase"
 	if _camera_mode == "free":
 		_free.take_over(_cockpit.camera if previous == "cockpit" else _chase.camera)
-		# The kart keeps simulating but stops reading input, because the flight
-		# camera reuses the drive keys.
-		_kart.set_process_input_enabled(false)
+		# The kart keeps simulating but the driver stops reading the pad, because the
+		# flight camera reuses the drive keys. It keeps pushing neutral rather than
+		# going quiet — see `player_driver.h`.
+		_driver.enabled = false
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 		return
 	if _camera_mode == "cockpit":
 		_cockpit.make_current()
 	else:
 		_chase.camera.current = true
-	_kart.set_process_input_enabled(true)
+	_driver.enabled = true
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 
 
@@ -1043,7 +1064,7 @@ func _hud_text() -> String:
 	# `tests/core/test_vehicle.cpp` — so this reports what fraction of stick travel
 	# reaches it at the current gamma. At gamma 1 it is 6.5%, which is inside the
 	# 0.15 deadzone and is the whole reason ADR-0036 exists.
-	var gamma: float = _kart.steer_gamma
+	var gamma: float = _driver.steer_gamma
 	var tuned := ""
 	if _tuning != null and not _tuning.is_at_defaults():
 		tuned = "   TUNED: %d changed, %d defended" % [

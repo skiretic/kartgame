@@ -396,7 +396,16 @@ String KartTuning::to_text(const String &p_name) const {
 	// would produce a file that parses as something else. Replaced rather than
 	// rejected: a caller passing a multi-line name has made a typo, not an
 	// attack, and losing the save would be the larger harm.
-	String clean = p_name.replace("\n", " ").replace("\r", " ").strip_edges();
+	//
+	// **`#` is in this list and was missing from it**, which broke the one property
+	// `tools/verify/tuning.sh --check` gates on. `parse_line` strips a comment before
+	// it classifies the line, so a preset saved as `hairpin #3` loaded back named
+	// `hairpin` and one saved as `#private` loaded back with an empty name and
+	// re-saved as `unnamed` — a round trip that is not byte-identical, in the format
+	// whose whole selling point is that it is. Two of ADR-0040's readers found the
+	// wrong doc comment in `tuning.h` independently; neither the comment nor this
+	// line had been checked against the other.
+	String clean = p_name.replace("\n", " ").replace("\r", " ").replace("#", " ").strip_edges();
 	if (clean.is_empty()) {
 		clean = "unnamed";
 	}
@@ -642,13 +651,19 @@ void KartTuning::apply(int p_id) {
 	const kart::core::Tunable &t = TUNABLES[p_id];
 	const double value = set_.get(p_id);
 
-	// Vehicle and controller values go into `KartBody`'s existing setters. Audio
-	// values do not go anywhere from here: the three voice constants live in
-	// GDScript and the two synth ones live on `EngineVoiceStream`, and this node
-	// deliberately does not know how to reach either. `tuning_changed` is how
-	// they arrive, which also means an audio consumer that is not in the scene
-	// costs nothing rather than needing a null check here.
-	if (t.owner != kart::core::TuningOwner::Audio && !vehicle_path_.is_empty() &&
+	// **Only vehicle values are pushed from here, and that changed with ADR-0040.**
+	// Audio values never went anywhere from this node: the three voice constants
+	// live in GDScript and the two synth ones live on `EngineVoiceStream`, and this
+	// node deliberately does not know how to reach either. `tuning_changed` is how
+	// they arrive, which also means a consumer that is not in the scene costs
+	// nothing rather than needing a null check here.
+	//
+	// `steer_gamma` — the one `TuningOwner::Controller` value — joined them when the
+	// steering curve moved out of `KartBody` and onto `PlayerDriver`. It is not a
+	// property of the vehicle and this node has no business knowing which node is
+	// holding the stick, so `PlayerDriver` subscribes to the signal like every other
+	// non-vehicle consumer.
+	if (t.owner == kart::core::TuningOwner::Vehicle && !vehicle_path_.is_empty() &&
 			is_inside_tree()) {
 		KartBody *kart = Object::cast_to<KartBody>(get_node_or_null(vehicle_path_));
 		if (kart != nullptr) {
@@ -669,7 +684,6 @@ void KartTuning::apply(int p_id) {
 					kart->set_brake_torque_rear(value);
 					break;
 				case kart::core::TUNE_STEER_RATE: kart->set_steer_rate(value); break;
-				case kart::core::TUNE_STEER_GAMMA: kart->set_steer_gamma(value); break;
 				default:
 					// A vehicle-owned tunable with no case here would silently do
 					// nothing, which is the failure this system is supposed to
