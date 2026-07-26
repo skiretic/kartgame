@@ -2246,3 +2246,587 @@ nothing read it.** C and Triangle did nothing at all. The cockpit rig implements
 it; the chase rig's own look-back is separate work with its own issue. It is the
 failure CLAUDE.md's driving section opens with, one level worse — the key was
 advertised rather than merely omitted.
+
+---
+
+## ADR-0040 — Input is handed to the vehicle, not fetched by it
+
+**Status.** Accepted, and **not yet implemented** — this is a decision taken
+ahead of the work rather than a record of it, which is unusual for this file and
+is the point. It is the first structural item of `docs/GAMEDESIGN.md`'s planning
+pass, and it precedes ROADMAP M3c. Extends
+[ADR-0036](#adr-0036--the-steering-curve-is-a-controller-property-and-steeringh-keeps-its-position),
+which established that the steering curve is a controller property, and it
+finishes the sentence that ADR started.
+
+**Context.** `src/vehicle/kart_body.cpp:585` opens with `Input *map =
+Input::get_singleton()` and fills its own `VehicleInput` from the action map. The
+struct exists and is already the right shape. What is wrong is the arrow: **the
+vehicle reaches out for input rather than being given it.**
+
+That works for exactly one configuration — one kart, one human, one process, now.
+Five things this project has already committed to need input to arrive as *data*:
+
+| Wants input as data | Milestone |
+| --- | --- |
+| A replay that re-sims to an identical state hash | M6 |
+| A ghost, which is a recorded input stream played back | M6 |
+| An AI driver emitting "the standard input struct" through the same path the player uses | M7 |
+| A second kart in the same scene, and then eight | M11 |
+| A headless gate that asserts the advertised controls are the real ones ([#169](https://github.com/skiretic/kartgame/issues/169)) | M3c |
+
+Every one of those is a rewrite of the sim's hottest file if it arrives after the
+systems that sit on top of it. It is one indirection now.
+
+**And there is already a symptom in the tree.** CLAUDE.md records that the tuning
+overlay cannot use the arrow keys, because they are the second binding on
+throttle, brake and steer, and `KartBody` polls them through the `Input`
+singleton where `set_input_as_handled` cannot reach. That is not a quirk of the
+overlay. It is this ADR's problem observed from the other end: a node that
+fetches global input cannot be told to stop, so anything upstream of it — a menu,
+a pause, an overlay, a replay — has no authority over it.
+
+**Decision.** `KartBody` exposes `set_input(const VehicleInput &)` and consumes
+whatever it was handed for the current tick. It never reads `Input`. Four
+producers fill the same struct:
+
+- `PlayerDriver` — reads the action map, and **owns the steering curve**, which
+  moves out of `kart_body.cpp` with it. ADR-0036 already said that curve is a
+  controller property and `steering.h`'s position is correct; the code kept it in
+  the vehicle anyway. This is where it belongs.
+- `AIDriver` — M7.
+- `ReplayDriver` and `GhostDriver` — M6, reading a recorded stream.
+
+**Freshness is a tick stamp, not a convention.** A push model has one failure
+mode: a producer that does not run, or runs after the body in tree order, leaves
+the vehicle consuming last tick's input, and *that reads as a physics bug*. So
+`VehicleInput` carries the tick it was set on; `KartBody` compares it against the
+current tick and, on a mismatch, applies **neutral input and says so once**. A
+stale-input bug that costs a session is a stale-input bug that announces itself.
+
+Neutral rather than held-last is deliberate: holding the last input means a
+crashed AI drives into a wall at full throttle, and worse, it means a divergence
+between two runs is invisible in the hash for as long as the throttle is the same
+either way.
+
+**Alternatives, and why not.**
+
+- *A mode enum on `KartBody`* — smaller diff today, and it keeps the vehicle
+  knowing about input sources. Every new source then edits the sim's hottest
+  file, and `src/vehicle/` keeps its dependency on Godot's `Input`.
+- *An `InputSource` abstract base with a virtual `next()`* — the conventional OO
+  answer, and it fights ADR-0017. `src/core/` is a godot-cpp-free zone; a player
+  source needs the action map, so the interface either straddles that boundary or
+  drags godot-cpp across it. It also puts a virtual dispatch in a 120 Hz path to
+  solve a problem that a setter solves.
+
+**Consequences.**
+
+- The vehicle becomes testable without an engine in a way it currently is not:
+  a fixed input stream in, a state hash out.
+- Determinism gets cheaper rather than harder. A replay is the input struct per
+  tick, and the struct is now the actual interface rather than an internal detail
+  that happens to have a name.
+- The shell can gate input, which is what makes a pause menu and the tuning
+  overlay's key bindings tractable instead of a fight with the `Input` singleton.
+- `steering_curve` leaves `kart_body.cpp`. `drive.sh`'s figures must not move —
+  the curve is applied to the same value in the same order, one node earlier —
+  and that is an acceptance item, not an assumption. If any §6.4 figure moves,
+  the move is a defect in this change and not a new measurement.
+
+**What this does not decide.** What a replay records *besides* input — the
+session configuration, the class, the assists, the tuning preset that ADR-0037
+deliberately keeps out of `StateHash` — is a separate decision and a separate
+ADR, owed before M6 writes a format. That is
+[ADR-0041](#adr-0041--a-replay-carries-its-whole-configuration-and-hashes-it-separately).
+
+---
+
+## ADR-0041 — A replay carries its whole configuration, and hashes it separately
+
+**Status.** Accepted, not yet implemented. Owed by
+[ADR-0040](#adr-0040--input-is-handed-to-the-vehicle-not-fetched-by-it) and due
+before ROADMAP M6 writes a format. Applies
+[ADR-0037](#adr-0037--tuning-is-an-audit-trail-that-happens-to-be-adjustable-and-a-preset-is-not-in-the-state-hash)'s
+separation rather than reversing it.
+
+**Context.** M6 specifies a replay as "seed + input stream + tick count", and
+that is sufficient only if everything *else* about the run is identical by
+assumption. It is not. A session also carries a track and a layout, a session
+type, a class, assists, a field, surface state, and a tuning preset — and
+ADR-0037 deliberately keeps the preset out of `StateHash`, because a hash that
+mixes configuration into simulation state cannot tell you *which* of the two
+diverged. That decision is right and it leaves a hole: something has to carry the
+configuration, or a replay recorded under a preset silently re-sims under the
+defaults and reports a determinism failure that is nothing of the sort.
+
+**Decision.** The replay carries its entire configuration inline, and fingerprints
+it with a hash that is **not** `StateHash`.
+
+```
+header    format_version, build and extension API version
+          track + layout + session type
+          class, assists, field, surface
+          tuning preset — the full diff, inline, not a path
+          config_hash — over all of the above
+          seed, tick_count
+body      VehicleInput per tick, per kart
+footer    state hash every N ticks
+```
+
+Playback compares `config_hash` **first**. That ordering is the whole design:
+
+- config mismatch → **refuse, and name the field that moved.** "This replay was
+  recorded with `frame_torsion` at 210.0; the current default is 193.62" is a
+  sentence a person can act on.
+- config matches, state hash diverges → a **real determinism bug**, and now it is
+  unambiguous, which is the property ADR-0037 was protecting.
+
+**The preset goes in as a diff, not as a path.** ADR-0037's format is already a
+diff against the sourced defaults, so it is small, and a path is a reference to a
+file that can be edited or deleted afterwards — a replay that breaks when someone
+tidies `user://tuning/` is a replay that cannot be trusted for anything.
+
+**Text header, binary body.** The header is the part a person reads, diffs and
+files a bug with, so it stays text in the style ADR-0037 already established. The
+body is not: a 15-minute round is 108,000 ticks, and eight karts of uncompressed
+float input is about 20 MB. Quantized to fixed point it is under 8 MB, and it is
+never committed — replays live in `user://`.
+
+**And the quantization has a determinism trap in it, which is the reason it is in
+this ADR rather than left to the implementation.** If input is quantized *on
+write*, the live run consumed full-precision values and the replay consumes
+rounded ones, and the two diverge for a reason that looks exactly like a solver
+bug. **The producer emits already-quantized input** — `PlayerDriver` rounds before
+`KartBody` ever sees it — so the live run and the replay consume bit-identical
+values by construction. This is the same class of defect as
+[ADR-0033](#adr-0033--the-contact-boundary-measured-and-the-lever-arm-it-caught)'s
+lever arm: correct arithmetic applied at the wrong point in the chain.
+
+**A ghost is not a replay.** A replay re-sims; a ghost is drawn beside a live
+session that is diverging from it by design, so re-simulating it buys nothing and
+costs a second vehicle solve. A ghost is a **transform stream**, sampled and
+interpolated, with the lap time and the sector splits in its header. Two formats,
+because they are two problems — and M6's line item is written as though they were
+one.
+
+**Versioning.** `format_version` is refused across a mismatch, not migrated: a
+replay is a diagnostic artifact, not user data, and silently migrating one
+produces a plausible-looking run of something that never happened. The build and
+extension API version are recorded and **warn** rather than refuse, because
+cross-build determinism is not claimed — ROADMAP defers cross-platform bit
+determinism explicitly, and a warning that says "this was recorded on a different
+build" is the honest form of that.
+
+**Where it lives.** The header, the hashing and the quantization are pure
+arithmetic over plain structs and belong under `src/core/`, engine-free, held by
+`tests/run.sh` per ADR-0017. Only file I/O sits on the Godot side.
+
+**Consequences.**
+
+- `SessionConfig` becomes a real type with a `hash()`, modeled on
+  `TuningSet::hash()`. It is also exactly what the session runner in
+  `ARCHITECTURE.md` §17 takes as its argument, so this ADR and that structure are
+  the same object seen from two sides.
+- The determinism harness gains a failure mode it did not have: *refused*, which
+  is distinct from *passed* and from *diverged*, and CI has to treat it as such
+  rather than folding it into a red.
+- Saved presets become shareable with a replay attached, which is the first thing
+  in this project that is worth sending to another person.
+
+**What this does not decide.** How a career save is versioned and migrated — that
+*is* user data and the opposite policy applies. That is
+[ADR-0042](#adr-0042--a-save-always-loads-and-the-migration-tests-eat-real-old-files).
+
+---
+
+## ADR-0042 — A save always loads, and the migration tests eat real old files
+
+**Status.** Accepted, not yet implemented. Pairs with
+[ADR-0041](#adr-0041--a-replay-carries-its-whole-configuration-and-hashes-it-separately)
+and deliberately takes the **opposite** policy on a version mismatch, because the
+two files are not the same kind of thing.
+
+**Context.** A replay is a diagnostic artifact and refusing to load a stale one
+costs nobody anything. A career save is the record of an evening someone spent,
+and `docs/GAMEDESIGN.md` puts a whole season behind it. Refusing to load it is
+deleting it with extra steps.
+
+**Decision.** One text format, versioned, with a written migration per bump.
+**A save never fails to load because of its age.**
+
+```
+user://profile.save        text, diffable, in the family of the preset format
+    version   = 3
+    driver    = name, number, nationality
+    career    = class, season, round, standings
+    bests     = per track, per layout, per class — lap time + a ghost id
+    ...
+user://ghosts/<id>.ghost   transform streams, referenced not inlined
+user://settings.cfg        separate file, see below
+```
+
+Loading chains migrations — `v1 → v2 → v3` — and each one ships with a test.
+
+**The test is the actual decision here.** A migration test that generates its own
+v1 input tests nothing: it round-trips today's writer through today's reader and
+passes forever, including on the day the migration is wrong. So `tests/data/saves/`
+holds **real captured files**, one per historical version, checked in and never
+regenerated. When v4 arrives, a real v3 file joins the corpus. The corpus only
+grows.
+
+**Settings live in their own file, and that is not tidiness.** If `profile.save`
+is unreadable, a player still has to reach the menu, read the text, and use the
+pad — which means the comfort options, the control bindings and the accessibility
+settings in `ARCHITECTURE.md` §18 must load when the career does not. Coupling
+them means a corrupt career save presents an unreadable menu for fixing it.
+
+**Corruption is not a version problem and gets its own rule.** A file that does
+not parse is **moved aside, not overwritten** — `profile.save.corrupt.1` — a fresh
+profile is started, and the game says where the old one went. The failure mode
+this exists to prevent is the ordinary one: something goes wrong at load, the
+game starts fresh, the player plays for an hour, and the first successful *save*
+destroys the evidence.
+
+**Writes are atomic.** Write a temporary file, fsync, rename over the target.
+A save interrupted by a crash or a power cut leaves the previous save intact
+rather than a half-written one, and rename is the only operation that gives that
+for free.
+
+**Version bumps on every format change, and a migration may be the identity
+function.** The alternative — bump only on incompatible changes — requires
+somebody to correctly classify a change as compatible, at the moment they are
+thinking about something else. An identity migration costs one line.
+
+**Ghosts are referenced, not inlined.** They are transform streams, they are the
+largest thing in the profile by an order of magnitude, and a profile that has to
+be fully parsed to read a driver's name is a profile that gets slow exactly as
+someone plays more.
+
+**Alternative rejected: best-effort load** — parse what is recognized, discard
+what is not, default what is missing. It costs nothing to write and it fails
+silently in the one case that matters. Rename `standings` to `championship` and
+every existing career resets to empty, with no error raised and nothing for a
+player to point at. Silent data loss is worse than a refusal, and this ADR is
+buying neither.
+
+**Where it lives.** Parsing, versioning and the migration chain are pure string
+and struct work and belong under `src/core/`, engine-free and covered by
+`tests/run.sh` per ADR-0017 — the same place ADR-0041 puts the replay header.
+Only the file I/O and the `user://` path resolution sit on the Godot side.
+
+**Consequences.**
+
+- `tests/data/saves/` becomes a permanent, append-only asset, and deleting
+  anything from it is a defect rather than housekeeping.
+- The save format is diffable, so "what changed in my career" is `git diff` on a
+  copied file, and a bug report can carry a save inline.
+- Multiple profiles are not designed in and not designed out; the format is a
+  single profile per file, which makes a second one a path change rather than a
+  schema change.
+
+---
+
+## ADR-0043 — The race rules are arithmetic, so they go where the tire model went
+
+**Status.** Accepted, not yet implemented. Completes the structural set opened by
+[ADR-0040](#adr-0040--input-is-handed-to-the-vehicle-not-fetched-by-it), and
+supplies the `SessionConfig` that
+[ADR-0041](#adr-0041--a-replay-carries-its-whole-configuration-and-hashes-it-separately)
+requires.
+
+**Context.** `docs/GAMEDESIGN.md` §4 puts four separate points tables in a single
+race weekend, and three of them begin with 50 or 25:
+
+| Table | Scale, to 8th |
+| --- | --- |
+| Qualifying Heat, position points | 50, 44, 41, 38, 36, 34, 32, 30 |
+| Super Heat, position points | 90, 80, 72, 66, 60, 54, 50, 46 |
+| Championship, heats and Super Heat classifications | 25, 22, 19, 17, 15, 13, 11, 9 |
+| Championship, Final | 50, 44, 38, 34, 30, 26, 22, 18 |
+
+`docs/REFERENCES.md` says the sharp thing about them: **collapse any pair and the
+standings look entirely plausible and are simply wrong, forever, because there is
+no render to disagree with it.** A wrong tire curve produces a kart that drives
+badly and somebody notices in ten minutes. A wrong points scale produces a
+championship table that is subtly not the real one and nobody ever notices at all.
+
+**Decision.** The rules are pure arithmetic over plain structs, so they live where
+the tire model, the gearbox and the tuning audit already live: `src/core/`,
+engine-free, no godot-cpp on the include path, covered by `tests/run.sh` in
+seconds with no engine per
+[ADR-0017](#adr-0017--srccore-is-compiled-without-godot-cpp).
+
+```
+src/core/race_rules.h    the four scales, aggregation, tie-breaks, part-distance
+src/core/session.h       SessionConfig + hash()  — ADR-0041's header type
+src/core/standings.h     the season table, and promotion
+```
+
+**The scales are constants with their citation attached**, in the style
+`kz_reference.h` already uses for the KZ2 reference figures — the article number
+goes in the comment beside the number, because a scale with no provenance is
+indistinguishable from a scale somebody adjusted for feel.
+
+**And one test exists purely to catch the failure the sourcing warned about:**
+assert the four scales are **pairwise distinct**. It is a strange-looking test and
+it is the highest-value one in the file, because the defect it catches is a
+copy-paste that produces working code.
+
+The rest of the suite is ordinary and mostly writes itself: a tie on equal points
+resolves to the Qualifying Practice classification at every stage; part-distance
+scaling gives zero under 2 laps, half under 75% of the scheduled distance and full
+at or above it; a Final awards its fastest lap one extra championship point; and
+at four rounds nothing is dropped, because the discard rule only engages at five
+Competitions or more.
+
+**Two rules in the module are ours and are marked as such in the source**, not
+just here: truncating a 36-place scale to an 8-kart field, and promotion at top 3.
+The first has an alternative that was rejected — rescaling the values to spread
+across 8 — because real numbers exist and inventing a spread throws them away.
+
+**Sequencing is arithmetic too, and it also goes in.** Which session runs next,
+whether a round is complete, whether a season promotes — none of that touches the
+engine. `src/core/` gets the progression as a pure state machine, and GDScript is
+left with what only GDScript can do: load a scene, draw a table, move a focus
+ring. That is a boundary this project already knows how to hold.
+
+**Consequences.**
+
+- The entire race format is testable before a single menu exists, and a season can
+  be simulated end to end in a unit test in milliseconds — eight drivers, four
+  rounds, a promotion — which is the cheapest possible way to find out that the
+  structure in `GAMEDESIGN.md` §4 does not actually work.
+- `SessionConfig` has one definition, shared by the session runner, the replay
+  header and its hash. ADR-0041 and `ARCHITECTURE.md` §17 stop being two
+  descriptions of the same object.
+- The rules cannot read a node, a scene or a setting, which is the point: a
+  classification is a list of driver ids and results, and it stays that way.
+
+---
+
+## ADR-0044 — UI text is English literals, and two rules keep the retrofit cheap
+
+**Status.** Accepted. A small decision recorded because the alternative is that it
+gets made by accident, forty screens in.
+
+**Context.** Localization is post-demo in both `ARCHITECTURE.md` §20 and
+`ROADMAP.md`, and on a portfolio piece it may never arrive at all. But every
+string written from ROADMAP M3c onward is either a key or a literal, and switching
+afterwards is a wide mechanical pass.
+
+**Decision.** Plain English literals, American English per the project's own
+convention — tire, meter, license, curb.
+
+The alternative was keys and a CSV from day one. Rejected on three counts: a name
+per string forever on a solo project; the code stops showing what the screen says,
+which matters most in exactly the file where copy is being written; and Godot's
+`tr()` returns the key unchanged when it is missing, so the failure mode is
+**shipping a screen that reads `MENU_START_SESSION`**. Catching that wants a
+verify gate, which is more work than the keys were saving.
+
+**What makes the retrofit tractable, and it is worth writing down now so a later
+session does not mistake it for a rewrite:** a Godot `Control` passes its `text`
+property through `tr()` automatically. Converting a literal to a key is replacing
+the string, not rewiring a call.
+
+**Two rules, and they are the whole reason this ADR exists.** They cost nothing
+today and they are the difference between an afternoon per screen and a rewrite:
+
+1. **Never build a sentence by concatenation.** `"Round " + n + " of " + total` is
+   three fragments no translator can reorder, and word order is exactly what
+   changes between languages. Use one format string with placeholders —
+   `"Round %d of %d"` — so the unit of text is a whole sentence.
+2. **UI text lives on the scene and script side, never in `src/`.** That boundary
+   already exists for an unrelated reason: `godot::String` decodes a bare
+   `const char *` as Latin-1, so a non-ASCII character in a C++ literal arrives as
+   mojibake, and everything in `src/` is ASCII by rule. Any language this would
+   ever be translated into breaks that rule immediately, so translated text could
+   not live there anyway.
+
+**Consequence.** The cost is recorded rather than avoided: a localization pass has
+to find every literal, and it is real work. It is bounded, it is mechanical, and
+it only happens if localization does.
+
+---
+
+## ADR-0045 — Menus take pad, keyboard and mouse, and hover moves the focus ring
+
+**Status.** Accepted, not yet implemented. Applies to ROADMAP M3c.
+
+**Context.** This project is driven on a pad and every control failure it has had
+came from an assumption about input that nothing checked — four in one day, which
+is why [#169](https://github.com/skiretic/kartgame/issues/169) exists. Menus
+inherit that history and add one of their own: **Godot's built-in `ui_up` /
+`ui_down` default to the arrow keys, and the arrow keys are already the second
+binding on throttle, brake and steer.** That collision is not hypothetical — it is
+why the tuning overlay navigates on PgUp/PgDn and `[` `]` rather than the arrows,
+recorded in CLAUDE.md.
+
+**Decision, part one: menus declare their own actions.** `menu_up`, `menu_down`,
+`menu_left`, `menu_right`, `menu_accept`, `menu_back`, generated into the InputMap
+by the same script that generates the driving actions, so the serialization cannot
+be typo'd. The engine's `ui_*` set carries roughly twenty default bindings that
+this project did not choose and will not see until one misfires.
+
+**Decision, part two: all three devices are supported** — pad, keyboard and mouse.
+A desktop release with no pointer is a conspicuous omission, and the accessibility
+commitments in `ARCHITECTURE.md` §18 already promise full remapping and adjustable
+deadzones, which is most of the same work.
+
+**And one rule makes that one interaction model rather than two: hovering moves
+the focus ring.** The mouse does not get a second highlight state of its own. Move
+the pointer over a row and that row *becomes* the focused row; click activates
+whatever is focused. So every screen has exactly one selected thing, one visual
+state to design, and one state to test — and the focus ring stays meaningful when
+a hand goes back to the pad mid-screen.
+
+The alternative, hover as a distinct state alongside focus, is what makes a screen
+cost twice: two highlight treatments that must agree, a defined precedence when
+they disagree, and a stale focus ring left behind the pointer.
+
+**Supporting rules.**
+
+- The cursor **hides on pad or keyboard input and reappears on mouse motion**, so
+  a pad player never has an abandoned pointer sitting on the screen.
+- Nothing is reachable by pointer alone. Every action has a focus path, which is
+  what makes the pad complete rather than a courtesy.
+- The storyboard was drawn assuming a focus ring and no cursor. That is still the
+  primary read; the pointer is an additional way to move the same ring.
+
+**Consequence.** [#169](https://github.com/skiretic/kartgame/issues/169)'s gate
+extends to menus: whatever a screen says its controls are, something asserts they
+exist in the InputMap and are read. The failure this project keeps having is not
+a wrong binding — it is a **binding that is advertised and unread**, and a menu is
+the easiest place in a codebase for that to happen quietly.
+
+---
+
+## ADR-0046 — `track.json` owns the whole track, and furniture is placed by distance
+
+**Status.** Accepted, not yet implemented. Due before ROADMAP M5 writes the
+schema. Extends `ARCHITECTURE.md` §11's "one definition, two consumers" to a
+third consumer.
+
+**Context.** §11 already argues the principle: the spline is authored once and
+read by `gentrack.py` and by the C++ extension, so what you see and what you
+collide with cannot drift apart. `docs/GAMEDESIGN.md` adds a third reader — the
+session runner needs a start line, grid slots, sectors and checkpoints — and a
+second circuit with reverse layouts. If the schema is written for one circuit run
+one way, the second one changes it.
+
+**Decision.** One file owns everything the track is.
+
+```
+meta        name, length, direction of travel
+spline      control points: position, width, banking, elevation
+surfaces    spans -> asphalt / curb / grass / dirt
+furniture   start line, grid slots, sector marks, checkpoints,
+            repair area, pit entry
+layouts     forward, reverse — each naming its own sector order,
+            grid placement and racing-line seed
+```
+
+**Furniture is placed by arc length from the start line, in meters — not by
+control-point index.** This is the schema decision that matters most and it is
+invisible until the day it bites: with indices, inserting one control point to
+smooth a corner silently renumbers every checkpoint and sector behind it. Meters
+also match how the regulations already think — a Final is 30 km, and a lap count
+falls out of the circuit.
+
+**Reverse is an authored layout, not a programmatic reversal.** Flipping the
+spline is trivial and everything attached to it is not: curbs sit on the inside of
+the corner they serve, run-off is sized for an approach speed that changes,
+braking zones move, and a sector split that made sense clockwise lands mid-corner
+counter-clockwise. Each layout names its own furniture and its own racing-line
+seed. The geometry is shared; nothing else is assumed to be.
+
+**Coordinates are Godot's** — meters, Y-up, -Z forward — and `gentrack.py`
+converts once on read. The kart pipeline's convention is the opposite way round,
+building toward Blender's +Y, and `export_yup` maps it. Doing the same here would
+put a second conversion in the file that the *runtime* reads, and the runtime is
+the consumer that must not have a transform bug. One conversion, in the tool, in
+one place.
+
+**Validation is part of the schema, not a later pass.** M5's accept already
+requires rejecting a deliberately self-intersecting spline; this widens it,
+because furniture can be wrong in ways geometry cannot: grid slots must fit on the
+track surface, sector marks must be ordered and distinct, checkpoints must be
+ordered and must close the loop, and no radius may be tighter than the kart can
+physically take. A track that loads and cannot be raced is worse than one that
+refuses to load.
+
+**Versioning refuses rather than migrates**, opposite to
+[ADR-0042](#adr-0042--a-save-always-loads-and-the-migration-tests-eat-real-old-files)
+and for the same reason it applies there in reverse: `track.json` is authored
+project data under version control, not user data. A schema bump is a commit that
+edits the tracks in the same commit, and a loud failure is correct.
+
+**Consequence for replays.** The track's content hash enters `SessionConfig` per
+[ADR-0041](#adr-0041--a-replay-carries-its-whole-configuration-and-hashes-it-separately),
+so a replay recorded before a corner was smoothed refuses to play back and says
+which file moved — rather than re-simulating against different collision geometry
+and reporting a determinism failure that is really a content change.
+
+**Consequence for the grid.** Slot count is data, not a constant. The design's
+eight karts is a number in a file, which is what lets the audio measurement it
+comes from move it without a code change.
+
+---
+
+## ADR-0047 — The field is an authored roster of invented drivers
+
+**Status.** Accepted, not yet implemented. Supplies the entry list that
+`docs/GAMEDESIGN.md` §7 makes the whole of the fiction.
+
+**Context.** Seven of the eight karts on the grid are rivals, and §7 commits to
+carrying the entire fiction through entry lists, number panels, timing screens and
+standings — no prose, no dialogue. That only works if the drivers on those screens
+have texture. It also has to survive a replay: the field is part of the session,
+so it is part of `SessionConfig` per
+[ADR-0041](#adr-0041--a-replay-carries-its-whole-configuration-and-hashes-it-separately).
+
+**Decision.** A hand-authored roster in `data/drivers.json`, roughly sixteen
+drivers, eight drawn per season by the season seed. Each carries name,
+nationality, race number, entrant, entrant nationality, equipment, livery, and a
+**frozen** set of the difficulty parameters `ARCHITECTURE.md` §10 already names —
+lookahead, throttle discipline, grip ceiling, mistake rate.
+
+Frozen is what makes a rival. The driver who beat you in round 1 drives the same
+way in round 4, and the standings do the storytelling that no text has to.
+
+**The names are invented, and this needs saying because the sourcing makes it easy
+to get wrong.** `docs/REFERENCES.md` records a real published entry list, and it
+was read for its **shape**: "Surname, Forename", two nationality fields that
+routinely differ, chassis/engine/tire as one slash-joined string, numbers issued
+in per-category blocks. Those are conventions and they are exactly what to copy.
+The people on it are not. Real karters' names and nationalities are not this
+project's to ship, and a roster assembled by lifting an entry list would be
+copying the one part of the reference that was never the point.
+
+**Equipment is authored uneven, because real fields are.** Of 101 OK entries at
+the sourced event, "KR / IAME / Maxxis" appears 51 times and the rest spread thin
+across six chassis makes. A uniform-random assignment reads immediately as
+generated; a dominant combination with a scattered tail reads as a paddock. The
+tire make is uniform across the whole field, because it is a mandated control
+tire, and getting that detail right costs one line.
+
+**Alternative rejected: generation from seeded pools.** Infinite fields, zero
+authoring, and no driver who means anything the second time you see them — which
+is the only thing this system exists to produce. Sixteen drivers is an afternoon.
+
+**Where it lives.** The file is repository data, versioned like `track.json` and
+refusing rather than migrating on a schema bump. Parsing is engine-side; the rules
+and the AI consume plain structs, so `src/core/` stays engine-free per ADR-0017.
+
+**Consequences.**
+
+- The player's own number is picked at profile creation from the free numbers in
+  the class's block — 1xx for OK — which is a small thing that makes the entry
+  list read as one document rather than as the player plus some AI.
+- The seeded draw and the roster's content hash both enter `SessionConfig`, so a
+  replay reproduces the field it was recorded against rather than whichever eight
+  today's seed picks.
+- Adding a driver is a data commit. Adding a *difficulty tier* is not — the tiers
+  scale the roster's parameters rather than replacing them, so a season at a
+  higher tier is the same rivals driving better.

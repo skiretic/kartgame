@@ -27,7 +27,7 @@ Pin these. Godot's 4.x line moves, and Blender's `bpy` API shifts between major 
 | Languages | GDScript for game flow + **C++ GDExtension** for the sim | Fast iteration where it helps, native speed where it matters. §3. |
 | Art direction | Somewhat realistic | Photoscan materials, correct scale, baked GI, AgX tonemap. §5 is the realism plan. |
 | Driving feel | Grounded kart sim-lite | Per-wheel raycasts, slip-curve tires, weight transfer, kart-specific frame flex. §6. |
-| Kart class | **KZ shifter, 125cc, 6-speed** | ~45 hp, ~175 kg with driver, ~140 km/h, ~2.5 g cornering. Adds gearbox, clutch lever, engine braking. Highest skill ceiling in real karting. §6.3. |
+| Kart class | **KZ2 shifter, 125cc, 6-speed** | ~45 hp, **175 kg** with driver, ~140 km/h, **1.5–2.0 g sustained** cornering. Adds gearbox, clutch lever, engine braking. Highest skill ceiling in real karting. §6.3. |
 | First track | Fictional, plausible | Built to real kart-circuit design constraints. No real lap times to check against, so physics validates against published KZ performance figures instead. §6.4. |
 | Physics | Jolt (built into Godot 4.4+), custom vehicle on top | Jolt owns collision. `VehicleBody3D` is not used — its raycast model is too coarse for kart feel. |
 | Content | CC0 photoscans + procedural + AI fill | Photoreal materials free and legally clean; tracks and karts generated for precision; AI for gaps. §11. |
@@ -35,6 +35,16 @@ Pin these. Godot's 4.x line moves, and Blender's `bpy` API shifts between major 
 | Cameras | Chase + in-kart cockpit + free/debug | Cockpit drives interior geometry, near plane, and comfort options. §7. |
 | Multiplayer | Deferred | Sim built deterministic now. Ghosts and replays are the near-term payoff. §8. |
 | Distribution | Free, open source | Public repo, no store revenue, no royalty exposure. §16. |
+
+**Two corrections to that row, both made late and both worth reading as such.**
+The class is **KZ2**, not KZ: the Technical Regulations put KZ at 170.0 kg with
+driver and KZ2 at 175.0 kg, and 175 is what this project models. `kz_reference.h`
+has carried that correction in a comment for a milestone while this table did not
+— the header that owns the constant was right and the design document was stale.
+`docs/REFERENCES.md`, *The class ladder*, has the regulation. And cornering was
+written here as ~2.5 g, which [ADR-0034](DECISIONS.md#adr-0034--64s-lateral-band-was-a-peak-figure-being-read-as-a-sustained-one)
+established is a **transient-peak** figure; the sustained band is 1.5–2.0 g and
+that is what §6.4 validates against.
 
 **North star:** the kart drives well and reads as real at speed. Everything is judged against that.
 
@@ -329,6 +339,17 @@ track.json  ──┬──►  gentrack.py (Blender)  ──►  visual mesh, c
 
 Contains control points with position, width, banking, and elevation, plus surface-type spans and start-grid placement. Because both consumers read the same file, what you see and what you collide with cannot drift apart.
 
+**There are three consumers now, not two.** The session runner in §17 needs a
+start line, grid slots, sector marks and checkpoints, and the calendar in
+`docs/GAMEDESIGN.md` needs reverse layouts.
+[ADR-0046](DECISIONS.md#adr-0046--trackjson-owns-the-whole-track-and-furniture-is-placed-by-distance)
+extends the schema to own all of it, and settles two things this section did not:
+furniture is placed by **arc length in meters from the start line** rather than by
+control-point index, so inserting one control point to smooth a corner does not
+silently renumber every checkpoint behind it; and **reverse is an authored layout
+rather than a reversed spline**, because curbs, run-off and sector marks do not
+reverse meaningfully even though the geometry does.
+
 ### Track design constraints
 
 The first track is fictional, so plausibility has to be enforced deliberately rather than inherited from a real layout:
@@ -449,6 +470,16 @@ Target 60 fps = 16.6 ms. Stated up front so regressions are visible rather than 
 
 Steam Deck at 800p is the honesty check — it will find the parts of §4 that are too expensive.
 
+**Every figure in that table is for one kart**, and `docs/GAMEDESIGN.md` puts
+eight on a grid. The vehicle solver scales comfortably — 15.4 µs a tick measured,
+0.77% of its budget — and audio does not: `engine_voice.h` records 6.23% of real
+time per voice at the synth's worst operating point, which is **idle**, and a
+standing start is the one moment every kart in the field is at idle simultaneously.
+The audio row is also specified against the wrong clock and the wrong core
+([#155](https://github.com/skiretic/kartgame/issues/155)), so it cannot currently
+be compared against that measurement at all. Both are open, and the field size is
+a consequence of them rather than a design choice.
+
 ---
 
 ## 16. Repository and licensing
@@ -467,15 +498,61 @@ Free and open source, so the repo is the deliverable, not just the build.
 
 ## 17. Game rules and modes
 
-Underspecified in the first draft. Needed for a coherent race:
+**This section was titled "modes" and named none of them for the whole of M0–M3b.**
+`docs/GAMEDESIGN.md` is now the design; this section holds only what the *engine*
+has to provide for it, and the two must not drift.
 
-- **Track limits:** off-track detection, lap invalidation in time trial, penalty or slowdown in a race
-- **Respawn:** rescue after leaving the world or beaching, with a rejoin cooldown
-- **Kart-to-kart collision response:** tuned separately from world collision — realistic rigid-body contact between karts reads as chaotic and unfair, so bumping needs its own damping and impulse clamping
+### The structure everything else is a case of
+
+```
+Session   = track + layout + session type + rule set + entry list
+Round     = ordered list of sessions at one venue        (a race weekend)
+Season    = ordered list of rounds + a points table      (a championship)
+Career    = ordered list of seasons, one per class
+```
+
+A session is the only thing the engine runs. Everything above it is data and a
+results ledger, and it lives outside the simulation — a standings table is
+configuration in exactly the sense [ADR-0037](DECISIONS.md#adr-0037--tuning-is-an-audit-trail-that-happens-to-be-adjustable-and-a-preset-is-not-in-the-state-hash)
+means, so it does not enter `StateHash`.
+
+**Consequence for M6, and it is the reason this section moved before M4:** the
+milestone's "race states — grid, countdown, racing, finished, results" is a state
+machine for one mode. Built as a **session runner** it costs the same and the other
+modes are configuration; built as a race it absorbs one mode's assumptions and a
+championship becomes a retrofit against it.
+
+### Modes
+
+- **Practice / Time Trial** — one track, no field, own ghost, sector deltas. Also
+  the first session of every weekend, so there is one session type behind two
+  doors. The only mode playable before AI exists, and therefore the first built.
+- **Race weekend** — Qualifying Practice, Qualifying Heat, Super Heat, Final, at
+  one venue. The FIA session names and points scales are real and sourced;
+  distances are compressed to a quarter. `GAMEDESIGN.md` §4.
+- **Career** — OK into KZ2, one four-round season each, promotion at top 3.
+
+### Rules the engine owes them
+
+- **Track limits:** off-track detection by the FIA's own definition — all four
+  wheels beyond the white line. **The penalty is ours**: the regulations define
+  leaving the track and attach nothing to it, and their 5-second penalty applies to
+  *Incidents*, which include forcing another driver off but never going off
+  yourself. Labeled as ours in `REFERENCES.md` rather than implying a citation.
+- **Respawn:** rescue after leaving the world or beaching, with a rejoin cooldown.
+  The regulations disqualify a kart restarted with outside help, which is a real
+  rule the respawn half-implements already.
+- **Kart-to-kart collision response:** tuned separately from world collision —
+  realistic rigid-body contact between karts reads as chaotic and unfair, so
+  bumping needs its own damping and impulse clamping.
 - **Damage:** none. Karts don't crumple and it adds nothing here.
-- **Race flow:** grid, countdown, racing, finish, results
-- **Time trial:** ghost against personal best, sector splits, lap validation
-- **Weather and time of day:** a strong realism lever and cheap in Godot — sun angle, cloud cover, wet track with a grip multiplier feeding §6. Post-demo, but the material and physics hooks are designed in now.
+- **Field size is bounded by the audio synth, not by design taste.**
+  `engine_voice.h` measures 6.23% of real time per voice at its worst operating
+  point, and that point is *idle* — which is the standing start. See §15 and
+  [#155](https://github.com/skiretic/kartgame/issues/155).
+- **Weather and time of day:** a strong realism lever and cheap in Godot — sun
+  angle, cloud cover, wet track with a grip multiplier feeding §6. Post-demo, but
+  the material and physics hooks are designed in now.
 
 ---
 

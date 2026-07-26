@@ -1503,3 +1503,302 @@ right side and put the center of mass 41 mm right of the centerline.
    glance. Drawn rather than typed on purpose: Godot's fallback font is a
    proportional humanist sans, and shipping a segment typeface would be an asset
    for ten glyphs.
+
+## Race format and sporting regulations — `GAMEDESIGN.md`
+
+Every other section of this file sources a *thing* — a shape, a stiffness, a
+frequency band. This one sources a **procedure**, and the failure mode is
+different. Nobody renders a points scale wrongly and notices; a championship
+table that is subtly not the real one looks entirely plausible and is simply
+wrong, forever, because there is no render to disagree with it.
+
+All of it is read from the regulations themselves rather than from journalism or
+fan wikis, and the primary documents are the FIA Karting **General Prescriptions**
+and **Specific Prescriptions**, 2026 editions.
+
+### Written sources
+
+| Ref | Document | Source |
+| --- | --- | --- |
+| G1 | *Prescriptions Générales / General Prescriptions*, FIA Karting, **2026** | [`4.1_Prépa PG2026.pdf`](https://www.fiakarting.com/sites/default/files/2026-01/4.1_Pr%C3%A9pa%20PG2026.pdf) |
+| G2 | *Prescriptions Spécifiques / Specific Prescriptions*, FIA Karting, **2026** | [`4.2_Prépa PS2026.pdf`](https://www.fiakarting.com/sites/default/files/2026-01/4.2_Pr%C3%A9pa%20PS2026.pdf) |
+| G3 | *General Prescriptions*, FIA Karting, **2025** — used only to confirm an article did not change | [`4.1_Prépa PG2025_0.pdf`](https://www.fiakarting.com/sites/default/files/2025-01/4.1_Pr%C3%A9pa%20PG2025_0.pdf) |
+| G4 | *FIA Karting European Championship – OK, Sporting Regulations*, **2026** | [`5.4_RS Euro OK 2026_0.pdf`](https://www.fiakarting.com/sites/default/files/2026-01/5.4_RS%20Euro%20OK%202026_0.pdf) |
+| G5 | *Karting Technical Regulations*, CIK-FIA, **2023** — Art. 3.7, racing numbers | [`6.0_RT2023.pdf`](https://www.fiakarting.com/sites/default/files/2023-03/6.0_RT2023.pdf) |
+| G6 | *WSK Super Master Series Sporting Regulations*, **2026** | [`Regulations_ENG_2026.pdf`](https://www.wskarting.it/regolamenti/WSK%20Super%20Master%20Series/Regulations_ENG_2026.pdf) |
+| G7 | *WSK Euro Series Sporting Regulations*, **2026** | [`Regulations_ENG_2026.pdf`](https://www.wskarting.it/regolamenti/WSK%20Euro%20Series/Regulations_ENG_2026.pdf) |
+| G8 | Official entry list, 2025 FIA Karting European Championship, Portimão, OK | [`ok_entry.xml`](https://backend.fiakarting.com/sites/default/files/xml_folder/2025/Portimao/ok_entry.xml) |
+
+G8 is worth its own note. The FIA Karting website is an Angular application and
+its entry-list pages cannot be fetched, but the backend serves the underlying XML
+directly and the event index at
+`https://backend.fiakarting.com/api/v1/events?year=2025` locates one per event and
+category. That is how a *real* entry list was read rather than a described one.
+
+**And one rule from G4 Art. 1 governs the reading of all of them:** "The final
+text of these Sporting Regulations shall be the French version which will be used
+should any dispute arise as to their interpretation." The English column is what
+everyone reads and it is not authoritative. It matters in practice — G2's
+advertising article is numbered 24 in French and 23 in English on the same line.
+
+### What the references settled
+
+**The session order, and its name.** G2 Art. 18: "Any FIA Karting Championship
+Competition shall comprise Free Practice, Qualifying Practice, Qualifying Heats,
+Super Heat(s) and a final phase." The session between the heats and the Final is
+a **Super Heat**. *Prefinal* is WSK's word (G6), not the FIA's, and journalism
+uses the two interchangeably. Getting this wrong is not a naming slip: the two
+series aggregate in opposite directions.
+
+**There are four distinct points tables in one weekend**, and three of them begin
+with 50 or 25:
+
+| Table | Scale | Source |
+| --- | --- | --- |
+| Qualifying Heat, position points | 50, 44, 41, 38, 36, 34, 32, 30, 28, 27, 26 … 1 (36th) | G2 18C |
+| Super Heat, position points | 90, 80, 72, 66, 60, 54, 50, 46, 42, 38, 34, 32 … 1 (36th) | G2 18D |
+| Championship, from the intermediate and Super Heat classifications | 25, 22, 19, 17, 15, 13, 11, 9, 7, 6, 5, 4, 3, 2, 1 | G2 19 |
+| Championship, from the Final | 50, 44, 38, 34, 30, 26, 22, 18, 14, 10, 8, 6, 4, 2, 1 | G2 19 |
+
+The first two are added *within* the weekend to order the next grid; the last two
+are added *across* the season. Collapsing any pair produces standings that look
+right and are not. Ties break on the Qualifying Practice classification at every
+stage.
+
+**Championship points come from three classifications per event, not just the
+Final** (G2 Art. 19) — the intermediate classification after the heats, the Super
+Heat classification, and the Final. Plus one point for the fastest lap of the
+Final. Part-distance scaling is explicit: under 2 laps scores nothing, over 2 laps
+but under 75% of the scheduled distance scores half, 75% or more scores full.
+
+**A season is four Competitions** — G4 Art. 4, the 2026 European Championship for
+OK. Dropped scores exist (G2 19b) but do not bite below five Competitions, so a
+four-round season counts everything. *(That article's "80% of the results rounded
+up or down" sentence does not reproduce its own case table — 80% of 7 is 5.6, not
+6. INFERRED: the case table governs and the percentage is descriptive.)*
+
+**A session is a distance, not a lap count.** G2 Art. 18 and G4 Art. 6: the Final
+is "the minimum number of full laps necessary for reaching the distance of 30 km"
+for Seniors, 25 km for Juniors; the Super Heat 20 km; each Qualifying Heat 15 km.
+So lap counts change per circuit, and a full weekend is roughly an hour of track
+time on a 1,200 m circuit.
+
+**Track limits are defined and carry no penalty.** G1 Art. 2.14 B, verbatim: "The
+circuit is defined by the white lines on both sides of the track. Drivers are
+allowed to use the whole width of the track between these lines. If the four
+wheels of a kart are outside these lines, the kart is considered as having left
+the track." Identical in G3, so the article did not change. Nothing in the
+General Prescriptions attaches a penalty to that act.
+
+What does carry a penalty is an **Incident** (G1 Art. 2.24): "The Stewards shall
+inflict a 5-second time penalty on any Driver having caused an Incident. If the
+Incident was caused during a Qualifying Practice session, they shall proceed to
+the cancellation of the fastest lap which he achieved in the session concerned."
+Note that qualifying deletes the driver's **fastest** lap, not the offending one.
+The enumerated Incident list includes having "forced another Driver out of the
+track" — it penalizes putting someone else off, never going off yourself.
+
+**Rejoining is the driver's own problem.** G1 Art. 2.14 C: a kart restarted with
+outside help "will be disqualified from the classification of the Qualifying
+Practice or the race in which this help was provided." Art. 2.14 H allows help
+only in the Repair Area, which must be reached under the kart's own power.
+
+**Racing numbers are regulated geometry.** G5 Art. 3.7: "Racing numbers must be
+black, in an Arial font on a yellow background. For short circuits, they must be
+at least 15 cm high and have a 2 cm thick stroke. … Racing numbers must be
+bordered by a yellow background of at least 1 cm. They must be fitted before
+scrutineering, on the front panel, rear wheel protection or rear number plate,
+and on both sides towards the rear of the bodywork." Four positions. Plus, for
+FIA Karting Championships, the driver's name and nationality flag on the front of
+the lateral bodywork, letters at least 3 cm high. Advertising on the number
+background is capped at 20 × 5 cm (G2 Art. 24).
+
+**What an entry list actually contains**, read off G8 rather than described:
+columns are `No. | Driver | Nat | Entrant | Nat | Equipment`. Three structural
+facts that a designed-from-imagination version gets wrong — the name is
+"Surname, Forename"; there are **two** nationality fields, the driver's and the
+entrant's, and they frequently differ; and chassis, engine and tire are a single
+slash-joined `Equipment` string, not three columns. The tire make is uniform
+across the field because it is a mandated control tire (G4 Art. 16), so chassis
+and engine are the only variables.
+
+Numbers are issued centrally: G2 Art. 9 D has the CIK-FIA publish "the list of
+karts and Drivers accepted, with their racing numbers", and G4 Art. 9a makes them
+fixed for the season. *(The allocation rule itself is not in any regulation.
+INFERRED from G8: the leading digit is a category block — 101–197 for OK, 202–291
+for OK-Junior — issued sequentially, with a separate 3xx block for the Wild Card
+entries G4 Art. 9b defines as per-event and non-scoring. That is a pattern read
+off two lists, not a stated rule.)*
+
+### Where WSK differs, and why it was not chosen
+
+G6 aggregates **penalty points, lowest total wins** — 0 for first, 5 for second,
+8 for third, then one more per place — where the FIA adds position points and the
+highest total wins. It keeps the name Prefinal, runs five rounds, escalates the
+championship scale round by round so a round-five win is worth 80 against a
+round-one win at 50, and draws its qualifying series **by lot** where the FIA
+seeds them from championship standings.
+
+`GAMEDESIGN.md` takes the FIA shape. It is sourced more deeply here, its
+four-Competition season matches the season length already chosen for other
+reasons, and a championship total that counts upward is the one a HUD can show
+without explaining itself.
+
+### What could not be sourced, and what stays assumed
+
+1. **The 2026 Technical Regulations.** Art. 3.7's number-plate dimensions above
+   are quoted from the **2023** edition (G5). The 2026 file could not be located —
+   the site is a single-page application with no scrapable index and every
+   probed path 404'd. G2 Art. 12 A still points at "Article 3.7 of the Technical
+   Regulations", so the article number is current, but the centimeters are three
+   years old. INFERRED as unchanged, since plate specifications are among the most
+   static text in the rulebook — **re-verify before any of those numbers is baked
+   into geometry.**
+2. **In-race track-limits enforcement.** There is no "gaining a lasting
+   advantage" rule in FIA Karting; searching G1 for *advantage* returns only the
+   French word *davantage*, meaning "further". INFERRED: enforcement lives in the
+   per-event **Race Director Event Notes**, which G4 Art. 2 makes binding and
+   which G1 Art. 2.24 makes an Incident to disobey. No such document could be
+   obtained. Do **not** fill this gap from memory of Formula 1 practice — that is
+   a different rulebook, and this project's own track-limits rule is therefore
+   ours, invented deliberately, and must be labeled as ours.
+3. **The day-by-day timetable.** G4 Art. 14 mentions a "Thursday test day",
+   "Free Official Practice on Friday" and "the Saturday and Sunday warm-ups" in
+   passing, so the broad shape is sourced by implication. Which day each of
+   qualifying, the heats, the Super Heat and the Final falls on is set per event
+   in a published time schedule, not in the regulations. Any "Friday qualifying,
+   Sunday final" claim is unsourced.
+4. **How many heats one driver runs.** G2 18C gives the pairing list for the
+   four-group case — A v B, A v C, A v D, B v C, B v D, C v D — and never states
+   the per-driver count. It is three, by arithmetic, and that is INFERRED.
+5. **A defect in G7 worth recording**, because it is the kind of thing a later
+   session would otherwise re-derive: the WSK Euro Series regulations say "The
+   2026 WSK Euro Series structured in two events" in Art. 2 and then list three
+   rounds in the calendar immediately below and three rounds of points tables in
+   Art. 13. INFERRED: three, on two independent structures against one sentence
+   that reads like a stale copy from a previous year.
+
+## The class ladder — `GAMEDESIGN.md` §5
+
+The career mode promotes the player from a single-speed class into the shifter
+this project already models. That means two neighboring classes had to be sourced
+rather than named from memory, and the naming is the first trap: **KF**, **TaG**
+and **Rotax Max** are all in wide circulation and none of them is a current FIA
+class.
+
+### Written sources
+
+| Ref | Document | Source |
+| --- | --- | --- |
+| C1 | *Karting Technical Regulations*, CIK-FIA, text dated **19-Dec-2025**, carrying changes marked immediate / 1.1.2026 / 1.4.2026 | [`6.0 RT2025_Clean Web_1.2_16.12.2025.pdf`](https://www.fiakarting.com/sites/default/files/2025-12/6.0%20RT2025_Clean%20Web_1.2_16.12.2025.pdf) |
+| C2 | FIA Karting, *The FIA Karting Categories* — last updated 2023-03-01 | [backend JSON](https://backend.fiakarting.com/api/v1/page?alias=/page/fia-karting-categories) (the human page is an Angular application) |
+| C3 | *International Karting Licences for Drivers & Code of Driving Conduct*, FIA Karting, 2026 | [`3.0_Prépa Licences Pilotes 2026.pdf`](https://www.fiakarting.com/sites/default/files/2026-02/3.0_Pr%C3%A9pa%20Licences%20Pilotes%202026.pdf) |
+| C4 | IAME **R125K** (OK) product specification | <https://iameengines.com/product/r125k-040-es-01/> |
+| C5 | IAME **R125Z** (KZ / KZ2) product specification | <https://iameengines.com/product/r125z-040-ez-10/> |
+| C6 | TM Kart **KZ-R2** engine data | <https://www.tmkart.it/portfolio-items/kz-r2/> |
+| C7 | BRP-Rotax, *125 Senior MAX evo* datasheet, 2021/01 — the TaG reference point, **not** an FIA class | [`2021_Datasheet_Senior_Printpreview.pdf`](https://www.rotax-racing.com/assets/uploads/Engines/2021_Datasheet_Senior_Printpreview.pdf) |
+| C8 | TKART, *10 tricks to best drive a KZ shifter kart*, 25 Oct 2018 — trade press, items 3–10 paywalled, read via the Internet Archive because tkart.it 403s scripted requests | <https://tkart.it/en/magazine/how-to/10-tricks-kz-shifter-kart> |
+| C9 | Vroomkart, *Shifter or single speed?* — trade press | <https://www.vroomkart.com/news/40338/shifter-or-single-speed> |
+| C10 | KartPulse forums, *Single Speed vs GearBox (Shifter) driving styles* — forum, named racers and coaches, opinion | <https://forums.kartpulse.com/t/single-speed-vs-gearbox-shifter-driving-styles/4303> |
+
+### The table
+
+| | OK-N | OK | KZ2 | KZ |
+| --- | --- | --- | --- | --- |
+| Capacity | 125 cc two-stroke | 125 cc two-stroke | 125 cc two-stroke | 125 cc two-stroke |
+| Transmission | direct drive | direct drive | 6-speed sequential | 6-speed sequential |
+| Clutch | **none** | **none** | hand-operated, manual | hand-operated, manual |
+| Starter | push | push | push | push |
+| Rev limit, regulated | 15,000 rpm | 16,000 rpm | **none** | **none** |
+| Minimum weight with driver | 155.0 kg | 150.0 kg | **175.0 kg** | **170.0 kg** |
+| Brakes | rear only | rear only | four-wheel, mandated | *"free in Group 1"* |
+| Minimum driver age | 14 | 14 | 15 | 15 |
+| Licence grade | F or E | F or E | E | E |
+| Peak power | **unsourced** | **unsourced** | **unsourced** | **unsourced** |
+| Top speed | **unsourced** | **unsourced** | **unsourced** | **unsourced** |
+
+Everything but the two unsourced rows is C1, cross-checked against C2, C3 and the
+manufacturer pages. OK-N is formally *"National class according to the OK-N
+Regulations"* (C1 Art. 2) rather than a Championship class; it is new in 2023 and
+differs from OK by a lower rev limit, a larger minimum combustion chamber, no
+power valve and +5 kg — three separate power reductions and a weight penalty.
+
+### What the references settled
+
+**This project simulates a KZ2.** C1 §8.9 puts KZ at 170.0 kg with driver and
+§9.9 puts KZ2 at 175.0 kg; the 175 figure widely attached to KZ predates a World
+Motor Sport Council decision of September 2016. `kz_reference.h` already carries
+this correction and its reasoning. `ARCHITECTURE.md` §1 does not.
+
+**The direct-drive classes have no clutch and no starter.** C1 §9.11.1 defines OK
+and OK-N as *"direct drive water-cooled 125 cm3 single cylinder two-stroke reed
+valve engine"*, with a mandatory decompression valve to make push-starting
+possible. There is no clutch article for the group at all. The only centrifugal
+clutch anywhere in the CIK-FIA regulations is **Mini**, 60 cc, which *"must start
+to grip at 3,500 rpm"* (C1 Art. 10.11.2) alongside a mandatory electric starter.
+If an entry class in this game is meant to have a start button and a centrifugal
+clutch, it is a TaG/Rotax machine (C7: 30 hp at 11,500 rpm, 21 N·m at 9,000,
+12.0 kg bare) and it is **not an FIA class** — a decision worth making on purpose
+rather than by accident.
+
+**The promotion carries brakes as well as gears.** C1 §9.6: four-wheel braking is
+required *"in the KZ2 gearbox classes"* and the non-gearbox OK classes run
+*"2WP B2 or BRKR"* — rear only. So moving up hands the driver front brakes,
+adjustable bias, engine braking and a gearbox at once.
+
+**How the two are actually driven**, and this is the part no regulation contains.
+C8: *"On a non-shifter, lines tend to be more round and precise, while with a
+gearbox kart they get edgier"*; the OK driver must maintain mid-corner speed to
+keep the engine in its band, while KZ *"allows to delay corner entry and
+anticipate corner exit, relying on the curbs"*, and its greater braking power is
+something a driver has to *learn to manage*. C10, a racer: *"A gearbox kart can
+stop much faster and accelerate much better so they can be driven in deeper, a
+quick rotation, then back on the gas … In a single speed if you go in too deep,
+you'll need to slow down too much, and will lose time on the following straight."*
+C10, a coach, on why the momentum class teaches: *"if you make a mistake in an
+LO206, it's a lot more noticeable to the driver than if you make a mistake in an
+X30. You can feel the low-powered kart fall on its face."* C9 adds that a shifter
+is driven one-handed for roughly half a lap, and that heavier drivers gain on
+shifters — which is why they often stay in the weight-regulated single-speed
+classes.
+
+One dissent, recorded because it is the useful kind: C10 also carries a poster
+calling the "single-seaters make you a better driver" claim *"paddock talk with
+very little substance"*. The behavioral deltas above are sourced; the pedagogy is
+an opinion held by most of a forum.
+
+### What could not be sourced, and what stays assumed
+
+1. **Peak power, for every class in the table.** IAME prints `max-power: –` on
+   both the OK and the KZ engine; TM publishes none; the FIA publishes performance
+   figures for Superkart and for nothing else. Every 35, 45, 50 and 53 hp figure
+   in circulation traces to retail listings, SEO pages or forums. The drivetrain
+   section of this file already handles KZ2's 45 hp honestly — cited to a dyno
+   thread, chosen as the conservative class-legal value — and **OK has no
+   equivalent**. Worse, "around 35 hp" is quoted for OK *and* OK-N, which cannot
+   both be true across three regulated reductions. An OK torque curve will be a
+   shape constrained by the rev limit and the class differences, not a citation.
+2. **Top speed, for every class.** Nothing primary. What the FIA does publish is
+   *average* lap speed — a KZ pole at Valencia of 54.028 s at 95 km/h average, and
+   Franciacorta described as allowing over 100 km/h average with a gearbox kart.
+   Real, citable, and not the same quantity. `kz_reference.h`'s 135–145 km/h band
+   is derived from gearing rather than from a published top speed, which is the
+   right way round.
+3. **KZ's brakes are open, not four-wheel.** C1 §8.6 says *"Brakes are free in
+   Group 1"*; only KZ2 mandates four-wheel. Every KZ runs four-wheel in practice
+   and C2 describes the two classes jointly, but a model built from the regulation
+   should not cite §8.6 as the reason for front brakes. INFERRED.
+4. **"KZ1" is still live in an FIA document.** The string appears zero times in
+   C1, yet the 2026 KZ European Championship Sporting Regulations Art. 13 says the
+   championship is *"reserved for KZ1 karts"*. INFERRED: the Technical Regulations
+   define the classes and the Sporting Regulations are citing them, so the SR is
+   carrying a stale label.
+5. **C2 contradicts C1 twice.** It describes the KZ engine as *"direct-coupled"*
+   in the same paragraph as *"six-speed sequential gearbox"* — a copy-paste from
+   the OK section, and exactly the phrase someone would grep for when deciding
+   which class is direct drive — and it gives both OK and KZ *"valve inlet in the
+   piston skirt"* where C1 §9.10.1 and §9.11.1 both specify reed valves. Trust C1;
+   C2 was last updated in 2023 and has no OK-N entry at all.
+6. **The rename chain is fan-wiki-sourced.** ICC → KZ2, Super-ICC → KZ1 → KZ,
+   ICA → KF2 → KF → OK. Only KF → OK in 2016 is confirmed primary (C2). Usable as
+   flavor, not as a citable date.

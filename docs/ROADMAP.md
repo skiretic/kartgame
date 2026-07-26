@@ -10,10 +10,12 @@ Effort is relative sizing, not calendar time. **M3b dominates** — vehicle feel
 
 The demo is **M0 through M8**. It ships when all of this is true on macOS:
 
-- A generated KZ shifter kart drives on a generated track, gamepad in hand, locked 60 fps
+- **The game boots into itself.** A main scene, a menu, a session you choose, a pause, a result. This list ran for three milestones without it, and `project.godot` still sets no main scene at all — the game is launched by typing a scene path on a command line. `docs/GAMEDESIGN.md` is the design and M3c below is the work
+- A generated KZ2 shifter kart drives on a generated track, gamepad in hand, locked 60 fps
 - It reads as realistic in motion — photoscan materials at correct scale, baked GI, AgX, motion blur
 - Both cameras work: chase and in-kart cockpit with head stabilization and comfort options
 - Lap timing and checkpoints work; you can race your own ghost
+- **A time trial is a finished mode, not a scene** — chosen from a menu, with sector deltas, lap validation, a ghost and a saved best that survives a restart
 - One AI opponent drives a generated racing line through the same input path you use
 - Telemetry, physics visualization, and tuning presets are live
 - The physics validation suite passes against real KZ performance figures
@@ -372,6 +374,43 @@ Effort: XL
 
 ---
 
+## M3c — Game shell and the session runner
+
+**Inserted rather than appended, and inserted here on purpose.** `M3b` proved the
+kart drives. Nothing in M0–M8 as originally written ever gave a person a way to
+*start* it — the tech demo definition was eleven capabilities with no player in
+it, and `project.godot` sets no main scene. `docs/GAMEDESIGN.md` is the design
+this milestone builds; `ARCHITECTURE.md` §17 is the structure.
+
+It goes before M4 for one reason that is not impatience: M6's race loop is
+specified as "race states — grid, countdown, racing, finished, results", which is
+a state machine for a single mode. Written now as a **session runner** it costs
+the same and race weekends and championships become data. Written at M6, against
+one mode, everything else is a retrofit against it.
+
+- **Input is handed to the vehicle, not fetched by it** ([ADR-0040](DECISIONS.md#adr-0040--input-is-handed-to-the-vehicle-not-fetched-by-it)) — `kart_body.cpp` stops reading the `Input` singleton, driver nodes produce the struct, and the steering curve moves out of the vehicle to where ADR-0036 already said it belongs. Do this **first**: it is one indirection now and a rewrite through replay, ghost, AI and the field later
+- Main scene, boot, and a paddock menu — diegetic, per `GAMEDESIGN.md` §7
+- **Session runner**: session = track + layout + type + rule set + entry list. Practice, Qualifying, Heat, Final are configurations of one runner, not four code paths
+- Session setup, loading, results, and a return path
+- Pause: resume, restart session, controls, quit
+- Settings: the §18 comfort options, controls, assists — all of which exist as values already and none of which a player can reach
+- Profile and save: driver name, number, nationality, best lap and ghost per track per layout per class, tuning presets (already built, ADR-0037), settings
+- **Practice / Time Trial finished end to end** — sector deltas, lap validation against our own track-limits rule, ghost record and playback, a saved best that survives a restart
+- An input-map reader check, so the on-screen control list cannot drift from the bindings again ([#169](https://github.com/skiretic/kartgame/issues/169))
+
+**Accept:** the game is launched by double-clicking it, not by typing a scene
+path. A person who has never seen the repository reaches a moving kart from the
+boot screen without being told how, sets a lap time, sees it recorded, quits, and
+finds it still there. Nothing in the shell holds simulation state — the
+determinism harness at M6 must not have to reason about menus.
+
+**Explicitly not here:** any mode that needs a field. A grid of karts the AI
+cannot race is a worse artifact than no grid, so race weekends wait for M7.
+
+Effort: M
+
+---
+
 ## M4 — Cameras
 
 - Chase rig: spring arm, look-ahead, FOV kick, lateral-G roll, wall raycast
@@ -409,8 +448,8 @@ Effort: L
 ## M6 — Race loop and determinism
 
 - Checkpoint volumes, lap counting, lap and sector timing
-- Race states: grid, countdown, racing, finished, results
-- Track-limits detection, lap invalidation, respawn with rejoin cooldown
+- **Race sessions as configurations of M3c's session runner** — grid, countdown, racing, finished, results. This line read "race states" and was a state machine for one mode; `ARCHITECTURE.md` §17 has why that ordering was wrong
+- Track-limits detection, lap invalidation, respawn with rejoin cooldown. The off-track *definition* is the FIA's — all four wheels past the white line — and the penalty is **ours**, because the regulations attach none to it
 - Replay recording: seed + input stream + tick count
 - Ghost recording: transform stream plus input stream; playback and rendering
 - **Determinism harness:** state hash every N ticks, replay re-sim must match. Into CI from here on.
@@ -486,6 +525,47 @@ Effort: L
 
 ---
 
+## M11 — The game: race weekend, championship, career
+
+Beyond the tech demo, and the reason the demo is worth finishing. Designed in
+`docs/GAMEDESIGN.md`; the format is FIA Karting's and is sourced in
+`docs/REFERENCES.md`.
+
+Each item below **finishes before the next begins**. That ordering is the
+milestone's only real risk control: a championship over a stubbed weekend, or a
+career over a costume of a second class, is worth less than the time trial it
+was built on top of.
+
+- **Race weekend** — Qualifying Practice, Qualifying Heat, Super Heat, Final. Real FIA position-point scales truncated to the field, each session's result forming the next session's grid. Distances compressed to a quarter, which is stated in the design rather than implied
+- **Second circuit**, and reverse layouts. A four-round calendar over one geometry is the same race four times
+- **Championship** — four rounds, points from all three classifications per round, nothing dropped, standings that persist
+- **A second class: OK.** Direct drive, **no clutch at all**, rear brakes only, 16,000 rpm limiter, 150 kg with driver. Its own torque curve, its own synth voice, its own tuning defaults with declared provenance — the same bar `tuning.h` holds the KZ2 to. Not a KZ2 with the gearbox flagged off
+- **Career** — OK season into KZ2 season, promotion at top 3, a career that ends
+- **Entry lists, number panels and standings** as the whole of the fiction. Number panels are regulated geometry: black Arial on yellow, 15 cm high, four positions on the kart
+
+**Accept:** a person finishes a four-round season in an evening, loses one, and
+runs it again. The single-speed class is recognisably a different machine to
+drive rather than the same one with a feature removed — measured against its own
+regulation figures the way §6.4 measures the KZ2, and judged at the wheel the way
+[#138](https://github.com/skiretic/kartgame/issues/138) says it has to be.
+
+**One figure it cannot have:** no manufacturer publishes a power output for any
+FIA-homologated OK or KZ engine. OK's torque curve is a shape constrained by the
+class differences, not a citation, and it goes on
+[#159](https://github.com/skiretic/kartgame/issues/159) marked unsourced the day
+it is written.
+
+Effort: L
+
+---
+
 ## Post-demo, unscheduled
 
-Netcode via Godot's high-level multiplayer API, cross-platform bit determinism, virtual mirror, photo mode and replay cameras, additional tracks and karts, other kart classes (TaG single-speed is a trivial variant once the gearbox exists), championship structure, split-screen, localization.
+Netcode via Godot's high-level multiplayer API, cross-platform bit determinism, virtual mirror, photo mode and replay cameras, additional tracks, further kart classes, split-screen, localization.
+
+**Two things left this list at M11.** "Championship structure" was a comma in a
+pile and is now a milestone with a sourced format. And "TaG single-speed is a
+trivial variant once the gearbox exists" was wrong twice over: *TaG* is not an FIA
+designation at all — the class is **OK** — and the variant is not trivial, because
+it changes the brakes, the audio, the geometry and every tuning default, not just
+the drivetrain.
