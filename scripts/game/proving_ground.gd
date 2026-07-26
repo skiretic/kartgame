@@ -111,6 +111,7 @@ var _args: Dictionary = {}
 var _kart: KartBody
 var _chase: ChaseCamera
 var _free: FreeCamera
+var _cockpit: CockpitCamera
 var _fixed: Camera3D
 var _hud: Label
 var _driving_hud: Control
@@ -461,6 +462,11 @@ func _build_kart() -> void:
 	var noise: Array = EngineVoiceRig.attach_noise(_kart)
 	_scrub_voice = noise[0]
 	_wind_voice = noise[1]
+	# The listener, at the driver's head. Issue #160: without it Godot falls back to
+	# whichever `Camera3D` is current, which was measured to swing the level 20.7 dB
+	# as the chase camera moves — so the mix changed every time somebody pressed V,
+	# and only one of the two mixes was ever judged.
+	EngineVoiceRig.attach_listener(_kart)
 
 	_physics_draw = PhysicsDraw.new()
 	_physics_draw.name = "PhysicsDraw"
@@ -597,6 +603,15 @@ func _build_cameras() -> void:
 	_chase.set_target(_kart)
 	_chase.camera.attributes = LookEnv.camera_attributes(_args)
 
+	# The cockpit rig, parented to the kart rather than to the scene: the eye is a
+	# position in the body frame and a rig in the scene would have to re-derive the
+	# kart's transform every frame to put it there.
+	_cockpit = CockpitCamera.new()
+	_cockpit.name = "CockpitRig"
+	_kart.add_child(_cockpit)
+	_cockpit.set_target(_kart)
+	_cockpit.camera.attributes = LookEnv.camera_attributes(_args)
+
 	_free = FreeCamera.new()
 	_free.name = "FreeCamera"
 	_free.attributes = LookEnv.camera_attributes(_args)
@@ -676,7 +691,15 @@ func _build_hud() -> void:
 
 func _process(_delta: float) -> void:
 	if Input.is_action_just_pressed(&"camera_cycle"):
-		_set_camera_mode("free" if _camera_mode == "chase" else "chase")
+		_set_camera_mode(_next_camera_mode())
+	# `look_back` has been bound in `project.godot` and printed in this HUD since
+	# M3a, and until now **nothing read it** — C and Triangle did nothing at all.
+	# That is the exact failure CLAUDE.md's driving section opens with, one level
+	# worse: the key was advertised rather than omitted. The chase rig's own
+	# look-back is separate work and has its own issue; this is the cockpit's, where
+	# looking back is a head turn and is three lines.
+	if _cockpit != null:
+		_cockpit.set_looking_back(Input.is_action_pressed(&"look_back"))
 	# Respawn is the scene's, not the kart's. `KartBody` reads throttle, brake,
 	# steer, clutch and the two shift edges off the input map, and deliberately
 	# stops there: `respawn()` moves a body to a pose only whoever placed it knows,
@@ -753,18 +776,42 @@ func _set_camera_mode(mode: String) -> void:
 		_camera_mode = "fixed"
 		_fixed.current = true
 		return
-	_camera_mode = "free" if mode == "free" else "chase"
+	if mode == "cockpit" and _cockpit == null:
+		mode = "chase"
+	# Captured before the assignment, because the free camera takes over from
+	# wherever the view currently *is*. Handing it the chase camera while the
+	# driver is in the cockpit teleports the view three meters backwards on a key
+	# press, which reads as the free camera being broken.
+	var previous := _camera_mode
+	_camera_mode = mode if mode in ["free", "cockpit"] else "chase"
 	if _camera_mode == "free":
-		_free.take_over(_chase.camera)
+		_free.take_over(_cockpit.camera if previous == "cockpit" else _chase.camera)
 		# The kart keeps simulating but stops reading input, because the flight
 		# camera reuses the drive keys. Freezing the body instead would make the
 		# free camera a different experiment from the one being debugged.
 		_kart.set_process_input_enabled(false)
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+		return
+	if _camera_mode == "cockpit":
+		_cockpit.make_current()
 	else:
 		_chase.camera.current = true
-		_kart.set_process_input_enabled(true)
-		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	_kart.set_process_input_enabled(true)
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+
+
+## Chase, cockpit, free, round again.
+##
+## Cockpit second rather than last because it is the one somebody switches to in
+## order to drive, and free is a debugging tool that happens to share the key.
+func _next_camera_mode() -> String:
+	match _camera_mode:
+		"chase":
+			return "cockpit"
+		"cockpit":
+			return "free"
+		_:
+			return "chase"
 
 
 ## The four-line corner overlay.
@@ -800,7 +847,7 @@ func _hud_text() -> String:
 	# `debug_*` actions: F3, F4, F5.
 	lines.append(
 		"W/S throttle-brake  A/D steer  E/Q shift up-down  Shift clutch  "
-		+ "C look back  R respawn  V camera"
+		+ "C look back  R respawn  V camera (chase/cockpit/free)"
 	)
 	lines.append("F3 telemetry  F4 freeze frustum  F5 physics draw")
 	return "\n".join(lines)
