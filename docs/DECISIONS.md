@@ -1297,3 +1297,121 @@ inert — Jolt's movement threshold is 0.75 of the body's own extent per step,
 about 0.41 m for the chassis box, and the kart covers 0.32 m per step at its top
 speed — but that is an argument, not a measurement, and it is filed rather than
 concluded. Kart-to-kart contact is untouched and belongs to M7.
+
+
+## ADR-0034 — §6.4's lateral band was a peak figure being read as a sustained one
+
+**Status.** Accepted. This is issue
+[#120](https://github.com/skiretic/kartgame/issues/120), and it changes a
+validation target rather than a model.
+
+**Context.** M3b's solver measures 1.86 g of best sustained lateral acceleration
+against `ARCHITECTURE.md` §6.4's 2.0-2.5 g. ROADMAP recorded the figure outside
+its band deliberately, and #120 named three possible levers: raise grip, change
+the chassis geometry, or decide the target is wrong.
+
+The first two were already closed. Grip is measured not to work — raising
+`peak_friction` from 2.10 to 2.70 buys 0.265 g with collapsing returns, which
+re-measures ADR-0031's conclusion with the real solver. Geometry is closed by
+regulation: FIA Karting Art. 8.1.1 caps overall width at 1400 mm and
+`tools/blender/kartlib/params.py:56` already sets the rear track to exactly that,
+so there is no legal width left to find.
+
+**The third lever did not need an external source to settle. The project
+contradicts itself.** The same two constants are labeled two incompatible ways:
+
+    docs/ARCHITECTURE.md:187   | Peak lateral acceleration | ~2.0-2.5 g |
+    src/core/kz_reference.h:43 // Steady-state skidpad, slicks, dry asphalt.
+                               LATERAL_G_MIN = 2.0    LATERAL_G_MAX = 2.5
+
+The document says peak. The header the document feeds says steady-state skidpad.
+Every measurement taken against it — M3a's, M3b's, ADR-0033's before-and-after
+table — is a sustained number. The project has been asserting a peak figure
+against a sustained measurement for two milestones.
+
+**And read as sustained, the band asks for a state the kart cannot occupy.**
+Recomputed from `src/core/chassis.h`'s twenty-one lump table:
+
+    mass 175.000  com (0.0409  0.2197  0.0838)
+    rollover left   2.4336 g
+    rollover right  2.8061 g
+
+The band's top edge, 2.5 g, is **above the left-turn tipping point**. A kart
+sustaining it is on two wheels. Nothing sustains more lateral acceleration than
+it tips at, so the upper half of a sustained 2.0-2.5 g band is unreachable by
+construction, in one of the two directions, on any legal kart geometry.
+
+**Decision.** §6.4 carries two lateral rows instead of one: a **sustained**
+band of 1.5-2.0 g, which the skidpad scenario is judged against, and a
+**transient peak** band of 2.0-2.5 g, which only a transient probe may be judged
+against. `kz_reference.h` splits its constants to match and each consumer is
+repointed at the one it actually measures.
+
+**Why a peak may exceed the tipping threshold and a sustained figure may not.**
+Tipping is not instantaneous. Roll inertia about the outside contact line is
+`Izz + m d^2` = 13.20 + 175 x 0.5782^2 = 71.69 kg m^2, and the excess roll moment
+at lateral `a` is `m (a - t) g h`:
+
+| held at | 0.2 s | 0.5 s | 1.0 s | to the point of no return |
+|---|---|---|---|---|
+| 2.5 g | 0.40 deg, 4 mm lift | 2.5 deg, 23 mm | 10.0 deg, 93 mm | 2.60 s |
+| 2.8 g | 2.2 deg, 21 mm | 13.8 deg, 128 mm | 55.2 deg, 439 mm | 1.11 s |
+
+2.5 g through a corner entry costs 0.4 degrees of roll. 2.5 g around a skidpad
+puts the kart on its side. That is the whole distinction, computed from this
+kart's own numbers.
+
+**Why published kart figures cluster where they do.** Practitioners make the same
+split explicitly — "to have a kart that actually sustains 2G's for a turn is very
+rare. Most of the time you have spike g's that averaged do produce between
+1,6-2g's", with transients "sometimes up to 2,5G's". There is also a measurement
+artifact that inflates every logged kart lateral number: a MyChron or Alfano
+mounts on the steering wheel, roughly 0.6 m ahead of the center of mass, so the
+signal is `a_y + yaw_accel * x` — 10 rad/s^2 of turn-in yaw acceleration
+contributes 0.6 g the chassis never felt. For scale, a 1983 ground-effect
+Formula 1 car skidpads at 1.68 g.
+
+**Where the sustained band's edges come from, and how solid each is.** The top,
+2.0 g, is anchored on this kart's own geometry: it sits 18% below the 2.4336 g
+left-turn threshold, so every value in the band is sustainable with margin, which
+the old band's top was not. That is the strong half. The bottom, 1.5 g, is
+weaker and is recorded as weak: it comes from Lot and Dal Bianco's
+lab-measured, telemetry-validated kart solving to 1.456-1.477 g steady state, and
+this project has reached that only through a third-party re-encoding of a
+paywalled paper nobody here has read. It is a plausibility floor, not a
+measurement. `kz_reference.h` already says these ranges are a plausibility gate
+rather than a fit target and that is the spirit the band keeps.
+
+**What this does not claim.** That the model is now correct. 1.86 g landing
+inside a restated band is a target being fixed, not a solver being validated, and
+the two should not be confused when reading the M3b table.
+
+**A correction to ROADMAP's own diagnosis, which was directionally right and
+quantitatively loose.** M3b records that "the kart runs out of ability to use
+grip at its own rollover threshold". At 1.86 g the kart is at **76% of its
+tipping point**, which is not close. What actually binds is load sensitivity
+amplified by lateral transfer, and the rollover threshold enters as the
+*denominator* of the transfer term — a narrower or taller kart loses grip to
+transfer faster at the same `a`. Rollover only becomes the binding constraint
+above roughly `peak_friction` 2.63, which is why the returns collapse where they
+do. The ROADMAP sentence is restated accordingly.
+
+**What it opened.** Four tickets, filed rather than left in this prose:
+[#128](https://github.com/skiretic/kartgame/issues/128), because `tire.h`'s
+`peak_friction = 2.10` was justified by pointing at the very band this ADR
+relabels, and every deformable-surface grip multiplier is a quotient of it;
+[#129](https://github.com/skiretic/kartgame/issues/129), because three
+disagreeing rollover thresholds turned up while checking this one, and the one in
+`chassis_flex.h` cannot see the lateral center-of-mass offset at all;
+[#130](https://github.com/skiretic/kartgame/issues/130), four citations pointing
+at reference files that no longer exist; and
+[#131](https://github.com/skiretic/kartgame/issues/131), the identical peak-versus-mean
+confusion in the braking row.
+
+**The general lesson, which is the expensive one.** `ARCHITECTURE.md` §5 item 10
+requires a real part to be modeled from photographs rather than from prose, and
+records that rule for *generated geometry*. The performance envelope is not
+geometry, so it escaped the rule — and it is the project's substitute ground
+truth, per ADR-0014. `git log -S` puts this band in the initial docs commit,
+written from prose in a planning session and never sourced. The rule wants
+widening to cover any externally-sourced constant, not just any generated shape.

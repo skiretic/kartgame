@@ -184,12 +184,15 @@ A fictional track means no published lap time to check against. Real KZ performa
 |---|---|
 | Top speed | ~135–145 km/h, gearing dependent |
 | 0–100 km/h | ~3.5 s |
-| Peak lateral acceleration | ~2.0–2.5 g |
+| Lateral, sustained (skidpad) | ~1.5–2.0 g |
+| Lateral, transient peak | ~2.0–2.5 g |
 | Peak braking | ~1.5–2.0 g |
 | Weight | 175 kg minimum including driver |
 | Usable powerband | ~9,000–14,000 rpm |
 
-Build instrumented test scenarios that measure each — straight-line acceleration, constant-radius skidpad for lateral g, braking-distance test — and assert against these ranges in CI. This *is* the physics regression suite from §14, and it replaces the lap-time ground truth a real circuit would have given you.
+**The two lateral rows are two different quantities, and the split is not pedantry.** A steady-state corner is bounded by the kart's own geometry: it tips about the line joining its outside contact patches, at `arm / CoM height`, which for the mass table in `src/core/chassis.h` is **2.43 g turning left** and 2.81 g turning right — the two differ because 27 kg of engine, exhaust and radiator put the center of mass 41 mm right of the centerline. Nothing sustains more lateral acceleration than it tips at, so a *sustained* band topping out at 2.5 g asks for a state the kart cannot occupy; and FIA Karting Art. 8.1.1 caps overall width at 1400 mm, which this kart's rear track already is, so no legal geometry fixes it either. A *transient* peak may exceed the threshold freely, because tipping takes time: 2.5 g held for 0.2 s rolls this kart 0.4° and lifts the inside wheels 4 mm, while the same 2.5 g held for 2.6 s puts it over. Published kart figures near 2.5 g are peak-channel readings from steering-wheel-mounted loggers whose accelerometer sits ~0.6 m ahead of the center of mass, where turn-in yaw acceleration adds several tenths of a g the chassis never felt. This table said "peak lateral acceleration" for two milestones while `kz_reference.h` labeled the same two constants "steady-state skidpad", and every measurement taken against them was sustained. [ADR-0034](DECISIONS.md#adr-0034--64s-lateral-band-was-a-peak-figure-being-read-as-a-sustained-one) has the arithmetic and the sourcing, including which edge of the sustained band is weakly sourced.
+
+Build instrumented test scenarios that measure each — straight-line acceleration, constant-radius skidpad for lateral g, braking-distance test — and assert against these ranges in CI. **The skidpad measures the sustained row; only a transient probe may be judged against the peak row.** This *is* the physics regression suite from §14, and it replaces the lap-time ground truth a real circuit would have given you.
 
 ### Integration rate
 

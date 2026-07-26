@@ -130,12 +130,35 @@ Measured by `tools/verify/drive.sh`, which runs each scenario in two separate pr
 | | Measured | KZ reference (§6.4) |
 |---|---|---|
 | Top speed | **136.9 km/h** | 135-145 |
-| 0-100 km/h | **3.40 s** | 3.0-3.5 |
-| Braking, 90-20 km/h mean | **1.98 g** | 1.5-2.0 |
-| Lateral, sustained | **1.76 g** | 2.0-2.5 |
+| 0-100 km/h | **2.88 s** | 3.0-3.5 |
+| Braking, 90-20 km/h mean | **1.53 g** | 1.5-2.0 sustained |
+| Lateral, sustained | **1.84 g** | 1.5-2.0 sustained (§6.4) |
 | Determinism | identical hash, two processes | — |
 
-Lateral is the one figure outside its band and it is left there deliberately. More grip does not fix it: the kart rolls over first, because half the rear track over the center-of-mass height is 2.58 g and `VehicleWheel3D` reaches that before the tires slide. The inside-rear lift and caster jacking that let a real kart use 2.5 g are M3b. [ADR-0031](DECISIONS.md#adr-0031--the-m3a-vehicle-applies-its-own-forces-in-newtons) has that and the two measurement traps found on the way: `VehicleBody3D.engine_force` is a wheel torque with no single conversion to newtons, and Godot applies a project-default `linear_damp` of 0.1 to every rigid body — a quarter of the kart's acceleration at 10 m/s, arriving from nowhere.
+**These are the corrected figures, and the correction is the point.** This table
+read 3.40 s, 1.98 g and 1.76 g for a milestone. [ADR-0033](DECISIONS.md#adr-0033--the-contact-boundary-measured-and-the-lever-arm-it-caught)
+measured that `apply_force`'s offset is taken from the body **origin** rather than
+the center of mass, which doubled every pitch and roll moment M3a was calibrated
+against; re-running `drive.sh` after the fix moved all three. 0-100 is now outside
+its band in the other direction and is left there — M3a's constants are not being
+re-tuned, because `kart_debug_vehicle.gd` is deleted at M3b and re-tuning a
+stand-in to restore a pretty number is exactly the unbounded-tuning risk §19
+names.
+
+Lateral was recorded as outside its band here, against a 2.0-2.5 g target.
+[ADR-0034](DECISIONS.md#adr-0034--64s-lateral-band-was-a-peak-figure-being-read-as-a-sustained-one)
+has since established that the target was a **transient-peak** figure being
+asserted against a **sustained** measurement, and §6.4 now carries the two
+separately. Against the sustained band, 1.84 g is inside it.
+
+The reasoning recorded at the time still holds for why more grip was not the
+answer: the kart rolls over before the tires let go, and `VehicleWheel3D` reaches
+that threshold first. The figure quoted here was 2.58 g, half the rear track over
+the center-of-mass height; that naive form has since been superseded twice and
+the kart's real threshold is 2.43 g turning left against 2.81 g turning right —
+[#129](https://github.com/skiretic/kartgame/issues/129) tracks the three
+disagreeing versions still in the tree. The inside-rear lift and caster jacking
+are M3b. [ADR-0031](DECISIONS.md#adr-0031--the-m3a-vehicle-applies-its-own-forces-in-newtons) has that and the two measurement traps found on the way: `VehicleBody3D.engine_force` is a wheel torque with no single conversion to newtons, and Godot applies a project-default `linear_damp` of 0.1 to every rigid body — a quarter of the kart's acceleration at 10 m/s, arriving from nowhere.
 
 Effort: S
 
@@ -176,7 +199,7 @@ Measured through the solver, with no engine running:
 | Top speed | **143.9 km/h** | 135–145 |
 | 0–100 km/h | **4.50 s** | 3.0–3.5 — [#121](https://github.com/skiretic/kartgame/issues/121) |
 | Braking, 90–20 km/h mean | **1.53 g** at threshold | 1.5–2.0 |
-| Lateral, best sustained | **1.86 g** | 2.0–2.5 — [#120](https://github.com/skiretic/kartgame/issues/120) |
+| Lateral, best sustained | **1.86 g** | 1.5–2.0 sustained (§6.4) |
 | Solver cost | **15.4 µs/tick**, 0.77% of the §15 budget | — |
 | Determinism | identical per-tick hash, two instances, 2,400 ticks | — |
 
@@ -189,13 +212,32 @@ scrubs exactly as §6 says it must — the inside rear pushes forward 252 N whil
 outside rear drags back 113 N, a 216 N·m couple opposing the turn, and the kart
 reaches 85.5% of its geometric yaw rate instead of 108.8%.
 
-**Two figures are outside their bands and are recorded outside them.** 0–100 is
-entirely the auto-clutch launch (time from first motion is 3.90 s however the
-throttle is fed in). Lateral does not respond to grip: raising `peak_friction`
-from 2.10 to 2.70 buys 0.265 g with collapsing returns, because the kart runs out
-of ability to *use* grip at its own rollover threshold. That re-measures
+**One figure is outside its band; the other target was wrong.** 0–100 is entirely
+the auto-clutch launch (time from first motion is 3.90 s however the throttle is
+fed in), and [#121](https://github.com/skiretic/kartgame/issues/121) holds it.
+
+Lateral is no longer outside anything. §6.4's 2.0–2.5 g was a **transient-peak**
+band being asserted against a **sustained** measurement — `ARCHITECTURE.md` said
+"peak" over the same two constants `kz_reference.h` labeled "steady-state
+skidpad" — and as a sustained target it was unreachable by construction, because
+the kart tips at 2.43 g turning left. Against the restated sustained band of
+1.5–2.0 g, the measured **1.86 g is inside it**.
+[ADR-0034](DECISIONS.md#adr-0034--64s-lateral-band-was-a-peak-figure-being-read-as-a-sustained-one)
+has the roll-dynamics arithmetic and the sourcing. That is a target being
+corrected, not a solver being validated, and the two should not be read as the
+same thing.
+
+Raising `peak_friction` from 2.10 to 2.70 still buys only 0.265 g with collapsing
+returns, and that is now recorded for what it is. It is **not** the kart running
+out of ability to use grip at its rollover threshold — at 1.86 g it is at 76% of
+that threshold, which is not close. What binds is load sensitivity amplified by
+lateral transfer, in which the rollover threshold appears as the *denominator*: a
+narrower or taller kart loses grip to transfer faster at the same lateral g.
+Rollover becomes the binding constraint only above roughly `peak_friction` 2.63,
+which is where the returns are observed to collapse.
 [ADR-0031](DECISIONS.md#adr-0031--the-m3a-vehicle-applies-its-own-forces-in-newtons)'s
-conclusion with the real solver, and ADR-0031 was right.
+conclusion — that more grip is not the lever — survives the real solver. Its
+stated *mechanism* did not.
 
 **A correction to M3a's recorded figures.**
 [ADR-0033](DECISIONS.md#adr-0033--the-contact-boundary-measured-and-the-lever-arm-it-caught)
