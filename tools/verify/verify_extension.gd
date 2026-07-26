@@ -125,7 +125,8 @@ func _check_kz_reference_is_self_consistent() -> void:
 	var ranges := {
 		"top_speed": ["top_speed_min_kmh", "top_speed_max_kmh"],
 		"zero_to_100": ["zero_to_100_kmh_min_s", "zero_to_100_kmh_max_s"],
-		"lateral_g": ["lateral_g_min", "lateral_g_max"],
+		"lateral_sustained_g": ["lateral_sustained_g_min", "lateral_sustained_g_max"],
+		"lateral_peak_g": ["lateral_peak_g_min", "lateral_peak_g_max"],
 		"braking_g": ["braking_g_min", "braking_g_max"],
 		"powerband": ["powerband_min_rpm", "powerband_max_rpm"],
 	}

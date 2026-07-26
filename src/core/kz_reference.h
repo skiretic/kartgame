@@ -40,9 +40,47 @@ inline constexpr double TOP_SPEED_MAX_KMH = 145.0;
 inline constexpr double ZERO_TO_100_KMH_MIN_S = 3.0;
 inline constexpr double ZERO_TO_100_KMH_MAX_S = 3.5;
 
-// Steady-state skidpad, slicks, dry asphalt.
-inline constexpr double LATERAL_G_MIN = 2.0;
-inline constexpr double LATERAL_G_MAX = 2.5;
+// Lateral acceleration, in two bands, because they are two different quantities
+// and reading one as the other cost this project two milestones. ADR-0034.
+//
+// This file used to carry a single pair labeled "steady-state skidpad" while
+// `ARCHITECTURE.md` §6.4 labeled the same two numbers "peak lateral
+// acceleration". Every measurement ever taken against them was sustained, and
+// read as sustained the pair is not merely wrong but impossible: the kart tips
+// about the line joining its outside contact patches at **2.4336 g turning left**
+// (`chassis.h`'s `rollover_threshold_g`), so a sustained 2.5 g describes a kart
+// already on two wheels. Nothing sustains more lateral acceleration than it tips
+// at.
+//
+// A transient may exceed the tipping threshold freely, because tipping takes
+// time — 2.5 g held for 0.2 s rolls this kart 0.4 degrees, and held for 2.6 s
+// puts it over. That is the whole distinction, and it is why the peak band is
+// allowed to sit above a number the sustained band must stay below.
+//
+// **The two bands are not equally well sourced, and the difference is stated
+// rather than smoothed over.** The sustained ceiling is anchored on this kart's
+// own geometry: 2.0 g sits 18% below its own tipping point, so every value in the
+// band is reachable with margin. The sustained floor is weaker — it comes from a
+// lab-measured, telemetry-validated kart that solves to 1.456 g steady state, a
+// figure this project has reached only through a third-party re-encoding of a
+// paywalled paper nobody here has read. It is a plausibility floor, not a
+// measurement, which is exactly what the header comment above says these ranges
+// are for.
+
+// Steady-state skidpad, slicks, dry asphalt. What the constant-radius scenario
+// measures, and the only band a sustained figure may be judged against.
+inline constexpr double LATERAL_SUSTAINED_G_MIN = 1.5;
+inline constexpr double LATERAL_SUSTAINED_G_MAX = 2.0;
+
+// Transient peak — corner entry, a single apex, a datalogger's peak channel.
+// Only a transient probe may be judged against this.
+//
+// Published kart figures cluster here partly for a measurement reason worth
+// knowing: a steering-wheel-mounted logger sits roughly 0.6 m ahead of the center
+// of mass, so its lateral channel reads `a_y + yaw_accel * x`, and 10 rad/s^2 of
+// turn-in contributes 0.6 g the chassis never felt.
+inline constexpr double LATERAL_PEAK_G_MIN = 2.0;
+inline constexpr double LATERAL_PEAK_G_MAX = 2.5;
 
 inline constexpr double BRAKING_G_MIN = 1.5;
 inline constexpr double BRAKING_G_MAX = 2.0;

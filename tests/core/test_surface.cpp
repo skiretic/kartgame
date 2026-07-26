@@ -108,12 +108,24 @@ TEST_CASE("the multipliers are the ones the references derive") {
 
 TEST_CASE("asphalt holds the ARCHITECTURE 6.4 lateral envelope") {
 	const double asphalt = lateral_g_on(kart::core::SURFACE_ASPHALT);
-	// The §6.4 validation band, 2.0-2.5 g. This is the same assertion
-	// test_tire.cpp makes about the tire; it is repeated here because every
-	// other surface in this file is measured as a fraction of it, and a table of
+	// Checked against the **peak** band, not the sustained one, and the reason is
+	// that this figure is not a vehicle measurement at all: `lateral_g_on` loads
+	// four tires equally and asks the curve what it gives, with no load transfer,
+	// no rollover and no chassis. It is a tire bench number that happens to be
+	// expressed in g. Against the sustained band it would fail outright, and it
+	// should not — nothing here is sustaining anything.
+	//
+	// The honest home for it is `tire.peak_friction` rather than any vehicle
+	// band; issue #128 tracks that, together with the larger problem that
+	// `peak_friction` itself was justified by pointing at §6.4 and every surface
+	// multiplier below is a quotient of it. Until then this at least asserts
+	// against the band that describes the right kind of quantity.
+	//
+	// It is repeated here rather than left to test_tire.cpp because every other
+	// surface in this file is measured as a fraction of it, and a table of
 	// fractions of a wrong number is worse than no table.
-	CHECK(asphalt > kart::core::kz::LATERAL_G_MIN);
-	CHECK(asphalt < kart::core::kz::LATERAL_G_MAX);
+	CHECK(asphalt > kart::core::kz::LATERAL_PEAK_G_MIN);
+	CHECK(asphalt < kart::core::kz::LATERAL_PEAK_G_MAX);
 	CHECK(asphalt == doctest::Approx(2.13).epsilon(0.01));
 }
 

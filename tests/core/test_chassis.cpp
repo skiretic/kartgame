@@ -227,16 +227,18 @@ TEST_CASE("the rollover threshold is asymmetric, and it bounds the tire") {
 	CHECK(right == doctest::Approx(2.806).epsilon(1e-2));
 	CHECK(right - left == doctest::Approx(0.372).epsilon(2e-2));
 
-	// The number that matters for M3b: the kart must reach §6.4's 2.0-2.5 g
-	// lateral band *without* tipping over first, in the worse of the two
-	// directions. This is the margin ADR-0031 said the milestone has to work
-	// inside, recomputed from the mass table rather than from an assumed center
-	// of mass height.
-	CHECK(left > kz::LATERAL_G_MIN);
-	// And it is genuinely tight: the margin over the bottom of the band is under
-	// half a g, so a tire peak raised to reach the middle of the band eats most
-	// of it. That is not a defect, it is what a kart is — they do roll over.
-	CHECK(left - kz::LATERAL_G_MIN < 0.5);
+	// The number that matters for M3b: the kart must be able to **sustain** the
+	// top of §6.4's sustained band without tipping over first, in the worse of
+	// the two directions. Compared against the sustained ceiling and not the peak
+	// one, because a transient is allowed to exceed the tipping threshold — it
+	// takes 2.6 s at 2.5 g to actually put this kart over — while a steady state
+	// is not. ADR-0034 split the two bands for exactly this reason, after they
+	// were the same pair of numbers wearing two contradictory labels.
+	CHECK(left > kz::LATERAL_SUSTAINED_G_MAX);
+	// And it is genuinely tight: the margin over the band's ceiling is under half
+	// a g, so a tire peak raised to reach further into the band eats most of it.
+	// That is not a defect, it is what a kart is — they do roll over.
+	CHECK(left - kz::LATERAL_SUSTAINED_G_MAX < 0.5);
 }
 
 TEST_CASE("report the mass properties") {

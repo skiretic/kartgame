@@ -101,7 +101,9 @@ func _report_build_info() -> void:
 	lines.append("  mass            %.0f kg with driver" % kz["mass_with_driver_kg"])
 	lines.append("  top speed       %.0f-%.0f km/h" % [kz["top_speed_min_kmh"], kz["top_speed_max_kmh"]])
 	lines.append("  0-100 km/h      %.1f-%.1f s" % [kz["zero_to_100_kmh_min_s"], kz["zero_to_100_kmh_max_s"]])
-	lines.append("  lateral         %.1f-%.1f g" % [kz["lateral_g_min"], kz["lateral_g_max"]])
+	lines.append("  lateral         %.1f-%.1f g sustained, %.1f-%.1f peak" % [
+			kz["lateral_sustained_g_min"], kz["lateral_sustained_g_max"],
+			kz["lateral_peak_g_min"], kz["lateral_peak_g_max"]])
 	lines.append("  powerband       %.0f-%.0f rpm, %d gears" % [kz["powerband_min_rpm"], kz["powerband_max_rpm"], kz["gear_count"]])
 	lines.append("")
 	lines.append("  100 km/h -> %.4f m/s (via src/core/units.h)" % one_hundred_kmh_in_ms)

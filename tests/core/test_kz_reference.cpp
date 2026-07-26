@@ -1,5 +1,6 @@
 #include "doctest.h"
 
+#include "core/chassis.h"
 #include "core/kz_reference.h"
 
 // The KZ envelope is a plausibility gate, not a fit target, so what is worth
@@ -16,7 +17,10 @@ namespace kz = kart::core::kz;
 TEST_CASE("every range is the right way round") {
 	CHECK(kz::TOP_SPEED_MIN_KMH < kz::TOP_SPEED_MAX_KMH);
 	CHECK(kz::ZERO_TO_100_KMH_MIN_S < kz::ZERO_TO_100_KMH_MAX_S);
-	CHECK(kz::LATERAL_G_MIN < kz::LATERAL_G_MAX);
+	CHECK(kz::LATERAL_SUSTAINED_G_MIN < kz::LATERAL_SUSTAINED_G_MAX);
+	CHECK(kz::LATERAL_PEAK_G_MIN < kz::LATERAL_PEAK_G_MAX);
+	// A transient peak is by definition not below what the kart can hold all day.
+	CHECK(kz::LATERAL_SUSTAINED_G_MAX <= kz::LATERAL_PEAK_G_MIN);
 	CHECK(kz::BRAKING_G_MIN < kz::BRAKING_G_MAX);
 	CHECK(kz::POWERBAND_MIN_RPM < kz::POWERBAND_MAX_RPM);
 }
@@ -49,6 +53,40 @@ TEST_CASE("the envelope is internally consistent") {
 	// corner would be describing a car with wings. Neither is a deep truth; both
 	// catch a figure edited in isolation.
 	const double average_accel = kart::core::kmh_to_ms(100.0) / kz::ZERO_TO_100_KMH_MAX_S;
-	CHECK(kart::core::ms2_to_g(average_accel) < kz::LATERAL_G_MIN);
-	CHECK(kz::BRAKING_G_MAX <= kz::LATERAL_G_MAX);
+	CHECK(kart::core::ms2_to_g(average_accel) < kz::LATERAL_SUSTAINED_G_MIN);
+	// Braking against the peak band, because §6.4 labels the braking row "peak"
+	// too. Issue #131 notes that the figure actually measured against it is a
+	// 90-20 km/h *mean*, which is the same category error this file just had
+	// fixed in the lateral row — filed rather than fixed here, because unlike the
+	// lateral case it is a labeling problem and not a physical impossibility.
+	CHECK(kz::BRAKING_G_MAX <= kz::LATERAL_PEAK_G_MAX);
+}
+
+TEST_CASE("the sustained lateral band is one the kart can actually occupy") {
+	// **This is the assertion whose absence cost two milestones.** ADR-0034: the
+	// project carried a single 2.0-2.5 g lateral band, labeled "steady-state
+	// skidpad" in this file and "peak lateral acceleration" in ARCHITECTURE.md
+	// §6.4, and asserted it against sustained measurements. Nobody noticed,
+	// because nothing ever compared the band against the kart it described.
+	//
+	// A kart cannot sustain more lateral acceleration than it tips at. So the
+	// sustained ceiling must sit below the rollover threshold in the *worse* of
+	// the two directions — which is turning left, because 27 kg of engine,
+	// exhaust and radiator put the center of mass 41 mm right of the centerline.
+	// The old band's top, 2.5 g, was above it. This one is not, and if anybody
+	// widens it back it fails here rather than two milestones later.
+	const kart::core::MassProperties properties = kz::kart_mass_properties();
+	const double worst = kz::rollover_threshold_g(properties, true);
+
+	CHECK(worst == doctest::Approx(2.434).epsilon(1e-2));
+	CHECK(kz::LATERAL_SUSTAINED_G_MAX < worst);
+
+	// With real margin, not by a rounding error. A band whose ceiling sits at
+	// 99% of the tipping point describes a kart balanced on two wheels.
+	CHECK(worst - kz::LATERAL_SUSTAINED_G_MAX > 0.3);
+
+	// The peak band is deliberately allowed above it — tipping takes time, and
+	// 2.5 g needs 2.6 s to actually put this kart over. That asymmetry is the
+	// whole reason the two bands exist separately.
+	CHECK(kz::LATERAL_PEAK_G_MAX > worst);
 }

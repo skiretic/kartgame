@@ -175,10 +175,19 @@ TEST_CASE("the rollover threshold uses the tipping axis, not half the rear track
 
 	CHECK(actual < naive);
 	CHECK(actual == doctest::Approx(2.50).epsilon(0.01));
-	// The difference is not academic: 2.58 g sits comfortably above §6.4's
-	// 2.0-2.5 g band and 2.50 g sits exactly on top of it, so the kart has no
-	// margin at the top of the band rather than 3% of one.
-	CHECK(actual < kz::LATERAL_G_MAX * 1.01);
+	// The difference is not academic: it decides whether the kart has any margin
+	// over the lateral band at all. Compared against the **peak** band, because
+	// that is the pair of numbers this comparison was originally written against
+	// — ADR-0034 has since split §6.4's single 2.0-2.5 g band into sustained
+	// (1.5-2.0) and transient peak (2.0-2.5), after finding it was a peak figure
+	// being asserted against sustained measurements.
+	//
+	// Issue #129 is open on this whole assertion: `actual` here is the
+	// **default-constructed** 2.50 g, and the running solver produces 2.618
+	// because `vehicle.h` overwrites `com_height` with the mass table's 0.2197.
+	// The kart's real left-turn threshold is 2.4336. So this pins a number the
+	// solver never sees, which is precisely how the divergence went unnoticed.
+	CHECK(actual < kz::LATERAL_PEAK_G_MAX * 1.01);
 }
 
 // ---------------------------------------------------------------------------

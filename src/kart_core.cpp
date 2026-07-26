@@ -58,8 +58,16 @@ Dictionary KartCore::kz_reference() {
 	ref["top_speed_max_kmh"] = kz::TOP_SPEED_MAX_KMH;
 	ref["zero_to_100_kmh_min_s"] = kz::ZERO_TO_100_KMH_MIN_S;
 	ref["zero_to_100_kmh_max_s"] = kz::ZERO_TO_100_KMH_MAX_S;
-	ref["lateral_g_min"] = kz::LATERAL_G_MIN;
-	ref["lateral_g_max"] = kz::LATERAL_G_MAX;
+	// Four keys, not two. ADR-0034: the single `lateral_g_min`/`lateral_g_max`
+	// pair was a transient-peak band that every caller read as sustained, and no
+	// name it could have been given would have told them apart. The old keys are
+	// **removed rather than aliased** — an ambiguous name that still resolves is
+	// what caused this, so a caller that has not been updated should fail to find
+	// its key rather than quietly keep reading the wrong band.
+	ref["lateral_sustained_g_min"] = kz::LATERAL_SUSTAINED_G_MIN;
+	ref["lateral_sustained_g_max"] = kz::LATERAL_SUSTAINED_G_MAX;
+	ref["lateral_peak_g_min"] = kz::LATERAL_PEAK_G_MIN;
+	ref["lateral_peak_g_max"] = kz::LATERAL_PEAK_G_MAX;
 	ref["braking_g_min"] = kz::BRAKING_G_MIN;
 	ref["braking_g_max"] = kz::BRAKING_G_MAX;
 	ref["powerband_min_rpm"] = kz::POWERBAND_MIN_RPM;

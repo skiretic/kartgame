@@ -860,8 +860,12 @@ TEST_CASE("the skidpad, and whether the dynamic answer agrees with the quasi-sta
 			best_at = best_speed;
 		}
 	}
-	std::printf("    best %.3f g at %.1f lock and %.1f km/h; reference %.1f-%.1f\n", best_overall,
-			best_input, ms_to_kmh(best_at), kz::LATERAL_G_MIN, kz::LATERAL_G_MAX);
+	// The sustained band, because a skidpad sweep is a sustained measurement.
+	// ADR-0034 split it from the transient-peak band it used to share numbers
+	// with; this line reported against the peak figures for a milestone.
+	std::printf("    best %.3f g at %.1f lock and %.1f km/h; reference %.1f-%.1f sustained\n",
+			best_overall, best_input, ms_to_kmh(best_at), kz::LATERAL_SUSTAINED_G_MIN,
+			kz::LATERAL_SUSTAINED_G_MAX);
 	CHECK(best_overall >= peak_lateral);
 
 	// **Why that number and not §6.4's.** `tire.h` says that on a vehicle with no
