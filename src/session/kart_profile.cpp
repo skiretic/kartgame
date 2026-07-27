@@ -1,5 +1,7 @@
 #include "session/kart_profile.h"
 
+#include "session/fsync_shim.h"
+
 #include <godot_cpp/classes/dir_access.hpp>
 #include <godot_cpp/classes/file_access.hpp>
 #include <godot_cpp/classes/project_settings.hpp>
@@ -83,11 +85,13 @@ String path_in(const String &dir, const char *name) {
 
 // Write `text` to `target` through `target + ".tmp"`, then rename over it.
 //
-// The whole of the atomicity is these fifteen lines, and the two things that make
-// it work are that the target is never opened and that the rename is the last
+// The whole of the atomicity is these lines, and the three things that make it
+// work are that the target is never opened, that the bytes are synced to the
+// medium before the rename (issue #173's shim — `fsync_shim.h` names the
+// platform call per platform), and that the rename is the last name-changing
 // operation. `kart_profile.h` states exactly what that does and does not
-// guarantee; the short version is that a process death is covered and a power cut
-// is not, because Godot's `FileAccess` exposes no fsync.
+// guarantee; the short version is that a power cut leaves either the old
+// complete file or the new complete one.
 //
 // **Not modeled on `KartTuning::save_preset`, on purpose.** That function opens
 // its target directly, so a write interrupted halfway leaves a truncated preset
@@ -133,6 +137,20 @@ Error atomic_store(const String &target, const String &temp, const PackedByteArr
 		}
 	}
 
+	// Issue #173: the bytes reach the medium before any name points at them. A
+	// filesystem that cannot sync downgrades this save to the process-death
+	// guarantee it had before the shim, with a warning; a sync that failed is a
+	// failed save, because returning OK from here claims durability.
+	const Error synced = fsync_file(temp);
+	if (synced == ERR_UNAVAILABLE) {
+		warnings.push_back(vformat(
+				"%s cannot sync; this save is safe against a crash, not a power cut", temp));
+	} else if (synced != OK) {
+		warnings.push_back(vformat("the sync of %s failed (error %d)", temp, synced));
+		DirAccess::remove_absolute(temp);
+		return ERR_FILE_CANT_WRITE;
+	}
+
 	const Error renamed = DirAccess::rename_absolute(temp, target);
 	if (renamed != OK) {
 		// The target is untouched, which is the entire point. Take the temporary with
@@ -141,6 +159,15 @@ Error atomic_store(const String &target, const String &temp, const PackedByteArr
 		warnings.push_back(vformat("cannot rename %s over %s (error %d)", temp, target, renamed));
 		DirAccess::remove_absolute(temp);
 		return renamed;
+	}
+
+	// And the rename itself, so a save that reported OK exists after the cut.
+	// Best effort: a lost rename reverts to the previous complete save, which is
+	// a lost lap and not a corrupt career, so this one warns rather than fails.
+	if (fsync_dir(target.get_base_dir()) != OK) {
+		warnings.push_back(vformat(
+				"the directory of %s did not sync; a power cut may revert to the previous save",
+				target));
 	}
 	return OK;
 }

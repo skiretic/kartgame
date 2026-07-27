@@ -34,13 +34,15 @@ extends SceneTree
 ##
 ## ## What it cannot prove, stated rather than glossed
 ##
-## **Durability across a power cut.** Godot's `FileAccess` exposes `flush()` and
-## `close()` and no fsync, so the sequence guarantees that a *process* death
-## cannot leave a half-written save — check 11 simulates exactly that, a crash
-## between the temporary write and the rename — and it does not guarantee that the
-## rename cannot outlive the data through a kernel panic. Simulating a panic needs
-## a VM and a hard power cut, which is not something a headless probe does. The
-## claim is scoped in `kart_profile.h` and it is scoped here.
+## **Durability across a power cut.** The writer claims it since issue #173 —
+## `fsync_shim.h` syncs the temporary to the medium between the close and the
+## rename, F_FULLFSYNC on macOS — but *proving* it needs a VM and a hard power
+## cut, which is not something a headless probe does. What this probe can and
+## does prove is the process-death half: check 11 simulates a crash between the
+## temporary write and the rename. The power-cut claim rests on the sequence
+## being what `kart_profile.cpp` says it is, plus the platform call doing what
+## its manpage says; neither is measured here, and this line is the record of
+## which half is measurement and which is documentation.
 ##
 ## ## Nothing here touches the real save
 ##
@@ -506,11 +508,11 @@ func _check_future_version_is_refused_not_moved() -> void:
 ## that state is built by hand and the target is compared byte for byte with what
 ## it held before.
 ##
-## **What this does not prove** is durability across a kernel panic or a power cut.
-## `FileAccess` exposes no fsync, so the bytes are with the kernel and not
-## necessarily on the platter when the rename is issued. `kart_profile.h` scopes
-## the claim to a process death, which is the failure that actually happens, and
-## this check is the process death.
+## **What this does not prove** is durability across a kernel panic or a power
+## cut. Since issue #173 the writer syncs the temporary to the medium before the
+## rename (`fsync_shim.h`), so the claim exists — but this check cannot cut the
+## power, so it proves the process-death half and the file header records the
+## split. This check is the process death.
 func _check_interrupted_write_leaves_previous_intact() -> void:
 	_clean_scratch()
 	var profile := _populated()

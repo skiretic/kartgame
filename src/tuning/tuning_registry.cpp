@@ -1,5 +1,6 @@
 #include "tuning/tuning_registry.h"
 
+#include "session/fsync_shim.h"
 #include "vehicle/kart_body.h"
 
 #include <godot_cpp/classes/dir_access.hpp>
@@ -616,8 +617,11 @@ Error KartTuning::save_preset(const String &p_path, const String &p_name) const 
 	// season re-run, so they are user data by exactly the argument ADR-0042 makes
 	// about the career save. A preset is a session that found a good number.
 	//
-	// The guarantee this buys is process death, not a power cut: `FileAccess` has no
-	// fsync of any kind. `src/core/profile.h` states the same limit at length.
+	// The guarantee: a power cut leaves either the old complete preset or the new
+	// complete one. `FileAccess` has no fsync of any kind, so for a milestone this
+	// bought process death only; issue #173's shim (`fsync_shim.h`, which names
+	// the platform call per platform) closed the gap between the close and the
+	// rename below. `src/core/profile.h` states the whole argument at length.
 	const String temp = p_path + String(".tmp");
 	{
 		Ref<FileAccess> file = FileAccess::open(temp, FileAccess::WRITE);
@@ -659,6 +663,21 @@ Error KartTuning::save_preset(const String &p_path, const String &p_name) const 
 		}
 	}
 
+	// Issue #173: the bytes reach the medium before any name points at them.
+	// A filesystem that cannot sync downgrades this save to the process-death
+	// guarantee it had before the shim, out loud; a sync that failed is a failed
+	// save, because returning OK here claims durability.
+	const Error synced = fsync_file(temp);
+	if (synced == ERR_UNAVAILABLE) {
+		WARN_PRINT(vformat("tuning: %s cannot sync; this preset is safe against a crash, "
+						   "not a power cut",
+				temp));
+	} else if (synced != OK) {
+		DirAccess::remove_absolute(temp);
+		ERR_FAIL_V_MSG(ERR_FILE_CANT_WRITE,
+				vformat("tuning: the sync of %s failed (error %d)", temp, synced));
+	}
+
 	const Error renamed = DirAccess::rename_absolute(temp, p_path);
 	if (renamed != OK) {
 		// The target is untouched, which is the whole point. Take the temporary with
@@ -666,6 +685,15 @@ Error KartTuning::save_preset(const String &p_path, const String &p_name) const 
 		DirAccess::remove_absolute(temp);
 		ERR_FAIL_V_MSG(renamed,
 				vformat("tuning: cannot rename %s over %s (error %d)", temp, p_path, renamed));
+	}
+
+	// And the rename itself, so a preset that reported OK exists after the cut.
+	// Best effort: a lost rename reverts to the old complete preset, which loses
+	// a number and not a career, so this one warns rather than fails.
+	if (fsync_dir(p_path.get_base_dir()) != OK) {
+		WARN_PRINT(vformat("tuning: the directory of %s did not sync; a power cut may "
+						   "revert to the previous preset",
+				p_path));
 	}
 	return OK;
 }

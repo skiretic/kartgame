@@ -79,18 +79,20 @@ namespace kartgame {
 //     closed lid mid-session — and it is closed. `profile_probe.gd` check 11
 //     builds exactly that state, a written temporary with no rename, and measures
 //     the target unchanged.
-//   * **A kernel panic or a power cut is not fully closed, and cannot be from
-//     here.** A close is not a sync: without an fsync, POSIX does not order the
-//     file's data against the directory entry that names it, so in principle the
-//     rename can become durable while the contents have not. How likely that is
-//     depends on the filesystem and is not something this project has measured.
-//     "Unlikely in practice" is not the guarantee ADR-0042 asked for, and claiming
-//     it here would be worse than the gap.
+//   * **A kernel panic or a power cut leaves either the old complete save or the
+//     new complete one.** This was the open half for a milestone — a close is not
+//     a sync, and without one POSIX does not order the file's data against the
+//     directory entry that names it, so the rename could become durable while
+//     the contents had not. Issue #173's shim closed it: `fsync_shim.h` syncs
+//     the temporary to the medium (`F_FULLFSYNC` on macOS, `fsync` elsewhere —
+//     the shim's header says why they differ) between the close and the rename,
+//     and syncs the directory after it. A filesystem that refuses the sync
+//     downgrades that save to the process-death guarantee, with a warning in the
+//     save report, rather than pretending.
 //
-// Closing that last gap wants an `fsync` on the Godot side — an engine change or a
-// small platform shim — and it is filed rather than faked. Nothing in this class
-// pretends to it, and `profile_probe.gd` says in its own header which half it
-// proved.
+// What is still not claimed: that a save which never reported OK exists. A
+// power cut before the rename loses the new save and keeps the old one, which
+// is the correct reading of "atomic" and not a gap.
 //
 // **`FileAccess::create_temp` is the wrong tool here and this is the note that
 // stops it being a simplification later.** It exists as of 4.7 and it puts the file

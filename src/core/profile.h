@@ -814,11 +814,15 @@ private:
 // distinguish from a shorter valid one, and step 4 is what makes that
 // undetectable case unreachable in practice.
 //
-// **Step 3 said "fsync" and that instruction cannot be followed.** ADR-0042 says it
-// too. Godot's `FileAccess` exposes 68 methods and not one of them syncs: there is
-// no `fsync`, no `F_FULLFSYNC`, no `O_SYNC`, and nothing in `DirAccess` either —
-// checked against `extension_api.json` rather than remembered. So the guarantee has
-// to be stated at the size it really is:
+// **Step 3 said "fsync" and, through the engine, that instruction cannot be
+// followed.** ADR-0042 says it too. Godot's `FileAccess` exposes 68 methods and
+// not one of them syncs: there is no `fsync`, no `F_FULLFSYNC`, no `O_SYNC`, and
+// nothing in `DirAccess` either — checked against `extension_api.json` rather
+// than remembered. For a milestone the guarantee was therefore process death
+// only. Issue #173 closed the gap where an engine-side writer can: the
+// GDExtension shim (`src/session/fsync_shim.h`) syncs the temporary to the
+// medium between the close and the rename, and the directory after it, with the
+// platform call named per platform. So, for the writer that uses the shim:
 //
 //   * **Process death cannot produce a half-written save.** The target is never
 //     opened for writing at all, so whatever kills the process kills it during the
@@ -827,14 +831,17 @@ private:
 //     successfully, because POSIX `rename` needs write permission on the directory
 //     and not on the file. A direct open fails there with error 12, which is what
 //     `KartTuning::save_preset` used to do.
-//   * **A power cut is not covered and cannot be from here.** A close is not a
-//     sync; without one, POSIX does not order the data against the directory entry.
-//     Claiming APFS makes it safe would be memory dressed up as a measurement.
+//   * **A power cut leaves either the old complete save or the new complete
+//     one**, because the data is on the medium before the rename is issued. On a
+//     filesystem that refuses to sync, the writer says so and the guarantee for
+//     that save is process death again — stated, not assumed.
 //
-// The honest fix is an fsync shim on the GDExtension side, which is a ticket rather
-// than a line. Confirming the length off disk before the rename is the part of the
-// guarantee that *is* reachable, and it is what catches a full disk — `store_buffer`
-// returning true says the calls were accepted, not that the bytes landed.
+// Anything in `src/core/` still cannot sync; this header stays engine-free, so
+// the sequence above is instructions to the engine-side writer, not code here.
+// Confirming the length off disk before the rename is the part of the guarantee
+// that *is* reachable from any writer, and it is what catches a full disk —
+// `store_buffer` returning true says the calls were accepted, not that the
+// bytes landed.
 
 // The preamble, emitted verbatim. Deliberately short: the byte-identity assertion
 // against the corpus means every character here is part of the format, so a
