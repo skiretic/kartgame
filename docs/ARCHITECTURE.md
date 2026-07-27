@@ -371,7 +371,7 @@ the line **min 70 m**, **6 m minimum** between adjacent sections of track, verge
 any direction change over **80°**, straights cambered **1.5–3%**, corner banking
 **max 10% (5.7°)** and adverse camber not generally acceptable, and every change of
 gradient laid on a vertical radius of **R = V²/K**, K = 20 concave and 15 convex —
-which is 1,249 m at this kart's measured 136.9 km/h, and is the reason a kart
+which is 1,380 m at this kart's measured 143.9 km/h, and is the reason a kart
 circuit's elevation change belongs in its slow sections.
 
 Two items on the list stay a design choice because no regulation touches them:

@@ -1906,19 +1906,19 @@ boards go on structures beside the track, not on the road.
 > possible, changes in gradient should be avoided altogether in these sections.
 > **The gradient of the starting straight should not exceed 2%.**
 
-Worked against this kart's measured speeds (`drive.sh`: top speed 136.9 km/h), the
-formula is a much harder constraint than it looks:
+Worked against this kart's measured speeds (`drive.sh` at M3b: top speed 143.9
+km/h), the formula is a much harder constraint than it looks:
 
 | Speed at the crest or compression | Convex, K = 15 | Concave, K = 20 |
 | --- | --- | --- |
-| 136.9 km/h — measured top speed | **1,249 m** | 937 m |
+| 143.9 km/h — measured top speed | **1,380 m** | 1,035 m |
 | 120 km/h | 960 m | 720 m |
 | 100 km/h | 667 m | 500 m |
 | 81.3 km/h — the 0.25-lock / 0.6-throttle row | 441 m | 330 m |
 | 46.0 km/h — the 0.25-lock / 0.3-throttle row | 141 m | 106 m |
 | 21.2 km/h — where #137's cliff settles the kart | 30 m | 23 m |
 
-A 1,249 m vertical radius on a circuit whose whole lap is 1,200 m is the finding
+A 1,380 m vertical radius on a circuit whose whole lap is 1,200 m is the finding
 that matters: **elevation change on a kart circuit lives in the slow parts.** A
 crest taken flat out has to be nearly flat; a compression at the bottom of a
 braking zone can be four times tighter for the same legality, and gets tighter
