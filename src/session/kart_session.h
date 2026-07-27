@@ -34,6 +34,12 @@ namespace kartgame {
 // value is refused at the boundary rather than travelling as an integer nobody
 // checked. `to_dictionary` exists for a UI that wants to lay the fields out in a
 // table, and it is one-way on purpose.
+//
+// **Every setter returns whether it took the value.** Six of them used to return
+// `void` and only print, which made the sentence above half true: the value was
+// refused and the caller was not told, on exactly the setters where a wrong integer
+// is otherwise silent. A setup screen validating by return value got false
+// confidence from the six that could not give it.
 class KartSession : public godot::RefCounted {
 	GDCLASS(KartSession, godot::RefCounted)
 
@@ -86,31 +92,31 @@ public:
 	bool set_track_hash_hex(const godot::String &p_hex);
 	godot::String get_track_hash_hex() const;
 
-	void set_layout(int p_layout);
+	bool set_layout(int p_layout);
 	int get_layout() const;
 
-	void set_condition(int p_condition);
+	bool set_condition(int p_condition);
 	int get_condition() const;
 
 	// --- what kind of session ---------------------------------------------------
 
-	void set_type(int p_type);
+	bool set_type(int p_type);
 	int get_type() const;
 
-	void set_kart_class(int p_kart_class);
+	bool set_kart_class(int p_kart_class);
 	int get_kart_class() const;
 
 	// The limit, as the pair it is. Setting the kind alone leaves the value, which
 	// is why `use_scheduled_limit` exists: a Heat's distance is arithmetic on a
 	// sourced FIA figure and typing 3750 into a menu is how that citation gets lost.
-	void set_limit(int p_kind, double p_value);
+	bool set_limit(int p_kind, double p_value);
 	int get_limit_kind() const;
 	double get_limit_value() const;
 	void use_scheduled_limit();
 
 	// --- the field --------------------------------------------------------------
 
-	void set_entry_count(int p_count);
+	bool set_entry_count(int p_count);
 	int get_entry_count() const;
 
 	bool set_roster_hash_hex(const godot::String &p_hex);
@@ -237,14 +243,39 @@ public:
 	int valid_lap_count() const;
 	int invalid_lap_count() const;
 
-	// Split against the best lap so far, negative when ahead. Negative-is-ahead and
-	// "no comparison" both being negative is why this is a pair: `has_best()` first.
+	// Split against the best lap so far, negative when ahead.
+	//
+	// **Ask `has_sector_delta_to_best()` first.** Negative means ahead and
+	// `LAP_TIME_NONE` is -1.0, so "one second up on your best" and "there is nothing
+	// to compare against" are the same number. That is a live trap rather than a
+	// theoretical one: the first HUD written against this had to guard it, and a HUD
+	// that forgot would show a plausible -1.000 for the whole session. The predicate
+	// is here so the guard is one call rather than a convention.
 	double sector_delta_to_best() const;
+	bool has_sector_delta_to_best() const;
 
 	// Whether this session type invalidates a lap for running wide — ours, and only
 	// in the timed sessions — and whether a penalty deletes the fastest lap instead.
 	static bool type_invalidates_laps(int p_type);
 	static bool type_deletes_fastest_lap(int p_type);
+
+	// `race_rules.h`'s sequencing predicates, forwarded.
+	//
+	// **They are here because the session runner was otherwise re-deciding them.**
+	// ADR-0043 put the progression in `src/core/` as a pure state machine precisely
+	// so that GDScript is left with loading a scene, drawing a table and moving a
+	// focus ring — and then nothing bound them, so the first runner written against
+	// this bridge compared against `TYPE_PRACTICE` by hand. That is a second reader
+	// of a fact the ADR gave one owner, which is the shape of defect this project
+	// keeps finding in its documents.
+	static bool type_has_field(int p_type);
+	static bool type_awards_championship_points(int p_type);
+	static bool type_sets_next_grid(int p_type);
+
+	// Minimum full laps that reach a distance, which is a ceiling and not a
+	// division. `GAMEDESIGN.md` §4's lap column was written as a floor and was one
+	// lap short on every race because of it.
+	static int laps_for_distance(double p_distance_m, double p_lap_length_m);
 
 	kart::core::LapTimer &timer() { return timer_; }
 

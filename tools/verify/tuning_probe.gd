@@ -241,6 +241,7 @@ func _check() -> void:
 	_check_stale_defaults_hash_warns()
 	_check_clamped_value_is_the_truth()
 	_check_ready_with_no_vehicle()
+	_check_save_never_opens_the_target()
 
 	_clean_scratch()
 
@@ -923,6 +924,65 @@ func _check_ready_with_no_vehicle() -> void:
 
 	_ok("_ready with no vehicle path is inert", problems.is_empty(), "; ".join(problems))
 	get_root().remove_child(tuning)
+	tuning.free()
+
+
+## 16. Saving a preset never opens the target for writing.
+##
+## It used to, and that is three defects in five lines. `FileAccess.open(target,
+## WRITE)` **truncates on open**, so between that call and the first store the
+## preset on disk was zero bytes — kill the process there and the file is not
+## half-written, it is empty. It also failed on a read-only target where a rename
+## would have succeeded, and it ignored the return of both `store_string` and
+## `close`, so a full disk reported `OK`.
+##
+## `GAMEDESIGN.md` §8 lists presets in what persists and §5 has them surviving a
+## season re-run, so they are user data by exactly the argument ADR-0042 makes about
+## the career save.
+##
+## **The check is a permission bit, and it works because POSIX `rename` needs write
+## permission on the *directory*, not on the file.** A save that succeeds over a
+## 0444 target cannot have opened it. A direct open fails there with error 12, which
+## is what this used to do — so the check has a real negative, not just a green.
+##
+## What this does not prove: durability across a power cut. `FileAccess` exposes no
+## fsync of any kind, and `src/core/profile.h` states that limit at length.
+func _check_save_never_opens_the_target() -> void:
+	var tuning := KartTuning.new()
+	_tune_sample(tuning)
+
+	var path := SCRATCH_DIR + "/readonly.tune"
+	var problems: Array[String] = []
+
+	var first := tuning.save_preset(path, "probe-readonly")
+	if first != OK:
+		problems.append("the first save returned %d" % first)
+	var before := FileAccess.get_file_as_bytes(path).size()
+
+	# Lock the file itself, leaving the directory writable.
+	var locked := OS.execute("/bin/chmod", ["0444", ProjectSettings.globalize_path(path)])
+	if locked != 0:
+		problems.append("chmod returned %d" % locked)
+
+	# Move a value so the second save is a different file, or "unchanged" would be
+	# indistinguishable from "did nothing".
+	tuning.nudge(_first_undefended(tuning), 1)
+	var second := tuning.save_preset(path, "probe-readonly-2")
+	var after := FileAccess.get_file_as_bytes(path)
+	if second != OK:
+		problems.append("saving over a 0444 target returned %d -- it opened the target" % second)
+	elif after.size() == 0:
+		problems.append("the target is empty after the save")
+	elif after.get_string_from_utf8().find("probe-readonly-2") < 0:
+		problems.append("the second save did not land")
+
+	# And no temporary is left behind.
+	if FileAccess.file_exists(path + ".tmp"):
+		problems.append("a .tmp survived the save")
+
+	_ok("saving never opens the target", problems.is_empty(),
+		"%d bytes, then %d over a 0444 target, no .tmp left" % [before, after.size()]
+			if problems.is_empty() else "; ".join(problems))
 	tuning.free()
 
 

@@ -299,15 +299,51 @@ struct SessionConfig {
 	// drivers from the roster, and anything `pcg32.h` is handed downstream.
 	uint64_t seed = 0;
 
-	// Copy a slug in, terminating and truncating rather than overflowing. Returns
-	// false if the source did not fit, and still leaves a valid string — a
-	// truncated track id fails to resolve loudly at load, where an unterminated
-	// buffer would read off the end of the struct.
+	// Whether a track id is a slug: lower case, digits, underscore and hyphen, at
+	// least one character.
+	//
+	// **This exists because a track id reaches a filename.** ADR-0046 has the track
+	// loaded from a file named for it, and `profile.h` keys a best lap on it and
+	// pastes a ghost id into `user://ghosts/<id>.ghost`. `set_track_id` used to check
+	// the *length* and nothing else, so `../../../etc/passwd` was a legal track id as
+	// far as this type was concerned, and every consumer was left to notice. One of
+	// them did, sanitized it in its own id minting, and reported that the boundary
+	// was upstream. It is here now: the type that carries the id is the one place
+	// that can promise every reader the same thing.
+	//
+	// Deliberately narrower than a filename needs to be. A display name for a
+	// circuit lives on the script side per ADR-0044, so nothing is lost by refusing
+	// spaces, dots and capitals — and a dot is what makes `..` reachable at all.
+	static bool is_slug(const char *id) {
+		if (id == nullptr || id[0] == '\0') {
+			return false;
+		}
+		for (int i = 0; id[i] != '\0'; ++i) {
+			const char c = id[i];
+			const bool ok = (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_' ||
+					c == '-';
+			if (!ok) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	// Copy a slug in, terminating rather than overflowing. Returns false if the
+	// source was not a slug or did not fit, and in either case leaves the id
+	// **empty** rather than partly written.
+	//
+	// Empty, not truncated: an earlier version kept the truncated prefix on the
+	// grounds that it would fail to resolve loudly at load. That is true of a
+	// truncation and false of a rejected character — `circuit/../x` truncated to
+	// `circuit/..` is worse than what it started as. An empty id fails `is_valid`
+	// immediately, which is the loudest failure available and the nearest one to the
+	// caller.
 	bool set_track_id(const char *id) {
 		for (int i = 0; i < SESSION_ID_CHARS; ++i) {
 			track_id[i] = '\0';
 		}
-		if (id == nullptr) {
+		if (!is_slug(id)) {
 			return false;
 		}
 		int i = 0;
@@ -315,7 +351,14 @@ struct SessionConfig {
 			track_id[i] = id[i];
 			++i;
 		}
-		return id[i] == '\0';
+		if (id[i] != '\0') {
+			// Did not fit. Leave nothing behind for the same reason as above.
+			for (int j = 0; j < SESSION_ID_CHARS; ++j) {
+				track_id[j] = '\0';
+			}
+			return false;
+		}
+		return true;
 	}
 
 	// Whether this describes a session that can actually be run. Cheap, total, and

@@ -395,14 +395,26 @@ public:
 		return out;
 	}
 
+	// Whether there is anything to compare the current sector against.
+	//
+	// **Ask this before reading the delta, because the delta cannot say so itself.**
+	// A delta is negative when the driver is ahead and `LAP_TIME_NONE` is -1.0, so
+	// "one second up" and "no comparison" are the same number. Every guard that
+	// matters is in this one function rather than repeated at each caller — a second
+	// copy of the condition is how a HUD ends up showing a plausible -1.000 all
+	// session.
+	bool has_sector_delta(const LapRecord &reference) const {
+		if (sector_ < 0 || sector_ >= reference.sector_count) {
+			return false;
+		}
+		return lap_time_exists(reference.sector_s[sector_]);
+	}
+
 	// Split against a reference lap: negative is ahead. `LAP_TIME_NONE` when there
 	// is nothing to compare, which is not zero — zero means dead level and is a
-	// thing a driver reads as good news.
+	// thing a driver reads as good news. See `has_sector_delta` above.
 	double sector_delta_s(const LapRecord &reference) const {
-		if (sector_ < 0 || sector_ >= reference.sector_count) {
-			return LAP_TIME_NONE;
-		}
-		if (!lap_time_exists(reference.sector_s[sector_])) {
+		if (!has_sector_delta(reference)) {
 			return LAP_TIME_NONE;
 		}
 		return static_cast<double>(sector_ticks_) * step_s_ - reference.sector_s[sector_];

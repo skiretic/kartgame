@@ -269,6 +269,254 @@ func nearest_sample(distance: float) -> Dictionary:
 	return best
 
 
+## How far either side of a hint the projection below searches, meters.
+##
+## **This constant is the whole of the "which part of the lap am I on" problem**,
+## and the number is bracketed from both sides by measurements rather than picked.
+##
+##   * **Above** the furthest a kart can move between two calls.
+##     `src/core/lap_timing.h` sets `LAP_MAX_SPEED_MS` at 60 m/s — half again above
+##     this kart's top speed — which is 0.5 m in a 120 Hz tick. 30 m is sixty
+##     times that, so a caller that skips fifty ticks still lands inside the window.
+##   * **Below** the point where the window could contain a *second* part of the
+##     lap and prefer it. `min_separation()` is the measurement that bounds this and
+##     it reports **22.0001 m** for this layout: the braking straight and the power
+##     straight run antiparallel 22 m apart either side of the hairpin, and the
+##     hairpin between them is only 34.56 m long, so the closest pair a 40 m
+##     along-the-lap threshold admits is one sample on each of those two straights.
+##
+## 30 m against a 22 m separation is not a contradiction, and the reason is worth
+## stating because it is what makes the window a convenience rather than the
+## correctness argument: the search below picks the smallest **perpendicular gap**,
+## not the nearest sample. A kart on the braking straight is at most 5 m from that
+## centerline and therefore at least 17 m from the other one, so the two branches
+## are never a close call while the kart is anywhere near the road. The window is
+## what keeps the cost down and what pins the answer when the kart is a long way
+## off — in the grass, where both branches really are far away and the hint is the
+## only thing that says which way it left.
+##
+## The nearest-*sample* search this replaces would have failed differently and
+## worse: `nearest_sample()` snaps by distance and a naive nearest-position scan
+## over a closed loop has no hint at all, so a kart at the hairpin apex is 11 m from
+## its own centerline sample and 11 m from the sample on the other side of the
+## corner, and the tie is broken by array order.
+##
+const PROJECTION_WINDOW := 30.0
+
+
+## Project a world position onto the centerline: where along the lap, and how far
+## to the side.
+##
+## Returns `{distance, lateral, gap, heading}` where `distance` is arc length in
+## `[0, length())`, `lateral` is signed with **positive to the right of the
+## direction of travel** (`right()`'s sign), `gap` is the unsigned 2D distance to
+## the centerline polyline — which differs from `absf(lateral)` only when the foot
+## of the perpendicular falls off the end of a segment — and `heading` is the
+## centerline's own heading there, so a caller with several points close together
+## can place the rest of them in that frame instead of projecting each one.
+##
+## **Cost, measured on this layout rather than estimated:** 24.4 us with a hint and
+## 227.7 us without. One hinted call per physics tick is 0.29% of a 120 Hz tick,
+## which is why the wheels are placed in the returned frame rather than projected
+## individually — five calls would be 1.5% of every tick for a lateral offset that
+## a 4 m threshold cannot tell apart.
+##
+## `hint` is the previous call's `distance`, and passing it is not an optimization.
+## It is what tells the two ends of a hairpin apart. Pass a negative hint for the
+## first call of a session and after anything that moves the kart without driving
+## it there — a respawn, a teleport, a scene that reset the body — because a stale
+## hint is worse than none: it would confine the search to a window the kart is no
+## longer in and return the nearest point of it with every appearance of success.
+##
+## `position.y` is ignored. This class is flat and elevation is M5's business, so a
+## kart in mid-air projects to where it is over the ground.
+func project(position: Vector3, hint := -1.0) -> Dictionary:
+	var segments := samples.size() - 1
+	var first := 0
+	var span := segments
+	if hint >= 0.0:
+		var total := length()
+		first = _segment_at(fposmod(hint - PROJECTION_WINDOW, total))
+		span = _segments_spanning(first, PROJECTION_WINDOW * 2.0)
+
+	var best_gap := INF
+	var best_index := 0
+	var best_travel := 0.0
+	var best_lateral := 0.0
+	for step in span:
+		var index := (first + step) % segments
+		var from: Vector3 = samples[index]["position"]
+		var to: Vector3 = samples[index + 1]["position"]
+		var along := Vector3(to.x - from.x, 0.0, to.z - from.z)
+		var span_squared := along.length_squared()
+		if span_squared <= 0.0:
+			continue
+		var offset := Vector3(position.x - from.x, 0.0, position.z - from.z)
+		# Clamped, so a position beside the *end* of a segment is measured to the
+		# end point rather than to the infinite line through it. Without the clamp
+		# an outside-of-a-corner position projects onto the extension of every
+		# segment in the corner and the smallest gap is a point the track does not
+		# contain.
+		var travel := clampf(offset.dot(along) / span_squared, 0.0, 1.0)
+		var gap_vector := offset - along * travel
+		var gap := gap_vector.length()
+		if gap >= best_gap:
+			continue
+		best_gap = gap
+		best_index = index
+		best_travel = travel
+		# `right()` at this segment's heading, derived from the segment rather than
+		# read from `heading`: the two agree to the sampling resolution and deriving
+		# it means the sign cannot disagree with the geometry the gap was measured
+		# against. Overwritten by `_refine_on_arc` when the segment is a corner.
+		best_lateral = gap_vector.dot(Vector3(-along.z, 0.0, along.x) / sqrt(span_squared))
+
+	var refined := _refine_on_arc(position, best_index, best_travel, best_lateral)
+	# `[0, length())` rather than `[0, length()]`. A projection onto the very last
+	# sample returns exactly the lap length, and `lap_timing.h` reads a *fall* in arc
+	# length as the forward crossing of the start line — so a distance equal to the
+	# length is a position that is simultaneously the end of one lap and the start of
+	# the next, which is one tick of ambiguity at the one place it costs a lap.
+	var total_length := length()
+	var distance: float = refined["distance"]
+	if distance >= total_length:
+		distance -= total_length
+	return {
+		"distance": distance,
+		"lateral": refined["lateral"],
+		"gap": best_gap,
+		"heading": refined["heading"],
+	}
+
+
+## Turn a chord parameter into an arc length, on the arc the segment came from.
+##
+## **The chord is a secant, and on a tight corner that costs real distance.** A
+## point lying 3.5 m inside the hairpin's centerline is radially inward of a
+## sample, so its true arc length *is* that sample's — but the perpendicular from it
+## to either adjacent chord lands a fifth of a meter along, because each chord's
+## direction differs from the arc's tangent by half the segment's own turn. The
+## error is `lateral * segment_turn / 2`, which on the 11 m hairpin at 1.33 m
+## sampling is 3.5 * 0.1206 / 2 = 0.21 m, and it was measured at 0.204 m before this
+## function existed.
+##
+## Two reasons that is not acceptable at a fifth of a meter. It is **not monotonic**:
+## the bias reverses sign at every sample, so a kart driving an offset line through a
+## corner produces an arc length that steps backwards, and `lap_timing.h` reads a
+## fall in arc length as the forward crossing of the start line. And it is the exact
+## quantity a sector split is measured at, so a sector mark placed in a corner would
+## fire a fifth of a meter early or late depending on which line the kart took.
+##
+## The fix is exact rather than approximate, because the segment really is a circular
+## arc and this class built it: the samples carry `heading`, so the signed curvature
+## is `dh / ds`, the center is one radius to the right of the heading, and the swept
+## angle from the segment's start to the point *is* the arc length divided by the
+## radius. No iteration and no tolerance.
+##
+## Run on the winning segment only, not on all of them. The chord search picks the
+## right segment — the bias is a fifth of a meter and the segments are over a meter
+## long, and where it picks the neighbour instead the refinement below still lands on
+## the same answer from the other side, which is the property that makes one atan2
+## pair per call sufficient rather than one per candidate.
+func _refine_on_arc(position: Vector3, index: int, travel: float, chord_lateral: float) -> Dictionary:
+	var from_distance: float = samples[index]["distance"]
+	var to_distance: float = samples[index + 1]["distance"]
+	var from_heading: float = samples[index]["heading"]
+	var to_heading: float = samples[index + 1]["heading"]
+	# **Wrapped, and the last segment of the lap is why.** `_init` overwrites the
+	# closing sample with a copy of the first so the ribbon's seam is bit-identical,
+	# and the first sample's heading is 0.0 while the true final heading is -360
+	# degrees. The raw difference across that one segment is therefore +6.245 rad
+	# instead of -0.038, which without this line would put the last 2 m of the lap on
+	# a corner of radius 4 mm.
+	var turn := wrapf(to_heading - from_heading, -PI, PI)
+	var span := to_distance - from_distance
+	# A straight, and the test is exact rather than a tolerance: `_straight` never
+	# touches `_heading`, so the two headings of a straight's segment are the same
+	# double. Nothing to refine — a chord and its arc are the same line.
+	if turn == 0.0 or span <= 0.0:
+		return {
+			"distance": from_distance + span * travel,
+			"lateral": chord_lateral,
+			"heading": from_heading,
+		}
+
+	var curvature := turn / span
+	var from_position: Vector3 = samples[index]["position"]
+	# `right()` is `(cos h, sin h)` in (x, z), and `_arc` puts the center exactly one
+	# signed radius that way — a right-hand turn has positive curvature and its
+	# center to the right. So `1.0 / curvature` is the signed radius and this is the
+	# same construction `_arc` used to place the samples, read backwards.
+	var radius := 1.0 / curvature
+	var center_x := from_position.x + cos(from_heading) * radius
+	var center_z := from_position.z + sin(from_heading) * radius
+
+	var from_angle := atan2(from_position.z - center_z, from_position.x - center_x)
+	var point_angle := atan2(position.z - center_z, position.x - center_x)
+	# Wrapped for the same reason as the heading, one scale down: the branch cut of
+	# `atan2` is somewhere on the circle and a segment that straddles it would
+	# otherwise sweep the long way round.
+	var swept := wrapf(point_angle - from_angle, -PI, PI)
+	# Clamped to the segment the search chose. A point beyond either end is nearest
+	# to that end, which is what the chord search already decided by clamping
+	# `travel`; this keeps the two in agreement rather than letting the refinement
+	# hand back a distance outside the segment it was given.
+	var distance := clampf(from_distance + swept / curvature, from_distance, to_distance)
+
+	# Signed lateral, positive to the right of travel, exact on the arc. A point at
+	# lateral `l` sits at `|radius| - l * sign(radius)` from the center, so inverting
+	# that gives `l = radius - sign(radius) * |center to point|` — one expression that
+	# is right for both hands, where a left-hander's negative radius flips the sign of
+	# the term as well as the offset.
+	var to_point := sqrt((position.x - center_x) * (position.x - center_x)
+			+ (position.z - center_z) * (position.z - center_z))
+	return {
+		"distance": distance,
+		"lateral": radius - signf(radius) * to_point,
+		# The heading where the point actually is, not where the segment started.
+		# `swept` is the angle turned and the heading turns with it by construction —
+		# that identity is what `curvature` was derived from. Clamped the same way
+		# `distance` is, so the frame and the distance describe one point.
+		"heading": from_heading + clampf(swept, minf(0.0, turn), maxf(0.0, turn)),
+	}
+
+
+## The segment containing a centerline distance, by binary search.
+##
+## A scan would be fine at scene build — `nearest_sample()` says so about itself —
+## and this one is on the physics path, called five times a tick for the body and
+## its four wheels. Nine comparisons over 900 samples rather than 900.
+func _segment_at(distance: float) -> int:
+	var low := 0
+	var high := samples.size() - 2
+	while low < high:
+		var middle := (low + high + 1) / 2
+		if float(samples[middle]["distance"]) <= distance:
+			low = middle
+		else:
+			high = middle - 1
+	return low
+
+
+## How many segments starting at `first` are needed to cover `span` meters.
+##
+## Counted from the stored distances rather than from a division by the sample
+## spacing, because the spacing is not uniform: `ARC_SAGITTA` puts the hairpin's
+## samples 1.33 m apart and the Turn 1 kink's 4.19 m apart, so a fixed segment
+## count would be a 30 m window on one corner and a 94 m window on another.
+func _segments_spanning(first: int, span: float) -> int:
+	var segments := samples.size() - 1
+	var covered := 0.0
+	for step in segments:
+		var index := (first + step) % segments
+		var from: float = samples[index]["distance"]
+		var to: float = samples[index + 1]["distance"]
+		covered += to - from
+		if covered >= span:
+			return step + 1
+	return segments
+
+
 ## The horizontal extent of the centerline, ignoring track width.
 func bounds() -> AABB:
 	var box := AABB(samples[0]["position"], Vector3.ZERO)

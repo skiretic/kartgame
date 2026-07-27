@@ -413,11 +413,15 @@ func _draw_screen(screen: Rect2, rpm: float, over_rev: bool, on_limiter: bool) -
 	_text(Vector2(speed_x + speed_w * 0.5 + 8.0 * _s, mid_y + 46.0 * _s), "km/h", 19.0, FIG,
 		HORIZONTAL_ALIGNMENT_LEFT, 0.95)
 
-	# The reference puts LAP and BEST here. **Nothing is drawn there until M6**,
-	# which owns lap timing — #73's other half. An "absent" placeholder was tried
-	# and removed: it landed two pixels from the LAT label below it and the two
-	# overprinted, which is worse than an empty region. An instrument with a blank
-	# area is honest; an instrument with two labels on top of each other is not.
+	# The reference puts LAP and BEST here, and this panel still does not draw them.
+	# That is now a **placement** decision rather than a missing feature:
+	# `scripts/ui/timing_hud.gd` owns lap, sector and delta as of M3c, and it draws
+	# them where a driver reads timing rather than where the dash reference puts
+	# them. Two panels showing the same lap time would be two things to keep in
+	# step. An "absent" placeholder was tried here and removed: it landed two pixels
+	# from the LAT label below and the two overprinted, which is worse than an empty
+	# region. An instrument with a blank area is honest; one with two labels on top
+	# of each other is not.
 
 	# ---- lateral g, the hero figure -----------------------------------------
 	var lateral: float = kart.get_lateral_g()

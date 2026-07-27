@@ -6,6 +6,8 @@
 #include "kart_core.h"
 #include "kart_random.h"
 #include "kart_state_hash.h"
+#include "session/kart_ghost.h"
+#include "session/kart_profile.h"
 #include "session/kart_session.h"
 #include "tuning/tuning_registry.h"
 #include "vehicle/kart_body.h"
@@ -99,6 +101,25 @@ void initialize_kartgame_module(ModuleInitializationLevel p_level) {
 	// argument and a lap timer is one per kart, and neither belongs in a tree.
 	GDREGISTER_CLASS(kartgame::KartSession);
 	GDREGISTER_CLASS(kartgame::KartLapTimer);
+
+	// The save. ROADMAP M3c, ADR-0042, `GAMEDESIGN.md` §8.
+	//
+	// Two classes rather than one, and the split is ADR-0042's second decision made
+	// structural: if `profile.save` will not parse, a player still has to reach the
+	// menu, read the text and use the pad. A boot script constructs a `KartSettings`,
+	// loads it and has a usable menu before it has looked at a `KartProfile` at all.
+	GDREGISTER_CLASS(kartgame::KartProfile);
+	GDREGISTER_CLASS(kartgame::KartSettings);
+
+	// The ghost you race, which is a transform stream and not a second kart.
+	// RefCounted for the same reason the rest are — one per best-lap slot, held by
+	// whatever is drawing it, and `scripts/game/ghost_kart.gd` is the Node3D that
+	// does the drawing.
+	//
+	// ADR-0041: a ghost is **not** re-simulated, so there is no `GhostDriver` here
+	// and there must not be one. ADR-0040's producer table says otherwise in one
+	// line and ADR-0041 is the later decision.
+	GDREGISTER_CLASS(kartgame::KartGhost);
 }
 
 void uninitialize_kartgame_module(ModuleInitializationLevel p_level) {

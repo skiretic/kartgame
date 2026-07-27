@@ -380,6 +380,23 @@ TEST_CASE("sector deltas are signed against a reference, and absent is not zero"
 	// reported as dead level — a driver reads 0.000 as good news.
 	LapRecord empty;
 	CHECK(timer.sector_delta_s(empty) == LAP_TIME_NONE);
+	CHECK_FALSE(timer.has_sector_delta(empty));
+	CHECK(timer.has_sector_delta(reference));
+
+	// **And the predicate is not the value in disguise.** A driver exactly one
+	// second up on the reference sector has a delta of -1.0, which is bit-identical
+	// to `LAP_TIME_NONE` — so a caller testing the number instead of asking the
+	// question hides a real split behind "no comparison". Construct that case.
+	LapRecord one_second;
+	one_second.sector_count = reference.sector_count;
+	for (int i = 0; i < one_second.sector_count; ++i) {
+		one_second.sector_s[i] = reference.sector_s[i];
+	}
+	one_second.time_s = reference.time_s;
+	const double elapsed = timer.progress().sector_time_s;
+	one_second.sector_s[timer.progress().sector] = elapsed + 1.0;
+	CHECK(timer.sector_delta_s(one_second) == doctest::Approx(-1.0));
+	CHECK(timer.has_sector_delta(one_second));
 }
 
 TEST_CASE("lap timing is a function of ticks, so two runs of the same drive agree exactly") {

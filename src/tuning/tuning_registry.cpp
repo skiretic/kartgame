@@ -587,13 +587,73 @@ Error KartTuning::save_preset(const String &p_path, const String &p_name) const 
 		}
 	}
 
-	Ref<FileAccess> file = FileAccess::open(p_path, FileAccess::WRITE);
-	if (file.is_null()) {
-		const Error why = FileAccess::get_open_error();
-		ERR_FAIL_V_MSG(why, vformat("tuning: cannot write %s (error %d)", p_path, why));
+	// **Written to a temporary and renamed over the target, and it did not used to
+	// be.** The previous version opened `p_path` for writing directly, which is three
+	// defects in five lines and all of them measured:
+	//
+	//   * `FileAccess::open(target, WRITE)` **truncates on open**, so between that
+	//     call and the first `store_string` the preset on disk is zero bytes. Kill the
+	//     process there and the file is not half-written, it is empty.
+	//   * it opens the target at all, so a read-only file fails with error 12 where a
+	//     rename would have succeeded.
+	//   * it ignored `store_string`'s return and `close`'s, so a full disk reported
+	//     `OK` and the caller believed the preset was saved.
+	//
+	// `GAMEDESIGN.md` §8 lists presets in what persists and §5 has them surviving a
+	// season re-run, so they are user data by exactly the argument ADR-0042 makes
+	// about the career save. A preset is a session that found a good number.
+	//
+	// The guarantee this buys is process death, not a power cut: `FileAccess` has no
+	// fsync of any kind. `src/core/profile.h` states the same limit at length.
+	const String temp = p_path + String(".tmp");
+	{
+		Ref<FileAccess> file = FileAccess::open(temp, FileAccess::WRITE);
+		if (file.is_null()) {
+			const Error why = FileAccess::get_open_error();
+			ERR_FAIL_V_MSG(why, vformat("tuning: cannot write %s (error %d)", temp, why));
+		}
+		const String text = to_text(p_name);
+		const bool stored = file->store_string(text);
+		// Flush before close rather than trusting close to do it. Close does flush;
+		// the ordering that matters is that the bytes are with the kernel before the
+		// rename is issued, and this is the only place that says so.
+		file->flush();
+		file->close();
+		if (!stored) {
+			DirAccess::remove_absolute(temp);
+			ERR_FAIL_V_MSG(ERR_FILE_CANT_WRITE,
+					vformat("tuning: the write to %s did not complete", temp));
+		}
 	}
-	file->store_string(to_text(p_name));
-	file->close();
+
+	// Read the length back. `store_string` returning true says the calls were
+	// accepted, not that the bytes landed, and a full disk is the case where those
+	// two differ. A stat, not a read.
+	{
+		Ref<FileAccess> check = FileAccess::open(temp, FileAccess::READ);
+		if (check.is_null()) {
+			ERR_FAIL_V_MSG(ERR_FILE_CANT_READ,
+					vformat("tuning: wrote %s and could not reopen it", temp));
+		}
+		const int64_t on_disk = static_cast<int64_t>(check->get_length());
+		check->close();
+		const int64_t expected = static_cast<int64_t>(to_text(p_name).utf8().length());
+		if (on_disk != expected) {
+			DirAccess::remove_absolute(temp);
+			ERR_FAIL_V_MSG(ERR_FILE_CANT_WRITE,
+					vformat("tuning: %s holds %d bytes of %d -- out of space?", temp, on_disk,
+							expected));
+		}
+	}
+
+	const Error renamed = DirAccess::rename_absolute(temp, p_path);
+	if (renamed != OK) {
+		// The target is untouched, which is the whole point. Take the temporary with
+		// us so a retry does not find a stale one and nobody mistakes it for a preset.
+		DirAccess::remove_absolute(temp);
+		ERR_FAIL_V_MSG(renamed,
+				vformat("tuning: cannot rename %s over %s (error %d)", temp, p_path, renamed));
+	}
 	return OK;
 }
 

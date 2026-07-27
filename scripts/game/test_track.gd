@@ -14,7 +14,12 @@ extends Node3D
 ##   --camera=chase      which rig starts current: chase or free
 ##   --eye=x,y,z         park a camera here instead, and leave it there
 ##   --look=x,y,z        what the parked camera aims at (default: the grid)
-##   --hud=true          the corner text overlay and the driving HUD
+##   --hud=true          the corner text overlay, the driving HUD and the timing HUD
+##   --session=practice  which session type runs: practice, qualifying, heat,
+##                       super_heat, final. Its limit comes from `session.h`'s
+##                       compression of the FIA distances unless --laps says otherwise
+##   --laps=3            end the session after this many start-line crossings
+##                       instead, which is what a standalone session thinks in
 ##   --steer-gamma=3.0   the steering input curve, through the tuning registry
 ##   --tune=key=value[,key=value]
 ##                       any tunable, by key. `tools/verify/tuning.sh` lists them
@@ -168,6 +173,11 @@ var _hud: Label
 var _driving_hud: Control
 var _tuning: KartTuning
 var _tuning_panel: TuningPanel
+## The session, its runner and its timing screen. ROADMAP M3c. The scene assembles
+## them and owns none of the rules — `scripts/game/session_runner.gd` does.
+var _session: KartSession
+var _runner: SessionRunner
+var _timing_hud: TimingHud
 ## The `EngineVoiceStream` the kart is publishing into, or null where there is no
 ## audio device. Held so the HUD can read `voice_stats()` — the worst-block
 ## render figure is the one that sees a dropout, and a mean never will.
@@ -212,6 +222,11 @@ func _ready() -> void:
 	_build_track()
 	_build_kart()
 	_build_tuning()
+	# After the tuning, because the session records the preset it is driven under and
+	# `adopt_tuning` reads the registry. Before the cameras, because `_set_camera_mode`
+	# gates the driver's input through the runner and a null runner would leave the
+	# free camera flying the kart as well as the view.
+	_build_session()
 	_build_cameras()
 	_build_hud()
 	# One line, and it is the whole of issue #43's integration: `KartBody::_ready`
@@ -819,6 +834,90 @@ func _apply_tuning_argument(key: String, value: float) -> void:
 	_tuning.set_value(id, value)
 
 
+## The session type names `--session=` takes, to `KartSession`'s own constants.
+##
+## The strings are `session.h`'s `session_type_name()` values, which is what the
+## extension already prints and what a preset or a save would carry. Written as a
+## table rather than as a chain of comparisons so that an unknown name can be
+## refused by name — a typo'd `--session=quali` silently running Practice is a
+## session that is not the one that was asked for.
+const SESSION_TYPES: Dictionary = {
+	"practice": KartSession.TYPE_PRACTICE,
+	"qualifying": KartSession.TYPE_QUALIFYING,
+	"heat": KartSession.TYPE_HEAT,
+	"super_heat": KartSession.TYPE_SUPER_HEAT,
+	"final": KartSession.TYPE_FINAL,
+}
+
+
+## Build a session in code and start it. ROADMAP M3c.
+##
+## **This is deliberately not the front end.** `GAMEDESIGN.md` §9's boot screen,
+## paddock and session setup are blocked on [#171](https://github.com/skiretic/kartgame/issues/171)'s
+## visual pass and are not this scene's; what is here is the smallest thing that
+## makes the runner drivable today, which is a configuration assembled from
+## arguments. The runner must be callable *from* a shell — that is what "the shell
+## owns no simulation state" means — and this proves the same call works from a
+## scene, which is the cheaper half of the same seam.
+func _build_session() -> void:
+	if _kart == null or _driver == null:
+		return
+
+	_session = KartSession.new()
+	# The slug, not a display name — `session.h` keeps display names on the script
+	# side per ADR-0044. The **track hash stays zero**, and that is honest rather than
+	# lazy: ADR-0046 puts a content hash on `track.json` and this track has no
+	# `track.json`, it is built in code. A hash invented here would claim a provenance
+	# the geometry does not have, and a replay would compare against it.
+	_session.set_track("test_track")
+	_session.set_layout(KartSession.LAYOUT_FORWARD)
+	_session.set_condition(KartSession.CONDITION_DRY)
+	_session.set_kart_class(KartSession.CLASS_KZ2)
+
+	var requested := Cmdline.as_string(_args, "session", "practice")
+	if not SESSION_TYPES.has(requested):
+		push_error("--session=%s is not one of %s" % [
+			requested, ", ".join(PackedStringArray(SESSION_TYPES.keys())),
+		])
+		requested = "practice"
+	_session.set_type(SESSION_TYPES[requested])
+	# The scheduled limit rather than a typed number, which is `KartSession`'s own
+	# reason for having the call: *"a Heat's distance is arithmetic on a sourced FIA
+	# figure and typing 3750 into a menu is how that citation gets lost."*
+	_session.use_scheduled_limit()
+	if _args.has("laps"):
+		_session.set_limit(KartSession.LIMIT_LAPS, float(Cmdline.as_int(_args, "laps", 3)))
+
+	# The assists as the kart already has them, so `--auto-shift=off` is recorded in
+	# the configuration rather than contradicted by it. The kart is the owner of what
+	# "on" means — `_build_kart` defaults the flag to the assist's own default for the
+	# same reason — and the session copies it.
+	_session.set_auto_clutch(_kart.auto_clutch)
+	_session.set_auto_shift(_kart.auto_shift)
+	if _tuning != null:
+		# One way, and `kart_session.h` says why: this records the preset the session
+		# was driven under. There is no call that pushes a configuration's tuning back
+		# onto the registry, so a session restored from a save cannot yet impose its
+		# own preset. `session_runner.gd`'s header records that gap.
+		_session.adopt_tuning(_tuning)
+
+	_runner = SessionRunner.new()
+	_runner.name = "SessionRunner"
+	add_child(_runner)
+	if not _runner.configure(_session, _kart, _driver, _layout):
+		push_error("session refused: %s" % _runner.refusal())
+		return
+	_runner.session_finished.connect(_on_session_finished)
+	_runner.begin()
+
+
+## The result, printed. There is no results screen — `GAMEDESIGN.md` §9 puts that
+## behind #171 and the main thread owns it — so the terminal is where a session's
+## result goes from this scene, and it goes there as one sentence.
+func _on_session_finished(_result: Dictionary) -> void:
+	print(_runner.result_line())
+
+
 func _build_hud() -> void:
 	if not Cmdline.as_bool(_args, "hud", true):
 		return
@@ -855,6 +954,20 @@ func _build_hud() -> void:
 	if _kart != null:
 		_driving_hud.bind(_kart)
 
+	# The timing screen, on the same layer and under the same flag. A third overlay
+	# and not a fourth row on the driving HUD, because they answer different
+	# questions and `driving_hud.gd` is emphatic about not becoming the panel it
+	# already refused to become once. Its own header carries the argument.
+	#
+	# `driving_hud.gd` reserves the slot its reference gives to a lap time and says
+	# "nothing is drawn there until M6, which owns lap timing". There is a lap time
+	# now, and filling that slot is a change to a file this one does not own.
+	if _runner != null:
+		_timing_hud = TimingHud.new()
+		_timing_hud.name = "TimingHud"
+		layer.add_child(_timing_hud)
+		_timing_hud.bind(_runner)
+
 	# The tuning overlay, on F2. It finds the registry through the `tuning_source`
 	# group the same way the telemetry panel finds the kart, so this is the whole
 	# integration and neither node learns the other exists.
@@ -886,6 +999,24 @@ func _report() -> void:
 	print("  geometry    %d road triangles + %d curb, drawn and collided from the same array" % [
 		_road_triangles, _curb_triangles,
 	])
+	if _runner != null and _session != null:
+		# The configuration and its fingerprint, so a driving session starts by saying
+		# which session it is. ADR-0041's `config_hash` is the one number that says two
+		# sessions are the same session, and printing it here is what lets a lap time
+		# quoted from this terminal a year from now be checked against the setup that
+		# produced it.
+		print("  session     %s, limit %s %.1f, assists clutch %s shift %s, config %s" % [
+			KartSession.type_name(_session.get_type()),
+			KartSession.limit_kind_name(_session.get_limit_kind()),
+			_session.get_limit_value(),
+			"on" if _session.is_auto_clutch() else "off",
+			"on" if _session.is_auto_shift() else "off",
+			_session.config_hash_hex(),
+		])
+		print("  timing      %d sectors over %.1f m, grid %.1f m past the line, state %s" % [
+			SessionRunner.SECTOR_COUNT, _layout.length(), _grid_distance(),
+			_runner.state_name(),
+		])
 	if Cmdline.as_bool(_args, "validate", false):
 		# ARCHITECTURE.md §11's M5 validation item, pulled forward: "closed loop, no
 		# self-intersection". O(n^2) over 900 samples, so it is opt-in rather than
@@ -966,6 +1097,15 @@ func _respawn() -> void:
 	_respawn_quiet = RESPAWN_QUIET_TICKS + 1
 	if _driving_hud != null:
 		_driving_hud.reset_peaks()
+	# The third half, and it is the one that is invisible when it is missing. The
+	# lap dies — `lap_timing.h` treats a restart with outside help as the real
+	# disqualification it is — and the runner throws away its projection hint, without
+	# which the next tick would look for the kart in a 60 m window it has just left
+	# and confidently report the nearest point of it. `notify_respawn` has both.
+	#
+	# After `respawn()`, because it reads the kart's new position.
+	if _runner != null:
+		_runner.notify_respawn()
 
 
 ## Turn the front wheel meshes to the angle the solver is steering at.
@@ -1009,15 +1149,35 @@ func _set_camera_mode(mode: String) -> void:
 		# The kart keeps simulating but the driver stops reading the pad, because the
 		# flight camera reuses the drive keys. It keeps pushing neutral rather than
 		# going quiet — see `player_driver.h`.
-		_driver.enabled = false
+		#
+		# **Through the runner, not by writing `_driver.enabled` directly.** That line
+		# used to be here and it made this function a second owner of the flag ADR-0040
+		# put the input authority on: the runner turns the input off during its hold
+		# and back on at the green, so a camera that also wrote the flag would hand
+		# the throttle to a driver who is flying a camera the moment a state changed —
+		# or take it away from one who is driving. `session_runner.gd`'s header has the
+		# long version.
+		_suspend_input(true)
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 		return
 	if _camera_mode == "cockpit":
 		_cockpit.make_current()
 	else:
 		_chase.camera.current = true
-	_driver.enabled = true
+	_suspend_input(false)
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+
+
+## One writer of `PlayerDriver.enabled`, and it is the runner when there is one.
+##
+## The direct write survives for the case where there is not — a session that was
+## refused, or `_build_session` bailing before the runner existed — because a free
+## camera that could not stop the kart would be a flight control that also drives.
+func _suspend_input(suspended: bool) -> void:
+	if _runner != null:
+		_runner.set_input_suspended(suspended)
+	else:
+		_driver.enabled = not suspended
 
 
 ## Chase, cockpit, free, round again.

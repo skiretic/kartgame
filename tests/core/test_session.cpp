@@ -40,26 +40,56 @@ TEST_CASE("a default SessionConfig is not valid, because it has no track") {
 	CHECK(config.is_valid());
 }
 
-TEST_CASE("set_track_id terminates, and reports a truncation rather than hiding it") {
+TEST_CASE("a track id is a slug, because it reaches a filename") {
 	SessionConfig config;
 	CHECK(config.set_track_id("autumn_ridge"));
 	CHECK(std::strcmp(config.track_id, "autumn_ridge") == 0);
+	CHECK(config.set_track_id("circuit-1"));
+	CHECK(config.set_track_id("t2"));
 
-	// One character longer than the buffer can hold with its terminator.
-	char oversized[SESSION_ID_CHARS + 8];
-	for (int i = 0; i < SESSION_ID_CHARS + 7; ++i) {
-		oversized[i] = 'a';
+	// **The case this exists for.** ADR-0046 loads a track from a file named for the
+	// id and `profile.h` pastes it into a `user://` path, so a traversal in a track
+	// id is a traversal in a filename. Length was the only thing checked before.
+	SUBCASE("a traversal is refused and leaves nothing behind") {
+		REQUIRE(config.set_track_id("autumn_ridge"));
+		CHECK_FALSE(config.set_track_id("../../../etc/passwd"));
+		// Empty, not the truncated prefix: `circuit/..` is worse than what it started
+		// as, and an empty id fails validation at once.
+		CHECK(config.track_id[0] == '\0');
+		CHECK_FALSE(config.is_valid());
 	}
-	oversized[SESSION_ID_CHARS + 7] = '\0';
-	CHECK_FALSE(config.set_track_id(oversized));
-	// Truncated, still terminated, still a usable string — the id fails to resolve
-	// loudly at load where an unterminated buffer would read off the end.
-	CHECK(static_cast<int>(std::strlen(config.track_id)) == SESSION_ID_CHARS - 1);
-	CHECK(config.is_valid());
+	SUBCASE("every other way in is refused too") {
+		const char *hostile[] = { "..", ".", "a/b", "a\\b", "a.b", "A_B", "a b", "a\tb",
+			"a\nb", "ghost;rm", "a*", "~root", "" };
+		for (const char *id : hostile) {
+			CHECK_FALSE(config.set_track_id(id));
+			CHECK(config.track_id[0] == '\0');
+		}
+	}
+	SUBCASE("too long is refused, and also leaves nothing behind") {
+		char oversized[SESSION_ID_CHARS + 8];
+		for (int i = 0; i < SESSION_ID_CHARS + 7; ++i) {
+			oversized[i] = 'a';
+		}
+		oversized[SESSION_ID_CHARS + 7] = '\0';
+		CHECK_FALSE(config.set_track_id(oversized));
+		CHECK(config.track_id[0] == '\0');
+		CHECK_FALSE(config.is_valid());
 
-	CHECK_FALSE(config.set_track_id(nullptr));
-	CHECK(config.track_id[0] == '\0');
-	CHECK_FALSE(config.is_valid());
+		// One character shorter is the longest id that fits.
+		char exact[SESSION_ID_CHARS];
+		for (int i = 0; i < SESSION_ID_CHARS - 1; ++i) {
+			exact[i] = 'a';
+		}
+		exact[SESSION_ID_CHARS - 1] = '\0';
+		CHECK(config.set_track_id(exact));
+		CHECK(static_cast<int>(std::strlen(config.track_id)) == SESSION_ID_CHARS - 1);
+	}
+	SUBCASE("null is refused") {
+		CHECK_FALSE(config.set_track_id(nullptr));
+		CHECK(config.track_id[0] == '\0');
+		CHECK_FALSE(config.is_valid());
+	}
 }
 
 TEST_CASE("is_valid rejects a limit with no number and an impossible field") {

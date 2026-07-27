@@ -1,5 +1,7 @@
 #include "session/kart_session.h"
 
+#include "core/race_rules.h"
+
 #include "tuning/tuning_registry.h"
 
 #include <godot_cpp/core/class_db.hpp>
@@ -179,66 +181,71 @@ String KartSession::get_track_hash_hex() const {
 	return hex64(config_.track_hash);
 }
 
-void KartSession::set_layout(int p_layout) {
+bool KartSession::set_layout(int p_layout) {
 	if (p_layout < 0 || p_layout >= TRACK_LAYOUT_COUNT) {
 		ERR_PRINT(vformat("KartSession: layout %d is not one of the %d layouts", p_layout,
 				TRACK_LAYOUT_COUNT));
-		return;
+		return false;
 	}
 	config_.layout = static_cast<TrackLayout>(p_layout);
+	return true;
 }
 
 int KartSession::get_layout() const {
 	return static_cast<int>(config_.layout);
 }
 
-void KartSession::set_condition(int p_condition) {
+bool KartSession::set_condition(int p_condition) {
 	if (p_condition < 0 || p_condition >= TRACK_CONDITION_COUNT) {
 		ERR_PRINT(vformat("KartSession: condition %d is not one of the %d conditions",
 				p_condition, TRACK_CONDITION_COUNT));
-		return;
+		return false;
 	}
 	config_.condition = static_cast<TrackCondition>(p_condition);
+	return true;
 }
 
 int KartSession::get_condition() const {
 	return static_cast<int>(config_.condition);
 }
 
-void KartSession::set_type(int p_type) {
+bool KartSession::set_type(int p_type) {
 	if (p_type < 0 || p_type >= SESSION_TYPE_COUNT) {
 		ERR_PRINT(vformat("KartSession: session type %d is not one of the %d types", p_type,
 				SESSION_TYPE_COUNT));
-		return;
+		return false;
 	}
 	config_.type = static_cast<SessionType>(p_type);
+	return true;
 }
 
 int KartSession::get_type() const {
 	return static_cast<int>(config_.type);
 }
 
-void KartSession::set_kart_class(int p_kart_class) {
+bool KartSession::set_kart_class(int p_kart_class) {
 	if (p_kart_class < 0 || p_kart_class >= KART_CLASS_COUNT) {
 		ERR_PRINT(vformat("KartSession: class %d is not one of the %d classes", p_kart_class,
 				KART_CLASS_COUNT));
-		return;
+		return false;
 	}
 	config_.kart_class = static_cast<KartClass>(p_kart_class);
+	return true;
 }
 
 int KartSession::get_kart_class() const {
 	return static_cast<int>(config_.kart_class);
 }
 
-void KartSession::set_limit(int p_kind, double p_value) {
+bool KartSession::set_limit(int p_kind, double p_value) {
 	if (p_kind < 0 || p_kind >= SESSION_LIMIT_KIND_COUNT) {
 		ERR_PRINT(vformat("KartSession: limit kind %d is not one of the %d kinds", p_kind,
 				SESSION_LIMIT_KIND_COUNT));
-		return;
+		return false;
 	}
 	config_.limit.kind = static_cast<SessionLimitKind>(p_kind);
 	config_.limit.value = p_value;
+	return true;
 }
 
 int KartSession::get_limit_kind() const {
@@ -253,13 +260,14 @@ void KartSession::use_scheduled_limit() {
 	config_.limit = scheduled_limit(config_.type);
 }
 
-void KartSession::set_entry_count(int p_count) {
+bool KartSession::set_entry_count(int p_count) {
 	if (p_count < 1 || p_count > SESSION_MAX_ENTRIES) {
 		ERR_PRINT(vformat("KartSession: an entry list of %d is outside 1..%d", p_count,
 				SESSION_MAX_ENTRIES));
-		return;
+		return false;
 	}
 	config_.entry_count = p_count;
+	return true;
 }
 
 int KartSession::get_entry_count() const {
@@ -426,11 +434,23 @@ void KartLapTimer::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("valid_lap_count"), &KartLapTimer::valid_lap_count);
 	ClassDB::bind_method(D_METHOD("invalid_lap_count"), &KartLapTimer::invalid_lap_count);
 	ClassDB::bind_method(D_METHOD("sector_delta_to_best"), &KartLapTimer::sector_delta_to_best);
+	ClassDB::bind_method(D_METHOD("has_sector_delta_to_best"),
+			&KartLapTimer::has_sector_delta_to_best);
 
 	ClassDB::bind_static_method("KartLapTimer", D_METHOD("type_invalidates_laps", "type"),
 			&KartLapTimer::type_invalidates_laps);
 	ClassDB::bind_static_method("KartLapTimer", D_METHOD("type_deletes_fastest_lap", "type"),
 			&KartLapTimer::type_deletes_fastest_lap);
+	ClassDB::bind_static_method("KartLapTimer", D_METHOD("type_has_field", "type"),
+			&KartLapTimer::type_has_field);
+	ClassDB::bind_static_method("KartLapTimer",
+			D_METHOD("type_awards_championship_points", "type"),
+			&KartLapTimer::type_awards_championship_points);
+	ClassDB::bind_static_method("KartLapTimer", D_METHOD("type_sets_next_grid", "type"),
+			&KartLapTimer::type_sets_next_grid);
+	ClassDB::bind_static_method("KartLapTimer",
+			D_METHOD("laps_for_distance", "distance_m", "lap_length_m"),
+			&KartLapTimer::laps_for_distance);
 }
 
 bool KartLapTimer::begin_even(double p_length_m, int p_sectors, double p_step_s) {
@@ -581,12 +601,32 @@ double KartLapTimer::sector_delta_to_best() const {
 	return timer_.sector_delta_s(timer_.best());
 }
 
+bool KartLapTimer::has_sector_delta_to_best() const {
+	return timer_.has_sector_delta(timer_.best());
+}
+
 bool KartLapTimer::type_invalidates_laps(int p_type) {
 	return session_invalidates_laps(static_cast<SessionType>(p_type));
 }
 
 bool KartLapTimer::type_deletes_fastest_lap(int p_type) {
 	return session_deletes_fastest_lap(static_cast<SessionType>(p_type));
+}
+
+bool KartLapTimer::type_has_field(int p_type) {
+	return session_has_field(static_cast<SessionType>(p_type));
+}
+
+bool KartLapTimer::type_awards_championship_points(int p_type) {
+	return session_awards_championship_points(static_cast<SessionType>(p_type));
+}
+
+bool KartLapTimer::type_sets_next_grid(int p_type) {
+	return session_sets_next_grid(static_cast<SessionType>(p_type));
+}
+
+int KartLapTimer::laps_for_distance(double p_distance_m, double p_lap_length_m) {
+	return scheduled_laps(p_distance_m, p_lap_length_m);
 }
 
 } // namespace kartgame

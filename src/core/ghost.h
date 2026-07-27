@@ -341,8 +341,22 @@ inline GhostSample ghost_sample_at(const GhostSample *samples, int count, double
 	// not give a zero tangent, it gives a tangent of half the correct magnitude, so
 	// the first and last segments bow away from the path: measured at 0.52 m on a
 	// straight line in `tests/core/test_ghost.cpp`, which is most of a kart's width.
-	// Reflecting — `p0 = 2*p1 - p2` — makes a straight run exactly straight and gives
-	// the right tangent at the ends.
+	// Reflecting — `p0 = 2*p1 - p2` — makes a straight run **exactly** straight, and
+	// that half is measured at precisely zero error.
+	//
+	// It does **not** give the right tangent at the ends, and this comment used to
+	// claim it did. On a curve the reflected phantom sits on the extension of the
+	// chord, missing the true previous point by `2R(1 - cos(w*h))` — 14.8 mm on the
+	// 30 m corner at 20 m/s this file sizes against — and `w0(t)` carries a fraction
+	// of that into the first segment. Measured **1.1530 mm** against a closed-form
+	// prediction of 1.0850 mm: third order in the step where the interior is fourth.
+	//
+	// It stays as it is, and the reason is a number rather than a shrug: 1.15 mm is
+	// inside the 1 mm storage quantum's own rounding and 480 times better than the
+	// 0.52 m the duplicated endpoint produced. Fixing it properly wants the sample
+	// before the line, which is a cyclic stream this format does not carry. Recorded
+	// here because a flying lap starts mid-corner as often as not, so this is the
+	// error's real operating point rather than a corner case.
 	//
 	// And the ends are not a standing start. A best lap is a **flying** lap: the first
 	// sample is already at racing speed across the line, so a tangent that was
@@ -476,7 +490,28 @@ inline int ghost_samples_for_lap(double lap_time_s, int sample_hz = GHOST_SAMPLE
 		return 0;
 	}
 	// One sample at t = 0 and one at every interval after it.
-	return 1 + static_cast<int>(std::floor(lap_time_s * static_cast<double>(sample_hz)));
+	//
+	// **The nudge is not cosmetic and this function was wrong without it.** A lap
+	// time does not arrive as an arbitrary real: `lap_timing.h` builds it as
+	// `lap_ticks * (1.0 / 120.0)`, and that reciprocal is not exact in binary. So a
+	// lap that is exactly 30 sample intervals long arrives a fraction of an ULP
+	// under, `floor` drops to 29, and the count is one short — measured on **234 of
+	// the first 20,000 tick counts**, first failure at 124 ticks, one second into a
+	// lap. Writing the division the other way round does not save it either: that
+	// form fails at 98.
+	//
+	// The consequence is worth stating because it is silent. A recorder that sized
+	// its buffer from this function and a header that quoted it would disagree with
+	// the body by one sample, `load` would refuse the ghost, and a driver would lose
+	// a best lap on roughly one lap in a hundred with nothing on screen to explain
+	// it. The ghost agent found it by measuring the helper rather than trusting it,
+	// which is the only reason it is not in the tree.
+	//
+	// The epsilon is relative to the sample count and is far below one interval, so
+	// it cannot invent a sample on a lap that genuinely falls between two.
+	const double intervals = lap_time_s * static_cast<double>(sample_hz);
+	const double snapped = std::floor(intervals + 1e-9 * (intervals + 1.0));
+	return 1 + static_cast<int>(snapped);
 }
 
 inline uint64_t ghost_bytes_for_lap(double lap_time_s, int sample_hz = GHOST_SAMPLE_HZ) {
