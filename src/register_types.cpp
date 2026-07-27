@@ -100,6 +100,7 @@ void initialize_kartgame_module(ModuleInitializationLevel p_level) {
 	// RefCounted rather than Node, both of them: a session configuration is an
 	// argument and a lap timer is one per kart, and neither belongs in a tree.
 	GDREGISTER_CLASS(kartgame::KartSession);
+	GDREGISTER_CLASS(kartgame::KartClassification);
 	GDREGISTER_CLASS(kartgame::KartLapTimer);
 
 	// The save. ROADMAP M3c, ADR-0042, `GAMEDESIGN.md` §8.

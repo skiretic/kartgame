@@ -900,10 +900,10 @@ func _build_session() -> void:
 	# rate in the hash; the runner refuses a config whose claim disagrees.
 	_session.set_tick_hz(Engine.physics_ticks_per_second)
 	if _tuning != null:
-		# One way, and `kart_session.h` says why: this records the preset the session
-		# was driven under. There is no call that pushes a configuration's tuning back
-		# onto the registry, so a session restored from a save cannot yet impose its
-		# own preset. `session_runner.gd`'s header records that gap.
+		# This direction records the preset the session was driven under. The other
+		# direction exists too since issue #178 — `apply_tuning` pushes a
+		# configuration's tuning onto the registry — but it belongs to a restorer,
+		# not to a scene that is recording what it was already tuned to.
 		_session.adopt_tuning(_tuning)
 
 	_runner = SessionRunner.new()

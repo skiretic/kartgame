@@ -111,10 +111,11 @@
 // `ARCHITECTURE.md` §18 must load when the career does not. Coupling them means a
 // corrupt career save presents an unreadable menu for fixing it.
 //
-// `PROFILE_SETTINGS_FILE_NAME` is named here and modeled nowhere: `settings.cfg`
-// is a separate file and a **later piece of work that has not been written.**
-// Naming it without modeling it is the point — the separation is stated rather
-// than left for somebody to discover by adding a `bool invert_look` to `Profile`.
+// `PROFILE_SETTINGS_FILE_NAME` is named here and modeled in `core/settings.h` —
+// a separate header on purpose, so the separation cannot erode by somebody
+// adding a `bool invert_look` to `Profile`. It was modeled nowhere for a
+// milestone, then engine-side where `tests/run.sh` could not reach it; issue
+// #178 is the move to its stated home.
 //
 // ## Multiple profiles
 //

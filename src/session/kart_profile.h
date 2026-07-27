@@ -2,6 +2,7 @@
 #define KARTGAME_SESSION_KART_PROFILE_H
 
 #include "core/profile.h"
+#include "core/settings.h"
 
 #include <godot_cpp/classes/ref_counted.hpp>
 #include <godot_cpp/variant/array.hpp>
@@ -474,13 +475,16 @@ protected:
 	static void _bind_methods();
 
 public:
+	// Bound projections of `src/core/settings.h`'s values, which owns the model
+	// since issue #178. The static_casts keep this list from drifting into a
+	// second spelling of the enum it mirrors.
 	enum {
-		CAMERA_CHASE = 0,
-		CAMERA_COCKPIT = 1,
-		CAMERA_FREE = 2,
-		CAMERA_COUNT = 3,
+		CAMERA_CHASE = static_cast<int>(kart::core::SettingsCamera::Chase),
+		CAMERA_COCKPIT = static_cast<int>(kart::core::SettingsCamera::Cockpit),
+		CAMERA_FREE = static_cast<int>(kart::core::SettingsCamera::Free),
+		CAMERA_COUNT = kart::core::SETTINGS_CAMERA_COUNT,
 
-		SETTINGS_VERSION = 1,
+		SETTINGS_VERSION = kart::core::SETTINGS_FORMAT_VERSION,
 	};
 
 	bool set_base_dir(const godot::String &p_dir);
@@ -534,11 +538,10 @@ private:
 	godot::String join(const char *p_name) const;
 
 	godot::String base_dir_ = godot::String("user://");
-	bool auto_clutch_ = true;
-	bool auto_shift_ = true;
-	int camera_ = CAMERA_CHASE;
-	double master_volume_db_ = 0.0;
-	double steer_deadzone_ = 0.15;
+
+	// The model, whole. `src/core/settings.h` owns the defaults, the clamps and
+	// the text format; this class owns `user://` and the write.
+	kart::core::Settings settings_;
 };
 
 } // namespace kartgame

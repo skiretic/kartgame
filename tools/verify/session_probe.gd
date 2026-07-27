@@ -284,6 +284,7 @@ func _initialize() -> void:
 	_check_sector_sum_synthetic()
 	_check_transition_table()
 	_check_refusals()
+	_check_tuning_round_trip()
 
 	if _failed > 0:
 		# The driven half is measured through the projection the checks above just
@@ -651,6 +652,43 @@ func _check_refusals() -> void:
 
 	_ok("refusals name the field", problems.is_empty(),
 		"%s" % ("; ".join(refusals) if problems.is_empty() else ", ".join(problems)))
+
+
+## Issue #178's second piece, measured: `adopt_tuning` reads the registry into a
+## configuration and `apply_tuning` pushes it back, so a recorded set survives a
+## registry that moved on. The check is a hash round trip — move a value, adopt,
+## reset the registry (proving the hashes differ, or the restore proves nothing),
+## apply, and the registry hashes back to what was recorded.
+func _check_tuning_round_trip() -> void:
+	var problems := PackedStringArray()
+	var registry := KartTuning.new()
+	var moved_hash := ""
+	var free_id := -1
+	for descriptor in registry.descriptors():
+		if not bool(descriptor["defended"]):
+			free_id = int(descriptor["id"])
+			break
+	if free_id < 0:
+		problems.append("no undefended tunable to move")
+	else:
+		registry.nudge(free_id, 3)
+		moved_hash = registry.tuning_hash_hex()
+		var session := KartSession.new()
+		if not session.adopt_tuning(registry):
+			problems.append("adopt_tuning refused a KartTuning")
+		registry.reset_all()
+		if registry.tuning_hash_hex() == moved_hash:
+			problems.append("reset_all left the hash in place, so a restore proves nothing")
+		if not session.apply_tuning(registry):
+			problems.append("apply_tuning refused a KartTuning")
+		if registry.tuning_hash_hex() != moved_hash:
+			problems.append("apply_tuning restored %s, recorded %s" % [
+				registry.tuning_hash_hex(), moved_hash,
+			])
+	registry.free()
+	_ok("a config's tuning applies back", problems.is_empty(),
+		("recorded and restored %s" % moved_hash) if problems.is_empty()
+			else ", ".join(problems))
 
 
 # --- the driven session ---------------------------------------------------------
@@ -1208,6 +1246,31 @@ func _check_result() -> void:
 			problems.append("no config hash")
 		if String(result["outcome"]) == "":
 			problems.append("no outcome")
+		# Issue #178: the same finish as a bound type, agreeing with the Dictionary
+		# measurement for measurement. The player is driver id 0, classified only
+		# when a valid lap exists.
+		var classified := _runner.classification()
+		if classified == null:
+			problems.append("no classification after RESULT")
+		elif classified.count() != 1:
+			problems.append("classification holds %d entries, not the player" \
+				% classified.count())
+		else:
+			var entry := classified.entry(0)
+			if int(entry["driver_id"]) != 0:
+				problems.append("the player is not driver 0")
+			var want_position := 1 if timer.has_best() else 0
+			if int(entry["position"]) != want_position:
+				problems.append("position %d against has_best %s" % [
+					int(entry["position"]), timer.has_best(),
+				])
+			if int(entry["laps_completed"]) != int(result["laps_completed"]):
+				problems.append("classification laps disagree with the result")
+			if absf(float(entry["distance_m"]) - float(result["distance_m"])) > 0.001:
+				problems.append("classification distance disagrees with the result")
+			if timer.has_best() \
+					and absf(float(entry["best_lap_s"]) - timer.best_time()) > HALF_TICK_S:
+				problems.append("classification best lap disagrees with the timer")
 	_ok("the result says what it produced", problems.is_empty(),
 		"%s" % (_runner.result_line() if problems.is_empty() else ", ".join(problems)))
 	if problems.is_empty():

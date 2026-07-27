@@ -575,6 +575,19 @@ Dictionary KartTuning::from_text(const String &p_text) {
 	return result;
 }
 
+int KartTuning::adopt_set(const kart::core::TuningSet &p_set) {
+	set_ = p_set;
+	for (int id = 0; id < TUNABLE_COUNT; ++id) {
+		if (kart::core::is_defended(TUNABLES[id].provenance) && !set_.is_default(id)) {
+			// In writing, in a configuration somebody recorded — `from_text` grants
+			// the acknowledgement for a file's `!` marker on the same reasoning.
+			acknowledged_[id] = true;
+		}
+	}
+	apply_all();
+	return set_.defended_override_count();
+}
+
 Error KartTuning::save_preset(const String &p_path, const String &p_name) const {
 	// Create the directory rather than fail on it. The natural home for these is
 	// `user://tuning/`, which does not exist until something makes it, and a save

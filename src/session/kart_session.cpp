@@ -116,6 +116,7 @@ void KartSession::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_seed_hex", "hex"), &KartSession::set_seed_hex);
 	ClassDB::bind_method(D_METHOD("get_seed_hex"), &KartSession::get_seed_hex);
 	ClassDB::bind_method(D_METHOD("adopt_tuning", "tuning"), &KartSession::adopt_tuning);
+	ClassDB::bind_method(D_METHOD("apply_tuning", "tuning"), &KartSession::apply_tuning);
 
 	ClassDB::bind_method(D_METHOD("config_hash_hex"), &KartSession::config_hash_hex);
 	ClassDB::bind_method(D_METHOD("is_valid"), &KartSession::is_valid);
@@ -344,6 +345,16 @@ bool KartSession::adopt_tuning(Object *p_tuning) {
 	return true;
 }
 
+bool KartSession::apply_tuning(Object *p_tuning) {
+	KartTuning *tuning = Object::cast_to<KartTuning>(p_tuning);
+	if (tuning == nullptr) {
+		ERR_PRINT("KartSession: apply_tuning wants a KartTuning");
+		return false;
+	}
+	tuning->adopt_set(config_.tuning);
+	return true;
+}
+
 String KartSession::config_hash_hex() const {
 	return hex64(config_.hash());
 }
@@ -415,6 +426,107 @@ String KartSession::layout_name(int p_layout) {
 
 String KartSession::limit_kind_name(int p_kind) {
 	return from_utf8(session_limit_kind_name(static_cast<SessionLimitKind>(p_kind)));
+}
+
+// --- KartClassification --------------------------------------------------------
+
+void KartClassification::_bind_methods() {
+	ClassDB::bind_method(D_METHOD("begin", "type"), &KartClassification::begin);
+	ClassDB::bind_method(D_METHOD("get_type"), &KartClassification::get_type);
+	ClassDB::bind_method(D_METHOD("get_scheduled_distance_m"),
+			&KartClassification::get_scheduled_distance_m);
+	ClassDB::bind_method(
+			D_METHOD("add_result", "driver_id", "position", "laps_completed", "distance_m",
+					"best_lap_s"),
+			&KartClassification::add_result);
+	ClassDB::bind_method(D_METHOD("count"), &KartClassification::count);
+	ClassDB::bind_method(D_METHOD("driver_at", "index"), &KartClassification::driver_at);
+	ClassDB::bind_method(D_METHOD("position_of", "driver_id"), &KartClassification::position_of);
+	ClassDB::bind_method(D_METHOD("credit_of", "driver_id"), &KartClassification::credit_of);
+	ClassDB::bind_method(D_METHOD("entry", "index"), &KartClassification::entry);
+
+	BIND_CONSTANT(CREDIT_NONE);
+	BIND_CONSTANT(CREDIT_HALF);
+	BIND_CONSTANT(CREDIT_FULL);
+	BIND_CONSTANT(MAX_RESULTS);
+}
+
+bool KartClassification::begin(int p_type) {
+	if (p_type < 0 || p_type >= kart::core::SESSION_TYPE_COUNT) {
+		ERR_PRINT(vformat("KartClassification: %d is not a session type", p_type));
+		return false;
+	}
+	classification_ = kart::core::Classification::of(static_cast<SessionType>(p_type));
+	return true;
+}
+
+int KartClassification::get_type() const {
+	return static_cast<int>(classification_.type);
+}
+
+double KartClassification::get_scheduled_distance_m() const {
+	return classification_.scheduled_distance_m;
+}
+
+bool KartClassification::add_result(int p_driver_id, int p_position, int p_laps_completed,
+		double p_distance_m, double p_best_lap_s) {
+	if (p_driver_id < 0) {
+		// DRIVER_NONE is a sentinel for "nobody", and an entry naming nobody is a
+		// row `position_of` and `find` can never reach.
+		ERR_PRINT(vformat("KartClassification: %d is not a driver id", p_driver_id));
+		return false;
+	}
+	if (p_position < 0 || p_laps_completed < 0 || p_distance_m < 0.0) {
+		ERR_PRINT(vformat("KartClassification: refused a negative measurement for driver %d",
+				p_driver_id));
+		return false;
+	}
+	kart::core::DriverResult result;
+	result.driver_id = p_driver_id;
+	result.position = p_position;
+	result.laps_completed = p_laps_completed;
+	result.distance_m = p_distance_m;
+	result.best_lap_s = p_best_lap_s;
+	if (!classification_.add(result)) {
+		ERR_PRINT(vformat("KartClassification: full at %d entries",
+				kart::core::RULES_MAX_ENTRIES));
+		return false;
+	}
+	return true;
+}
+
+int KartClassification::count() const {
+	return classification_.count;
+}
+
+int KartClassification::driver_at(int p_index) const {
+	if (p_index < 0 || p_index >= classification_.count) {
+		return kart::core::DRIVER_NONE;
+	}
+	return classification_.entries[p_index].driver_id;
+}
+
+int KartClassification::position_of(int p_driver_id) const {
+	return classification_.position_of(p_driver_id);
+}
+
+int KartClassification::credit_of(int p_driver_id) const {
+	return static_cast<int>(classification_.credit_of(p_driver_id));
+}
+
+Dictionary KartClassification::entry(int p_index) const {
+	Dictionary out;
+	if (p_index < 0 || p_index >= classification_.count) {
+		return out;
+	}
+	const kart::core::DriverResult &result = classification_.entries[p_index];
+	out["driver_id"] = result.driver_id;
+	out["position"] = result.position;
+	out["laps_completed"] = result.laps_completed;
+	out["distance_m"] = result.distance_m;
+	out["best_lap_s"] = result.best_lap_s;
+	out["has_lap"] = result.has_lap();
+	return out;
 }
 
 // --- KartLapTimer -------------------------------------------------------------

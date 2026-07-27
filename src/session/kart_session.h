@@ -2,6 +2,7 @@
 #define KARTGAME_SESSION_KART_SESSION_H
 
 #include "core/lap_timing.h"
+#include "core/race_rules.h"
 #include "core/session.h"
 
 #include <godot_cpp/classes/ref_counted.hpp>
@@ -144,6 +145,14 @@ public:
 	// this header from including the tuning bridge; the cast is checked.
 	bool adopt_tuning(godot::Object *p_tuning);
 
+	// The other direction, issue #178: push this configuration's tuning onto the
+	// registry, which pushes it to its owners and emits `tuning_changed`. What a
+	// session restored from a save or a replay header calls before it runs —
+	// ADR-0041's whole argument for carrying the preset inline is that a replay
+	// recorded under a preset must not re-sim under the defaults, and for one
+	// milestone the bridge could record that and not apply it.
+	bool apply_tuning(godot::Object *p_tuning);
+
 	// --- the whole thing --------------------------------------------------------
 
 	// ADR-0041's `config_hash`, as hex. The one number that says two sessions are
@@ -182,6 +191,78 @@ public:
 
 private:
 	kart::core::SessionConfig config_;
+};
+
+// One session's classification, as GDScript can hold one. `src/core/race_rules.h`
+// owns what a classification *is*; issue #178 is why this binding exists: with
+// nothing bound, the first session runner emitted a Dictionary whose keys were
+// spelled like `DriverResult`'s fields by hand. Fine for one kart in Practice,
+// and the wrong shape the moment a Heat has eight — the join between the
+// runner's output and `score_round()` was a spelling agreement rather than a
+// type. This makes it mechanical.
+//
+// **Driver ids are session-local integers, not roster slugs.** `race_rules.h`
+// scores whatever ids it is handed and needs only consistency within the round.
+// ADR-0047's seeded draw will own the mapping from roster slugs to these ids
+// when a field exists; until then the runner files the player as id 0 and says
+// so where it does it. `profile.h` stores slugs rather than these ids for the
+// mirror-image reason: a session-local id is meaningless in a file.
+class KartClassification : public godot::RefCounted {
+	GDCLASS(KartClassification, godot::RefCounted)
+
+protected:
+	static void _bind_methods();
+
+public:
+	// `race_rules.h`'s DistanceCredit, for `credit_of`. Constants for the same
+	// reason `KartSession` binds its enums: a wrong bare integer is silent.
+	enum {
+		CREDIT_NONE = static_cast<int>(kart::core::DistanceCredit::None),
+		CREDIT_HALF = static_cast<int>(kart::core::DistanceCredit::Half),
+		CREDIT_FULL = static_cast<int>(kart::core::DistanceCredit::Full),
+
+		MAX_RESULTS = kart::core::RULES_MAX_ENTRIES,
+	};
+
+	// Reset to an empty classification of a session type — `Classification::of`,
+	// which also fills the scheduled distance the compressed weekend actually
+	// runs, so distance credit is judged against the FIA arithmetic and not a
+	// number somebody typed. Takes `KartSession.TYPE_*`; refuses garbage.
+	bool begin(int p_type);
+	int get_type() const;
+	double get_scheduled_distance_m() const;
+
+	// One driver's result. Position is 1-based and **0 means not classified** —
+	// retired, flagged, never started — which scores nothing on any scale.
+	// Refuses a full table, a negative id, position or lap count rather than
+	// overrunning or storing what `race_rules.h` would misread.
+	bool add_result(int p_driver_id, int p_position, int p_laps_completed,
+			double p_distance_m, double p_best_lap_s);
+
+	int count() const;
+
+	// The driver id at a 0-based index, or `race_rules.h`'s DRIVER_NONE (-1).
+	int driver_at(int p_index) const;
+
+	// 1-based, or 0 for a driver not classified or not present — the two cases
+	// share a value because both score nothing.
+	int position_of(int p_driver_id) const;
+
+	// CREDIT_* for a driver's covered distance against the scheduled one.
+	int credit_of(int p_driver_id) const;
+
+	// One entry as a Dictionary, for a results table. **This method is the only
+	// speller of these keys** — `driver_id`, `position`, `laps_completed`,
+	// `distance_m`, `best_lap_s`, `has_lap` — which is the point of the class:
+	// a UI reads them from here rather than agreeing with the runner about them.
+	godot::Dictionary entry(int p_index) const;
+
+	// Not bound. The scorer and the recorder want the real struct.
+	const kart::core::Classification &classification() const { return classification_; }
+	kart::core::Classification &classification() { return classification_; }
+
+private:
+	kart::core::Classification classification_;
 };
 
 // One kart's laps and sectors. `src/core/lap_timing.h` is the timer; this hands it

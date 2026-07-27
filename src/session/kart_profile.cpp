@@ -147,71 +147,37 @@ Error atomic_store(const String &target, const String &temp, const PackedByteArr
 
 // --- the settings text format --------------------------------------------------
 //
-// Line oriented, `key` then the rest, the same shape as the profile and the preset
-// format. It is parsed here rather than in `src/core/` for one reason and it is a
-// boundary rather than a preference: `src/core/` is owned elsewhere in this
-// milestone and `profile.h` names `settings.cfg` while deliberately modeling
-// nothing about it. The parsing is pure string work and belongs beside the profile
-// parser under ADR-0017; moving it is a mechanical lift and it is reported rather
-// than done here.
+// `src/core/settings.h` now, per issue #178. The model first shipped here with a
+// comment saying it belonged in core and why it had not moved — the milestone's
+// file split — and `tests/core/test_settings.cpp` is what the move bought. What
+// stays on this side is `user://`, the temp-then-rename write, and turning each
+// typed parse note into the warning sentence a boot log prints.
 
-constexpr const char *SETTINGS_PREAMBLE =
-		"# kartgame settings: comfort, controls and assists. Deliberately NOT in\n"
-		"# profile.save -- a career that will not parse must still leave a menu a\n"
-		"# player can read. See src/session/kart_profile.h, ADR-0042.\n";
-
-constexpr double SETTINGS_MIN_VOLUME_DB = -60.0;
-constexpr double SETTINGS_MAX_VOLUME_DB = 6.0;
-// `player_driver.h`'s table: below 0.15 the whole followable steering range at
-// 100 km/h is inside the deadzone. Above 0.5 a stick has no usable travel left.
-constexpr double SETTINGS_MIN_DEADZONE = 0.0;
-constexpr double SETTINGS_MAX_DEADZONE = 0.5;
-
-const char *camera_slug(int camera) {
-	switch (camera) {
-		case KartSettings::CAMERA_CHASE: return "chase";
-		case KartSettings::CAMERA_COCKPIT: return "cockpit";
-		case KartSettings::CAMERA_FREE: return "free";
-		default: break;
+// One warning sentence per parse note, the same sentences this file printed when
+// it owned the parser. The note is typed so a unit test asserts on the enum; the
+// sentence is here so the wording can improve without touching core.
+String settings_note_text(const kart::core::SettingsNote &note) {
+	using kart::core::SettingsProblem;
+	const String key = from_utf8(note.key);
+	switch (note.problem) {
+		case SettingsProblem::VersionNotAVersion:
+			return vformat("line %d: settings_version is not a version", note.line);
+		case SettingsProblem::KeyWithNoValue:
+			return vformat("line %d: a key with no value, skipped", note.line);
+		case SettingsProblem::NotABool:
+			return vformat("line %d: %s is not true or false", note.line, key);
+		case SettingsProblem::NoSuchCamera:
+			return vformat("line %d: camera names no rig", note.line);
+		case SettingsProblem::NotANumber:
+			return vformat("line %d: %s is not a number", note.line, key);
+		case SettingsProblem::UnknownKey:
+			return vformat("line %d: unknown setting, skipped", note.line);
+		case SettingsProblem::NoVersionLine:
+			return from_utf8("no settings_version line; the file may not be a settings file");
+		case SettingsProblem::None:
+			break;
 	}
-	return "invalid";
-}
-
-bool parse_camera(const char *text, int len, int &out) {
-	for (int i = 0; i < KartSettings::CAMERA_COUNT; ++i) {
-		if (profile_text_equals(text, len, camera_slug(i))) {
-			out = i;
-			return true;
-		}
-	}
-	return false;
-}
-
-// Exactly `true` or `false`. Not 1/0 and not yes/no: a settings file is diffable
-// text and one spelling per value is what keeps a round trip byte-identical.
-bool parse_bool(const char *text, int len, bool &out) {
-	if (profile_text_equals(text, len, "true")) {
-		out = true;
-		return true;
-	}
-	if (profile_text_equals(text, len, "false")) {
-		out = false;
-		return true;
-	}
-	return false;
-}
-
-double clamp_double(double value, double low, double high) {
-	if (!(value == value)) { // NaN
-		return low > 0.0 || high < 0.0 ? low : 0.0;
-	}
-	if (value < low) {
-		return low;
-	}
-	if (value > high) {
-		return high;
-	}
-	return value;
+	return String();
 }
 
 } // namespace
@@ -922,94 +888,65 @@ String KartSettings::temp_path() const {
 }
 
 void KartSettings::set_auto_clutch(bool p_enabled) {
-	auto_clutch_ = p_enabled;
+	settings_.auto_clutch = p_enabled;
 }
 
 bool KartSettings::is_auto_clutch() const {
-	return auto_clutch_;
+	return settings_.auto_clutch;
 }
 
 void KartSettings::set_auto_shift(bool p_enabled) {
-	auto_shift_ = p_enabled;
+	settings_.auto_shift = p_enabled;
 }
 
 bool KartSettings::is_auto_shift() const {
-	return auto_shift_;
+	return settings_.auto_shift;
 }
 
 bool KartSettings::set_camera(int p_camera) {
-	if (p_camera < 0 || p_camera >= CAMERA_COUNT) {
-		return false;
-	}
-	camera_ = p_camera;
-	return true;
+	return settings_.set_camera(p_camera);
 }
 
 int KartSettings::get_camera() const {
-	return camera_;
+	return static_cast<int>(settings_.camera);
 }
 
 String KartSettings::get_camera_name() const {
-	return camera_name(camera_);
+	return camera_name(get_camera());
 }
 
 String KartSettings::camera_name(int p_camera) {
-	return from_utf8(camera_slug(p_camera));
+	return from_utf8(settings_camera_name(static_cast<SettingsCamera>(p_camera)));
 }
 
 void KartSettings::set_master_volume_db(double p_db) {
-	master_volume_db_ = clamp_double(p_db, SETTINGS_MIN_VOLUME_DB, SETTINGS_MAX_VOLUME_DB);
+	settings_.set_master_volume_db(p_db);
 }
 
 double KartSettings::get_master_volume_db() const {
-	return master_volume_db_;
+	return settings_.master_volume_db;
 }
 
 void KartSettings::set_steer_deadzone(double p_deadzone) {
-	steer_deadzone_ = clamp_double(p_deadzone, SETTINGS_MIN_DEADZONE, SETTINGS_MAX_DEADZONE);
+	settings_.set_steer_deadzone(p_deadzone);
 }
 
 double KartSettings::get_steer_deadzone() const {
-	return steer_deadzone_;
+	return settings_.steer_deadzone;
 }
 
 void KartSettings::reset_to_defaults() {
-	auto_clutch_ = true;
-	auto_shift_ = true;
-	camera_ = CAMERA_CHASE;
-	master_volume_db_ = 0.0;
-	steer_deadzone_ = 0.15;
+	settings_ = Settings{};
 }
 
 String KartSettings::to_text() const {
-	// Declaration order, fixed, one key per line, and every number through
-	// `tuning.h`'s `format_value` so a deadzone and a tunable are quantized to the
-	// same 1e-6 grid. There is one number renderer in this project.
-	char number[TUNING_VALUE_CHARS];
-	String text = from_utf8(SETTINGS_PREAMBLE);
-
-	if (format_int(SETTINGS_VERSION, number, static_cast<int>(sizeof(number))) < 0) {
+	// `settings_format` owns the layout, and its docstring carries what this
+	// comment used to: declaration order, one key per line, one number renderer.
+	char text[SETTINGS_TEXT_CHARS];
+	if (settings_format(settings_, text, static_cast<int>(sizeof(text))) < 0) {
 		return String();
 	}
-	text += from_utf8("settings_version ") + from_utf8(number) + from_utf8("\n");
-
-	text += from_utf8("assist_auto_clutch ") + from_utf8(auto_clutch_ ? "true" : "false") +
-			from_utf8("\n");
-	text += from_utf8("assist_auto_shift ") + from_utf8(auto_shift_ ? "true" : "false") +
-			from_utf8("\n");
-	text += from_utf8("camera ") + from_utf8(camera_slug(camera_)) + from_utf8("\n");
-
-	if (format_value(master_volume_db_, number, static_cast<int>(sizeof(number))) < 0) {
-		return String();
-	}
-	text += from_utf8("master_volume_db ") + from_utf8(number) + from_utf8("\n");
-
-	if (format_value(steer_deadzone_, number, static_cast<int>(sizeof(number))) < 0) {
-		return String();
-	}
-	text += from_utf8("steer_deadzone ") + from_utf8(number) + from_utf8("\n");
-
-	return text;
+	return from_utf8(text);
 }
 
 Dictionary KartSettings::save() {
@@ -1099,118 +1036,28 @@ Dictionary KartSettings::load() {
 	result["bytes"] = on_disk;
 
 	const CharString utf8 = text.utf8();
-	const char *raw = bytes_of(utf8);
-	const int len = profile_length(raw);
 
-	// Line oriented, blank lines and `#` comments dropped, `key` then the rest --
-	// the same lexing the profile and the preset format use. Written out here rather
-	// than reusing `profile_lex` because that one requires `version` as the first
-	// record and refuses everything else, which is exactly the property that keeps
-	// the two files from being loaded as each other.
-	int index = 0;
-	int line_number = 0;
-	bool seen_version = false;
-	while (index < len) {
-		const int line_begin = index;
-		while (index < len && raw[index] != '\n') {
-			++index;
-		}
-		int begin = line_begin;
-		int end = index;
-		++index;
-		++line_number;
-		while (begin < end && profile_is_space(raw[begin])) {
-			++begin;
-		}
-		for (int i = begin; i < end; ++i) {
-			if (raw[i] == '#') {
-				end = i;
-				break;
-			}
-		}
-		while (end > begin && profile_is_space(raw[end - 1])) {
-			--end;
-		}
-		if (begin >= end) {
-			continue;
-		}
-		int key_end = begin;
-		while (key_end < end && !profile_is_space(raw[key_end])) {
-			++key_end;
-		}
-		const char *key = raw + begin;
-		const int key_len = key_end - begin;
-		int value_begin = key_end;
-		while (value_begin < end && profile_is_space(raw[value_begin])) {
-			++value_begin;
-		}
-		const char *value = raw + value_begin;
-		const int value_len = end - value_begin;
-
-		if (profile_text_equals(key, key_len, "settings_version")) {
-			if (!profile_parse_int(value, value_len, declared) || declared < 1) {
-				warnings.push_back(vformat("line %d: settings_version is not a version",
-						line_number));
-				declared = 0;
-			}
-			seen_version = true;
-			continue;
-		}
-		if (value_len <= 0) {
-			warnings.push_back(vformat("line %d: a key with no value, skipped", line_number));
-			continue;
-		}
-		bool flag = false;
-		double number = 0.0;
-		if (profile_text_equals(key, key_len, "assist_auto_clutch")) {
-			if (parse_bool(value, value_len, flag)) {
-				auto_clutch_ = flag;
-				++applied;
-			} else {
-				warnings.push_back(vformat("line %d: assist_auto_clutch is not true or false",
-						line_number));
-			}
-		} else if (profile_text_equals(key, key_len, "assist_auto_shift")) {
-			if (parse_bool(value, value_len, flag)) {
-				auto_shift_ = flag;
-				++applied;
-			} else {
-				warnings.push_back(vformat("line %d: assist_auto_shift is not true or false",
-						line_number));
-			}
-		} else if (profile_text_equals(key, key_len, "camera")) {
-			int camera = CAMERA_CHASE;
-			if (parse_camera(value, value_len, camera)) {
-				camera_ = camera;
-				++applied;
-			} else {
-				warnings.push_back(vformat("line %d: camera names no rig", line_number));
-			}
-		} else if (profile_text_equals(key, key_len, "master_volume_db")) {
-			if (parse_value(value, value_len, number)) {
-				set_master_volume_db(number);
-				++applied;
-			} else {
-				warnings.push_back(vformat("line %d: master_volume_db is not a number",
-						line_number));
-			}
-		} else if (profile_text_equals(key, key_len, "steer_deadzone")) {
-			if (parse_value(value, value_len, number)) {
-				set_steer_deadzone(number);
-				++applied;
-			} else {
-				warnings.push_back(vformat("line %d: steer_deadzone is not a number", line_number));
-			}
-		} else {
-			// A key from a newer build is the realistic case, and it is skipped rather
-			// than refused. `kart_profile.h` says why this is the opposite of the
-			// career's policy and why the asymmetry is correct.
-			warnings.push_back(vformat("line %d: unknown setting, skipped", line_number));
+	// `settings_parse` owns the lexing and every decision about what the bytes
+	// mean — including why it does not reuse `profile_lex`, which is the property
+	// that keeps the two files from being loaded as each other. What this side
+	// adds is the sentences: one warning per typed note, the same wording this
+	// file printed when it owned the parser, so a boot log reads unchanged.
+	SettingsParse report;
+	settings_parse(bytes_of(utf8), static_cast<int>(utf8.length()), settings_, report);
+	applied = report.applied;
+	declared = report.declared_version;
+	for (int i = 0; i < report.note_count; ++i) {
+		const String sentence = settings_note_text(report.notes[i]);
+		if (!sentence.is_empty()) {
+			warnings.push_back(sentence);
 		}
 	}
-
-	if (!seen_version) {
-		warnings.push_back(from_utf8("no settings_version line; the file may not be a settings file"));
+	if (report.notes_dropped > 0) {
+		// A file of pure garbage produces one note per line; core caps what it
+		// keeps rather than allocating, and the count is worth a sentence because
+		// "16 warnings" reading as the whole story would understate the mess.
+		warnings.push_back(vformat("and %d more warnings like these were dropped",
+				report.notes_dropped));
 	}
 	return finish(true, true);
 }

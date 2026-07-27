@@ -306,6 +306,20 @@ public:
 	// reports a determinism failure that is nothing of the sort.
 	const kart::core::TuningSet &tuning_set() const { return set_; }
 
+	// The inverse, and issue #178's missing half: replace the whole set and push
+	// every value to its owner. `KartSession::apply_tuning` is the caller — the
+	// preset is carried inline precisely so a replay or a save can impose it, and
+	// until this existed the bridge could record a configuration's tuning and not
+	// apply it.
+	//
+	// Defended overrides in the incoming set are granted their acknowledgement,
+	// the same decision `from_text` makes for a file: a recorded configuration
+	// carries the override in writing, which is a stronger acknowledgement than
+	// the overlay's two-press gesture. Returns how many defended defaults the
+	// adopted set moves, because the caller's next sentence is usually about
+	// exactly that number.
+	int adopt_set(const kart::core::TuningSet &p_set);
+
 private:
 
 	// Per-tunable, per-session, never persisted. See the header note on why this

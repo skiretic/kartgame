@@ -66,17 +66,17 @@ extends Node
 ## moment, its release condition is the physical fact that the kart has landed, and
 ## a race's countdown is a *floor* added to the same wait.
 ##
-## ## What it applies to the kart, and one thing it cannot
+## ## What it applies to the kart, and what a restorer applies itself
 ##
 ## `SessionConfig` carries the assists and the tuning set. The assists are applied
 ## here, because they change the lap and are in the configuration hash for that
-## reason. **The tuning is not, and cannot be from GDScript today**: `KartSession`
-## has `adopt_tuning(KartTuning)`, which reads the registry *into* the
-## configuration, and nothing goes the other way. So this node records what the
-## scene was already tuned to rather than imposing what the session says — which is
-## the right direction for a session started from a scene and the wrong one for a
-## session restored from a save. `src/session/kart_session.*` is not this file's to
-## edit; the missing method is reported rather than worked around.
+## reason. The tuning is **not** applied here, and since issue #178 that is a
+## choice rather than a missing method: `KartSession.apply_tuning(KartTuning)`
+## pushes a configuration's tuning onto the registry, and it belongs to whoever
+## *restored* the session — a replay player, a save loader — not to this node. A
+## session started from a scene records what the scene was already tuned to
+## (`adopt_tuning`, the other direction), and a runner that re-imposed it on
+## every configure() would fight the F2 overlay for the same knobs mid-session.
 ##
 ## ## Input is gated at the producer, and this node is its only owner
 ##
@@ -100,6 +100,14 @@ extends Node
 ## `result()["best_lap_s"]` against `result()["config_hash"]`; a ghost recorder
 ## subscribes to `lap_completed` and keeps the stream of the lap that was fastest.**
 ## Those are the two seams and they are the only two.
+##
+## Since issue #178 the result also carries `classification()`, a bound
+## `KartClassification` holding the same measurements as typed `DriverResult`
+## fields — because the Dictionary's spelling of those keys was an agreement,
+## and `score_round()` will want eight of these the day a Heat has a field. The
+## player is filed as **driver id 0**: ids are session-local integers
+## (`kart_session.h` says why they are not roster slugs), and ADR-0047's draw
+## will own the mapping when a field exists.
 
 # --- states --------------------------------------------------------------------
 
@@ -231,6 +239,10 @@ var _odometer_step_limit := 0.0
 ## Filled once, when the session reaches `RESULT` or `REFUSED`. Held rather than
 ## recomputed so that reading a result twice cannot give two answers.
 var _result: Dictionary = {}
+
+## The same finish, as the type `race_rules.h` scores. Empty (count 0) for a
+## refused session — a session that never ran classified nobody.
+var _classification: KartClassification
 
 ## What ended the session, in the vocabulary `result()["outcome"]` publishes.
 var _outcome := ""
@@ -758,6 +770,13 @@ func result() -> Dictionary:
 	return _result.duplicate()
 
 
+## The finish as `race_rules.h`'s type, or null before the session is over. The
+## same measurements as the Dictionary's `laps_completed` / `distance_m` /
+## `best_lap_s` keys, spelled by a struct instead of an agreement — issue #178.
+func classification() -> KartClassification:
+	return _classification
+
+
 ## The result as one sentence, for a terminal and for a report.
 ##
 ## ADR-0044: one format string with placeholders, never a sentence built by
@@ -844,6 +863,18 @@ func _build_result() -> void:
 	var type := _session.get_type() if _session != null else KartSession.TYPE_PRACTICE
 	if _outcome == "":
 		_outcome = "refused" if _state == STATE_REFUSED else "abandoned"
+
+	# The typed half of the result, issue #178. The player is driver id 0 — ids
+	# are session-local, per the header — and is classified (position 1, alone in
+	# the field) only when a valid lap exists: `race_rules.h` reads position 0 as
+	# "not classified", which is the honest entry for a session that produced no
+	# timed lap. A refused session classifies nobody at all.
+	_classification = KartClassification.new()
+	_classification.begin(type)
+	if _state == STATE_RESULT and _timer != null:
+		var position := 1 if _timer.has_best() else 0
+		_classification.add_result(0, position, _timer.laps_completed(), _odometer,
+			_timer.best_time() if _timer.has_best() else 0.0)
 	_result = {
 		"type": type,
 		"type_name": KartSession.type_name(type),
