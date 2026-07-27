@@ -43,23 +43,37 @@ const ROAD_LIP := 0.002
 
 ## Track width, meters, constant the whole way round.
 ##
-## **Not sourced.** The CIK-FIA circuit regulations put the minimum track width in
-## Appendix 13, which is not in the Part 1 text `docs/REFERENCES.md` already
-## records, so this is a chosen number and is flagged as one. What it is anchored
-## to is the kart: FIA Karting Art. 8.1.1 caps overall width at 1,400 mm and this
-## kart's rear track is that, so 8 m is 5.7 kart widths — enough for the widest
-## line through the hairpin to be a real choice rather than a formality, and
-## narrow enough that running out of road is a mistake with a consequence.
+## **Sourced now** — this docstring said it was not for a milestone, which is #157.
+## CIK-FIA *Appendix No. 13, Licence Criteria*, track requirements: a Grade 1
+## circuit — the grade for FIA Karting Championships, Cups and Trophies — is
+## **minimum 8 m** wide, against 7 m for Grade 2 and 6 m for Grade 3. So 8.0 is
+## exactly the regulation floor rather than a chosen number. The figure lives in
+## Appendix 13 and *not* in the Part 1 text, which is why it read as unsourceable:
+## Part 1 says "see Appendix 13" and its own appendix section says "see
+## fiakarting.com". `docs/REFERENCES.md`, *Circuit design and regulation*, has the
+## PDF and the whole grade table.
+##
+## What it means for a design is worth keeping next to the number: 8 m is a
+## *minimum*, so a circuit held at 8 m the whole way round is the narrowest legal
+## Grade 1 track. Widening an overtaking corner is free plausibility. The kart
+## check still holds too — FIA Karting Art. 8.1.1 caps overall kart width at
+## 1,400 mm, so 8 m is 5.7 kart widths.
 const TRACK_WIDTH := 8.0
 
 ## The white lines down both edges of the asphalt, meters wide.
 ##
-## Sourced, unlike the width itself. CIK-FIA Circuit Regulations Part 1 §7.2: "The
-## left and right edges of the track asphalt must be delimited by the required
-## white or yellow lines ... but with a maximum width of 120 mm." 100 mm is inside
-## that. They sit 4 mm above the road for the same reason `proving_ground.gd`'s
-## paint does — coplanar paint z-fights across the whole track, which looks like a
-## rendering bug and is one.
+## CIK-FIA Circuit Regulations Part 1 §7.2: "The left and right edges of the track
+## asphalt must be delimited by the required white or yellow lines ... but with a
+## maximum width of 120 mm." 100 mm is inside that. The citation was used here and
+## recorded nowhere for a milestone, which is the other half of #157 — it is in
+## `docs/REFERENCES.md` now. They sit 4 mm above the road for the same reason
+## `proving_ground.gd`'s paint does — coplanar paint z-fights across the whole
+## track, which looks like a rendering bug and is one.
+##
+## §12 of the same text is why nothing *else* is painted on the asphalt: "Any paint
+## on the circuit surfacing, other than that which delimits the edges of the track
+## and determines the starting grid, is forbidden for safety reasons." Corner
+## numbers and braking boards go on structures beside the track.
 const EDGE_LINE_WIDTH := 0.10
 const PAINT_LIFT := 0.004
 

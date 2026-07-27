@@ -361,6 +361,24 @@ The first track is fictional, so plausibility has to be enforced deliberately ra
 - Elevation change, both for looks and because it loads the tires
 - Validation pass: closed loop, no self-intersection, no radius the kart physically cannot take
 
+**Most of that list is now a regulation rather than taste**, and the figures are in
+`REFERENCES.md`, *Circuit design and regulation*, sourced to the CIK-FIA 2026
+Circuit Regulations and Appendix 13. The ones that bind a layout: width **min 8 m**
+for Grade 1, lap length **min 1,100 m**, starting straight **120–200 m**, **longest
+straight max 200 m**, start line to first corner **min 50 m**, last corner back to
+the line **min 70 m**, **6 m minimum** between adjacent sections of track, verge
+**min 1.80 m** both sides for the whole length, run-off mandatory on the axis of
+any direction change over **80°**, straights cambered **1.5–3%**, corner banking
+**max 10% (5.7°)** and adverse camber not generally acceptable, and every change of
+gradient laid on a vertical radius of **R = V²/K**, K = 20 concave and 15 convex —
+which is 1,249 m at this kart's measured 136.9 km/h, and is the reason a kart
+circuit's elevation change belongs in its slow sections.
+
+Two items on the list stay a design choice because no regulation touches them:
+**there is no minimum corner radius** — §7.1 says the plan shape "is not subject to
+restrictions" — so the floor comes from the kart's own measured lock sweep; and no
+article caps total elevation change.
+
 ### AI-generated — gap filling
 
 Decals, grime and wear overlays, background props, signage and banners, skybox variants where an HDRI does not fit. Local ComfyUI with SDXL or Flux, seamless tiling, delight, then normal and roughness extraction.

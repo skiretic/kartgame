@@ -1802,3 +1802,246 @@ an opinion held by most of a forum.
 6. **The rename chain is fan-wiki-sourced.** ICC → KZ2, Super-ICC → KZ1 → KZ,
    ICA → KF2 → KF → OK. Only KF → OK in 2016 is confirmed primary (C2). Usable as
    flavor, not as a citable date.
+
+---
+
+## Circuit design and regulation — issue #157, ROADMAP M5
+
+`ARCHITECTURE.md` §11's track-design constraints were written as design taste with
+one regulation cited in passing, and `track_ribbon.gd`'s 8 m width said in its own
+docstring that it was not sourced. Issue #157 is that gap. The regulations turn out
+to contain most of it, and one figure the code had already used — the 120 mm edge
+line — was sourced with the source recorded nowhere.
+
+**The trap that cost the time.** The Part 1 text is *not* where the track dimensions
+are. It says "see Appendix 13" for the characteristics and "see Appendix 13" again
+for the kart count, and its own appendix section reads, in full, *"Annexes — Voir
+fiakarting.com"*. The appendices are separate PDFs that the circuit-regulations page
+does not link. A session that reads Part 1 end to end concludes the FIA does not
+specify a track width. It does; it is in a different file.
+
+**The second trap: the 2026 text is materially different from the 2025 text.** The
+2025 edition has no elevation article at all. The 2026 edition adds an *Elevations*
+block under §7.2 carrying the vertical-radius formula, the starting-straight
+gradient cap, and both camber limits — which is to say, everything `track.json`'s
+`elevation` and `banking` fields need. Diffing the numeric tokens of the two
+editions, that block is the only substantive change. Cite the 2026 text.
+
+### Written sources
+
+| Ref | Document | Source |
+| --- | --- | --- |
+| T1 | *Règlement des Circuits / Circuit Regulations, Parts I + II*, CIK-FIA, **2026** (site-dated 9 Feb 2026) — the operative text | [`7.1 + 7.2_Prépa RCIRC PI + PII 2026.pdf`](https://www.fiakarting.com/sites/default/files/2026-02/7.1%20%2B%207.2_Pr%C3%A9pa%20RCIRC%20PI%20%2B%20PII%202026.pdf), SHA-256 `6ade6bd1…8ac6193` |
+| T2 | *Circuit Regulations, Parts I + II*, CIK-FIA, **2025** — kept only to date the Elevations block, and because the surfaces section above already cites it | [`7.1_Prépa RCIRC PI + II 2025.pdf`](https://www.fiakarting.com/sites/default/files/2025-04/7.1_Pr%C3%A9pa%20RCIRC%20PI%20+%20II%202025.pdf), SHA-256 `ad38a085…11add542` |
+| T3 | **Appendix No. 13, *Licence Criteria***, CIK-FIA — the grade table, implementation 01.01.2025. This is the file with the dimensions in it | [`Appendix 13 - Licence Criteria.pdf`](https://www.fiakarting.com/sites/default/files/2025-11/Appendix%2013%20-%20Licence%20Criteria.pdf), SHA-256 `23bc32d1…931b812b` |
+| T4 | Appendix No. 13, the January 2025 printing — track-requirement rows are **identical**, checked line by line; only the page header and the infrastructure table's caption differ | [`Appendix 13 - Licence Criteria_1.pdf`](https://www.fiakarting.com/sites/default/files/2025-01/Appendix%2013%20-%20Licence%20Criteria_1.pdf) |
+
+The French is the authentic text in T1 and T2 and says so; the English column is
+quoted below because it is the one a later reader will grep for, and the two were
+read side by side.
+
+### The table — what a Grade 1 kart circuit must be
+
+T3, *FIA Karting Circuit Licence Grades — Track Requirements*. Grade 1 is the
+requirement set for FIA Karting Championships, Cups and Trophies; Grade 2 is for
+other competitions on the International Sporting Calendar; Grade 3 is everything
+else that needs a licence.
+
+| Topic | Grade 1 | Grade 2 | Grade 3 |
+| --- | --- | --- | --- |
+| Length | min 1,100 m | min 1,000 m | min 800 m |
+| **Width** | **min 8 m** | min 7 m | min 6 m |
+| Width of starting straight | min 8 m | min 8 m | min 7 m |
+| Length of starting straight | **120–200 m** | 120–200 m | 100–170 m |
+| Length of longest straight | **max 200 m** | max 200 m | max 150 m |
+| Distance start line → 1st corner | min 50 m | min 50 m | min 30 m |
+| Distance last corner → start line | min 70 m | min 70 m | — |
+| Distance between alternating lanes | min 6 m | min 6 m | min 6 m |
+| Number of karts | L/28, max 36 | L/28, max 36 | L/28, max 36 |
+| Number of karts, practice | L/28 +20%, max 44 | same | same |
+| Number of karts, endurance | L/20, max 51 | same | same |
+
+`L` is the circuit length in meters. Grade 1 also mandates CCTV, light panels, a
+media safety plan and a medical questionnaire, and the infrastructure table sets
+paddock and scrutineering areas — none of which this game models, and all of which
+are in T3 if a paddock scene is ever built.
+
+### Everything else the regulations fix, article by article
+
+**Width, and the 8 m that was a guess.** T3: **8 m minimum for Grade 1.**
+`track_ribbon.gd`'s `TRACK_WIDTH = 8.0` is therefore exactly the regulation floor
+and no longer a chosen number. Note what that means for the design: 8 m is the
+*minimum*, so a circuit built at 8 m throughout is the narrowest legal Grade 1
+track, and widening the two overtaking corners is a free plausibility gain.
+
+**Edge lines.** T1 §7.2: *"The left and right edges of the track asphalt must be
+delimited by the required white or yellow lines, in compliance with the road
+standards valid in the country of the circuit but with a maximum width of 120
+mm."* `EDGE_LINE_WIDTH = 0.10` is inside it. This is the figure #157 says was used
+without being recorded; it is recorded now.
+
+**Kerbs.** T1 §14.6: *"Kerbs must be painted in two colours alternately
+(recommended colours: red and white)."* That is the whole of it — the regulations
+specify a kerb's paint, its inspection and its repair, and **say nothing about its
+profile, height, width or stripe pitch.** The 1 m red/white alternation the ribbon
+draws is a choice consistent with the rule, not a figure from it. The surfaces
+section above already carries this same citation for a different purpose (that a
+kerb is a *painted* surface, so its friction is a paint figure).
+
+**No other paint is legal.** T1 §12: *"Any paint on the circuit surfacing, other
+than that which delimits the edges of the track and determines the starting grid,
+is forbidden for safety reasons."* So a track dressed with painted corner numbers,
+sponsor logos on the asphalt or a painted racing line is dressed illegally. Braking
+boards go on structures beside the track, not on the road.
+
+**Surface.** T1 §7.2: *"Asphalt on the whole length of the track."*
+
+**Elevation — longitudinal.** T1 §7.2, *Elevations*, new in the 2026 text:
+
+> Any change in gradient should be affected using a minimum vertical radius
+> calculated by the formula: R = V²/K, where R is the radius in metres, V is the
+> speed in km/h and K is a constant equal to **20 in the case of a concave profile
+> or to 15 in the case of a convex profile**. The value of R must be adequately
+> increased along approach, release, braking and curved sections. Wherever
+> possible, changes in gradient should be avoided altogether in these sections.
+> **The gradient of the starting straight should not exceed 2%.**
+
+Worked against this kart's measured speeds (`drive.sh`: top speed 136.9 km/h), the
+formula is a much harder constraint than it looks:
+
+| Speed at the crest or compression | Convex, K = 15 | Concave, K = 20 |
+| --- | --- | --- |
+| 136.9 km/h — measured top speed | **1,249 m** | 937 m |
+| 120 km/h | 960 m | 720 m |
+| 100 km/h | 667 m | 500 m |
+| 81.3 km/h — the 0.25-lock / 0.6-throttle row | 441 m | 330 m |
+| 46.0 km/h — the 0.25-lock / 0.3-throttle row | 141 m | 106 m |
+| 21.2 km/h — where #137's cliff settles the kart | 30 m | 23 m |
+
+A 1,249 m vertical radius on a circuit whose whole lap is 1,200 m is the finding
+that matters: **elevation change on a kart circuit lives in the slow parts.** A
+crest taken flat out has to be nearly flat; a compression at the bottom of a
+braking zone can be four times tighter for the same legality, and gets tighter
+still as the kart slows. Any design that puts its dramatic elevation on the main
+straight is not a kart circuit.
+
+**Elevation — transverse.** Same article:
+
+> Along straights, the transversal incline, for drainage purposes, when measured
+> between the two track edges or between the centreline and the track edge
+> (camber), **must not exceed 3% (1.7°) or be less than 1.5% (0.9°)**.
+> In curves, the banking (cross camber) (downwards from the outside to the inside
+> of the track) **should not exceed 10% (5.7°)**. An adverse incline is not
+> generally acceptable unless dictated by special circumstances. All changes in
+> banking (cross camber) are to be made over an appropriate distance.
+
+Three consequences for `track.json`'s `banking` field. A straight is never flat —
+1.5% is a *floor*, not a permission. Positive banking is capped at 5.7°, which is
+gentle enough that it will move lap time far less than the geometry does. And
+**adverse camber is legal only under special circumstances**, so a designer who
+wants one has to say why, which is the correct default for a field that will
+otherwise get an off-camber corner because it sounded interesting.
+
+**Run-off and verges.** T1 §7.5: the track *"must be bordered all along its length
+on both sides by compact verges having an even surface and having a minimum width
+of **1.80 m**"*, free of debris or gravel, *"grass-covered or compacted ground over
+a minimum width of 1 m"*. The verge continues the track's transversal profile
+**with no negative slope**; any horizontal transition must be *"very gradual and
+progressive"*. The run-off area — verge to first line of protection — has the same
+basic characteristics, may be less stabilised, must grade to the verge without a
+negative slope, and if it slopes up *"this must not be in excess of **10%**"*. The
+same applies to gravel beds. **The minimum distance between two adjacent sections
+of the track is 6 m in any case.** A run-off area *"is mandatory to build one in
+the axis of kart lines with a change of direction of over 80°"* — which is to say,
+every hairpin gets one, and that is a rule and not a preference.
+
+The actual *width* of run-off is not a number in the regulations: §7.5 says it
+*"must be the result of a numeric simulation calculated according to the speed of
+the kart on its line, the impact angle and the friction coefficient"*, adjusted by
+inspection and data. So `ARCHITECTURE.md` §11's "run-off proportional to approach
+speed" is the regulation's own logic, and 1.80 m is the floor beneath it.
+
+**Gravel beds.** T1 §8.2: minimum width **2 m**, rolled gravel at 5/15
+granulometry preferably or 8/20 maximum, minimum thickness **30 cm**, decompacted
+before every competition, and *"must neither be located below the track level nor
+be preceded by a heightened verge"*.
+
+**Barriers.** T1 §8: where the probable impact angle is small (**under 30°**) a
+continuous, smooth, vertical barrier is preferred, with a conveyor belt or
+equivalent in front of a tire barrier; where it is large, a deceleration device
+(gravel bed) plus a stopping device (foam mattress) is required. §8.1 grades them
+Type A air mattress, Type B foam mattress or plastic block, Type C foam block or
+tire pile. §2 defines a tire barrier with roughly 500 mm of space behind it as
+*absorbing*, and plastic barriers as *semi-absorbing*.
+
+**The start.** T1 §7.6: *"There must be at least **50 m** between the starting line
+and the first corner. This corner must be open as much as possible and have a width
+of **8 to 12 m**, depending on the width of the starting straight line. By first
+corner is meant a change of direction of at least **45°**."* T3 tightens the same
+distance to 50 m for Grade 1 and adds the 70 m from last corner back to the line.
+§7.7: starting lights **10–15 m ahead of the first grid row**, **2.5–3.5 m above
+the track**, over at least half the track width and ideally the centerline; the
+red-light sequence for a standing start runs automatically for 4 s and is
+extinguished manually within the next 2 s.
+
+**Tunnels and bridges.** T1 §7.2: a tunnel needs a **30 m straight before** and a
+**20 m straight after**, track width plus **1.8 m** of protected run-off both
+sides, minimum height **2.5 m**. A bridge needs the same 30 m before the ascending
+ramp and 20 m after the descending one.
+
+**Pit entry.** T1 §7.2 and §7.4: the deceleration lane and the exit lane must not
+cross the racing line, their angle to the track *"must not exceed **30°**"*, the
+deceleration lane is **3–4 m** wide and needs a chicane at its entry to slow karts
+down.
+
+**How length is measured**, which is the rule `track.json` is validated against.
+T1 §11: the official length is that of *the centerline*, the median line between
+the left and right asphalt edges as delimited by the white or yellow lines. The
+plan definition carries the horizontal centerline length of every straight and
+curve, **the radius of all circular curves and the mathematical description of all
+transition curves**; the longitudinal profile is *"either vertical circular curves
+or a series of centreline levels at intervals of not less than 10 metres, accurate
+to 0.01 m"*; and the official length combines the two, to an accuracy of **1 m**.
+That is a spline schema described in a regulation, and it is close enough to
+ADR-0046's that the resemblance is worth stating rather than discovering.
+
+**Circuit capacity.** T3: `L/28`, capped at 36. A 1,200 m lap is 42 karts by
+formula, so the cap binds and the design's 8-kart grid is far inside it. T1 §6.2's
+*"one kart every 50 metres, with an absolute maximum of 60 karts"* is the **long
+circuit** rule — a Grade 1–4 *car* circuit hosting KZ, KZ2 or Superkart — and is
+not the number for a kart circuit. Two rules, two different quantities, and the
+looser one is the wrong one.
+
+### What could not be sourced, and what stays assumed
+
+1. **A minimum corner radius. There is none in the regulations**, and after
+   reading Part 1, Part 2 and Appendix 13 that is a positive finding rather than a
+   failed search: T1 §7.1 says outright that *"the shape of the course in plan is
+   not subject to restrictions"*, and safety is enforced by the numeric run-off
+   simulation instead of by a geometry rule. So `ARCHITECTURE.md` §11's "minimum
+   corner radius sane against the speed the physics actually reaches" has to be
+   answered by **this kart**, not by the FIA. The measured answer is already in
+   `track_layout.gd`'s docstring, from `drive_probe.gd`'s lock sweep: the tightest
+   circle the kart can physically hold is **2.70 m** at full lock and 5.6 km/h, and
+   the useful floor is far wider than that because past a quarter lock the kart
+   falls off a cliff (#137) — 1.02 g and 21.2 km/h at 0.60 lock. A corner below
+   about 11 m is a corner this kart crawls through.
+2. **Kerb geometry.** §14.6 gives paint and nothing else, so the 30 mm height, 1 m
+   width, 4 m ramp and 12 mm / 0.15 m ripple all remain what the surfaces section
+   above says they are: bracketed by the kart, not sourced from a drawing. A
+   dimensioned kart kerb was searched for again here and still not found.
+3. **Appendices 9, 10 and 15**, referenced by Part 1 for the servicing-park plan,
+   the starting-grid sketch and the required premises. Only Appendix 13 was located
+   as a public PDF; the circuit-regulations page links the Part 1+2 text and the
+   light-panel standard and nothing else, and the Part 1 appendix section reads
+   *"Voir fiakarting.com"*. **Grid slot spacing is therefore still unsourced**, and
+   ADR-0046 needs it. It is the one gap this pass leaves open.
+4. **What a kart circuit's elevation change actually is, in meters.** The formula
+   constrains the *radius* of a gradient change and caps the starting straight at
+   2%, but no article caps total elevation change or a mid-lap gradient. The number
+   this project picks is a design choice and must be recorded as one.
+5. **Whether the 2026 Elevations block is new or restored.** It is absent from the
+   2025 and 2021 texts, so it is new to the karting regulations within that window.
+   The identical R = V²/K formula with the same K = 20 / K = 15 constants is
+   long-standing in the FIA's circuit rules for cars, which was not fetched here —
+   so "new in 2026" is a statement about the *karting* text only. INFERRED.
