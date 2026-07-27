@@ -627,11 +627,26 @@ func _check_refusals() -> void:
 	if not ok_runner.refusal().contains("ok"):
 		problems.append("the OK class was not refused by name")
 
+	# A rate the engine will not run at. Issue #174 put the tick rate in the
+	# configuration hash; a config claiming a rate the engine will not integrate
+	# at would record a replay whose header lies about its own integration.
+	var claimed_hz := 240 if Engine.physics_ticks_per_second != 240 else 120
+	var rate_session := KartSession.new()
+	rate_session.set_track("test_track")
+	rate_session.set_tick_hz(claimed_hz)
+	var rate_runner := SessionRunner.new()
+	rate_runner.configure(rate_session, kart, driver, _layout)
+	refusals.append(rate_runner.refusal())
+	if not rate_runner.refusal().contains("%d Hz" % claimed_hz):
+		problems.append("a %d Hz claim against a %d Hz engine was not refused by name" % [
+			claimed_hz, Engine.physics_ticks_per_second,
+		])
+
 	for refusal in refusals:
 		if refusal == "":
 			problems.append("a refused session gave no reason")
 
-	for node in [bare, field_runner, ok_runner, driver, kart]:
+	for node in [bare, field_runner, ok_runner, rate_runner, driver, kart]:
 		node.free()
 
 	_ok("refusals name the field", problems.is_empty(),

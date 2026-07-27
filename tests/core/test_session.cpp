@@ -112,6 +112,15 @@ TEST_CASE("is_valid rejects a limit with no number and an impossible field") {
 	config.entry_count = 1;
 	CHECK(config.is_valid());
 
+	// The tick rate has the same two-sided sanity check as the entry count: zero
+	// is not a simulation and a garbage parse is not a rate anyone chose.
+	config.tick_hz = 0;
+	CHECK_FALSE(config.is_valid());
+	config.tick_hz = SESSION_MAX_TICK_HZ + 1;
+	CHECK_FALSE(config.is_valid());
+	config.tick_hz = SESSION_DEFAULT_TICK_HZ;
+	CHECK(config.is_valid());
+
 	// A parse that produced garbage in an enum is rejected rather than switched on.
 	config.type = static_cast<SessionType>(SESSION_TYPE_COUNT);
 	CHECK_FALSE(config.is_valid());
@@ -193,6 +202,15 @@ TEST_CASE("the hash is stable across a copy and changes for every field") {
 		// hashed as one integer would have made them.
 		CHECK(clutch.hash() != shift.hash());
 	}
+	SUBCASE("tick_hz, which is issue #174's field") {
+		// The collision this closes was demonstrated in `test_replay.cpp`: two
+		// sessions differing only in integration rate fingerprinted identically,
+		// and the replay header carried the rate beside the hash as a workaround.
+		SessionConfig moved = base;
+		moved.tick_hz = 240;
+		CHECK(moved.hash() != base.hash());
+		CHECK(first_difference(base, moved) == SessionField::TickHz);
+	}
 	SUBCASE("tuning, which is the hole ADR-0041 exists to close") {
 		SessionConfig moved = base;
 		const int id = tunable_by_key("steer_gamma");
@@ -219,7 +237,8 @@ TEST_CASE("the field names are distinct, so an error message cannot name two fie
 		SessionField::Layout, SessionField::Condition, SessionField::Type,
 		SessionField::KartClass, SessionField::LimitKind, SessionField::LimitValue,
 		SessionField::EntryCount, SessionField::RosterHash, SessionField::AutoClutch,
-		SessionField::AutoShift, SessionField::Tuning, SessionField::Seed
+		SessionField::AutoShift, SessionField::TickHz, SessionField::Tuning,
+		SessionField::Seed
 	};
 	const int count = static_cast<int>(sizeof(fields) / sizeof(fields[0]));
 	for (int i = 0; i < count; ++i) {

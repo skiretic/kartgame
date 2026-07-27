@@ -78,6 +78,17 @@ inline constexpr int SESSION_ID_CHARS = 48;
 // produced garbage.
 inline constexpr int SESSION_MAX_ENTRIES = 34;
 
+// `project.godot`'s `physics/common/physics_ticks_per_second`. The rate a config
+// claims unless whoever built it asked the engine — which the session runner
+// does, refusing a mismatch rather than trusting this default to still be true.
+inline constexpr int SESSION_DEFAULT_TICK_HZ = 120;
+
+// A sanity ceiling in the spirit of `SESSION_MAX_ENTRIES`: 1,000 Hz is a 1 ms
+// physics tick, an order of magnitude past anything this project has run, and
+// the constant exists only so `is_valid()` can reject a parse that produced
+// garbage rather than a rate anyone chose.
+inline constexpr int SESSION_MAX_TICK_HZ = 1000;
+
 // The four session types of `GAMEDESIGN.md` §4, which are the four the FIA
 // Karting Specific Prescriptions Art. 18 names: "Free Practice, Qualifying
 // Practice, Qualifying Heats, Super Heat(s) and a final phase".
@@ -288,6 +299,18 @@ struct SessionConfig {
 
 	Assists assists;
 
+	// Physics ticks per second. Issue #174's move: this was carried in the replay
+	// header, outside the config, because ADR-0041 omitted it — and the omission
+	// broke the ADR's central promise. A run recorded at 120 Hz and re-simulated
+	// at 240 Hz had an identical `config_hash` and a completely different lap:
+	// same solver, same inputs, different integration, which the ADR's two-outcome
+	// scheme could only call a determinism bug. The rate passes every test the ADR
+	// applies to configuration — chosen before the session, constant through it,
+	// two sessions differing only in it are not the same session — so it is hashed
+	// here like any other field, and a mismatch refuses naming `tick_hz` instead
+	// of through a special case sitting beside the hash it should have been in.
+	int tick_hz = SESSION_DEFAULT_TICK_HZ;
+
 	// The full tuning set, not a path and not a diff-on-disk. ADR-0041 is explicit
 	// about why a path is wrong — a replay that breaks when somebody tidies
 	// `user://tuning/` cannot be trusted for anything — and `TuningSet` is already
@@ -400,6 +423,9 @@ struct SessionConfig {
 		if (entry_count < 1 || entry_count > SESSION_MAX_ENTRIES) {
 			return false;
 		}
+		if (tick_hz < 1 || tick_hz > SESSION_MAX_TICK_HZ) {
+			return false;
+		}
 		return true;
 	}
 
@@ -454,6 +480,8 @@ struct SessionConfig {
 		digest.add_int(assists.auto_clutch ? 1 : 0);
 		mix_name(digest, "auto_shift");
 		digest.add_int(assists.auto_shift ? 1 : 0);
+		mix_name(digest, "tick_hz");
+		digest.add_int(tick_hz);
 		mix_name(digest, "tuning");
 		digest.add_uint64(tuning.hash());
 		mix_name(digest, "seed");
@@ -500,6 +528,7 @@ enum class SessionField : int {
 	RosterHash,
 	AutoClutch,
 	AutoShift,
+	TickHz,
 	Tuning,
 	Seed,
 };
@@ -519,6 +548,7 @@ inline const char *session_field_name(SessionField field) {
 		case SessionField::RosterHash: return "roster_hash";
 		case SessionField::AutoClutch: return "auto_clutch";
 		case SessionField::AutoShift: return "auto_shift";
+		case SessionField::TickHz: return "tick_hz";
 		case SessionField::Tuning: return "tuning";
 		case SessionField::Seed: return "seed";
 	}
@@ -578,6 +608,8 @@ inline int session_field_value(const SessionConfig &config, SessionField field, 
 			return copy(config.assists.auto_clutch ? "on" : "off");
 		case SessionField::AutoShift:
 			return copy(config.assists.auto_shift ? "on" : "off");
+		case SessionField::TickHz:
+			return format_int(config.tick_hz, out, cap);
 		case SessionField::Tuning:
 			return format_hex64(config.tuning.hash(), out, cap);
 		case SessionField::Seed:
@@ -638,6 +670,9 @@ inline SessionField first_difference(const SessionConfig &a, const SessionConfig
 	}
 	if (a.assists.auto_shift != b.assists.auto_shift) {
 		return SessionField::AutoShift;
+	}
+	if (a.tick_hz != b.tick_hz) {
+		return SessionField::TickHz;
 	}
 	if (a.tuning.hash() != b.tuning.hash()) {
 		return SessionField::Tuning;

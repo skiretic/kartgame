@@ -2413,9 +2413,12 @@ struct is `kart::core::DriverInput`; `VehicleInput` does not exist — same erro
 ADR-0040. And `tick_hz` was missing entirely: a run recorded at 120 Hz and re-simmed
 at 240 Hz has an identical `config_hash` and a completely different lap, which this
 ADR's two-outcome scheme classifies as "a real determinism bug" and which is nothing
-of the sort. It is carried in the header with its own refusal reason. The tidier home
-is a `SessionConfig` field, since it passes every test this ADR applies to
-configuration; that is an open call and it moves a type three modules share.)*
+of the sort. It was first carried in the header with its own refusal reason, as a
+workaround. Issue #174 then made the open call: it is a hashed `SessionConfig`
+field now, the header's `tick_hz` line fills it, the `TickRate` refusal reason is
+gone, and a rate mismatch refuses through the ordinary path below — naming
+`tick_hz` and both values. Nothing had shipped, so no stored `config_hash`
+was invalidated by the schema change.)*
 
 Playback compares `config_hash` **first**. That ordering is the whole design:
 

@@ -129,6 +129,13 @@ public:
 	void set_auto_shift(bool p_enabled);
 	bool is_auto_shift() const;
 
+	// The physics tick rate, hashed since issue #174. The default is
+	// `project.godot`'s 120, and whoever builds a config for a live run stamps
+	// `Engine.physics_ticks_per_second` here — the runner refuses a mismatch
+	// rather than assuming nobody moved the project setting.
+	bool set_tick_hz(int p_tick_hz);
+	int get_tick_hz() const;
+
 	bool set_seed_hex(const godot::String &p_hex);
 	godot::String get_seed_hex() const;
 

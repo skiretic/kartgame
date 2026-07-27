@@ -174,20 +174,14 @@ inline constexpr int REPLAY_CHECKPOINT_BYTES = 16;
 // "diverged at second 41" is the first thing the report says.
 inline constexpr int REPLAY_HASH_INTERVAL = 120;
 
-// `project.godot`'s `physics/common/physics_ticks_per_second`. The default a
-// recorder stamps unless it was told otherwise.
-//
-// **This is in the header and not in `SessionConfig`, and that is a hole in
-// ADR-0041 rather than a decision of this file.** A replay recorded at 120 Hz and
-// re-simulated at 240 Hz has an identical `config_hash` and a completely different
-// lap: same solver, same inputs, different integration. ADR-0041's two outcomes
-// would then classify it as "config matches, state hash diverges", which the ADR
-// says is a *real determinism bug* — and it is nothing of the sort. So the rate is
-// carried here and checked explicitly, and the check refuses with its own reason.
-// The tidy fix is for the tick rate to become a `SessionConfig` field, since it is
-// configuration by every test the ADR applies; that is the main thread's call and
-// the note in this project's issue list, not a change made here.
-inline constexpr int REPLAY_DEFAULT_TICK_HZ = 120;
+// The tick rate used to be a header field right here, carried outside the config
+// with its own refusal reason, because ADR-0041 omitted it — the hole an earlier
+// version of this comment documented. Issue #174 moved it into `SessionConfig`,
+// hashed like every other field, so a 120 Hz recording re-simulated at 240 Hz now
+// refuses as a config mismatch that names `tick_hz`, and this file stopped owning
+// a special case beside the hash the field should have been in. The `tick_hz`
+// line in the header text still exists and still parses; it just fills the
+// config's field now.
 
 // --- input quantization --------------------------------------------------------
 
@@ -442,10 +436,6 @@ struct ReplayHeader {
 	// nobody has measured.
 	char api_version[REPLAY_API_CHARS] = {};
 
-	// Physics ticks per second. See `REPLAY_DEFAULT_TICK_HZ` for why this is here
-	// and not in `SessionConfig`.
-	int tick_hz = REPLAY_DEFAULT_TICK_HZ;
-
 	// How long the body is, in ticks. The kart count is `config.entry_count`.
 	uint64_t tick_count = 0;
 
@@ -476,7 +466,7 @@ struct ReplayHeader {
 		if (!config.is_valid()) {
 			return false;
 		}
-		if (tick_hz < 1 || hash_interval < 1) {
+		if (hash_interval < 1) {
 			return false;
 		}
 		if (config.entry_count < 1 || config.entry_count > SESSION_MAX_ENTRIES) {
@@ -797,7 +787,7 @@ inline int replay_format_header(const ReplayHeader &header, char *out, int cap) 
 	put(header.api_version[0] == '\0' ? "unknown" : header.api_version);
 	put("\n");
 	put("tick_hz ");
-	put_int(header.tick_hz);
+	put_int(header.config.tick_hz);
 	put("\n");
 	put("ticks ");
 	put_int(static_cast<int64_t>(header.tick_count));
@@ -1043,7 +1033,7 @@ inline ReplayParse replay_parse_header(const char *text, int len, ReplayHeader &
 				result.problem = ReplayParseProblem::BadValue;
 				return result;
 			}
-			out.tick_hz = static_cast<int>(number);
+			out.config.tick_hz = static_cast<int>(number);
 		} else if (key_matches(key, "ticks")) {
 			if (!replay_parse_uint(value, value_length, out.tick_count)) {
 				result.problem = ReplayParseProblem::BadValue;
@@ -1214,10 +1204,10 @@ enum class RefusalReason : int {
 	FormatVersion,
 	// The header's own `config_hash` disagrees with a re-hash of its config.
 	HeaderCorrupt,
-	// `config_hash` differs from the live configuration's.
+	// `config_hash` differs from the live configuration's. The tick rate is in
+	// there too, per issue #174 — a rate mismatch refuses here naming `tick_hz`,
+	// where it used to be its own reason beside the hash.
 	ConfigMismatch,
-	// Same configuration, different integration rate. See `REPLAY_DEFAULT_TICK_HZ`.
-	TickRate,
 	// The body is shorter than `tick_count` times the field says it should be.
 	TruncatedBody,
 };
@@ -1228,7 +1218,6 @@ inline const char *refusal_reason_name(RefusalReason reason) {
 		case RefusalReason::FormatVersion: return "format version";
 		case RefusalReason::HeaderCorrupt: return "corrupt header";
 		case RefusalReason::ConfigMismatch: return "configuration mismatch";
-		case RefusalReason::TickRate: return "tick rate";
 		case RefusalReason::TruncatedBody: return "truncated body";
 	}
 	return "invalid";
@@ -1267,17 +1256,17 @@ struct PlaybackReport {
 // and decide whether the replay may be played at all.
 //
 // The `live` argument is a full `ReplayHeader` rather than a bare `SessionConfig`
-// so that the build, the API version and the tick rate are compared by the same
-// call that compares the configuration. A caller builds one describing *now* —
-// current build, current API, current tick rate, the configuration it is about to
-// run — and hands both in.
+// so that the build and the API version are compared by the same call that
+// compares the configuration. A caller builds one describing *now* — current
+// build, current API, the configuration it is about to run, its `tick_hz` filled
+// from the engine — and hands both in.
 //
 // **Order matters and is ADR-0041's.** Format first, because a header this build
 // cannot read cannot be trusted to say anything. Then the header's self-consistency,
 // because a corrupt header is not a changed configuration. Then `config_hash`,
-// which is the ADR's "first" among the things that describe the run. Then the tick
-// rate, which the ADR does not mention and which would otherwise be reported as a
-// determinism bug. Warnings last, because they never change the verdict.
+// which is the ADR's "first" among the things that describe the run — and which
+// covers the tick rate since issue #174 moved it into the config. Warnings last,
+// because they never change the verdict.
 inline PlaybackReport replay_admit(const ReplayHeader &recorded, const ReplayHeader &live) {
 	PlaybackReport report;
 
@@ -1306,12 +1295,6 @@ inline PlaybackReport replay_admit(const ReplayHeader &recorded, const ReplayHea
 		}
 		return report;
 	}
-	if (recorded.tick_hz != live.tick_hz) {
-		report.verdict = PlaybackVerdict::Refused;
-		report.reason = RefusalReason::TickRate;
-		return report;
-	}
-
 	// Admitted. The two version strings are diagnostic only.
 	report.verdict = PlaybackVerdict::Passed;
 	report.reason = RefusalReason::None;
@@ -1489,13 +1472,6 @@ inline int replay_describe(const PlaybackReport &report, const ReplayHeader &rec
 						put_field_value(live.config, report.field);
 						put(".");
 					}
-					break;
-				case RefusalReason::TickRate:
-					put("recorded at ");
-					put_int(recorded.tick_hz);
-					put(" Hz and this session runs at ");
-					put_int(live.tick_hz);
-					put(" Hz. Same inputs, different integration.");
 					break;
 				case RefusalReason::TruncatedBody:
 					put("the body is shorter than the ");

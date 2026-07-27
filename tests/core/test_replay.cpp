@@ -30,7 +30,7 @@ ReplayHeader recorded_header() {
 	ReplayHeader header;
 	header.set_build("8f1c4a2b6d0e");
 	header.set_api_version("4.7.1");
-	header.tick_hz = 120;
+	header.config.tick_hz = 120;
 	header.tick_count = 3600;
 	header.hash_interval = REPLAY_HASH_INTERVAL;
 	header.config.set_track_id("autumn_ridge");
@@ -338,7 +338,7 @@ TEST_CASE("the header round-trips to byte-identical text") {
 	CHECK_FALSE(parsed.config.assists.auto_shift);
 	CHECK(parsed.config.seed == 42);
 	CHECK(parsed.tick_count == 3600);
-	CHECK(parsed.tick_hz == 120);
+	CHECK(parsed.config.tick_hz == 120);
 	CHECK(std::strcmp(parsed.build, "8f1c4a2b6d0e") == 0);
 	CHECK(std::strcmp(parsed.api_version, "4.7.1") == 0);
 	CHECK(parsed.config.limit.kind == SessionLimitKind::Distance);
@@ -620,24 +620,30 @@ TEST_CASE("a different build warns and still plays") {
 	}
 }
 
-TEST_CASE("the tick rate is checked separately, because config_hash cannot see it") {
-	// The finding this test exists for: `SessionConfig` does not carry the physics
-	// tick rate, so a replay recorded at 120 Hz and re-simulated at 240 Hz has an
-	// **identical** config_hash and a completely different lap. ADR-0041's two
-	// outcomes would classify that as "config matches, state hash diverges", which
-	// the ADR calls a real determinism bug — and it is nothing of the sort.
+TEST_CASE("the tick rate is inside config_hash, so a rate mismatch refuses by name") {
+	// Inverted from the test that used to sit here. `SessionConfig` did not carry
+	// the physics tick rate, so a replay recorded at 120 Hz and re-simulated at
+	// 240 Hz had an **identical** config_hash and a completely different lap, and
+	// this test demonstrated the collision while the header carried the rate with
+	// its own refusal reason as a workaround. Issue #174 moved the rate into the
+	// config, hashed like any other field, so the hashes now differ and the
+	// generic refusal names `tick_hz` — the special case and its `RefusalReason`
+	// are gone.
 	const ReplayHeader recorded = recorded_header();
 	ReplayHeader live = recorded_header();
-	live.tick_hz = 240;
+	live.config.tick_hz = 240;
+	live.stamp();
 
-	CHECK(recorded.config.hash() == live.config.hash()); // the hole, demonstrated
+	CHECK(recorded.config.hash() != live.config.hash()); // the hole, closed
 
 	const PlaybackReport report = replay_admit(recorded, live);
 	CHECK(report.verdict == PlaybackVerdict::Refused);
-	CHECK(report.reason == RefusalReason::TickRate);
+	CHECK(report.reason == RefusalReason::ConfigMismatch);
+	CHECK(report.field == SessionField::TickHz);
 
 	char message[REPLAY_MESSAGE_CHARS];
 	REQUIRE(replay_describe(report, recorded, live, message, sizeof(message)) > 0);
+	CHECK(contains(message, "tick_hz"));
 	CHECK(contains(message, "120"));
 	CHECK(contains(message, "240"));
 }

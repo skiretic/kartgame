@@ -334,6 +334,15 @@ func _first_problem() -> String:
 		return "class %s is not simulated — nothing in src/ models it" % (
 			KartSession.kart_class_name(_session.get_kart_class())
 		)
+	if _session.get_tick_hz() != Engine.physics_ticks_per_second:
+		# Issue #174: the rate is in the configuration hash because two sessions
+		# differing only in integration rate are not the same session. A config
+		# claiming a rate the engine will not run at would record a replay whose
+		# header lies about its own integration, so it is refused here, at the
+		# same boundary that refuses a class nobody simulates.
+		return "the session claims %d Hz and the engine runs %d" % [
+			_session.get_tick_hz(), Engine.physics_ticks_per_second,
+		]
 	if _session.get_entry_count() > 1:
 		# There is no field. ADR-0047's roster, the AI of M7 and `GAMEDESIGN.md` §6's
 		# voice culling are all prerequisites, and §13.B says so in as many words:

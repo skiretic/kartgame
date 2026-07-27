@@ -73,7 +73,7 @@ constexpr SessionField SESSION_FIELDS[] = {
 	SessionField::Condition, SessionField::Type, SessionField::KartClass,
 	SessionField::LimitKind, SessionField::LimitValue, SessionField::EntryCount,
 	SessionField::RosterHash, SessionField::AutoClutch, SessionField::AutoShift,
-	SessionField::Tuning, SessionField::Seed
+	SessionField::TickHz, SessionField::Tuning, SessionField::Seed
 };
 
 constexpr int SESSION_FIELD_COUNT =
@@ -111,6 +111,8 @@ void KartSession::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("is_auto_clutch"), &KartSession::is_auto_clutch);
 	ClassDB::bind_method(D_METHOD("set_auto_shift", "enabled"), &KartSession::set_auto_shift);
 	ClassDB::bind_method(D_METHOD("is_auto_shift"), &KartSession::is_auto_shift);
+	ClassDB::bind_method(D_METHOD("set_tick_hz", "tick_hz"), &KartSession::set_tick_hz);
+	ClassDB::bind_method(D_METHOD("get_tick_hz"), &KartSession::get_tick_hz);
 	ClassDB::bind_method(D_METHOD("set_seed_hex", "hex"), &KartSession::set_seed_hex);
 	ClassDB::bind_method(D_METHOD("get_seed_hex"), &KartSession::get_seed_hex);
 	ClassDB::bind_method(D_METHOD("adopt_tuning", "tuning"), &KartSession::adopt_tuning);
@@ -302,6 +304,20 @@ void KartSession::set_auto_shift(bool p_enabled) {
 
 bool KartSession::is_auto_shift() const {
 	return config_.assists.auto_shift;
+}
+
+bool KartSession::set_tick_hz(int p_tick_hz) {
+	if (p_tick_hz < 1 || p_tick_hz > SESSION_MAX_TICK_HZ) {
+		ERR_PRINT(vformat("KartSession: a tick rate of %d Hz is outside 1..%d", p_tick_hz,
+				SESSION_MAX_TICK_HZ));
+		return false;
+	}
+	config_.tick_hz = p_tick_hz;
+	return true;
+}
+
+int KartSession::get_tick_hz() const {
+	return config_.tick_hz;
 }
 
 bool KartSession::set_seed_hex(const String &p_hex) {

@@ -894,6 +894,11 @@ func _build_session() -> void:
 	# same reason — and the session copies it.
 	_session.set_auto_clutch(_kart.auto_clutch)
 	_session.set_auto_shift(_kart.auto_shift)
+	# The rate the engine will actually integrate at, not the config's default —
+	# they are the same number today, and asking the engine is what keeps this
+	# line true the day someone moves the project setting. Issue #174 put the
+	# rate in the hash; the runner refuses a config whose claim disagrees.
+	_session.set_tick_hz(Engine.physics_ticks_per_second)
 	if _tuning != null:
 		# One way, and `kart_session.h` says why: this records the preset the session
 		# was driven under. There is no call that pushes a configuration's tuning back
