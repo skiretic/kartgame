@@ -2260,9 +2260,14 @@ which established that the steering curve is a controller property, and it
 finishes the sentence that ADR started.
 
 **Context.** `src/vehicle/kart_body.cpp:585` opens with `Input *map =
-Input::get_singleton()` and fills its own `VehicleInput` from the action map. The
+Input::get_singleton()` and fills its own `DriverInput` from the action map. The
 struct exists and is already the right shape. What is wrong is the arrow: **the
 vehicle reaches out for input rather than being given it.**
+
+*(This ADR was written calling the struct `VehicleInput`, and there is no such
+type: it is `kart::core::DriverInput`, `src/core/vehicle_state.h:37`. Corrected
+throughout. ADR-0041's header sketch had the same wrong name and is corrected
+there too.)*
 
 That works for exactly one configuration — one kart, one human, one process, now.
 Five things this project has already committed to need input to arrive as *data*:
@@ -2286,23 +2291,38 @@ overlay. It is this ADR's problem observed from the other end: a node that
 fetches global input cannot be told to stop, so anything upstream of it — a menu,
 a pause, an overlay, a replay — has no authority over it.
 
-**Decision.** `KartBody` exposes `set_input(const VehicleInput &)` and consumes
-whatever it was handed for the current tick. It never reads `Input`. Four
-producers fill the same struct:
+**Decision.** `KartBody` exposes `set_input(const DriverInput &, uint64_t tick)`
+and consumes whatever it was handed for the current tick. It never reads `Input`.
+Four producers fill the same struct:
 
 - `PlayerDriver` — reads the action map, and **owns the steering curve**, which
   moves out of `kart_body.cpp` with it. ADR-0036 already said that curve is a
   controller property and `steering.h`'s position is correct; the code kept it in
   the vehicle anyway. This is where it belongs.
 - `AIDriver` — M7.
-- `ReplayDriver` and `GhostDriver` — M6, reading a recorded stream.
+- `ReplayDriver` — M6, reading a recorded input stream.
+
+*(This line named a `GhostDriver` alongside it and there is no such thing.
+[ADR-0041](#adr-0041--a-replay-carries-its-whole-configuration-and-hashes-it-separately)
+is later and decides it: a ghost is a **transform** stream, not an input stream,
+because re-simulating something that is diverging from the live session by design
+buys nothing and costs a second vehicle solve. A ghost is therefore not a producer
+of `DriverInput` at all and never reaches this interface.
+`src/session/kart_ghost.h` says so at its registration.)*
 
 **Freshness is a tick stamp, not a convention.** A push model has one failure
 mode: a producer that does not run, or runs after the body in tree order, leaves
-the vehicle consuming last tick's input, and *that reads as a physics bug*. So
-`VehicleInput` carries the tick it was set on; `KartBody` compares it against the
+the vehicle consuming last tick's input, and *that reads as a physics bug*. So the
+tick the input was filled on travels with it; `KartBody` compares it against the
 current tick and, on a mismatch, applies **neutral input and says so once**. A
 stale-input bug that costs a session is a stale-input bug that announces itself.
+
+*(Implemented as a second argument to `set_input` rather than as a field on
+`DriverInput`, which is what this ADR said. Two reasons, both found while writing
+it: `DriverInput` is passed straight into `KartVehicle::step`, so a field the
+solver must ignore is a field that eventually gets hashed by accident and moves
+every recorded state hash in the project — and a struct field defaults to zero and
+can be forgotten, where a required argument cannot be.)*
 
 Neutral rather than held-last is deliberate: holding the last input means a
 crashed AI drives into a wall at full throttle, and worse, it means a divergence
@@ -2329,6 +2349,19 @@ either way.
   that happens to have a name.
 - The shell can gate input, which is what makes a pause menu and the tuning
   overlay's key bindings tractable instead of a fight with the `Input` singleton.
+- **A recorder taps what the solver was given, not what a producer sent.** This ADR
+  did not mention the shift latch, and `KartBody` ORs `request_shift_up` /
+  `request_shift_down` into the struct *after* both input branches have run. A
+  recorder listening to the producer silently drops a shift the live run acted on —
+  a divergence with no visible cause. `vehicle_state.h` now says so beside the
+  struct.
+- **`DriverInput::steer` became unambiguous, and it was not before.** The scripted
+  branch assigned a *lock fraction* and the polled branch assigned the steering
+  curve of a *stick position*, so the same stored number described two different
+  steering angles depending on who filled it. That is fine as an asymmetry between
+  a scripted run and a driven one, and fatal once a replay records the field. The
+  curve moving out to `PlayerDriver` is what fixes it: every producer now hands over
+  a lock fraction.
 - `steering_curve` leaves `kart_body.cpp`. `drive.sh`'s figures must not move —
   the curve is applied to the same value in the same order, one node earlier —
   and that is an acceptance item, not an assumption. If any §6.4 figure moves,
@@ -2370,9 +2403,19 @@ header    format_version, build and extension API version
           tuning preset — the full diff, inline, not a path
           config_hash — over all of the above
           seed, tick_count
-body      VehicleInput per tick, per kart
+tick_hz   the physics rate the run was recorded at
+body      DriverInput per tick, per kart
 footer    state hash every N ticks
 ```
+
+*(Two corrections to the sketch above, both found while implementing it. The
+struct is `kart::core::DriverInput`; `VehicleInput` does not exist — same error as
+ADR-0040. And `tick_hz` was missing entirely: a run recorded at 120 Hz and re-simmed
+at 240 Hz has an identical `config_hash` and a completely different lap, which this
+ADR's two-outcome scheme classifies as "a real determinism bug" and which is nothing
+of the sort. It is carried in the header with its own refusal reason. The tidier home
+is a `SessionConfig` field, since it passes every test this ADR applies to
+configuration; that is an open call and it moves a type three modules share.)*
 
 Playback compares `config_hash` **first**. That ordering is the whole design:
 
@@ -2409,6 +2452,15 @@ costs a second vehicle solve. A ghost is a **transform stream**, sampled and
 interpolated, with the lap time and the sector splits in its header. Two formats,
 because they are two problems — and M6's line item is written as though they were
 one.
+
+**And the ghost does not take this ADR's versioning policy — it takes
+[ADR-0042](#adr-0042--a-save-always-loads-and-the-migration-tests-eat-real-old-files)'s.**
+Refusing on a version mismatch is right for a replay because a replay is a
+diagnostic artifact. A ghost is referenced by id from `profile.save` as half of
+"best lap and ghost per track per layout per class", which makes it **user data**,
+and ADR-0042's whole argument is that refusing to load user data is deleting it with
+extra steps. A refused ghost is a deleted best lap. `src/core/ghost.h` migrates an
+older ghost and only refuses one written by a newer build than can read it.
 
 **Versioning.** `format_version` is refused across a mismatch, not migrated: a
 replay is a diagnostic artifact, not user data, and silently migrating one
@@ -2458,7 +2510,7 @@ deleting it with extra steps.
 ```
 user://profile.save        text, diffable, in the family of the preset format
     version   = 3
-    driver    = name, number, nationality
+    driver    = name, number, nationality, livery
     career    = class, season, round, standings
     bests     = per track, per layout, per class — lap time + a ghost id
     ...
@@ -2466,7 +2518,13 @@ user://ghosts/<id>.ghost   transform streams, referenced not inlined
 user://settings.cfg        separate file, see below
 ```
 
-Loading chains migrations — `v1 → v2 → v3` — and each one ships with a test.
+Loading chains migrations — `v1 → v2 → v3` — and each one ships with a test. The
+`version = 3` above is an illustration of a format that has been bumped twice, not
+where this starts: the corpus holds exactly one real file and it is a v1.
+
+*(The field list said `name, number, nationality` and omitted the livery, which
+`docs/GAMEDESIGN.md` §8 has. §8 is the one that is right and `src/core/profile.h`
+follows it.)*
 
 **The test is the actual decision here.** A migration test that generates its own
 v1 input tests nothing: it round-trips today's writer through today's reader and
@@ -2488,10 +2546,21 @@ this exists to prevent is the ordinary one: something goes wrong at load, the
 game starts fresh, the player plays for an hour, and the first successful *save*
 destroys the evidence.
 
-**Writes are atomic.** Write a temporary file, fsync, rename over the target.
-A save interrupted by a crash or a power cut leaves the previous save intact
-rather than a half-written one, and rename is the only operation that gives that
-for free.
+**Writes are atomic.** Write a temporary file, flush and close it, confirm its
+length off disk, rename over the target. A save interrupted by a crash leaves the
+previous save intact rather than a half-written one, and rename is the only
+operation that gives that for free.
+
+*(This said "fsync" and a power cut. **Godot's `FileAccess` cannot sync** — 68
+methods, none of them `fsync`, `F_FULLFSYNC` or `O_SYNC`, and nothing in
+`DirAccess` either, checked against `extension_api.json` rather than remembered. So
+the guarantee is scoped to **process death**, which the rename genuinely does buy,
+and a power cut is not covered: a close is not a sync, and without one POSIX does
+not order the data against the directory entry. The wording mattered because an
+implementer following it believes they bought durability they did not. An fsync
+shim on the GDExtension side is owed a ticket. The length check before the rename
+is the reachable part, and it is what catches a full disk —* `store_buffer`
+*returning true says the calls were accepted, not that the bytes landed.)*
 
 **Version bumps on every format change, and a migration may be the identity
 function.** The alternative — bump only on incompatible changes — requires
@@ -2572,6 +2641,15 @@ indistinguishable from a scale somebody adjusted for feel.
 assert the four scales are **pairwise distinct**. It is a strange-looking test and
 it is the highest-value one in the file, because the defect it catches is a
 copy-paste that produces working code.
+
+*(It proves less than it looks like it does, and the simulation found out why.
+`CHAMPIONSHIP_FINAL_POINTS` is **exactly twice** `CHAMPIONSHIP_HEAT_POINTS`, place
+for place, for all eight places an 8-kart field has — the real scales diverge only
+at 10th, 10 against 6. So the four are pairwise distinct and a `2 * heat_scale`
+implementation would still pass. `race_rules.h` pins the doubling with its own test
+so that the coincidence is recorded rather than relied on, and the same fact is why
+a championship total cannot be decomposed back into positions: a half-credit Final
+award and a full-credit heat award are the same number.)*
 
 The rest of the suite is ordinary and mostly writes itself: a tie on equal points
 resolves to the Qualifying Practice classification at every stage; part-distance

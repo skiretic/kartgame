@@ -110,12 +110,28 @@ Distances are scaled to **1/4**, and the three-heat structure is cut to one:
 |---|---|---|---|
 | Practice | not fixed | open, until you leave | — |
 | Qualifying Practice | 6 min | 3 min | ~3 timed |
-| Qualifying Heat | 15 km, and there are three | 4 km, and there is one | ~3 |
-| Super Heat | 20 km | 5 km | ~4 |
-| Final | 30 km | 7.5 km | ~6 |
+| Qualifying Heat | 15 km, and there are three | 3.75 km, and there is one | 4 |
+| Super Heat | 20 km | 5 km | 5 |
+| Final | 30 km | 7.5 km | 7 |
 
-Round ≈ 15 minutes. Season ≈ 60 minutes. One evening, which is the constraint
-this whole design was built to.
+**The lap column is a ceiling and it used to be written as a floor.** The
+regulations specify a distance and the race runs the *minimum number of full laps
+necessary for reaching it*, so 3,750 m on a 1,200 m circuit is 4 laps and not
+3.125 and not 3. The first draft of this table said ~3, ~4 and ~6, which is one
+lap short on every race, and it rounded 3.75 km to "4 km" — which is what made the
+short count hard to spot, because 4 km really would be 4 laps. Both are corrected
+above. `src/core/session.h` computes 3,750 m from the FIA figure and the scale, and
+`tests/core/test_lap_timing.cpp` derives the lap counts rather than restating them.
+
+**So the round is 15.80 minutes and the season is 63.20, not 15 and 60.** 16 racing
+laps at the 48 s pace this section assumes, plus 3 minutes of qualifying. The
+one-evening constraint this whole design was built to is overshot by 3.2 minutes.
+
+**Open, and it is a design decision rather than a bug:** move
+`SESSION_DISTANCE_SCALE` a little below 0.25 to land the season back under an hour,
+or accept 63 minutes and stop claiming 60. Nothing is blocked on it — the test
+asserts the real figure either way, so whichever is chosen, the document and the
+code will agree.
 
 **Three things were cut and the cuts are the design, not an oversight:** two of
 the three Qualifying Heats, three quarters of every race distance, and the
@@ -154,13 +170,30 @@ The real scales are used, truncated to the 8-kart field:
 |---|---|---|
 | Qualifying Heat position points | 50, 44, 41, 38, 36, 34, 32, 30 | ordering the Super Heat grid |
 | Super Heat position points | 90, 80, 72, 66, 60, 54, 50, 46 | ordering the Final grid |
-| Championship, heats + Super Heat classifications | 25, 22, 19, 17, 15, 13, 11, 9 | the standings |
+| Championship, the intermediate classification and the Super Heat | 25, 22, 19, 17, 15, 13, 11, 9 | the standings |
 | Championship, Final | 50, 44, 38, 34, 30, 26, 22, 18 | the standings |
 
 The first two are added *within* a round. The last two are added *across* the
 season, and note that **championship points come from three classifications per
 round, not just the Final** — so a bad Final does not erase a good day. Plus one
 championship point for the fastest lap of the Final.
+
+The three are the **intermediate classification after the heats**, the **Super
+Heat** and the **Final**, which is `REFERENCES.md`'s wording and is the precise
+one. This row read "heats + Super Heat classifications" and that phrasing produced
+three different readings between this section, ADR-0043 and the brief written from
+them. It matters because the heats produce *one* classification between them
+however many heats there are: cutting the FIA's three heats to one changes no
+championship total, and `race_rules.h` has a test proving exactly that.
+
+And a property of the scales that no document had noticed until a season was
+simulated: **the Final scale is exactly twice the heat scale, place for place, for
+all eight places an 8-kart field has.** The real scales only diverge at 10th. Two
+consequences, both pinned by tests in `race_rules.h`: a `2 * heat_scale`
+implementation would pass every test this field size can write, so the
+pairwise-distinctness check below proves less than it looks like it does; and a
+half-credit Final award is numerically identical to a full-credit heat award, so a
+championship total cannot be decomposed back into positions.
 
 Truncating a 36-place scale to 8 places is this project's decision, not the
 regulations'. The alternative — rescaling the values to spread across 8 — was
@@ -247,9 +280,13 @@ choice a returning player makes rather than a wall a new one hits.
   to keep by accident of season length.
 - Career = 2 seasons ≈ 2 hours, and it finishes. It is not a live-service ladder.
 - **Promotion at top 3 in the final standings.** Not the title. A 4-round season is
-  short enough that one bad final on a 20-point scale can end a title run on
-  variance rather than on driving, and the point of the career is to reach the
-  shifter, not to gate it behind a perfect season.
+  short enough that one bad final can end a title run on variance rather than on
+  driving, and the point of the career is to reach the shifter, not to gate it
+  behind a perfect season. This said "on a 20-point scale", which is a number that
+  appears nowhere in this design — the Final pays 50 for a win and 18 for eighth.
+  The real figures make the argument stronger, not weaker: a win-to-eighth swing in
+  one Final is **32 points**, against a title margin of **29** in the four-round
+  season `race_rules.h` simulates.
 - **Losing is real.** Finish outside the top 3 and the season does not promote you.
   Re-run it. Best laps, ghosts and tuning presets persist across the re-run; the
   standings do not.
@@ -373,6 +410,12 @@ One profile:
 - best lap and ghost per track per layout per class
 - tuning presets (`user://tuning/`, ADR-0037's format, already built)
 - settings: comfort, controls, assists
+
+And one thing this list omitted, which turns out to dominate the disk: **replays**.
+ADR-0041 puts them in `user://` and they are measured at **7.79 MB each** for a
+15-minute round of eight karts, against 212 kB for *every* ghost a whole career
+produces. A player who records a few sessions fills more disk than the rest of the
+game combined, so somebody has to own deleting them. Nothing does yet.
 
 **Career state is not in the determinism hash.** ADR-0037 already settled the
 equivalent question for tuning presets: `StateHash` asks whether two runs of the
