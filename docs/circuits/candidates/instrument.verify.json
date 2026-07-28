@@ -1,0 +1,417 @@
+{
+ "lens": "The instrument, scaled up",
+ "verdict": "major issues",
+ "measured": {
+  "walk_step_m": 0.25,
+  "total_length_m": 1299.9966,
+  "total_length_author": 1300.019,
+  "total_length_delta_m": -0.0224,
+  "closure_error_m": 0.001477,
+  "closure_error_author": 0.001036,
+  "final_heading_deg": -360.0,
+  "analytic_length_m": 1299.9966,
+  "angle_sum_deg": -360.0,
+  "bounding_box_m": [
+   232.6,
+   368.3
+  ],
+  "longest_straight_m": 178.0,
+  "longest_straight_segments": [
+   "Uscita della Cesta (78.00)",
+   "S/F (a) (36.00)",
+   "S/F (b) (64.00)"
+  ],
+  "next_longest_straights_m": [
+   126.17,
+   102.74,
+   81.18,
+   70.0
+  ],
+  "length_in_1100_1400": true,
+  "min_separation_m": 20.5576,
+  "min_separation_where": "d=26.25 m (S/F straight) vs d=789.73 m (inside T7 La Staccatina, 762.00-797.49). Cyclic arc-distance 736.5 m.",
+  "min_separation_author": 20.559,
+  "min_separation_clear_ground_m": 10.558,
+  "min_separation_height_difference_m": 8.094,
+  "min_separation_bank_slope_pct": 76.7,
+  "other_close_pairs_m": [
+   [
+    20.56,
+    26.0,
+    790.0
+   ],
+   [
+    26.148,
+    1.0,
+    807.0
+   ],
+   [
+    26.458,
+    808.0,
+    1300.0
+   ],
+   [
+    26.929,
+    51.0,
+    777.0
+   ],
+   [
+    27.84,
+    1019.1,
+    1060.1
+   ],
+   [
+    28.001,
+    994.1,
+    1084.1
+   ],
+   [
+    28.002,
+    969.0,
+    1109.1
+   ],
+   [
+    29.737,
+    948.0,
+    1135.0
+   ]
+  ],
+  "centerline_self_crossings": 0,
+  "start_to_first_corner_m": 100.0,
+  "last_corner_to_start_m": 78.0,
+  "starting_straight_m": 178.0,
+  "first_corner_direction_change_deg": 112.0,
+  "first_corner_width_m": 12.0,
+  "min_width_m": 10.0,
+  "max_width_m": 14.0,
+  "elevation_closure_m": 0.000962,
+  "elevation_range_m": 8.4722,
+  "elevation_max_m": 0.576,
+  "elevation_max_at_m": 36.0,
+  "elevation_min_m": -7.8962,
+  "elevation_min_at_m": 692.0,
+  "starting_straight_max_gradient_pct": 1.6,
+  "gradient_changes_found": 13,
+  "gradient_changes_listed_by_author": 13,
+  "vertical_curves_arithmetically_correct": 13,
+  "vertical_curves_that_fit_their_segment": 13,
+  "vertical_curves_landing_on_a_corner_or_braking_section": 11,
+  "camber_range_pct": [
+   2.0,
+   2.0
+  ],
+  "banking_range_pct": [
+   2.5,
+   6.0
+  ],
+  "adverse_camber_count": 0,
+  "braking_zones_over_20m_recomputed": {
+   "T1": 27.08,
+   "T5": 21.85,
+   "T6": 21.77,
+   "T9": 39.43
+  },
+  "crude_trapezoid_lap_time_s": 50.31,
+  "author_lap_time_s": 49.44
+ },
+ "violations": [
+  {
+   "rule": "Design validity - the racing-line model the whole proposal rests on",
+   "required": "An apex speed / lateral-g claim must follow from a racing line that is actually drivable, and the sweep-rung claims ('on #137's boundary', 'past the cliff', 'the kart's best sustained g') are claims about where a corner sits, so the line model has to be defensible.",
+   "actual": "Every racing-line radius in the document is exactly Rc + W/2 - 0.7 m. Verified on all twelve corner segments: T1a 71.3, T1b 37.3, T2 34.3, T3 54.8, T4 54.3, T5 25.8, T6 23.3, T7 28.8, T8 114.3, T9 20.3, T10 42.8. That is a constant offset with NO dependence on the corner's direction change and NO dependence on the length of the adjacent straights - i.e. the hug-the-inside-edge line, the tightest path the corridor allows, which nobody drives. Recomputing the geometric minimum-curvature line (fillet tangent to both outside edges, apex on the inside edge, capped by the available adjacent straight): T2 94.3 m not 34.3 (2.75x), T4a/T4b 118.5 m not 54.3 (2.18x), T10 128.1 m not 42.8 (2.99x), T6 50.6 m not 23.3 (2.17x), T7 54.5 m not 28.8 (1.89x), T8 283.9 m not 114.3 (2.48x), T5 34.8 m not 25.8 (1.35x). Only T9 (180 deg, 20.3 m, hard-bounded) and T3 (150 deg, 54.8 -> 58.2) and T1b (37.3 -> 42.1) are robust.",
+   "severity": "major",
+   "fix": "This is the proposal's central thesis and it is unvalidated. T2 Il Quarto is sold as sitting 1.7 m outside the sweep's 32.64 m quarter-lock row; on a proper line it is a 60-90 m corner and #137 is nowhere near it. T6 La Vite is sold as 'the lowest lateral g at close to the highest steering angle' - the control for the caster-jacking reading - and on a 50.6 m line it is a fast corner at low lock, which destroys the T2/T6 pairing outright. Either (a) narrow the corners that carry a sweep-rung claim so the corridor itself forces the radius (T2 and T6 at 8 m rather than 10 m, and shorten the straights either side), or (b) re-derive every apex speed from a minimum-curvature line solver and re-pick the radii against the new numbers. Do not ship the ladder as measured until one of those is done."
+  },
+  {
+   "rule": "CIK-FIA T1 s7.5 - verge and run-off, both sides, whole length: min 1.80 m of compact verge continuing the track's transverse profile with NO negative slope; run-off grades to the verge with no negative slope and if it rises, not over 10%",
+   "required": "1.80 m of verge each side with no negative slope, everywhere on the lap",
+   "actual": "The lap stacks the start/finish plateau on top of the valley floor. Measured at the closest pair: 20.558 m centerline separation, 10.558 m of clear ground between asphalt edges, 8.094 m of height difference -> a 76.7% face. And it is not a point: (d=1.0 vs 807.0) is 7.56 m over 16.1 m of ground (47%), (d=51 vs 777) is 8.29 m over 16.9 m (49%), (d=808 vs 1300) is 7.54 m over 16.5 m (46%). Roughly 60 m of the start/finish straight faces roughly 60 m of the T7 approach across a 45-77% bank. Neither side can carry a compliant verge, let alone run-off.",
+   "severity": "major",
+   "fix": "Author flagged this in `risks` and then reported the layout as passing anyway - it is a violation, not a construction note. Either open the plan separation to about 32 m (1.8 m verge + ~10% run-off + wall + wall + run-off + verge either side of an 8 m fall), or cut the elevation scale factor further so the fall at that pair is under ~2 m, or move the T7 approach out of the shadow of the S/F straight. The brief's 14 m centerline rule is purely horizontal and passes this silently, which is exactly how it survived."
+  },
+  {
+   "rule": "CIK-FIA T1 s7.2/s7.4 - the deceleration lane must not cross the racing line, angle to track max 30 deg",
+   "required": "Pit entry off the racing line",
+   "actual": "pit_entry_m = 1150.0, on Salita del Tornante, peeling RIGHT. T10 is a LEFT-hander with turn-in at 1187.53 and a braking zone starting at 1175.6. A kart on the line for a left-hander is moving to the RIGHT (the outside) through the whole approach, so the pit peel-off at 1150 m sits in the racing line 25.6 m before the braking point and 37.5 m before turn-in. The author's stated justification - 'the line through T10 is hard left, so a lane peeling right at 1150 m never crosses it' - has the geometry of a corner entry inverted.",
+   "severity": "major",
+   "fix": "Move the deceleration lane to peel LEFT (the inside of T10) or move it back to about 1080-1110 m, before the line has begun setting up. The 22 deg angle and the 3.5 m width and the entry chicane are all fine; the location and the reasoning behind it are not."
+  },
+  {
+   "rule": "CIK-FIA T1 s7.4 / practical - the exit lane must not cross the racing line",
+   "required": "An exit lane needs enough length to accelerate and merge behind the line",
+   "actual": "pit_exit_m = 195.0 onto Allungo del Banco, which runs 191.04-227.76 and is 36.72 m long. The field's braking point for T2 (9.88 m at 1.53 g from 104.4 km/h) is at 217.9 m. That leaves 22.9 m between the merge point and the field braking hard for a right-hander, with the rejoining kart at pit speed and the field at 90-104 km/h. There is no room for an 18 deg merge taper AND an acceleration lane in 36.72 m.",
+   "severity": "major",
+   "fix": "The author names this as 'the one genuinely uncomfortable thing' and then keeps it. Rejoin somewhere with room - the 178 m start/finish straight is the obvious candidate if the lane is routed inside T10 and along the top of the bank - or lengthen Allungo del Banco and take the length out of Discesa."
+  },
+  {
+   "rule": "Braking distance at the measured 1.53 g must fit the straight before the corner",
+   "required": "T5 Il Frantoio: 112.4 -> 64.3 km/h",
+   "actual": "21.85 m flat, 21.969 m on the segment's own -0.8% grade. Uscita delle Esse is 22.00 m. Margin 0.031 m. The corner is therefore entered by going full brakes at the instant the kart leaves T4b, with zero throttle on the link and zero tolerance.",
+   "severity": "minor",
+   "fix": "Lengthen Uscita delle Esse to about 30 m, or accept a lower T4b exit speed. As written the number is arithmetically true and practically fictional."
+  },
+  {
+   "rule": "CIK-FIA T1 s7.2 Elevations - R 'must be adequately increased along approach, release, braking and curved sections' and 'wherever possible, changes in gradient should be avoided altogether in these sections'",
+   "required": "Gradient changes off corners and braking zones, or R increased above V^2/K where they cannot be",
+   "actual": "Every one of the 13 vertical curves is arithmetically correct - my recompute of R = V^2/K and L = R*delta agrees within 0.5 m on R and 0.05 m on L on all thirteen, and all thirteen fit their segment. But 11 of the 13 sit exactly on a corner boundary, so the transition runs into a curved section: d=191.0 (4.3 m inside T1b's exit at 89.7 km/h), 258.1 (2.9 m inside T2), 539.2 (0.6 m into T5's turn-in, under threshold braking), 583.9 (3.4 m inside T5's exit), 665.1 (2.0 m into T6's turn-in), 692.0, 762.0, 797.5, 1017.4 (T9 turn-in, at the end of the circuit's biggest braking zone), 1061.3 (1.3 m inside T9's exit), 1222.0 (3.8 m inside T10's exit). Every one is marked 'ok': true; the flag reflects the V^2/K arithmetic only.",
+   "severity": "minor",
+   "fix": "The overlaps are individually small (largest half-length in a corner is 4.3 m) and every delta involved is under 2.4%, so this is defensible - but say so. Add the clause to the check and either shift the change point clear of the corner or record R as increased and by how much."
+  },
+  {
+   "rule": "CIK-FIA T1 s7.5 - run-off mandatory on the axis of any direction change over 80 deg",
+   "required": "Margin on a threshold that a later layout tweak can cross silently",
+   "actual": "T6 La Vite is 81 deg. One degree. The author flags it themselves and correctly notes the 81 came out of the heading-closure solve rather than a decision.",
+   "severity": "minor",
+   "fix": "Take T6 to 85 deg and give a degree back somewhere with slack (T8's 34 deg kink), or take it to 78 deg and drop the mandatory run-off. Either way stop it sitting on the line."
+  },
+  {
+   "rule": "CIK-FIA T1 s7.5 - min 1.80 m compact verge both sides for the whole length, grass or compacted ground over at least 1 m of it",
+   "required": "A verge figure",
+   "actual": "Not present anywhere in instrument.json. Run-off is described per corner in prose; the verge - which is the requirement that applies to the whole lap and not just the corners - is never given a number.",
+   "severity": "minor",
+   "fix": "Put a verge_m field on every segment, floor 1.80, and let the terrace problem above force it wider where it has to be."
+  },
+  {
+   "rule": "CIK-FIA T1 s7.2 - 'all changes in banking (cross camber) are to be made over an appropriate distance'",
+   "required": "A transition distance for every camber-to-banking change",
+   "actual": "Not specified. The jumps are real: 2.0% camber into 6.0% banking at T2 (d=227.76), T3 (301.47), T9 (1017.37, at the exit of the circuit's biggest braking zone) and T10 (1187.53, under threshold braking on a resurfacing joint). Nine such changes on the lap, none with a stated length.",
+   "severity": "minor",
+   "fix": "One number per boundary. T9's and T10's matter most because they land in braking zones."
+  },
+  {
+   "rule": "CIK-FIA T1 s7.5 - run-off width 'must be the result of a numeric simulation calculated according to the speed of the kart on its line, the impact angle and the friction coefficient'",
+   "required": "A simulation",
+   "actual": "Widths are picked by hand against a named approach speed. The author says so plainly in `risks` and notes that the measured 0.286 g on grass implies stopping distances far longer than any width quoted, so the run-offs work by reducing impact speed rather than stopping the kart - a distinction that appears in none of the numbers.",
+   "severity": "minor",
+   "fix": "Honest disclosure, and it is the right disclosure. Run the simulation before these become track.json geometry."
+  },
+  {
+   "rule": "Track width transitions",
+   "required": "A distance over which width changes",
+   "actual": "Width steps 10 -> 12 -> 10 at T1, 10 -> 11 -> 10 at T3/T5/T10, and 11 -> 14 -> 10 across T9. None has a transition length. The 11 -> 14 -> 10 at the hairpin is a 4 m step out over 44 m of arc.",
+   "severity": "minor",
+   "fix": "Give each a taper length. The T9 one is load-bearing: the 14 m entry is the whole overtaking argument."
+  },
+  {
+   "rule": "Centerline drivability (informational, not a regulation)",
+   "required": "n/a",
+   "actual": "At the claimed apex speeds the CENTERLINE lateral demand exceeds the kart's 1.86 g ceiling at four corners: T1b 1.95 g, T3 2.01 g, T4a/T4b 1.99 g, T10 1.97 g. Nobody drives the centerline, so this is not a defect - but any headless probe that follows the spline (which is how session_probe.gd measures arc length and track limits) will read those corners as impossible.",
+   "severity": "minor",
+   "fix": "Note it in track.json so a future validation gate checks the racing line and not the spline."
+  }
+ ],
+ "corner_checks": [
+  {
+   "corner": "T1 Curva del Banco",
+   "segment": "T1a",
+   "centerline_radius_m": 66.0,
+   "width_m": 12.0,
+   "direction_change_deg": -48.0,
+   "author_racing_line_radius_m": 71.3,
+   "claimed_apex_kmh": 89.1,
+   "lateral_g_on_author_line": 0.876,
+   "sweep_envelope_g_at_that_radius": 1.86,
+   "lateral_g_on_centerline": 0.946,
+   "geometric_min_curvature_line_radius_m": 71.3,
+   "radius_ok_vs_1_86g": true,
+   "note": "T1a's line is bounded by T1b, so 71.3 m is right here. 0.88 g - the entry half is not a limiting corner, it is a positioning corner, which is what makes the compound work."
+  },
+  {
+   "corner": "T1 Curva del Banco",
+   "segment": "T1b",
+   "centerline_radius_m": 32.0,
+   "width_m": 12.0,
+   "direction_change_deg": -64.0,
+   "author_racing_line_radius_m": 37.3,
+   "claimed_apex_kmh": 89.1,
+   "lateral_g_on_author_line": 1.675,
+   "sweep_envelope_g_at_that_radius": 1.65,
+   "lateral_g_on_centerline": 1.952,
+   "geometric_min_curvature_line_radius_m": 42.1,
+   "radius_ok_vs_1_86g": true,
+   "note": "1.675 g demanded against a 1.650 g interpolation of the sweep between the 32.64 m and 50.95 m rows - 1.5% over. On the geometric line (42.1 m) it is 1.484 g and comfortable. The corner survives either way; the claim that it sits '4.7 m outside the quarter-lock row' does not."
+  },
+  {
+   "corner": "T2 Il Quarto",
+   "segment": "T2",
+   "centerline_radius_m": 30.0,
+   "width_m": 10.0,
+   "direction_change_deg": 58.0,
+   "author_racing_line_radius_m": 34.3,
+   "claimed_apex_kmh": 84.0,
+   "lateral_g_on_author_line": 1.619,
+   "sweep_envelope_g_at_that_radius": 1.613,
+   "lateral_g_on_centerline": 1.851,
+   "geometric_min_curvature_line_radius_m": 94.3,
+   "radius_ok_vs_1_86g": true,
+   "note": "THE headline claim of the layout and the weakest. 34.3 m is the hug-the-inside line; the minimum-curvature line through this corridor is 94.3 m (bounded by the 36.72 m approach, which it uses 33.3 m of). At 34.3 m the corner is on #137's boundary; anywhere above about 45 m it is not a #137 corner at all. Unvalidated."
+  },
+  {
+   "corner": "T3 Il Curvone",
+   "segment": "T3",
+   "centerline_radius_m": 50.0,
+   "width_m": 11.0,
+   "direction_change_deg": -150.0,
+   "author_racing_line_radius_m": 54.8,
+   "claimed_apex_kmh": 112.9,
+   "lateral_g_on_author_line": 1.83,
+   "sweep_envelope_g_at_that_radius": 1.828,
+   "lateral_g_on_centerline": 2.006,
+   "geometric_min_curvature_line_radius_m": 58.2,
+   "radius_ok_vs_1_86g": true,
+   "note": "Robust - 150 deg of turn with only 20 m of straight either side leaves the line almost no room to open, 54.8 -> 58.2 m. The best corner in the proposal and the one whose claim actually holds. Author says 1.84 g; their own geometry gives 1.830 g."
+  },
+  {
+   "corner": "T4 Le Esse",
+   "segment": "T4a",
+   "centerline_radius_m": 50.0,
+   "width_m": 10.0,
+   "direction_change_deg": 28.0,
+   "author_racing_line_radius_m": 54.3,
+   "claimed_apex_kmh": 112.4,
+   "lateral_g_on_author_line": 1.831,
+   "sweep_envelope_g_at_that_radius": 1.827,
+   "lateral_g_on_centerline": 1.988,
+   "geometric_min_curvature_line_radius_m": 118.5,
+   "radius_ok_vs_1_86g": true,
+   "note": "28 deg of direction change with 4.3 m of usable half-width on each side: the centerline's mid-ordinate is 1.49 m, so each half of the esse can be very substantially straightened. 118.5 m of line radius means the esse is a flick at 130+ km/h, not a matched 1.82 g pair. The asymmetry test still works (both halves are still identical) but at a different g and possibly at a g too low to lift anything."
+  },
+  {
+   "corner": "T4 Le Esse",
+   "segment": "T4b",
+   "centerline_radius_m": 50.0,
+   "width_m": 10.0,
+   "direction_change_deg": -28.0,
+   "author_racing_line_radius_m": 54.3,
+   "claimed_apex_kmh": 112.4,
+   "lateral_g_on_author_line": 1.831,
+   "sweep_envelope_g_at_that_radius": 1.827,
+   "lateral_g_on_centerline": 1.988,
+   "geometric_min_curvature_line_radius_m": 118.5,
+   "radius_ok_vs_1_86g": true,
+   "note": "Same as T4a by construction."
+  },
+  {
+   "corner": "T5 Il Frantoio",
+   "segment": "T5",
+   "centerline_radius_m": 21.0,
+   "width_m": 11.0,
+   "direction_change_deg": -122.0,
+   "author_racing_line_radius_m": 25.8,
+   "claimed_apex_kmh": 64.3,
+   "lateral_g_on_author_line": 1.261,
+   "sweep_envelope_g_at_that_radius": 1.234,
+   "lateral_g_on_centerline": 1.549,
+   "geometric_min_curvature_line_radius_m": 34.8,
+   "radius_ok_vs_1_86g": true,
+   "note": "122 deg keeps the line honest - 25.8 -> 34.8 m. Still off the claimed rung: at 34.8 m this is a T2-class corner, not a past-the-cliff corner. And the 22.00 m approach holds 21.97 m of braking, margin 0.03 m."
+  },
+  {
+   "corner": "T6 La Vite",
+   "segment": "T6",
+   "centerline_radius_m": 19.0,
+   "width_m": 10.0,
+   "direction_change_deg": 81.0,
+   "author_racing_line_radius_m": 23.3,
+   "claimed_apex_kmh": 57.7,
+   "lateral_g_on_author_line": 1.124,
+   "sweep_envelope_g_at_that_radius": 1.103,
+   "lateral_g_on_centerline": 1.379,
+   "geometric_min_curvature_line_radius_m": 50.6,
+   "radius_ok_vs_1_86g": true,
+   "note": "The one that breaks. T6 exists as the low-g / high-lock control against T2's high-g / same-lock reading. Its claimed 1.02 g is not its own geometry (23.3 m at 57.7 km/h is 1.124 g; the 19 m centerline is 1.379 g) - 1.02 g is lifted straight off the sweep's 0.60-lock / 3.49 m row, a completely different operating point. And on a 50.6 m minimum-curvature line it is a 109 km/h corner at a few degrees of lock, which is the opposite of what it is for."
+  },
+  {
+   "corner": "T7 La Staccatina",
+   "segment": "T7",
+   "centerline_radius_m": 24.5,
+   "width_m": 10.0,
+   "direction_change_deg": 83.0,
+   "author_racing_line_radius_m": 28.8,
+   "claimed_apex_kmh": 71.7,
+   "lateral_g_on_author_line": 1.404,
+   "sweep_envelope_g_at_that_radius": 1.392,
+   "lateral_g_on_centerline": 1.651,
+   "geometric_min_curvature_line_radius_m": 54.5,
+   "radius_ok_vs_1_86g": true,
+   "note": "83 deg with 70 m in and 102.7 m out gives the line a lot to work with: 54.5 m. At 54.5 m the corner is worth 113 km/h and needs no braking from a 102.9 km/h approach - the 'engine braking shapes the entry' premise gets stronger, not weaker, but the quoted 14.0 m braking zone disappears entirely."
+  },
+  {
+   "corner": "T8 Il Ciglio",
+   "segment": "T8",
+   "centerline_radius_m": 110.0,
+   "width_m": 10.0,
+   "direction_change_deg": 34.0,
+   "author_racing_line_radius_m": 114.3,
+   "claimed_apex_kmh": 126.9,
+   "lateral_g_on_author_line": 1.109,
+   "sweep_envelope_g_at_that_radius": 1.86,
+   "lateral_g_on_centerline": 1.152,
+   "geometric_min_curvature_line_radius_m": 283.9,
+   "radius_ok_vs_1_86g": true,
+   "note": "Fine as a corner and correct as a straight-splitter. The claimed duration is wrong: 65.28 m of arc at 126.9 km/h is 1.852 s, not the 1.63 s stated. The 1.11 g checks against their own 114.3 m line; on a 283.9 m minimum-curvature line it is 0.45 g, which weakens the #139 kerb-strike argument (a driver at 0.45 g does not need the kerb)."
+  },
+  {
+   "corner": "T9 Il Tornante",
+   "segment": "T9",
+   "centerline_radius_m": 14.0,
+   "width_m": 14.0,
+   "direction_change_deg": -180.0,
+   "author_racing_line_radius_m": 20.3,
+   "claimed_apex_kmh": 49.6,
+   "lateral_g_on_author_line": 0.954,
+   "sweep_envelope_g_at_that_radius": 0.946,
+   "lateral_g_on_centerline": 1.383,
+   "geometric_min_curvature_line_radius_m": 20.3,
+   "radius_ok_vs_1_86g": true,
+   "note": "Hard-bounded by 180 deg of turn - the line cannot open. 20.3 m against the sweep's 18.99 m / 0.88 g / 46.0 km/h row: 0.954 g demanded, 0.946 g interpolated, 0.8% over. Honest, and the best-supported corner in the proposal after T3. 3.192 s checks exactly."
+  },
+  {
+   "corner": "T10 La Cesta",
+   "segment": "T10",
+   "centerline_radius_m": 38.0,
+   "width_m": 11.0,
+   "direction_change_deg": -52.0,
+   "author_racing_line_radius_m": 42.8,
+   "claimed_apex_kmh": 97.5,
+   "lateral_g_on_author_line": 1.748,
+   "sweep_envelope_g_at_that_radius": 1.718,
+   "lateral_g_on_centerline": 1.968,
+   "geometric_min_curvature_line_radius_m": 128.1,
+   "radius_ok_vs_1_86g": true,
+   "note": "52 deg with 126.17 m of approach: the line opens to 128.1 m, i.e. flat. The threshold-braking-on-a-grip-step test then has an 11.9 m braking zone (author's own figure, and I get 11.91 m) inside a corner nobody actually brakes for. The test needs a corner the line cannot open."
+  }
+ ],
+ "author_discrepancies": [
+  "total_length_m: author 1300.019, my walk 1299.9966 (-0.0224 m). Cause found: the JSON's start_m ladder accumulates the ROUNDED arc_length_m values (55.29, 35.74, ...) rather than the exact arcs, so start_m drifts to +0.0234 m by the last segment. Inside the regulation's 1 m length accuracy, but ADR-0046 places all furniture by arc length in metres and this ladder is not the same walk the spline will be.",
+  "closure_error_m: author 0.001036, my run of the brief's exact walk at step 0.25 gives 0.001477 m. Both trivially pass; the author did not use the brief's walk verbatim.",
+  "min_separation_m: author 20.559, measured 20.5576 - correct. But min_separation_where says the far point is 'on Il Fondovalle, the valley floor before T7'. d=789.73 m is inside T7 La Staccatina itself (762.00-797.49). Il Fondovalle ends at 762.00. Wrong segment named.",
+  "risks[0]: '8.11 m apart vertically' at the closest pair. Measured 8.094 m.",
+  "elevation_closure_m: author 0.0, measured 0.000962 m. Passes the 0.05 m gate either way.",
+  "overtaking[0] braking_zone_m 26.1 m into T1. Recomputed at 1.53 g on the segment's -0.4% grade, straight-line braking from 135.9 to the 89.1 km/h apex is 27.15 m. 26.1 m is only consistent under a trail-brake reading (26.1 m of straight-line braking leaves 91.4 km/h at turn-in, then 2.3 km/h shed over T1a's 55.29 m arc) - which is a fine way to drive it, but it is not what the document says and it is not what 'braking at about 74 m' means.",
+  "corners[0] provokes: '26.1 m of braking from 135.9 km/h runs out exactly at turn-in ... so the brake is still on while the kart is already at 1.4 g of lateral.' Those two halves contradict each other, and 1.4 g corresponds to nothing in the corner: T1a's line gives 0.88-0.92 g and T1b's gives 1.68-1.76 g at the speeds quoted.",
+  "corners[7] T8 Il Ciglio: '1.63 s at 1.11 g'. 65.275 m of arc at the 126.9 km/h apex is 1.852 s; at the entry/exit mean of 126.45 km/h it is 1.859 s. 1.63 s is 12% short. (T3's 4.17 s, T5's 2.51 s, T9's 3.19 s and T1b's 1.44 s all check exactly, so this one is a slip and not a different convention.)",
+  "corners[4] T5 rollover_note: 'A left at 1.5 g'. 1.549 g is the CENTERLINE figure at 21 m. Every other lateral-g figure in the document is quoted on the author's racing line, where T5 is 1.261 g. Two conventions inside one corner entry.",
+  "corners[5] T6 La Vite: 'about 1.02 g'. The corner's own geometry gives 1.124 g on the author's 23.3 m line and 1.379 g on the 19 m centerline. 1.02 g is the sweep's 0.60-lock / 1.00-throttle row, which settles at 3.49 m and 21.2 km/h - a different operating point entirely, imported wholesale. T6's stated purpose (isolate caster jacking at the lowest lateral g on the lap) rests on that number.",
+  "corners[5] T6: 'close to the highest steering angle'. Under the author's own line model T9 is tighter (20.3 m vs 23.3 m), so T6 is second, not highest.",
+  "corners[3] T4 / risks[2]: 'Le Esse are 0.78 s each and 0.9 s apart'. 0.78 s each is right (24.435 m at 112.4 km/h = 0.783 s). '0.9 s apart' matches nothing: apex-to-apex is 1.295 s, and the gap between the two arcs is 0.512 s.",
+  "corners[2] T3: '1.84 g'. The author's own 54.8 m line at 112.9 km/h is 1.830 g. 1.84 g is the sweep's 58.49 m row. (The derived '76% of 2.43 g' survives either figure.)",
+  "reverse.character: 'Forward there are two braking zones over 20 m; reversed there are six.' Recomputed at 1.53 g from the author's OWN entry/apex pairs, forward has FOUR over 20 m: T1 27.08, T5 21.85, T6 21.77, T9 39.43. The two-against-six contrast is the load-bearing claim of the reverse section and it is wrong by the document's own numbers. risks[1] repeats it ('only two of the ten corners have a braking zone worth the name').",
+  "reverse.what_breaks: 'T8 Il Ciglio is approached at 121.6 km/h forward'. corners[7] gives entry_kmh 120.7. Two sections of the same document disagree by 0.9 km/h.",
+  "overtaking[1] tow_length_m 220.2 m. 102.74 + 65.275 + 51.86 = 219.875 m (-0.33 m). Using the JSON's own rounded arc (65.28) it is 219.88.",
+  "concept: 'a deliberate ladder of racing-line radius ... with no two rungs close enough to test the same thing' - and then T3 is 54.8 m and T4 is 54.3 m, 0.5 m apart, and corners[3] says outright 'the same rung as T3, deliberately'. The concept paragraph contradicts the corner entry four screens later.",
+  "concept: 'ten corners on a deliberate ladder ... 114 m, 71, 55, 54, 43, 37, 34, 29, 26, 23, 20' - eleven values for ten corners. Correct, because T1 is compound, but the sentence does not say so.",
+  "elevation.vertical_curves: all thirteen carry 'ok': true. The V^2/K arithmetic is right on all thirteen (my recompute agrees within 0.5 m on R and 0.05 m on L) and all thirteen fit their segments, so the flag is true for what it checks. It does not check the second half of the same regulation sentence - 'wherever possible, changes in gradient should be avoided altogether in these sections' - and eleven of the thirteen land on a corner boundary or inside a braking zone.",
+  "estimated_lap_time_s 49.44 is not verifiable without the author's solver. A crude trapezoid over their own entry/apex/exit points gives 50.31 s, which is consistent (my model holds apex speed through the whole arc and so runs slow). Not counted as a discrepancy - recorded so nobody thinks it was checked.",
+  "measured.longest_straight_m 178.0, elevation_range_m 8.472, bounding_box 232.6 x 368.3, final_heading -360, start_to_first_corner 100.0, last_corner_to_start 78.0: all confirmed exactly. The plan geometry in this proposal is honest work."
+ ],
+ "notes": [
+  "PASSES, unambiguously: closes (0.0015 m), one full loop counter-clockwise (-360.000 deg exactly), 1299.997 m inside 1,100-1,400, longest straight 178.0 m inside the 200 m cap, zero centerline self-crossings, min separation 20.558 m against the brief's 14 m, start line to first corner 100 m >= 50, last corner to line 78 m >= 70, starting straight 178 m inside 120-200, first corner 112 deg >= 45 and 12.0 m wide inside the 8-12 band and at its maximum, width >= 10 m everywhere against the 8 m floor, elevation closes to 0.00096 m, camber 2.0% on every straight inside 1.5-3.0, banking 2.5-6.0% inside the 10% cap, no adverse camber anywhere, all six direction changes over 80 deg carry a run-off, every gravel bed >= 2 m, and all thirteen vertical curves are arithmetically correct and fit their segments. The starting straight's steepest gradient is 1.6%, inside the 2% cap. Nothing here is fatal.",
+  "The single best thing in the proposal is the elevation discipline. The steepest gradients (-3.2%, -3.6%) sit on the 20 m and 81 m links either side of the slow infield where the kart is at 57-95 km/h, and the fastest part of the lap (Rettifilo del Fondo, T8, the T9 braking zone) is held at a constant 0.689% with no gradient change anywhere in it. That is the brief's hardest constraint read correctly and acted on. The 0.689% is visibly a solved residual rather than a chosen number, which is fine and the author says so.",
+  "The second best thing is the honesty of the risks array. Six of the seven entries are real, and two of them (the terrace, the hand-sized run-off) are things I would have had to find. The problem is that they are filed as risks and the layout is then reported as passing - the terrace is a s7.5 violation, not a construction note.",
+  "The T8 kink is the right answer to the 200 m cap. 102.74 + 65.28 + 51.86 of physical run with a 34 deg direction change in the middle, giving the full tow into the hairpin while neither leg is over 200 m. That is a genuinely good piece of circuit design and it is the reason the T9 overtaking spot exists.",
+  "What the proposal actually needs before it becomes track.json: a minimum-curvature line solver. Not a nicety - seven of the twelve corner segments are 1.9x to 3.0x off the line radius they were sized against, and the corners that carry the sim-diagnostic claims (T2 on the #137 boundary, T6 as the low-g caster control, T10 as the threshold-braking-on-a-grip-step test) are exactly the ones where the model is furthest wrong. T3, T9 and T1b are robust because their direction changes are large enough that the corridor forces the line, which is the design lesson: if you want a corner to sit on a measured rung, make the geometry force it rather than the racing line assume it.",
+  "The reverse layout is argued better than most of the forward layout. Flipping every corner's hand against a 2.43/2.81 g rollover asymmetry is a real A/B that costs nothing to author, the sector-mark analysis is measured rather than asserted, and the observation that the T10 resurfacing joint becomes a bump under power rather than a grip step under brakes is the kind of thing the join between two layouts is supposed to surface. It is undermined by the braking-zone census being wrong (four forward, not two) and by every claim in it being unverifiable from the segment list alone.",
+  "Both pit lane ends are wrong and they are wrong for opposite reasons - the entry because the author reasoned about a left-hander's line backwards, the exit because there is no length available where it was put. Neither is hard to fix and neither is in the geometry, so they should not be read as a verdict on the layout."
+ ]
+}

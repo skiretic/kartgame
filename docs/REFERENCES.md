@@ -1916,7 +1916,24 @@ km/h), the formula is a much harder constraint than it looks:
 | 100 km/h | 667 m | 500 m |
 | 81.3 km/h — the 0.25-lock / 0.6-throttle row | 441 m | 330 m |
 | 46.0 km/h — the 0.25-lock / 0.3-throttle row | 141 m | 106 m |
-| 21.2 km/h — where #137's cliff settles the kart | 30 m | 23 m |
+| 21.2 km/h — where #137's cliff settles the kart | 30 m | 22 m |
+
+**And the formula caps how much elevation can ever load a tire, at a number that
+does not depend on speed.** The extra normal acceleration in a vertical curve is
+`v²/R`; substituting the regulation's own minimum `R = V²/K`, with `v = V/3.6`,
+gives
+
+    a = (V/3.6)² / (V²/K) = K / 12.96      — the V cancels
+
+which is **1.543 m/s² (0.157 g) in a compression** and **1.157 m/s² (0.118 g)
+over a crest**, at every speed, on the most aggressive profile the regulation
+permits. So `ARCHITECTURE.md` §11's "elevation change, both for looks and because
+it loads the tires" is half wrong and the half is worth knowing: a legal kart
+circuit cannot load a tire by more than about a sixth of gravity through
+elevation, and a crest can only unload it by about an eighth. Elevation on this
+circuit is a *visibility* and *commitment* device, not a grip device. Anything
+that wanted real vertical load would have to break the vertical-radius rule to
+get it.
 
 A 1,380 m vertical radius on a circuit whose whole lap is 1,200 m is the finding
 that matters: **elevation change on a kart circuit lives in the slow parts.** A

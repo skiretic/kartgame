@@ -1,0 +1,986 @@
+{
+ "lens": "synthesis",
+ "working_name": "Valdirone Nuova",
+ "base_layout": "RHYTHM / Valdirone, and it was not close. It is the only one of the four that no judge ranked below second (regulation 65/1st, sim-feature 82/1st, racing 78/2nd), the only one whose corner-speed claims survived independent recomputation - its verifier reproduced 12 of 13 quoted lock ceilings to within 0.1 km/h straight from drive_probe.gd's rows - and the only one of the four that used the correct geometric line construction rather than an inside-edge offset. What is inherited is the whole skeleton: three movements of roughly equal time; one long open first corner that carries the sustained load and resolves passes by friction ellipse rather than by braking; a deep hairpin at the bottom of a bowl fed by a descent and paid for by a long climb; a decreasing-radius compound as the #137 detector; an opening compound whose exit owns the start straight; the vertical-curve margin policy (a stated multiplier over R = V^2/K rather than the adverb 'adequately'); the per-corner margin ladder that doubles as a regression sensitivity ordering; and sectors written as a diagnostic partition rather than as three equal distances.\n\nNothing here overrules a judge. Where the three disagreed - the racing judge put Pietrarossa first on the strength of its two surviving overtaking spots - the disagreement is resolved by grafting rather than by choosing: Pietrarossa's T9 Il Tornante is imported whole, because the racing judge is right that it is the only corner in the exercise where tow, entry width and a punishing exit are all present, measured, and immune to the racing-line correction that broke most other claims.",
+ "concept": "One measured fact shapes this circuit more than any other, and it is not a fact about grip. At kart road widths the widest arc a corner allows is rho = R + h(1+cos(theta/2))/(1-cos(theta/2)) with h = (W-1.400)/2, and that multiplier is 16.70 at 55 deg, 8.68 at 75, 6.61 at 85, 5.17 at 95 and exactly 1.00 at 180. A corner is a DIRECTION CHANGE, not a radius: below about 80 deg nothing in an 8-14 m road can be slow, whatever its radius, and at 180 deg the line cannot open at all. Three of the four source layouts sized their corners on the hug-the-inside-edge path instead, which has no dependence on angle, and all four verify files came back 'major issues' largely because of it.\n\nRead forwards rather than as an obstacle, that relation writes the corner list. Every one of the eight corners here changes direction by at least 85 deg, which is why all eight carry a mandatory axial run-off and why none of them is a straight pretending to be a corner. It also sets a hard budget nobody in the exercise wrote down: on a loop that turns -360 deg net, lefts minus rights must equal 360, so a 180 deg hairpin consumes half the budget and every right-hander has to be bought with an equal left. Eight real corners plus one hairpin is close to the maximum a 1,375 m Grade 1 kart circuit can hold.\n\nThe second fact is that this kart's braking zones are short and its steering lock, not its grip, is what usually stops it. Six of the eight corners here are limited by drive_probe.gd's quarter-lock envelope and only two (T1 and T2) by the 1.86 g grip ceiling. That inverts the usual reading: a change to the tire model moves two corners, and a change to #137 moves six. It also decides where a pass can be made. The deepest braking zone the kart can produce anywhere on a legal Grade 1 circuit is about 45 m, and this circuit produces 43.0 m of it exactly once, into T3 Il Pozzo. Everywhere else the mechanism has to be width and exit, so the design pays for width where it buys a second line - 14 m at the hairpin, 12 m at T1 and T8 - and takes it away where narrowness is the point: T4 Il Ciglione is 9 m because at 8 m it would be a 97.6 km/h corner and at 12 m a 112.6 km/h one, and 101.3 is the number that makes its entry a lift rather than a brake.\n\nThe shape is a hillside. The start/finish straight and T1 run along a bench; the road crests 64 m past T1's exit and falls 4.60% through T2 and down La Discesa to a 180 deg hairpin at the bottom of a bowl 12.55 m below the crest; La Rampa climbs 4.60% back out for 161 m; and the infield returns to the bench at a steady 0.79%. Three gradient bands, three vertical curves, one elevation profile - the per-segment grades and the vertical curves are the same road by construction, because every grade break sits exactly on a segment boundary. All three curves are legal in BOTH directions at the same K, which is the check two of the four source layouts got wrong in opposite ways.",
+ "grafts": [
+  {
+   "from_": "instrument / Pietrarossa T9 Il Tornante",
+   "into": "T3 Il Pozzo",
+   "displaced": "rhythm's 140 deg / 16.5 m / 12 m hairpin",
+   "why": "180 deg at a 15 m centreline radius through 14 m of road. At 180 deg the multiplier (1+cos(theta/2))/(1-cos(theta/2)) is exactly 1.00, so the racing line is 21.30 m and NOTHING can open it - the corridor forces the radius instead of the driver assuming it. The racing judge called it the only corner in the exercise where all three overtaking ingredients are present, measured, and immune to the line-model correction. It is imported unchanged in radius, angle and width.",
+   "geometric_consequence": "A 180 deg corner is the most expensive thing on the angle budget: it consumes half the -360 deg loop on its own. The loop was re-closed by solving nine straight lengths in weighted least squares against the fixed corner angles; closure is 0.001283 m by the brief's walk at 0.25 m."
+  },
+  {
+   "from_": "rhythm / Valdirone T3 Il Pozzo - the APPROACH, not the corner",
+   "into": "T3 Il Pozzo",
+   "displaced": "instrument's 51.9 m post-kink run-up",
+   "why": "Pietrarossa's hairpin had the right corner and a squeezed approach: 39.4 m of braking need against 51.9 m available. Valdirone's had the right approach - a long descent, the lap's peak speed, five downshifts, first gear. Grafting the approach onto the corner gives 43.0 m of braking from 140.8 km/h on a -4.60% descent (42.74 m by the analytic 1.53 g figure grade-corrected), which is within 2 m of the deepest braking zone this kart can produce anywhere.",
+   "geometric_consequence": "La Discesa is 139.71 m of merged straight and the last 75 m of it is dedicated: a 50 m braking segment at 12 m and a 25 m widening segment at 13 m, tapering into the hairpin's 14 m. The tapers are segments, not prose."
+  },
+  {
+   "from_": "instrument / Pietrarossa T4 Le Esse - the MATCHED PAIR discipline",
+   "into": "T6 / T7 Le Forbici",
+   "displaced": "rhythm's mismatched 30 m / 34 m esse",
+   "why": "The rollover asymmetry (2.43 g left against 2.81 g right) is a 15.6% difference in margin that no driver can resolve across half a lap. Two corners of identical radius, identical angle and identical kerb, opposite hands, 1.35 s apart, is the only way to read it - and it is the one claim in the instrument document that was immune to its own line-model defect, because both halves inherit the same systematic error and the reading is a ratio. Rhythm's esse was 30 m and 34 m, which is not a matched pair and cannot carry the test.",
+   "geometric_consequence": "Both halves are 32 m / 85 deg / 11 m. Because they cancel in heading they cost nothing on the angle budget, which is what let them be moved onto the east return run where they also break what would otherwise be a 198 m straight into two 80 m ones."
+  },
+  {
+   "from_": "rhythm / Valdirone T4-T5 - the LINKED-PAIR arithmetic",
+   "into": "T6 / T7 Le Forbici",
+   "displaced": "nothing - it is the constraint on the graft above",
+   "why": "The crossing is 38.43 m. Moving across the 9.6 m of usable road in that distance at 102.3 km/h takes 1.352 s and demands 4y/t^2 = 2.14 g against the kart's 1.86, so at 1.0 g the driver gets 4.48 m of the 9.6 and both corners must be driven from mid-track. That is why the pair is capped at a 47.87 m line radius instead of the 63.74 m either would have alone - an analytic, falsifiable number rather than a feeling, and it is the same convention rhythm used, corrected to deduct the kart's own 1.400 m as its verifier required.",
+   "geometric_consequence": "The crossing length is one of the nine free straights in the closure solve."
+  },
+  {
+   "from_": "instrument / Pietrarossa T10 La Cesta - the resurfacing joint",
+   "into": "T3 Il Pozzo's braking zone at d = 500.0",
+   "displaced": "instrument's own 11.9 m braking zone, which was too thin to read",
+   "why": "A grip step across the road under an already-threshold pedal. It needs a zone long enough to separate the step from the initial application, and 43.0 m is the only zone in this exercise that has room: the joint sits 27.2 m before turn-in, 16 m after the brakes come on, with the kart at about 96 km/h. Art 12 forbids paint on the asphalt; a resurfacing joint is not paint.",
+   "geometric_consequence": "None - it is a surface span, not geometry."
+  },
+  {
+   "from_": "instrument / Pietrarossa T8 Il Ciglio - the #139 kerb at speed",
+   "into": "T2 Lama",
+   "displaced": "rhythm's T2 Il Filo, 45 deg at 0.78 g, which its own author called a bureaucrat",
+   "why": "Instrument's kerb corner was 34 deg and 0.45 g on a proper line, which its verifier correctly said is a corner nobody needs the kerb in. Rhythm's straight-splitter was 45 deg and 0.78 g and did nothing at all. T2 Lama is 85 deg at 1.86 g on a 70.43 m line with a 9.5 m braking zone: the driver is at the grip ceiling, the apex kerb is on the shortest path, and it happens at 129 km/h. It is still a straight-splitter - without it the shelf and the descent merge into a 267 m straight against a 200 m cap - but it is a corner first.",
+   "geometric_consequence": "85 deg is over the 80 deg run-off threshold, so the straight-splitter now costs a mandatory axial run-off. That is the price of the graft and it is paid."
+  },
+  {
+   "from_": "terrain / Cava Vecchia T7 Il Ciglione - uphill, blind, run-off into the cut face",
+   "into": "T4 Il Ciglione",
+   "displaced": "nothing; rhythm had no corner at the top of its climb",
+   "why": "The best single learnable anyone wrote, kept, with the one thing terrain got wrong removed. The axis of an 85 deg direction change at the top of a climb points into the hillside the climb was cut from, so the run-off is free from the landform: 6 m of apron at the art 7.5 10% up-slope cap, 20 m of rising gravel, tire barrier against rock.",
+   "geometric_consequence": "Terrain put its 8.51% grade break INSIDE the corner arc and called it compliant. Here the break sits 34.3 m before the braking point on an 1,800 m radius (2.05x the minimum forward, 1.81x reverse), which measures the honest version of the lesson: sight distance to turn-in is 75.9 m, 2.18 s at 125 km/h. See outside_scope_concerns - a genuinely blind crest immediately before a 120 km/h braking zone is not legal on a kart circuit at all."
+  },
+  {
+   "from_": "terrain / Cava Vecchia T4 Il Frantoio - width derived from the lock sweep",
+   "into": "T3 (14 m), T4 (9 m), T1 and T8 (12 m)",
+   "displaced": "width chosen by assertion, which is what all four source layouts did somewhere",
+   "why": "The single most useful piece of method in the exercise. Width moves a corner on or off the cliff without touching the plan geometry. T3: at the 8 m floor the line is 18.30 m and the apex 44.4 km/h; at 14 m it is 21.30 m and 52.0 km/h - the extra 6 m is what makes a second line exist at all. T4: 8 m gives 43.7 m and 97.6 km/h, 9 m gives 47.13 m and 101.3, 12 m would give 58.4 m and 112.6, and 101.3 is the number that makes the entry a lift instead of a brake.",
+   "geometric_consequence": "Widths are per-segment fields with a stated taper length, not note strings."
+  },
+  {
+   "from_": "racecraft / Sabliere - the compound sense-inversion",
+   "into": "T5 Vigna (closes forward, opens reversed) and T8 Uscita (opens forward, closes reversed)",
+   "displaced": "nothing - rhythm had both compounds and never said what they were for",
+   "why": "The only reverse-layout differentiation in the exercise that is structural rather than narrative, and it costs nothing to author. Forward, Vigna is the decreasing-radius trap and Uscita is the pass-and-drive-away exit; reversed they trade jobs, so each direction gets exactly one dive-bomb and exactly one drive-away corner. Measured rather than asserted: reversed, Uscita is entered at 142.2 km/h with a 20.5 m braking zone, against 124.3 km/h and 8.0 m forward.",
+   "geometric_consequence": "None - it is a reading of geometry that was already there."
+  },
+  {
+   "from_": "racecraft / Sabliere T4 The Cellar reversed - elevation bought for the reverse hairpin",
+   "into": "La Rampa",
+   "displaced": "rhythm's 7.39 m elevation range",
+   "why": "Racecraft's strongest single claim was that its reversed hairpin, fed by a 111.75 m descent to the kart's top speed, was the best passing corner on the property and did not exist forwards. It needed 14.59 m of range; rhythm's 7.39 m could not produce it. This circuit carries 12.55 m, which is what the return climb can pay for at a gradient whose vertical curves still fit, and reversed the 161 m Rampa is a -4.60% descent to 134.4 km/h with a 38.5 m braking zone.",
+   "geometric_consequence": "The range is derived, not chosen: La Rampa plus the hairpin's exit half is 125.07 m of climbing road, and the descent band is 289.44 m, and the loop closes at gA = +0.787% on the remaining 960.61 m. Raising the range further means steepening the bands, which lengthens the crest curve, which no longer fits the 127.72 m shelf."
+  },
+  {
+   "from_": "rhythm / Valdirone T8 - run-off sized once per layout",
+   "into": "every corner",
+   "displaced": "a single run-off figure per corner",
+   "why": "The concrete demonstration that a reverse layout is geometry and furniture and not a spline direction flag. Every corner here carries a forward approach speed and a reverse approach speed and the larger drives the build. T8 Uscita is the extreme case: 124.3 km/h forward against 142.2 km/h reversed, 1.31x the kinetic energy, 14 m of asphalt plus 26 m of grass instead of 10 plus 16.",
+   "geometric_consequence": "None."
+  },
+  {
+   "from_": "racecraft / Sabliere - a_vert = K/12.96, and the pit lane does not reverse",
+   "into": "the elevation argument and the start area",
+   "displaced": "the assumption that elevation loads the tires, and one shared pit complex",
+   "why": "At the legal minimum vertical radius a_vert = v^2/R = v^2/(V^2/K) = K/12.96 m/s^2 regardless of speed: 0.157 g in any compression and 0.118 g over any crest, and art 7.2 then says to increase R further. So no legal Grade 1 kart circuit can swing tire load by more than -11.8%/+15.7% anywhere. The three curves here deliver 0.079, 0.053 and 0.065 g. Elevation on this circuit is a visibility and braking-distance lever and it is not sold as anything else. Separately: a deceleration lane at 20 deg to the direction of travel is a 160 deg merge driven the other way, over art 7.4's 30 deg cap, so the reverse layout gets its own two stubs on the other edge.",
+   "geometric_consequence": "Two extra pit stubs are asphalt, not furniture."
+  }
+ ],
+ "segments": [
+  {
+   "index": 0,
+   "kind": "straight",
+   "label": "Rettifilo del Banco - start line to T1",
+   "length_m": 88.0,
+   "camber_pct": 2.0,
+   "width_m": 12.0,
+   "width_taper_in_m": 0.0,
+   "grade_pct": 0.787,
+   "start_m": 0.0
+  },
+  {
+   "index": 1,
+   "kind": "corner",
+   "label": "T1 - Ronda",
+   "radius_m": 57.0,
+   "angle_deg": -110.0,
+   "arc_length_m": 109.43,
+   "banking_pct": 5.0,
+   "width_m": 12.0,
+   "width_taper_in_m": 0.0,
+   "grade_pct": 0.787,
+   "start_m": 88.0
+  },
+  {
+   "index": 2,
+   "kind": "straight",
+   "label": "Il Banco - the shelf, pre-crest",
+   "length_m": 63.86,
+   "camber_pct": 2.0,
+   "width_m": 11.0,
+   "width_taper_in_m": 25.0,
+   "grade_pct": 0.787,
+   "start_m": 197.43
+  },
+  {
+   "index": 3,
+   "kind": "straight",
+   "label": "Il Banco - the shelf, post-crest",
+   "length_m": 63.86,
+   "camber_pct": 2.0,
+   "width_m": 11.0,
+   "width_taper_in_m": 0.0,
+   "grade_pct": -4.6,
+   "start_m": 261.29
+  },
+  {
+   "index": 4,
+   "kind": "corner",
+   "label": "T2 - Lama",
+   "radius_m": 42.0,
+   "angle_deg": 85.0,
+   "arc_length_m": 62.31,
+   "banking_pct": 5.0,
+   "width_m": 10.0,
+   "width_taper_in_m": 20.0,
+   "grade_pct": -4.6,
+   "start_m": 325.15
+  },
+  {
+   "index": 5,
+   "kind": "straight",
+   "label": "La Discesa - the tow",
+   "length_m": 64.71,
+   "camber_pct": 2.5,
+   "width_m": 11.0,
+   "width_taper_in_m": 20.0,
+   "grade_pct": -4.6,
+   "start_m": 387.46
+  },
+  {
+   "index": 6,
+   "kind": "straight",
+   "label": "La Discesa - the braking zone",
+   "length_m": 50.0,
+   "camber_pct": 2.5,
+   "width_m": 12.0,
+   "width_taper_in_m": 25.0,
+   "grade_pct": -4.6,
+   "start_m": 452.18
+  },
+  {
+   "index": 7,
+   "kind": "straight",
+   "label": "La Discesa - the widening",
+   "length_m": 25.0,
+   "camber_pct": 2.5,
+   "width_m": 13.0,
+   "width_taper_in_m": 25.0,
+   "grade_pct": -4.6,
+   "start_m": 502.18
+  },
+  {
+   "index": 8,
+   "kind": "corner",
+   "label": "T3a - Il Pozzo, entry half",
+   "radius_m": 15.0,
+   "angle_deg": -90.0,
+   "arc_length_m": 23.56,
+   "banking_pct": 7.0,
+   "width_m": 14.0,
+   "width_taper_in_m": 12.0,
+   "grade_pct": -4.6,
+   "start_m": 527.18
+  },
+  {
+   "index": 9,
+   "kind": "corner",
+   "label": "T3b - Il Pozzo, exit half",
+   "radius_m": 15.0,
+   "angle_deg": -90.0,
+   "arc_length_m": 23.56,
+   "banking_pct": 7.0,
+   "width_m": 14.0,
+   "width_taper_in_m": 0.0,
+   "grade_pct": 4.6,
+   "start_m": 550.74
+  },
+  {
+   "index": 10,
+   "kind": "straight",
+   "label": "La Rampa - the climb, lower",
+   "length_m": 101.51,
+   "camber_pct": 2.5,
+   "width_m": 11.0,
+   "width_taper_in_m": 30.0,
+   "grade_pct": 4.6,
+   "start_m": 574.3
+  },
+  {
+   "index": 11,
+   "kind": "straight",
+   "label": "La Rampa - the climb, upper",
+   "length_m": 59.51,
+   "camber_pct": 2.5,
+   "width_m": 9.0,
+   "width_taper_in_m": 35.0,
+   "grade_pct": 0.787,
+   "start_m": 675.81
+  },
+  {
+   "index": 12,
+   "kind": "corner",
+   "label": "T4 - Il Ciglione",
+   "radius_m": 22.0,
+   "angle_deg": 85.0,
+   "arc_length_m": 32.64,
+   "banking_pct": 7.0,
+   "width_m": 9.0,
+   "width_taper_in_m": 0.0,
+   "grade_pct": 0.787,
+   "start_m": 735.32
+  },
+  {
+   "index": 13,
+   "kind": "straight",
+   "label": "Link T4-T5",
+   "length_m": 28.29,
+   "camber_pct": 2.0,
+   "width_m": 10.0,
+   "width_taper_in_m": 20.0,
+   "grade_pct": 0.787,
+   "start_m": 767.96
+  },
+  {
+   "index": 14,
+   "kind": "corner",
+   "label": "T5a - Vigna, entry arc",
+   "radius_m": 60.0,
+   "angle_deg": -24.0,
+   "arc_length_m": 25.13,
+   "banking_pct": 3.0,
+   "width_m": 10.0,
+   "width_taper_in_m": 0.0,
+   "grade_pct": 0.787,
+   "start_m": 796.25
+  },
+  {
+   "index": 15,
+   "kind": "corner",
+   "label": "T5b - Vigna, apex arc",
+   "radius_m": 22.0,
+   "angle_deg": -71.0,
+   "arc_length_m": 27.26,
+   "banking_pct": 8.0,
+   "width_m": 10.0,
+   "width_taper_in_m": 0.0,
+   "grade_pct": 0.787,
+   "start_m": 821.38
+  },
+  {
+   "index": 16,
+   "kind": "straight",
+   "label": "Il Traverso - Vigna to Le Forbici",
+   "length_m": 79.95,
+   "camber_pct": 2.0,
+   "width_m": 11.0,
+   "width_taper_in_m": 25.0,
+   "grade_pct": 0.787,
+   "start_m": 848.64
+  },
+  {
+   "index": 17,
+   "kind": "corner",
+   "label": "T6 - Forbice A",
+   "radius_m": 32.0,
+   "angle_deg": -85.0,
+   "arc_length_m": 47.47,
+   "banking_pct": 6.0,
+   "width_m": 11.0,
+   "width_taper_in_m": 0.0,
+   "grade_pct": 0.787,
+   "start_m": 928.6
+  },
+  {
+   "index": 18,
+   "kind": "straight",
+   "label": "Le Forbici - the crossing",
+   "length_m": 38.43,
+   "camber_pct": 2.0,
+   "width_m": 11.0,
+   "width_taper_in_m": 0.0,
+   "grade_pct": 0.787,
+   "start_m": 976.07
+  },
+  {
+   "index": 19,
+   "kind": "corner",
+   "label": "T7 - Forbice B",
+   "radius_m": 32.0,
+   "angle_deg": 85.0,
+   "arc_length_m": 47.47,
+   "banking_pct": 6.0,
+   "width_m": 11.0,
+   "width_taper_in_m": 0.0,
+   "grade_pct": 0.787,
+   "start_m": 1014.5
+  },
+  {
+   "index": 20,
+   "kind": "straight",
+   "label": "Link T7-T8",
+   "length_m": 79.95,
+   "camber_pct": 2.0,
+   "width_m": 11.0,
+   "width_taper_in_m": 0.0,
+   "grade_pct": 0.787,
+   "start_m": 1061.97
+  },
+  {
+   "index": 21,
+   "kind": "corner",
+   "label": "T8a - Uscita, entry arc",
+   "radius_m": 45.0,
+   "angle_deg": -48.0,
+   "arc_length_m": 37.7,
+   "banking_pct": 4.0,
+   "width_m": 12.0,
+   "width_taper_in_m": 15.0,
+   "grade_pct": 0.787,
+   "start_m": 1141.92
+  },
+  {
+   "index": 22,
+   "kind": "corner",
+   "label": "T8b - Uscita, exit arc",
+   "radius_m": 70.0,
+   "angle_deg": -97.0,
+   "arc_length_m": 118.51,
+   "banking_pct": 6.0,
+   "width_m": 12.0,
+   "width_taper_in_m": 0.0,
+   "grade_pct": 0.787,
+   "start_m": 1179.62
+  },
+  {
+   "index": 23,
+   "kind": "straight",
+   "label": "Rettifilo del Banco - run to the line",
+   "length_m": 77.0,
+   "camber_pct": 2.0,
+   "width_m": 12.0,
+   "width_taper_in_m": 0.0,
+   "grade_pct": 0.787,
+   "start_m": 1298.13
+  }
+ ],
+ "corners": [
+  {
+   "name": "T1 - Ronda",
+   "segment_indices": [
+    1
+   ],
+   "radius_m": 57.0,
+   "angle_deg": 110.0,
+   "arcs": [
+    {
+     "radius_m": 57.0,
+     "angle_deg": -110.0
+    }
+   ],
+   "width_m": 12.0,
+   "line_radius_m": 76.56,
+   "line_radius_construction": "rho = R + h(1+cos(theta/2))/(1-cos(theta/2)), h = (W - 1.400)/2, R the tightest arc of the corner and theta the whole direction change; needs 20.4 m of straight before the corner's own tangent point (2*sqrt(h(rho-R))) and has 63.9 m",
+   "defender_line_radius_m": 62.49,
+   "defender_ceiling_kmh": 121.5,
+   "defender_penalty_kmh": 13.0,
+   "grip_ceiling_kmh": 134.5,
+   "lock_ceiling_kmh": 141.8,
+   "hand": "left",
+   "provokes": "Sustained lateral load, and the friction ellipse in traffic. 109.43 m of constant 57 m radius through the regulation's maximum 12 m first-corner width, held 2.93 s at 1.86 g on a 76.56 m racing line - the second longest steady state on the lap after T8 and the only one taken above 130 km/h. It is a LEFT because the kart tips at 2.43 g turning left against 2.81 g right, so this is the side where issue #32's inside rear leaves the ground first. It is also the corner where a pass started on the start straight is resolved: see overtaking[1].",
+   "entry_kmh": 134.5,
+   "apex_kmh": 134.5,
+   "exit_kmh": 134.5,
+   "braking_zone_m": 2.5,
+   "braking_from_kmh": 137.2,
+   "arc_duration_s": 2.93,
+   "lateral_g": 1.86,
+   "gear": "6th throughout, no shift (134.5 km/h is 12,959 rpm in 6th)",
+   "cliff_relation": "safe side",
+   "cliff_note": "Racing line 76.56 m: grip ceiling 134.5 km/h, quarter-lock ceiling 141.8 km/h, taken at 134.5 km/h. Grip is the binding limit and there is 7.3 km/h of lock margin above it. The defender's line - the largest arc that fits the INNER HALF of the corridor, radius 62.49 m about a centre at R - W/4 - is capped at 121.5 km/h, 13.0 km/h below the speed the corner is taken at, so defending here is scrubbing.",
+   "kerb": "Inside kerb over the middle 60 deg of the arc, red/white 1 m alternation, 30 mm. No exit kerb: reversed this is the last corner before the line and its exit is a track-limits question rather than a kerb-use one.",
+   "runoff": "MANDATORY - 110 deg exceeds the 80 deg threshold. Forward approach 137.2 km/h, reverse approach 138.0 km/h, so the two layouts size within 1% of each other and the larger is built: 10 m of asphalt then 24 m of graded grass on the tangent axis, then a conveyor-faced continuous barrier - Part I section 8's small-impact-angle case, because the departure angle off a 76.56 m line is about 11 deg. Assumed decelerations 0.45 g on the apron and 0.286 g on grass (the M3b measurement); the art 7.5 numeric simulation is not run here and these widths are its input, not its output.",
+   "rollover_note": "1.86 g against a 2.43 g left-hand threshold: 77%, the highest fraction on the lap and still 0.57 g clear. Nothing on this circuit comes within 0.2 g of tipping.",
+   "reverse": {
+    "hand": "right",
+    "entry_kmh": 134.5,
+    "apex_kmh": 134.5,
+    "exit_kmh": 134.5,
+    "braking_zone_m": 3.0,
+    "braking_from_kmh": 138.0
+   }
+  },
+  {
+   "name": "T2 - Lama",
+   "segment_indices": [
+    4
+   ],
+   "radius_m": 42.0,
+   "angle_deg": 85.0,
+   "arcs": [
+    {
+     "radius_m": 42.0,
+     "angle_deg": 85.0
+    }
+   ],
+   "width_m": 10.0,
+   "line_radius_m": 70.43,
+   "line_radius_construction": "rho = R + h(1+cos(theta/2))/(1-cos(theta/2)), h = (W - 1.400)/2, R the tightest arc of the corner and theta the whole direction change; needs 22.1 m of straight before the corner's own tangent point (2*sqrt(h(rho-R))) and has 63.9 m",
+   "defender_line_radius_m": 51.4,
+   "defender_ceiling_kmh": 107.1,
+   "defender_penalty_kmh": 21.9,
+   "grip_ceiling_kmh": 129.0,
+   "lock_ceiling_kmh": 133.3,
+   "hand": "right",
+   "provokes": "Issue #139 - a wheel driven at a kerb above 120 km/h. This is the only corner in either direction where the kart meets a 30 mm vertical-faced kerb at more than 120 km/h, it happens once a lap and 21 times in a 30 km Final, and the corner cannot be taken any other way: at 1.86 g on a 70.43 m line the driver is at the grip ceiling and the apex kerb is on the shortest path. It is also the corner that makes La Discesa legal - without it the shelf, the descent and the hairpin approach merge into a 267 m straight against a 200 m cap - and, unlike the straight-splitters in the four source layouts, it is a real corner: 85 deg, a 9.5 m braking zone, 1.86 g.",
+   "entry_kmh": 129.0,
+   "apex_kmh": 129.0,
+   "exit_kmh": 129.0,
+   "braking_zone_m": 9.5,
+   "braking_from_kmh": 142.5,
+   "arc_duration_s": 1.74,
+   "lateral_g": 1.86,
+   "gear": "6th, no shift (129.0 km/h is 12,429 rpm in 6th)",
+   "cliff_relation": "on the boundary",
+   "cliff_note": "Racing line 70.43 m: grip ceiling 129.0 km/h, quarter-lock ceiling 133.3 km/h, taken at 129.0 km/h. Grip is the binding limit and there is 4.3 km/h of lock margin above it. The defender's line - the largest arc that fits the INNER HALF of the corridor, radius 51.40 m about a centre at R - W/4 - is capped at 107.1 km/h, 21.9 km/h below the speed the corner is taken at, so defending here is scrubbing.",
+   "kerb": "30 mm VERTICAL-faced kerb, 24 m of it on the inside, and this is the reference kerb of the circuit - the one #139 should be measured against, because it is the only one struck above 120 km/h. Flat 20 mm exit strip on the outside so that running wide on the descent is a track-limits call and not a launch.",
+   "runoff": "MANDATORY - 85 deg. Forward 142.5 km/h, reverse 126.2 km/h; built for the forward case: 12 m asphalt, then a 3.0 m gravel bed at 5/15 granulometry and 300 mm depth, then a Type C tire barrier with 500 mm behind it.",
+   "rollover_note": "1.86 g against the 2.81 g right-hand threshold: 66%. The same lateral load as T1 on the side with 16% more margin, which is the cheapest A/B this circuit offers - same g, same lap, different hand, 240 m apart.",
+   "reverse": {
+    "hand": "left",
+    "entry_kmh": 122.8,
+    "apex_kmh": 122.8,
+    "exit_kmh": 126.2,
+    "braking_zone_m": 0.0,
+    "braking_from_kmh": 122.8
+   }
+  },
+  {
+   "name": "T3 - Il Pozzo",
+   "segment_indices": [
+    8,
+    9
+   ],
+   "radius_m": 15.0,
+   "angle_deg": 180.0,
+   "arcs": [
+    {
+     "radius_m": 15.0,
+     "angle_deg": -90.0
+    },
+    {
+     "radius_m": 15.0,
+     "angle_deg": -90.0
+    }
+   ],
+   "width_m": 14.0,
+   "line_radius_m": 21.3,
+   "line_radius_construction": "rho = R + h(1+cos(theta/2))/(1-cos(theta/2)), h = (W - 1.400)/2, R the tightest arc of the corner and theta the whole direction change; needs 12.6 m of straight before the corner's own tangent point (2*sqrt(h(rho-R))) and has 25.0 m",
+   "defender_line_radius_m": 14.3,
+   "defender_ceiling_kmh": 33.9,
+   "defender_penalty_kmh": 18.1,
+   "grip_ceiling_kmh": 71.0,
+   "lock_ceiling_kmh": 52.0,
+   "hand": "left",
+   "provokes": "The gearbox, bottom to top, and the one place on the circuit where braking is the overtaking mechanism. 43.0 m from the lap's peak of 140.8 km/h to a 52.0 km/h apex on a -4.60% descent, five downshifts, first gear at the apex at 13,736 rpm - 98% of the 14,000 limiter, so 1st is available and cannot be held: the upshift to 2nd happens inside the first 10 m of the climb and getting it wrong costs the whole ramp. That is issue #38's clutch question and issue #40's auto-shift question in one corner. 180 deg at 15 m through a 14 m road means the racing line is hard-bounded at 21.30 m and cannot open: the corridor forces the radius rather than the driver choosing it.",
+   "entry_kmh": 52.0,
+   "apex_kmh": 52.0,
+   "exit_kmh": 52.0,
+   "braking_zone_m": 43.0,
+   "braking_from_kmh": 140.8,
+   "arc_duration_s": 3.26,
+   "lateral_g": 1.0,
+   "gear": "6th to 1st on the brakes, 1st at the apex, 1st-2nd-3rd-4th-5th up La Rampa",
+   "cliff_relation": "on the boundary",
+   "cliff_note": "Racing line 21.30 m: grip ceiling 71.0 km/h, quarter-lock ceiling 52.0 km/h, taken at 52.0 km/h. Steering lock is the binding limit, so the corner sits exactly on #137's boundary by construction. The defender's line - the largest arc that fits the INNER HALF of the corridor, radius 14.30 m about a centre at R - W/4 - is capped at 33.9 km/h, 18.1 km/h below the speed the corner is taken at, so defending here is scrubbing.",
+   "kerb": "Full inside kerb through both 90 deg halves, 30 mm rippled, plus a flat exit kerb on the left for the first 15 m of the climb. Flat rather than rippled because reversed that same edge is an entry kerb taken at 52 km/h with the kart 0.053 g light over the compression.",
+   "runoff": "MANDATORY - 180 deg, and the largest on the circuit in both directions. Forward 140.8 km/h, reverse 134.4 km/h. On the axis of the braking zone: 14 m of asphalt, then a 3.0 m gravel bed at 300 mm depth not below track level, then a Type B foam mattress. The honest limit, stated: a total brake failure arrives here at 140.8 km/h and needs about 105 m of gravel at an assumed 0.75 g. That is not buildable and is not built; it is handed to the barrier.",
+   "rollover_note": "1.00 g, 41% of the 2.43 g left threshold. A hairpin is not a rollover corner; what it loads is the locked axle and the clutch.",
+   "reverse": {
+    "hand": "right",
+    "entry_kmh": 52.0,
+    "apex_kmh": 52.0,
+    "exit_kmh": 52.0,
+    "braking_zone_m": 38.5,
+    "braking_from_kmh": 134.4
+   }
+  },
+  {
+   "name": "T4 - Il Ciglione",
+   "segment_indices": [
+    12
+   ],
+   "radius_m": 22.0,
+   "angle_deg": 85.0,
+   "arcs": [
+    {
+     "radius_m": 22.0,
+     "angle_deg": 85.0
+    }
+   ],
+   "width_m": 9.0,
+   "line_radius_m": 47.13,
+   "line_radius_construction": "rho = R + h(1+cos(theta/2))/(1-cos(theta/2)), h = (W - 1.400)/2, R the tightest arc of the corner and theta the whole direction change; needs 19.5 m of straight before the corner's own tangent point (2*sqrt(h(rho-R))) and has 28.3 m",
+   "defender_line_radius_m": 30.0,
+   "defender_ceiling_kmh": 74.5,
+   "defender_penalty_kmh": 26.8,
+   "grip_ceiling_kmh": 105.5,
+   "lock_ceiling_kmh": 101.3,
+   "hand": "right",
+   "provokes": "Issue #39 - engine braking shaping the entry - over a crest, uphill, in a 9 m road. The kart arrives at 125.4 km/h at the top of a 161 m climb and needs 101.3; that is 14.5 m of braking, under three kart lengths, so the entry is set by lifting in 4th and the pedal is a correction. The road crests 34.3 m before the braking point over a 1,800 m convex curve, so sight distance to the turn-in is 75.9 m - 2.18 s at 125 km/h. The corner is deliberately the narrowest on the circuit: at the 8 m regulation floor the same 22 m centreline gives a 43.7 m line and 97.6 km/h, at 9 m it gives 47.13 m and 101.3 km/h, and at 12 m it would give 58.4 m and 112.6 km/h. Width is the control.",
+   "entry_kmh": 101.3,
+   "apex_kmh": 101.3,
+   "exit_kmh": 101.3,
+   "braking_zone_m": 14.5,
+   "braking_from_kmh": 125.4,
+   "arc_duration_s": 1.16,
+   "lateral_g": 1.71,
+   "gear": "5th down to 4th on the lift; 4th at the apex, 12,940 rpm",
+   "cliff_relation": "on the boundary",
+   "cliff_note": "Racing line 47.13 m: grip ceiling 105.5 km/h, quarter-lock ceiling 101.3 km/h, taken at 101.3 km/h. Steering lock is the binding limit, so the corner sits exactly on #137's boundary by construction. The defender's line - the largest arc that fits the INNER HALF of the corridor, radius 30.00 m about a centre at R - W/4 - is capped at 74.5 km/h, 26.8 km/h below the speed the corner is taken at, so defending here is scrubbing.",
+   "kerb": "Inside kerb, 30 mm rippled, whole arc. No exit kerb: running wide here loses Vigna.",
+   "runoff": "MANDATORY - 85 deg, and it is free from the landform. The axis of the direction change points straight on up the hill into the cut face that the climb was excavated from: 6 m of apron graded at the art 7.5 maximum 10% up-slope, then 20 m of rising gravel, then a tire barrier against the rock. Forward 125.4 km/h, reverse 108.7 km/h. A kart that loses it at the 101.3 km/h apex reaches the barrier at about 34 km/h, and the up-slope is doing work no flat run-off can.",
+   "rollover_note": "1.71 g against 2.81 g right: 61%. Nowhere near it, and deliberately - the reading here is about entry, not about load.",
+   "reverse": {
+    "hand": "left",
+    "entry_kmh": 101.3,
+    "apex_kmh": 101.3,
+    "exit_kmh": 101.3,
+    "braking_zone_m": 4.5,
+    "braking_from_kmh": 108.7
+   }
+  },
+  {
+   "name": "T5 - Vigna",
+   "segment_indices": [
+    14,
+    15
+   ],
+   "radius_m": 22.0,
+   "angle_deg": 95.0,
+   "arcs": [
+    {
+     "radius_m": 60.0,
+     "angle_deg": -24.0
+    },
+    {
+     "radius_m": 22.0,
+     "angle_deg": -71.0
+    }
+   ],
+   "width_m": 10.0,
+   "line_radius_m": 44.21,
+   "line_radius_construction": "rho = R + h(1+cos(theta/2))/(1-cos(theta/2)), h = (W - 1.400)/2, R the tightest arc of the corner and theta the whole direction change; needs 19.5 m of straight before the corner's own tangent point (2*sqrt(h(rho-R))) and has 28.3 m",
+   "defender_line_radius_m": 28.8,
+   "defender_ceiling_kmh": 71.4,
+   "defender_penalty_kmh": 25.9,
+   "grip_ceiling_kmh": 102.2,
+   "lock_ceiling_kmh": 97.2,
+   "hand": "left",
+   "provokes": "Issue #137, exposed to a bad line and only to a bad line. Decreasing radius: 60 m for 24 deg, then 22 m for 71 deg, with no straight between, so the entry arc denies the apex arc its entry width and the whole compound runs on a 44.21 m line at 97.2 km/h. A driver who commits early and arrives pinned to the inside is on a 28.80 m line whose quarter-lock ceiling is 71.4 km/h - 25.9 km/h below the speed the corner is taken at - and the kart scrubs. This is the corner that walks into #137 on the defensive line and never on the racing line, which is the honest version of the exposure: a good driver alone on the circuit never meets the cliff here, and a driver defending a place meets it every lap.",
+   "entry_kmh": 97.2,
+   "apex_kmh": 97.2,
+   "exit_kmh": 97.2,
+   "braking_zone_m": 7.4,
+   "braking_from_kmh": 110.1,
+   "arc_duration_s": 1.94,
+   "lateral_g": 1.68,
+   "gear": "5th down to 4th; 4th at the apex, 12,416 rpm",
+   "cliff_relation": "on the boundary",
+   "cliff_note": "Racing line 44.21 m: grip ceiling 102.2 km/h, quarter-lock ceiling 97.2 km/h, taken at 97.2 km/h. Steering lock is the binding limit, so the corner sits exactly on #137's boundary by construction. The defender's line - the largest arc that fits the INNER HALF of the corridor, radius 28.80 m about a centre at R - W/4 - is capped at 71.4 km/h, 25.9 km/h below the speed the corner is taken at, so defending here is scrubbing.",
+   "kerb": "Inside kerb through the 22 m apex arc only, 30 mm rippled. T5a's inside carries no kerb: a kerb there is an invitation to straighten the compound and delete the corner.",
+   "runoff": "MANDATORY - the two arcs total 95 deg, which is the compound and not the segment, and a validator written against the segment list would miss it (24 and 71 both clear 80). Forward 110.1 km/h, reverse 123.6 km/h - reversed is the binding case and the reverse figure is what is built: 10 m asphalt plus 18 m grass on each of the two tangent axes.",
+   "rollover_note": "1.68 g against 2.43 g left: 69%. The second highest fraction on the lap.",
+   "reverse": {
+    "hand": "right",
+    "entry_kmh": 97.2,
+    "apex_kmh": 97.2,
+    "exit_kmh": 97.2,
+    "braking_zone_m": 15.5,
+    "braking_from_kmh": 123.6
+   }
+  },
+  {
+   "name": "T6 - Forbice A",
+   "segment_indices": [
+    17
+   ],
+   "radius_m": 32.0,
+   "angle_deg": 85.0,
+   "arcs": [
+    {
+     "radius_m": 32.0,
+     "angle_deg": -85.0
+    }
+   ],
+   "width_m": 11.0,
+   "line_radius_m": 47.87,
+   "line_radius_construction": "rho = R + h(1+cos(theta/2))/(1-cos(theta/2)), h = (W - 1.400)/2, R the tightest arc of the corner and theta the whole direction change; needs 24.7 m of straight before the corner's own tangent point (2*sqrt(h(rho-R))) and has 38.4 m",
+   "defender_line_radius_m": 42.81,
+   "defender_ceiling_kmh": 95.3,
+   "defender_penalty_kmh": 7.0,
+   "grip_ceiling_kmh": 106.4,
+   "lock_ceiling_kmh": 102.3,
+   "hand": "left",
+   "provokes": "Half of the matched pair. 32 m radius, 85 deg, 11 m of road, identical kerb, 1.35 s of arc - and the other half is the same numbers in the other hand, 38.43 m later. The kart tips at 2.43 g left and 2.81 g right because 27 kg of engine sits 41 mm right of the centreline; that is a 15.6% difference in margin at the same 1.72 g, and it is not something a driver can resolve across half a lap. Back to back, at one second, it is the only way. Forward the left comes first and the right is judged against it; reversed the order swaps, which changes which hand the driver calibrated on and is the cleanest thing the two layouts can offer for the price of one corner.",
+   "entry_kmh": 102.3,
+   "apex_kmh": 102.3,
+   "exit_kmh": 102.3,
+   "braking_zone_m": 11.5,
+   "braking_from_kmh": 121.5,
+   "arc_duration_s": 1.67,
+   "lateral_g": 1.72,
+   "gear": "5th down to 4th; 4th through both halves, 13,068 rpm at the apex",
+   "cliff_relation": "on the boundary",
+   "cliff_note": "Racing line 47.87 m: grip ceiling 106.4 km/h, quarter-lock ceiling 102.3 km/h, taken at 102.3 km/h. Steering lock is the binding limit, so the corner sits exactly on #137's boundary by construction. The defender's line - the largest arc that fits the INNER HALF of the corridor, radius 42.81 m about a centre at R - W/4 - is capped at 95.3 km/h, 7.0 km/h below the speed the corner is taken at, so defending costs real time.",
+   "kerb": "25 mm at the apex, identical profile to T7 - the test is a comparison.",
+   "runoff": "MANDATORY - 85 deg. Forward 121.5 km/h, reverse 114.7 km/h. 10 m of asphalt on BOTH sides, because an esse throws a kart off in either direction and this is the one place on the circuit where the run-off has to be symmetric.",
+   "rollover_note": "1.72 g against 2.43 g left: 71%, the highest fraction on the lap. Its twin at T7 is 1.72 g against 2.81 g: 61%. That 10-point difference IS the experiment.",
+   "reverse": {
+    "hand": "right",
+    "entry_kmh": 102.3,
+    "apex_kmh": 102.3,
+    "exit_kmh": 102.3,
+    "braking_zone_m": 7.5,
+    "braking_from_kmh": 114.7
+   }
+  },
+  {
+   "name": "T7 - Forbice B",
+   "segment_indices": [
+    19
+   ],
+   "radius_m": 32.0,
+   "angle_deg": 85.0,
+   "arcs": [
+    {
+     "radius_m": 32.0,
+     "angle_deg": 85.0
+    }
+   ],
+   "width_m": 11.0,
+   "line_radius_m": 47.87,
+   "line_radius_construction": "rho = R + h(1+cos(theta/2))/(1-cos(theta/2)), h = (W - 1.400)/2, R the tightest arc of the corner and theta the whole direction change; needs 24.7 m of straight before the corner's own tangent point (2*sqrt(h(rho-R))) and has 38.4 m",
+   "defender_line_radius_m": 42.81,
+   "defender_ceiling_kmh": 95.3,
+   "defender_penalty_kmh": 7.0,
+   "grip_ceiling_kmh": 106.4,
+   "lock_ceiling_kmh": 102.3,
+   "hand": "right",
+   "provokes": "The other half, and the lateral transient. 38.43 m separates T6's exit from T7's entry. Crossing the 9.6 m of usable road in that distance at 102.3 km/h takes 1.352 s and demands 4y/t^2 = 2.14 g; the kart has 1.86. At 1.0 g the driver gets 4.48 m of the 9.6, so both corners have to be driven from mid-track and neither can be taken on its own free line. That is why the pair is capped at 47.87 m of line radius rather than the 63.74 m either corner would have in isolation, and it is an analytic, falsifiable number rather than a feeling.",
+   "entry_kmh": 102.3,
+   "apex_kmh": 102.3,
+   "exit_kmh": 102.3,
+   "braking_zone_m": 7.0,
+   "braking_from_kmh": 114.2,
+   "arc_duration_s": 1.67,
+   "lateral_g": 1.72,
+   "gear": "4th throughout, 13,068 rpm at the apex - the whole esse lives inside one gear",
+   "cliff_relation": "on the boundary",
+   "cliff_note": "Racing line 47.87 m: grip ceiling 106.4 km/h, quarter-lock ceiling 102.3 km/h, taken at 102.3 km/h. Steering lock is the binding limit, so the corner sits exactly on #137's boundary by construction. The defender's line - the largest arc that fits the INNER HALF of the corridor, radius 42.81 m about a centre at R - W/4 - is capped at 95.3 km/h, 7.0 km/h below the speed the corner is taken at, so defending costs real time.",
+   "kerb": "25 mm at the apex, identical profile to T6.",
+   "runoff": "MANDATORY - 85 deg. Forward 114.2 km/h, reverse 128.0 km/h; built for reverse.",
+   "rollover_note": "1.72 g against 2.81 g right: 61%, against T6's 71% at the same g. See T6.",
+   "reverse": {
+    "hand": "left",
+    "entry_kmh": 102.3,
+    "apex_kmh": 102.3,
+    "exit_kmh": 102.3,
+    "braking_zone_m": 15.5,
+    "braking_from_kmh": 128.0
+   }
+  },
+  {
+   "name": "T8 - Uscita",
+   "segment_indices": [
+    21,
+    22
+   ],
+   "radius_m": 45.0,
+   "angle_deg": 145.0,
+   "arcs": [
+    {
+     "radius_m": 45.0,
+     "angle_deg": -48.0
+    },
+    {
+     "radius_m": 70.0,
+     "angle_deg": -97.0
+    }
+   ],
+   "width_m": 12.0,
+   "line_radius_m": 54.86,
+   "line_radius_construction": "rho = R + h(1+cos(theta/2))/(1-cos(theta/2)), h = (W - 1.400)/2, R the tightest arc of the corner and theta the whole direction change; needs 14.5 m of straight before the corner's own tangent point (2*sqrt(h(rho-R))) and has 77.0 m",
+   "defender_line_radius_m": 46.28,
+   "defender_ceiling_kmh": 100.1,
+   "defender_penalty_kmh": 11.8,
+   "grip_ceiling_kmh": 113.9,
+   "lock_ceiling_kmh": 111.9,
+   "hand": "left",
+   "provokes": "Issue #32, and the exit that owns the next lap. Increasing radius: 45 m for 48 deg opening to 70 m for 97 deg, 156.21 m of arc taken at 111.9 km/h on a 54.86 m line - 1.80 g held for 5.03 s, which is by a wide margin the longest continuous lateral load anywhere in this exercise (instrument's Curvone was 4.17 s, rhythm's T1 2.98 s). If the inside rear lifts and stays lifted, this is where it is legible. Its exit owns 165 m of start straight - the run to the line plus the line to T1 - so speed lost here is speed lost at the only place on the lap where a kart can get alongside. And it is the FIRST corner of the reverse layout, where the same asphalt is a closing 145 deg right taken 30 km/h faster on entry: see reverse.",
+   "entry_kmh": 111.9,
+   "apex_kmh": 111.9,
+   "exit_kmh": 111.9,
+   "braking_zone_m": 8.0,
+   "braking_from_kmh": 124.3,
+   "arc_duration_s": 5.03,
+   "lateral_g": 1.8,
+   "gear": "6th down to 5th; 5th through both arcs at 12,384 rpm, 6th on the run to the line",
+   "cliff_relation": "on the boundary",
+   "cliff_note": "Racing line 54.86 m: grip ceiling 113.9 km/h, quarter-lock ceiling 111.9 km/h, taken at 111.9 km/h. Steering lock is the binding limit, so the corner sits exactly on #137's boundary by construction. The defender's line - the largest arc that fits the INNER HALF of the corridor, radius 46.28 m about a centre at R - W/4 - is capped at 100.1 km/h, 11.8 km/h below the speed the corner is taken at, so defending here is scrubbing.",
+   "kerb": "Inside kerb through T8a and the first 40 deg of T8b, 30 mm rippled. No exit kerb - the exit is the start straight and Part I article 12 allows no paint or furniture there. Reversed, the T8a inside kerb becomes an exit kerb struck at 111.9 km/h with the corner tightening, and it is respecified 25 mm flat for that layout.",
+   "runoff": "MANDATORY - 145 deg on the compound. Forward approach 124.3 km/h, REVERSE approach 142.2 km/h - 1.31x the kinetic energy, and the reverse figure is the one built: 14 m of asphalt plus 26 m of graded grass on the axis, against the 10 m plus 16 m the forward case alone would need. This is the concrete case for run-off being a per-layout field rather than shared furniture.",
+   "rollover_note": "1.80 g against 2.43 g left: 74%, held for 5.03 s. The longest exposure on the circuit and still 0.63 g clear of the threshold.",
+   "reverse": {
+    "hand": "right",
+    "entry_kmh": 111.9,
+    "apex_kmh": 111.9,
+    "exit_kmh": 111.9,
+    "braking_zone_m": 20.5,
+    "braking_from_kmh": 142.2
+   }
+  }
+ ],
+ "measured": {
+  "total_length_m": 1375.1318,
+  "closure_error_m": 0.007013,
+  "closure_note": "The brief's walk() verbatim at step 0.25 m over the segment list EXACTLY AS PUBLISHED above, i.e. with every length rounded to 2 decimals - so it is the number a reader can reproduce from this file and nothing else. The same walk on the unrounded solve gives 0.001283 m, and the exact closed-form endpoint of the unrounded segment list is 5.9e-13 m from the origin. All three are three orders inside the 1.0 m gate; the 7.0 mm is the publication rounding of the nine straights the closure solve owns, and the 1.283 mm under it is the integrator's discretisation, not the design's.",
+  "final_heading_deg": -360.0,
+  "longest_straight_m": 165.0,
+  "longest_straight_where": "segments 23 + 0 joined across the start line, the whole start/finish straight. Next: 161.02 m (La Rampa, segments 10+11), 139.71 m (La Discesa, 5+6+7), 127.72 m (Il Banco, 2+3).",
+  "longest_full_throttle_run_m": 162.5,
+  "longest_full_throttle_run_where": "d = 1298.1, the run to the line and the start straight - the same 165 m, minus the 2.5 m of braking into T1. Measured off the published speed profile as the longest run with no braking event AND under 0.55 g of lateral load.",
+  "longest_run_with_no_braking_event_m": 318.7,
+  "longest_run_with_no_braking_note": "318.7 m from d = 1141.9, and it is the honest number to put beside the 165 m: it is T8 Uscita's 156.21 m of arc plus the 165 m start straight. The kart is not braking through T8 but it is at 1.80 g, so it is not accelerating hard either - 5.03 s of the 318.7 m is spent at the tire's limit. By the regulation judge's own test (merge straights across any corner of centreline radius >= 80 m) this circuit's longest full-throttle run is 165.00 m, because no corner on it has a centreline radius above 70 m. Reported all three ways rather than picking the flattering one: rhythm's equivalent figure was 354.5 m, racecraft's 380 m, instrument's 219.9 m, terrain's 196.9 m.",
+  "min_separation_m": 29.269,
+  "min_separation_where": "d = 533.5 and d = 574.0, which are 40.5 m apart along the lap - the two ends of the 180 deg hairpin, i.e. one corner's own mouth rather than two bits of track. Raise the exclusion window from the brief's 40 m to 100 m and the minimum is 29.997 m at d = 424.5 (La Discesa) against d = 676.5 (the top of La Rampa).",
+  "min_separation_over_100m_apart_m": 29.997,
+  "min_separation_width_aware_slack_m": 9.269,
+  "min_separation_width_aware_note": "The brief's flat 14 m constant is only correct at the 8 m width floor. The requirement is 6 m of clear ground plus both half-widths: 6 + (w_a + w_b)/2, which at the hairpin's 14 m against La Rampa's 11 m is 18.5 m. Worst slack anywhere on the lap is +9.269 m.",
+  "worst_ground_slope_between_sections_pct": 8.95,
+  "worst_ground_slope_note": "d = 368.5 on La Discesa against d = 729.0 approaching T4: 2.21 m of height difference across 24.72 m of clear ground, 8.95%, inside art 7.5's 10% cap on run-off up-slope with 1.05 points to spare. This test is not in the brief, in ARCHITECTURE section 11 or in REFERENCES.md, and it is the test that Pietrarossa fails (76.6% over 10.56 m) while passing the horizontal one by 6.5 m. It belongs in the validator - see outside_scope_concerns.",
+  "elevation_closure_m": -0.0,
+  "elevation_closure_note": "Measured on the DRIVEN profile - the tangent grades with the three parabolic vertical curves laid on them - not on the segment grade list alone. Both close to 0.000000 m, because each curve is symmetric about a break that sits exactly on a segment boundary and is fully contained in the two adjacent constant-grade bands. There is one profile and final_centerline.csv is it.",
+  "elevation_range_m": 12.5473,
+  "elevation_range_note": "Driven. The tangent (piecewise-linear) profile has a 13.3145 m range; the vertical curves cut 0.767 m off the crest and fill the sag, which is the correct direction and is why the two figures must both be published.",
+  "elevation_high_m": 1.713,
+  "elevation_high_at_m": 224.9,
+  "elevation_low_m": -10.835,
+  "elevation_low_at_m": 550.7,
+  "start_to_first_corner_m": 88.0,
+  "last_corner_to_start_m": 77.0,
+  "starting_straight_m": 165.0,
+  "starting_straight_grade_pct": 0.787,
+  "first_corner_direction_change_deg": 110.0,
+  "first_corner_width_m": 12.0,
+  "min_width_m": 9.0,
+  "max_width_m": 14.0,
+  "camber_on_straights_pct": [
+   2.0,
+   2.5
+  ],
+  "banking_in_corners_pct": [
+   3.0,
+   4.0,
+   5.0,
+   6.0,
+   7.0,
+   8.0
+  ],
+  "adverse_camber_sections": 0,
+  "estimated_lap_time_s": 44.82,
+  "estimated_reverse_lap_time_s": 44.885,
+  "top_speed_reached_kmh": 142.5,
+  "top_speed_reached_reverse_kmh": 142.2,
+  "slowest_point_kmh": 52.0,
+  "bounding_box_m": [
+   336.6,
+   401.9
+  ],
+  "track_density_m_per_ha": 101.7,
+  "laps_in_a_30km_final": 21.8,
+  "grade1_capacity_karts": 49.1,
+  "corners_over_80deg": 8,
+  "corners_exceeding_1_86g_on_the_CENTRELINE_at_their_own_apex_speed": [
+   "T1 2.50 g",
+   "T2 3.12 g",
+   "T4 3.66 g",
+   "T5 3.44 g",
+   "T6 2.57 g",
+   "T7 2.57 g",
+   "T8 2.19 g"
+  ],
+  "centreline_note": "Nobody drives the centreline and no line radius in this document is a centreline figure. It is listed because ARCHITECTURE section 11 and ADR-0046 both say 'no radius the kart physically cannot take' and track.json stores the centreline, so a validator written from those words rejects this circuit and every other driveable one. The check has to be against rho, and the threshold against rho is min(grip, lock), not 1.86 g alone.",
+  "total_length_note": "Plan length of the centreline, from the exact unrounded segment list. Walking the rounded list published above gives 1375.1196 m - 12 mm less, which is the same publication rounding and is inside the regulation's own 1 m accuracy (T1 art 11). The 3D length including the longitudinal profile, which is what art 11 calls the official length, is 1375.53 m."
+ },
+ "overtaking": [
+  {
+   "where": "T3 Il Pozzo, braking from d = 484.2",
+   "rank": "the primary one, and the only place on the circuit where braking is the mechanism",
+   "mechanism": "All three of the brief's ingredients, measured. TOW: 96.7 m of full throttle from T2's exit plus the 62.31 m of T2 itself taken at a flat 129.0 km/h, so a following kart arrives with real closing speed rather than with whatever it saved in the last corner. BRAKING: 43.0 m from the lap's peak of 140.8 km/h to a 52.0 km/h apex on a -4.60% descent - 42.74 m by the grade-corrected 1.53 g figure, and within 2 m of the deepest zone this kart can produce on any legal Grade 1 circuit. WIDTH: 14 m of entry, the widest asphalt on the property, tapering up from 11 through 12 and 13 over the last 75 m. EXIT: 161.02 m of +4.60% climb through five upshifts.",
+   "tow_length_m": 159.0,
+   "braking_zone_m": 43.0,
+   "entry_width_m": 14.0,
+   "two_lines": "The racing line is 21.30 m - hard-bounded, because at 180 deg the (1+c)/(1-c) multiplier is exactly 1.00 and no amount of width opens it further than R + h. The defender's line, the largest arc that fits the inner half of the corridor, is 14.30 m about a centre at R - W/4, and its quarter-lock ceiling is 33.9 km/h against the corner's own 52.0 km/h apex. Defending the inside of Il Pozzo costs 18.1 km/h and puts the kart 18 km/h past #137's boundary. That is the mechanism, and it is computed on the inner-half corridor rather than on the inside-edge radius - the error that made Sabliere's defender faster than its attacker.",
+   "why_it_sticks": "The exit is 161 m of 4.60% climb from 52 km/h through 1st, 2nd, 3rd, 4th and 5th. A kart that leaves the hairpin 6 km/h down is a kart one upshift out of position on a powerband 5,000 rpm wide, and it pays for it all the way to T4's turn-in 208 m later. Nothing on this circuit punishes a compromised exit for longer, in either direction."
+  },
+  {
+   "where": "T1 Ronda, off the 165 m start straight",
+   "rank": "the second one, and it is a friction-ellipse pass, not a braking pass",
+   "mechanism": "The braking zone into T1 is 2.5 m. That is not a typographical error and no kart circuit can do better off a straight the regulation caps at 200 m: at 1.53 g, shedding 137.2 km/h to 134.5 takes 2.5 m. So the move is not made under braking. It is made by being alongside at the turn-in and by what the friction ellipse then does over 109.43 m of constant radius. Two karts at the FIA maximum 1.400 m width fit inside 12 m with 1.0 m to each edge and 2.6 m between them. At a common 121.5 km/h - which is the defender's own ceiling on the inner half - the attacker on the 76.56 m line pulls 1.52 g and has sqrt(1-(1.52/1.86)^2) = 0.579 of its longitudinal capability left; the defender on the 62.49 m line pulls 1.86 g and has 0.037. The attacker has fifteen times the drive available, for 2.93 s.",
+   "tow_length_m": 165.0,
+   "braking_zone_m": 2.5,
+   "entry_width_m": 12.0,
+   "two_lines": "Racing line 76.56 m, ceiling 134.5 km/h (grip; the quarter-lock ceiling is 141.8, so this is one of only two corners on the circuit where grip and not steering lock is the limit). Defender's inner-half line 62.49 m, ceiling 121.5 km/h. Penalty 13.0 km/h.",
+   "why_it_sticks": "Half of it sticks immediately and the other half is settled 300 m later. T1's exit owns 127.72 m of shelf into T2, and T2's exit owns La Discesa into the only real braking zone on the lap. A kart that loses T1 arrives at Il Pozzo's braking point slower, and that is the corner where the place actually changes hands. The two overtaking spots are 400 m apart and they are the same fight."
+  },
+  {
+   "where": "T8 Uscita, braking from d = 1133.9",
+   "rank": "the third, and the weakest of the three forward",
+   "mechanism": "8.0 m of braking from 124.3 to 111.9 km/h into a 12 m entry, then 156.21 m of arc at 1.80 g - 5.03 s side by side if it comes to that. The defender's inner-half line is 46.28 m against the racing line's 54.86 m, a ceiling of 100.1 km/h against 111.9, so 11.8 km/h.",
+   "tow_length_m": 79.95,
+   "braking_zone_m": 8.0,
+   "entry_width_m": 12.0,
+   "two_lines": "Racing line 54.86 m / 111.9 km/h; defender 46.28 m / 100.1 km/h.",
+   "why_it_sticks": "It is listed third because the tow into it is only 79.95 m and 8 m of braking does not let anyone arrive from a long way back. What it does do is decide the start straight: the exit owns 165 m, so a kart that defends Uscita hands over the tow into T1 and the whole sequence starts again one place down."
+  }
+ ],
+ "elevation": {
+  "story": "Three constant-grade bands and three gradient changes, and the reason there are only three is R = V^2/K. The bench carries the start/finish straight, T1, the shelf and the whole infield at a steady +0.787%, which is inside art 7.2's 2% cap for a starting straight and is a derived number rather than a chosen one: it is what closes the loop given a -4.60% descent band of 289.44 m and a +4.60% climb band of 125.07 m. The road crests 63.86 m past T1's exit and falls to a 180 deg hairpin 12.55 m below the crest; La Rampa climbs back out; the infield walks the remaining 7.6 m up at 0.787% over 675 m.\n\nWhat the elevation is FOR is braking distance and sight line, and it is not sold as anything else, because it cannot be. At the legal minimum vertical radius the vertical acceleration is K/12.96 m/s^2 whatever the speed - 0.157 g concave, 0.118 g convex - and art 7.2 then requires R to be increased further in approach, release, braking and curved sections. The three curves here deliver 0.079, 0.053 and 0.065 g: a maximum load swing of about 6.5% of static. ARCHITECTURE section 11's 'elevation... because it loads the tires' is wrong for a kart circuit and the arithmetic that shows it is one line long.\n\nWhat it does buy: the -4.60% descent lengthens Il Pozzo's braking zone from 42.0 m flat to 42.7 m and, more to the point, means the kart arrives at 140.8 km/h rather than the 136 it would reach on the level; the +4.60% climb makes a bad hairpin exit expensive for 161 m; the crest before T4 puts the turn-in 75.9 m away when the driver first sees it, 2.18 s at 125 km/h; and reversed, the whole thing swaps so that La Rampa becomes the descent and Il Pozzo is approached at 134.4 km/h from the other side.\n\nThe range is derived, not chosen. 12.55 m is what 125.07 m of climbing road at 4.60% plus 675 m of infield at 0.787% can pay back, and 4.60% is the steepest band whose crest curve (102.36 m at a 1,900 m radius) still fits inside the 127.72 m shelf with 12.5 m of clearance to T1's exit and 6.2 m to T2's braking point. Steepen the bands and the crest curve grows faster than the shelf does.",
+  "policy": "R is chosen as a stated multiplier over V^2/K rather than at the minimum: at least 1.3x outside the sections art 7.2 names and at least 1.9x inside them, checked in BOTH directions at the SAME K. Vertical curvature d2z/ds2 is invariant under s -> L-s, so a crest is a crest driven either way and K does not swap; only the speed changes. Two of the four source layouts got this wrong in opposite directions - rhythm swapped K and declared all six of its curves legal in reverse when one was not, and terrain never ran one of its curves backwards at all and had a 13.21 m overlap.",
+  "vertical_curves": [
+   {
+    "at_distance_m": 261.29,
+    "delta_grade_pct": 5.387,
+    "profile": "convex",
+    "K": 15.0,
+    "speed_forward_kmh": 138.5,
+    "required_radius_forward_m": 1279.6,
+    "speed_reverse_kmh": 132.5,
+    "required_radius_reverse_m": 1169.9,
+    "chosen_radius_m": 1900.0,
+    "factor_forward": 1.48,
+    "factor_reverse": 1.62,
+    "transition_length_m": 102.36,
+    "half_length_m": 51.18,
+    "vertical_acceleration_g": 0.079,
+    "ok_both_directions": true,
+    "note": "The crest, on the boundary between the two halves of Il Banco. Half-length 51.18 m against 63.86 m of shelf either side, so it clears T1's exit tangent by 12.68 m and T2's turn-in by 12.68 m; T2's braking zone is 9.5 m, so it clears the braking point by 3.2 m. 1.48x forward and 1.62x reverse. This is the tightest fit on the circuit and it is what caps the elevation range."
+   },
+   {
+    "at_distance_m": 550.74,
+    "delta_grade_pct": 9.2,
+    "profile": "concave",
+    "K": 20.0,
+    "speed_forward_kmh": 52.0,
+    "required_radius_forward_m": 135.1,
+    "speed_reverse_kmh": 52.0,
+    "required_radius_reverse_m": 135.1,
+    "chosen_radius_m": 400.0,
+    "factor_forward": 2.96,
+    "factor_reverse": 2.96,
+    "transition_length_m": 36.8,
+    "half_length_m": 18.4,
+    "vertical_acceleration_g": 0.053,
+    "ok_both_directions": true,
+    "note": "The compression, and the only vertical curve on the circuit inside a corner arc. It is a deliberate art 7.2 exception and is argued as one rather than reported as compliant: a 9.20% grade break is the whole descent-to-climb transition and there is nowhere else on the lap it fits. At the hairpin it is taken at 52.0 km/h in both directions, needs 135.06 m of radius, gets 400 m (2.96x) and occupies 36.80 m inside a 47.12 m arc - 5.16 m clear of each tangent point. It is CONCAVE, so it adds 0.053 g of load at the slowest point on the circuit rather than removing it, which is the benign direction. Terrain put a CONVEX 8.51% break inside its tightest corner and unloaded the driven axle by 0.118 g at the apex; this does the opposite."
+   },
+   {
+    "at_distance_m": 675.81,
+    "delta_grade_pct": 3.813,
+    "profile": "convex",
+    "K": 15.0,
+    "speed_forward_kmh": 114.7,
+    "required_radius_forward_m": 876.3,
+    "speed_reverse_kmh": 122.0,
+    "required_radius_reverse_m": 992.6,
+    "chosen_radius_m": 1800.0,
+    "factor_forward": 2.05,
+    "factor_reverse": 1.81,
+    "transition_length_m": 68.63,
+    "half_length_m": 34.32,
+    "vertical_acceleration_g": 0.065,
+    "ok_both_directions": true,
+    "note": "The top of La Rampa. Half-length 34.32 m against 101.51 m of climb before it and 59.51 m of shelf after, so it ends 25.19 m before T4's turn-in and 10.7 m before T4's braking point. 2.05x forward and 1.81x reverse. Sight distance over it is sqrt(2R)(sqrt(0.75) + sqrt(0.15)) = 75.9 m, which at 125.4 km/h is 2.18 s: the corner is late, not hidden, and this document does not claim otherwise."
+   }
+  ]
+ },
+ "reverse": {
+  "character": "Reversed the lap is 44.885 s against 44.820 s forward - 65 milliseconds - and almost nothing else is the same.\n\nTHE TWO COMPOUNDS TRADE JOBS. Forward, Vigna closes (60 m for 24 deg into 22 m for 71) and is the trap, and Uscita opens (45 m for 48 deg into 70 m for 97) and is the drive-away. Reversed, Vigna opens and becomes a throttle-timing problem with a 15.5 m braking zone from 123.6 km/h, and Uscita closes and becomes the reverse lap's first corner, 77 m past the start line, entered at 142.2 km/h with a 20.5 m braking zone - the second deepest on either layout. That is Sabliere's structural insight, applied and measured rather than asserted.\n\nEVERY CORNER CHANGES HAND, which on this kart is a physics change: it tips at 2.43 g left and 2.81 g right. Forward the two longest-loaded corners are lefts - T8 at 1.80 g for 5.03 s and T1 at 1.86 g for 2.93 s - so the inside rear unloads early and the kart rotates. Reversed they are rights at the same g against a threshold 16% higher, so the inside rear stays down and the locked axle pushes. Le Forbici inverts too: forward the left is judged against the right, reversed the right is judged against the left, which changes which hand the driver calibrated on.\n\nTHE HILL SWAPS. Forward, Il Pozzo is approached down 139.71 m of -4.60% Discesa at 140.8 km/h and braked in 43.0 m. Reversed it is approached down 161.02 m of Rampa at -4.60%, arriving at 134.4 km/h with a 38.5 m zone, and its exit is 289 m of climbing road instead of 161 - so reversed the hairpin has the shorter approach and the longer punishment. And T4 Il Ciglione stops being a blind uphill corner and becomes a downhill one entered at 108.7 km/h with a 4.5 m zone, which deletes its whole reason to exist forward; the reverse layout does not pretend otherwise.\n\nALL THREE VERTICAL CURVES ARE LEGAL BACKWARDS, checked at the same K and the reverse speed profile: 1.62x, 2.96x and 1.81x against 1.48x, 2.96x and 2.05x forward. The binding one is different in each direction, which is the point.",
+  "overtaking_spots": [
+   "T8 Uscita reversed, the FIRST corner. 165 m of start straight for the tow, arrival at 142.2 km/h - the reverse lap's top speed and 17.9 km/h faster than the same asphalt sees forward - and a 20.5 m braking zone (19.7 m by the grade-corrected analytic figure) into a 12 m entry. The corner CLOSES, 70 m for 97 deg into 45 m for 48, so a kart thrown at the open first half runs out of road in the second: the racing line through the whole 145 deg compound is 54.86 m and the defender's inner-half line is 46.28 m, 100.1 km/h against 111.9. It is a genuine dive-bomb and it does not exist in the forward direction, where the same corner is an 8 m braking event taken from 124.3 km/h.",
+   "T3 Il Pozzo reversed, off La Rampa. 161.02 m of -4.60% descent to 134.4 km/h, a 38.5 m braking zone, the same 14 m entry and the same hard-bounded 21.30 m line against a 14.30 m defensive one. What changes is the exit: forward it is 161 m of climb, reversed it is the 289.44 m descent band driven as a climb - Il Traverso is longer than La Rampa - so a compromised exit is paid for over 289 m and into T2. The forward version has the deeper braking zone; the reverse version has the longer consequence."
+  ],
+  "sector_marks": "Measured, not assumed. The reverse layout's own equal-time marks are at reverse-station 473.0 and 862.0, giving 14.963 / 14.985 / 14.937 s - a 48 millisecond spread, tighter than the forward split. Those stations are forward-station 902.1 and 513.1, i.e. within 0.1 m and 10.9 m of the mirrors of the forward marks (902.0 and 524.0). So on THIS lap the marks do translate, and both land on straights in both directions. That is a measurement and not a rule: it holds because the lap's time is distributed almost symmetrically about the hairpin, and it is exactly the sort of claim the other four proposals asserted in the other direction without checking.",
+  "what_breaks": "Four things, and only one of them is geometry.\n\n1. THE PIT LANE IS GEOMETRY AND IT DOES NOT REVERSE. Forward, T8 and T1 are both lefts, so the racing line runs down the RIGHT edge on both approaches and tracks out to the RIGHT on both exits, which leaves the LEFT edge free at both junctions. Reversed they are both rights and the free edge is the RIGHT one. Worse, a deceleration lane leaving at 20 deg to the direction of travel is a 160 deg merge driven the other way, over art 7.4's 30 deg cap, whichever edge it is on. So the reverse layout gets its own two stubs, on the right, at reverse-stations 1305.0 and 62.0. That is asphalt, not furniture, and ADR-0046's 'the geometry is shared; nothing else is assumed to be' does not currently cover it.\n\n2. RUN-OFF AT ONE CORNER IS SIZED BY THE REVERSE CASE. T8 Uscita is approached at 124.3 km/h forward and 142.2 km/h reversed - 1.31x the energy - so its axis carries 14 m of asphalt plus 26 m of grass rather than the 10 plus 16 the forward case needs. T5 Vigna is the same story at a smaller scale (110.1 forward, 123.6 reverse). Every other corner is within 15% either way. Two corners in eight, and neither is one a spline-direction flag would find.\n\n3. EXIT KERBS, NOT INSIDE KERBS. The geometric inside of a bend is the same physical edge whichever way it is driven, so every apex kerb survives untouched. The exit kerbs do not: T8a's inside kerb becomes an exit kerb struck at 111.9 km/h with the corner tightening, and it is respecified 25 mm flat for the reverse layout; T3's flat exit kerb on the climb becomes an entry kerb at 52 km/h, which is why it was specified flat in the first place.\n\n4. T4 LOSES ITS JOB. Forward it is an uphill, over-a-crest, lift-not-brake corner - issue #39's home. Reversed it is a downhill 85 deg left with a 4.5 m braking zone and it tests nothing in particular. The reverse layout does not have a #39 corner and says so rather than inventing one; what it has instead is a 20.5 m braking zone at Uscita that the forward layout cannot produce."
+ },
+ "sectors": [
+  {
+   "start_m": 0.0,
+   "end_m": 524.0,
+   "time_s": 14.351,
+   "rationale": "14.351 s, 524.00 m, mean 132.9 km/h, 4 gear changes. The bench and the fall: the start straight, T1's 2.93 s of held load, the crest, T2's kerb at 129 km/h and La Discesa to the lap's peak of 140.8. The mark sits at d = 524.0, 3.2 m before Il Pozzo's turn-in and 40 m into the braking zone at about 66 km/h - deliberately, so that the whole hairpin falls in sector 2 and a sector-1 delta can only mean T1's exit or the descent. Fastest sector, fewest inputs."
+  },
+  {
+   "start_m": 524.0,
+   "end_m": 902.0,
+   "time_s": 15.232,
+   "rationale": "15.232 s, 378.00 m, mean 95.9 km/h, 9 gear changes - more than the other two sectors together. The bowl: the hairpin, first gear at 13,736 rpm, five downshifts and five upshifts, La Rampa's 161 m of 4.60% climb, and T4 over the crest. This is the gearbox sector and a delta here is a gearbox question. The mark at d = 902.0 is on Il Traverso, 53.4 m past Vigna's exit and 26.6 m before Forbice A's turn-in."
+  },
+  {
+   "start_m": 902.0,
+   "end_m": 1375.1318,
+   "time_s": 15.237,
+   "rationale": "15.237 s, 473.13 m, mean 112.1 km/h, 5 gear changes. The return: Le Forbici's matched pair and its 2.14 g crossing problem, then Uscita's 5.03 s at 1.80 g and the run to the line. A delta here is a lateral-transient question or an exit-discipline question and the two are 200 m apart. It ends at the start line rather than at Uscita's exit so that the sector includes the straight the exit paid for."
+  }
+ ],
+ "sectors_note": "Marks are constrained to straights and then chosen to minimise the spread of the three times, which is 0.886 s - 2.0% of the lap. They are not equal and are not published as equal. Sabliere reported all three of its sectors as exactly 14.306 s summing to its claimed lap time to four decimal places, which is lap/3 dressed as a measurement; the sum here is 44.820 s and the lap is 44.820 s because both come from the same integration of final_speed.csv.",
+ "start_area": {
+  "grid_description": "Eight slots in two staggered columns on the 12 m start/finish straight. Front row 4.0 m behind the line (arc length 1371.1 m), rows at 8.0 m longitudinal pitch, so the grid occupies 1347.1 to 1371.1 m and leaves 49.0 m of straight behind the last row and 88.0 m from the line to T1's turn-in. Columns offset 3.0 m either side of the centreline, staggered 4.0 m so no kart sits directly behind another. POLE IS THE LEFT COLUMN, because T1 is a left-hander and the inside line at T1 is worth 13.0 km/h of corner ceiling to whoever holds it. GRID PITCH AND STAGGER ARE INVENTED: REFERENCES.md records that CIK-FIA Appendices 9, 10 and 15 could not be located and that grid slot spacing is the one gap that pass left open. These numbers are chosen to fit eight 1.400 m karts on a 12 m road and are the least-sourced figures in this document.",
+  "lights": "On a gantry 10.0 m past the start line, which is 14.0 m ahead of the front row - inside art 7.7's 10-15 m - at 3.0 m above the track, inside the 2.5-3.5 m band, spanning the full 12 m. Red sequence 4 s automatic, extinguished manually within 2 s.",
+  "grade": "The whole start/finish straight, both sides of the line, carries a single +0.787% and there is no gradient change within 261 m of the line in either direction: the nearest break is the crest at d = 261.29 and its curve begins at d = 210.11. Eight karts do a standing start on one plane. +0.787% is inside art 7.2's 2% cap with 1.2 points to spare.",
+  "pit_entry_m": 1305.0,
+  "pit_exit_m": 62.0,
+  "notes": "FORWARD LAYOUT. The deceleration lane branches LEFT off the run to the line at d = 1305.0, 6.9 m past T8b's exit tangent, at 22 deg to the track - inside art 7.4's 30 deg cap - 3.5 m wide, with a chicane 20 m in per art 7.2. It does not cross the racing line: T8b is a left-hander, so a kart on the line exits tracking to the RIGHT edge and the left edge is clear. The exit lane rejoins LEFT at d = 62.0, 26.0 m before T1's turn-in, at 16 deg; T1 is also a left-hander, so the line into it runs down the RIGHT edge and a kart rejoining on the left merges behind the line rather than through it. 26 m is short and it is the one uncomfortable thing about the forward arrangement; the alternative is to rejoin past T1 on the shelf, which puts a pit-speed kart on a 137 km/h descent, and that is worse.\n\nREVERSE LAYOUT, WHICH NEEDS ITS OWN ASPHALT. Reversed, T8 and T1 are both right-handers and the free edge at both junctions is the RIGHT one; and a 22 deg branch is a 158 deg merge driven the other way, over the 30 deg cap, on either edge. So the reverse layout carries a second pair of stubs: deceleration lane branching RIGHT at reverse-station 1305.0 (forward d = 70.1) at 22 deg, exit lane rejoining RIGHT at reverse-station 62.0 (forward d = 1313.1) at 16 deg. Both feed the same pit lane, which runs inside the loop on the bench. This is the concrete cost of GAMEDESIGN section 10's reverse layout and it is geometry rather than furniture.\n\nTrack limits: 100 mm white edge lines both sides for the whole 1,375.13 m, inside art 7.2's 120 mm maximum. No other paint anywhere on the asphalt except the grid markings - art 12 forbids it - so corner numbers and braking boards go on free-standing structures behind the 1.80 m verge. Verge is 1.80 m minimum on both sides for the whole length, per art 7.5, continuing the transverse profile with no negative slope; it is a per-segment requirement and not corner prose.\n\nCapacity by art / Appendix 13's L/28 is 49.1, capped at 36. The design's grid is 8. A 30 km Final is 21.8 laps."
+ },
+ "risks": [
+  "THE LAP TIME IS A POINT-MASS ESTIMATE AND IT IS OPTIMISTIC. 44.820 s comes from a quasi-static forward/backward pass on the published line radii with a friction ellipse, 1.53 g braking corrected for grade, and a one-parameter tractive model a = a0(1-(v/vmax)^2) fitted to the measured 143.9 km/h and 4.50 s to 100 km/h. It has no gearbox, no shift torque cut, no traction limit off the hairpin and no #137 scrub. Expect a real solver to return 48-52 s. Nothing in the layout depends on the absolute number, but the SECTOR BALANCE does, and 14.351 / 15.232 / 15.237 could drift.",
+  "EVERY CORNER SPEED RESTS ON A CONFOUNDED EXPERIMENT. drive_probe.gd's three 0.25-lock rows differ in THROTTLE as well as in settled radius (0.30, 0.60, 1.00), so radius, speed, load and throttle all move together and no relation of the form 'at radius r this kart holds v' can be extracted from them. Six of the eight corners here are limited by that interpolation rather than by grip. It is the single largest source of error in the corner table and it needs a lock-held-fixed, throttle-swept re-run before any of this becomes track.json.",
+  "TWO CORNERS SIT ON THE 1.86 g GRIP CEILING AND SIX SIT ON THE LOCK CEILING. That is what a quasi-static profile does - it puts every corner at its own cap - but it means the sensitivity is lopsided: re-measure grip at 1.80 g and T1 and T2 lose 1.6% of their apex speed and nothing else moves; re-measure or fix #137 and six corners move at once, including both overtaking corners' defensive lines. Cava Vecchia was marked down for having three fast corners simultaneously at 100% of one number; this circuit has two, and the exposure is stated rather than hidden.",
+  "THE SECOND FORWARD OVERTAKING PLACE IS NOT A BRAKING PLACE AND CANNOT BE. T1's braking zone is 2.5 m. The friction-ellipse mechanism is real and correctly computed, but it RESOLVES a move rather than creating one: a kart has to arrive alongside off the start straight, and there is no slipstream model in the simulation to help it. If the tow is never implemented, this circuit has one overtaking place and a half, which is the same criticism the racing judge made of Valdirone and it is not fully fixed here. What is fixed is the width - 12 m at T1 is the regulation maximum for a first corner - and the arithmetic, which now uses the inner-half corridor.",
+  "THE ANGLE BUDGET LEFT NO ROOM FOR A NINTH CORNER. Lefts minus rights must equal 360 on a counter-clockwise loop; the 180 deg hairpin takes half of it and every right-hander has to be bought with an equal left. Eight corners at 85-180 deg is what fits. A designer who wants ten corners has to give up the hairpin, and the hairpin is the only thing on the circuit that produces a 43 m braking zone. That trade is real and it is not obvious until the loop refuses to close.",
+  "T4 IL CIGLIONE IS NOT AS BLIND AS TERRAIN'S WAS, AND IT CANNOT BE. Sight distance to the turn-in over the 1,800 m crest is 75.9 m - 2.18 s at 125.4 km/h - against terrain's claimed 31 m. The difference is that terrain's crest was inside the braking zone at a radius art 7.2 does not allow there. The honest version is a corner that arrives late rather than one that is hidden, and the learnable is smaller for it.",
+  "RUN-OFF WIDTHS ARE A FIRST-ORDER ESTIMATE ON ASSUMED FRICTION - 0.45 g on a compacted apron and 0.75 g on gravel, with 0.286 g on grass from the M3b measurement. Art 7.5 requires the width to be the OUTPUT of a numeric simulation over speed, impact angle and friction coefficient. These figures are that simulation's input. At Il Pozzo the honest answer - about 105 m of gravel for a total brake failure at 140.8 km/h - is not buildable and is not built.",
+  "THE 14 m HAIRPIN AND THE 9 m CIGLIONE CANNOT BE BUILT BY track_ribbon.gd. TRACK_WIDTH is a single constant of 8.0 and ADR-0046's schema makes width a per-control-point field, but nothing in ROADMAP M5 says the ribbon becomes width-varying. This circuit runs 9 to 14 m with eight stated tapers, and none of it can be swept today.",
+  "GRID SLOT PITCH AND STAGGER ARE INVENTED, and so is the 30 mm kerb height, which REFERENCES.md already records as bracketed by the kart rather than sourced. Appendices 9, 10 and 15 were not located."
+ ],
+ "outside_scope_concerns": [
+  "MINIMUM CURVATURE IS NOT THE SAME CURVE AS MAXIMUM APEX RADIUS, AND THE BRIEF ASKS FOR THE SECOND. I built a box-constrained minimum-curvature solver (minimise the discrete integral of squared curvature inside the corridor) to cross-check the closed form and it disagrees systematically: on a clean 90 deg corner of 57 m radius through 12 m of road with 200 m straights either side, the closed form gives an 87.89 m apex radius and the minimum-curvature path gives 66.98 m. Both are right. Minimum curvature spreads the turning over a longer distance and accepts a tighter apex; the closed form maximises the apex radius and therefore the apex SPEED. Apex speed is what a quasi-static profile needs, so the closed form is the correct tool - but the instrument verifier called its construction 'the geometric minimum-curvature line' when it is not one, and a future session that implements a minimum-curvature raceline solver and feeds it to this speed model will get corner speeds 15-25% low and will not know why.",
+  "A CORNER IS A DIRECTION CHANGE, NOT A RADIUS, AND THE BRIEF'S REFERENCE TABLE IS INDEXED THE WRONG WAY. The multiplier (1+cos(theta/2))/(1-cos(theta/2)) is 25.3 at 45 deg, 16.70 at 55, 8.68 at 75, 6.61 at 85, 5.17 at 95, 3.69 at 110 and 1.00 at 180. At 9-14 m of road nothing under about 80 deg can be a slow corner whatever its radius: a 55 deg bend of 38 m radius through 10 m of road has a 126 m line radius and is flat out. The brief's 'corner speed at the 1.86 g ceiling for r = 15, 20, 25...' table has no angle column and actively pushes a designer toward shallow corners that read slow on paper and are straights in the kart. It needs an angle column or a sentence.",
+  "THE ANGLE BUDGET IS THE CONSTRAINT NOBODY WROTE DOWN. On a loop with net -360 deg, sum(lefts) - sum(rights) = 360. A 180 deg hairpin consumes half the budget on its own, and every right-hander must be paid for by an equal extra left. A matched esse is free because it cancels. That single identity explains why all four source layouts have 7-10 corners and why several of them are flat kinks: the designers ran out of budget and spent what was left on corners too shallow to be corners. It belongs in ARCHITECTURE section 11 next to the length band, because it is the first thing that bites when a lap is laid out.",
+  "YOU CANNOT LEGALLY PUT A BLIND CREST IMMEDIATELY BEFORE A BRAKING ZONE ABOVE ABOUT 100 km/h. At 125 km/h a convex break needs R >= 125^2/15 = 1,042 m, and art 7.2 then requires R increased further in braking sections and the change avoided there where possible. A 1,800 m radius has a sight distance of 75.9 m, which is 2.18 s - late, not blind. To get terrain's claimed 31 m of sight distance the radius has to be about 300 m, which is legal only below 67 km/h. Cava Vecchia's headline learnable was therefore not buildable at the speed it claimed, and the general rule - blindness and speed are traded against each other by K, not by the designer - is worth recording once.",
+  "THE SELF-INTERSECTION GATE NEEDS A VERTICAL COMPANION AND IT IS WRITTEN DOWN NOWHERE. Pietrarossa clears the brief's 14 m plan rule at 20.56 m while those same two sections are 8.09 m apart VERTICALLY across 10.56 m of clear ground - a 76.6% face, over roughly 60 m of the start straight and 60 m of a braking zone, where art 7.5 requires 1.80 m of non-negative-slope verge on both sides. The rule needs a second half: the slope between two sections must not exceed 10% (art 7.5's own cap on run-off up-slope) unless a retaining structure is declared as track furniture. This circuit's worst figure is 8.95% and it is reported in `measured` because otherwise nobody would know to look.",
+  "THE 14 m SEPARATION CONSTANT IS ONLY CORRECT AT THE 8 m WIDTH FLOOR. The regulation is 6 m of clear ground between asphalt edges, so the requirement is 6 + (w_a + w_b)/2. At this circuit's 14 m hairpin against an 11 m Rampa it is 18.5 m, not 14. Stated as a constant it will pass an illegal layout wherever the road is wider than 8 m, and the brief itself says widening is a free plausibility gain.",
+  "THE 40 m ARC-SEPARATION EXEMPTION MEASURES ALMOST NOTHING. A 180 deg corner of 15 m radius has 47.1 m of arc, so its own entry and exit tangents are 'more than 40 m apart along the lap' and 30 m apart in plan - and that pair is this layout's reported minimum, as it was rhythm's (40.07 m), racecraft's (40.02 m) and terrain's (40.03 m). Four for four. Raise the window to 100 m, or exclude pairs that belong to the same corner.",
+  "THE VERTICAL-RADIUS CHECK MUST RUN IN BOTH DIRECTIONS AT THE SAME K, AND TWO OF THE FOUR GOT IT WRONG IN OPPOSITE DIRECTIONS. Vertical curvature d2z/ds2 is invariant under s -> L-s: a crest is a crest driven either way, so K does not swap and only the speed changes. Rhythm swapped K, computed six 'reverse minima' with the wrong constant and declared all six legal when one was not. Terrain kept K but never ran one of the two Il Salto breaks backwards at all and has a 13.21 m overlap. The gate is one line - for each break, take max(V_forward, V_reverse) and test against the curve's own K - and it is not in the brief's Part 4 checklist, which is forward-only.",
+  "THERE IS STILL NO SLIPSTREAM MODEL ANYWHERE IN THE PROJECT AND EVERY OVERTAKING ARGUMENT IN ALL FIVE OF THESE DOCUMENTS DEPENDS ON ONE. src/core/vehicle.h carries a single drag term per kart with no awareness of any other kart. At 140 km/h drag is roughly 630 N = 3.6 m/s^2, so a 25% tow is worth up to 0.9 m/s^2, which over the 165 m start straight is the difference between arriving alongside and arriving behind. ROADMAP M5's 'two real overtaking spots' cannot be satisfied by track geometry alone and cannot be validated by driving until this exists. It wants a ticket before M5 is accepted.",
+  "ARCHITECTURE SECTION 11 IS WRONG IN TWO PLACES AND BOTH WILL SHAPE A FUTURE SESSION. 'At least two genuine overtaking spots - a long straight into a heavy braking zone': the deepest braking zone this kart can produce on a circuit whose longest straight is capped at 200 m is about 45 m, and this circuit reaches 43.0 m exactly once. 'Elevation change, both for looks and because it loads the tires': at the legal minimum vertical radius a_vert = K/12.96 m/s^2 regardless of speed, so the maximum load swing available anywhere on a legal Grade 1 kart circuit is -11.8% to +15.7% of static, and art 7.2 then says to increase R further. Both sentences should be corrected before a fifth layout is designed against them.",
+  "THE BRIEF'S OWN LINE-RADIUS FORMULA OMITS THE KART. It gives R - w/2 + w/(1-cos(theta/2)), which puts the path centre on the white line. The two verify files disagree with each other about this: rhythm.verify.json uses h = (W-1.400)/2 and racecraft.verify.json uses h = W/2, and on a 95 deg corner of 22 m radius through 10 m of road that is 44.21 m against 48.62 m - 10%, or 4.7 km/h of apex speed. My formula reproduces 45 of the 49 line radii published across the four verify files to within 0.1 m once the width convention is matched; the four it does not reproduce are the instrument verifier's numeric compound and esse solves, which no closed form can. Pick one convention and say which.",
+  "REFERENCES.md's VERTICAL-RADIUS TABLE HAS ONE WRONG CELL AND THE BRIEF ADDS ANOTHER. 21.2^2/20 = 22.47, which rounds to 22 m, and both documents print 23. 81.3^2/20 = 330.5: REFERENCES.md prints 330 and the brief prints 331. Every other cell reproduces. Two of the four verifiers found both independently; this is the third confirmation.",
+  "scripts/track/track_layout.gd's RACING-LINE RULE IS RIGHT FOR ITS CASE AND CATASTROPHIC IF GENERALISED. 'With the 8 m road width the widest line through an 11 m centerline radius is about 15 m' is R + W/2, which is exactly correct at 180 deg and only at 180 deg. At 55 deg the same construction is wrong by a factor of five. The docstring does not say it is 180-deg-specific, and the number that follows from it decides whether a corner is the safe side of #137.",
+  "FOUR AGENTS AND ONE SHARED SCRATCHPAD, AGAIN. instrument.json's outside_scope_concerns records that a module it had read and was importing belonged to another agent. This synthesis wrote into synth/ for the same reason. CLAUDE.md's worktree rule exists for exactly this failure and does not currently extend to the scratchpad; every fan-out brief should name a private subdirectory."
+ ]
+}

@@ -1,0 +1,352 @@
+{
+ "lens": "Racecraft first (working name: Sabliere)",
+ "verdict": "major issues",
+ "measured": {
+  "walk_step_m": 0.25,
+  "total_length_m": 1302.558455,
+  "analytic_length_m": 1302.558455,
+  "closure_error_m": 0.001025991,
+  "closure_error_at_step_0p10_m": 0.002132637,
+  "final_heading_deg": 360.0,
+  "sum_of_corner_angles_deg": 360.0,
+  "longest_straight_m": 198.0,
+  "longest_straight_is": "segments 16 + 0, joined across the start line (88.000 + 110.000)",
+  "longest_single_straight_segment_m": 195.0,
+  "longest_effectively_flat_run_m": 237.7949,
+  "longest_effectively_flat_run_is": "segments 10 + 11 + 12 (Cellar climb 111.751 + T5 R90 47.124 + Upper climb 78.920); T5 at R90 is, by the brief's own table, 'a direction change not a corner'",
+  "longest_full_throttle_run_author_m": 276.7,
+  "longest_no_braking_run_independent_sim_m": 380.0,
+  "min_separation_m": 30.3725,
+  "min_separation_where": "s = 764.92 m (last metre of The Plunge) against s = 804.93 m (inside T4), 40.02 m apart along the lap",
+  "min_separation_over_100m_apart_m": 34.2008,
+  "min_separation_over_100m_where": "s = 739.36 m against s = 839.39 m",
+  "width_aware_clearance_worst_slack_m": 14.3985,
+  "width_aware_clearance_violations": 0,
+  "bounding_box_m": [
+   377.496,
+   331.736
+  ],
+  "elevation_closure_segment_grades_m": -5.116e-05,
+  "elevation_range_segment_grades_m": 14.5872,
+  "elevation_lowest_point_m": -13.6882,
+  "elevation_highest_point_m": 0.8991,
+  "elevation_closure_vertical_curve_schedule_m": 0.601189,
+  "elevation_range_vertical_curve_schedule_m": 12.624,
+  "max_disagreement_between_the_two_published_profiles_m": 2.0947,
+  "three_d_centreline_length_m": 1303.096,
+  "start_to_first_corner_m": 110.0,
+  "last_corner_to_start_m": 88.0,
+  "starting_straight_m": 198.0,
+  "first_corner_direction_change_deg": 50.0,
+  "first_corner_width_m": 12.0,
+  "min_track_width_m": 9.0,
+  "camber_range_pct": [
+   2.0,
+   2.0
+  ],
+  "banking_range_pct": [
+   3.0,
+   6.0
+  ],
+  "adverse_camber_segments": 0,
+  "starting_straight_gradient_pct": 0.5,
+  "independent_lap_time_s": 39.731,
+  "independent_sector_times_s": [
+   12.764,
+   13.422,
+   13.546
+  ],
+  "independent_top_speed_kmh": 142.1,
+  "pit_lane_chord_m": 165.3,
+  "pit_lane_min_clearance_to_track_inner_edge_m": 16.66,
+  "geometric_max_racing_line_radius_m": {
+   "T1 The Anvil (compound, numeric)": 69.2,
+   "T2 The Kettle (compound, numeric)": 67.6,
+   "T3 The Rim": 78.24,
+   "T4 The Cellar": 21.46,
+   "T5 The Ramp": 349.63,
+   "T6 The Shelf": 121.56,
+   "T7 The Gate": 49.98
+  },
+  "pinned_to_inner_half_line_radius_m": {
+   "T1 The Anvil": 51.5,
+   "T2 The Kettle": 50.55,
+   "T3 The Rim": 64.37,
+   "T4 The Cellar": 16.23,
+   "T5 The Ramp": 217.56,
+   "T6 The Shelf": 73.53,
+   "T7 The Gate": 36.49
+  },
+  "method_note": "Racing-line radius computed as the largest circle tangent to both adjacent straights' outer edges that stays inside the corner corridor. Closed form for a constant-radius corner: R_line = R + (w/2)*(1+cos(t/2))/(1-cos(t/2)). Verified numerically to 0.05 m on all five simple corners; T1 and T2 solved numerically because they are compound. 'Pinned to inner half' repeats the computation with the outer boundary moved to the road centreline, which is what a defender genuinely alongside actually has."
+ },
+ "violations": [
+  {
+   "rule": "Corner speed must follow from the radius the kart actually drives (brief Part 4 item 6). T5's apex speed is impossible and contradicts the document's own numbers.",
+   "required": "apex_kmh <= the speed reachable at that station, and <= the document's own stated forward top speed of 137.8 km/h",
+   "actual": "corners[4].apex_kmh = 143.9 km/h, which is the kart's measured FLAT-GROUND top speed, claimed at the apex of a corner on a +4.3833% climb, with entry_kmh 116.5 and exit_kmh 125.4 either side of it. Accelerating 116.5 -> 143.9 km/h over T5's 47.124 m of arc needs 5.86 m/s2 of net longitudinal acceleration at 116 km/h, on a climb that costs 0.43 m/s2. The same corner's own prose says 'Taken flat at 116-126 km/h', and measured.extra.top_speed_reached_forward_kmh says 137.8. Three of the document's own statements disagree with the field.",
+   "severity": "major",
+   "fix": "Set T5's apex to the speed the profile actually reaches there (my independent profile gives 117.5 km/h at the entry rising to ~126 km/h at the exit, consistent with the corner's own prose). Then re-derive the 0.90 g figure, which is currently computed from 143.9 on a 180 m line."
+  },
+  {
+   "rule": "A defender confined to the inside of the road drives the largest arc that fits in the inner half, not the inside-edge radius. Every defensive-penalty number in the proposal uses the wrong one.",
+   "required": "pinned line radius = largest circle fitting the inner half of the corridor",
+   "actual": "T1: claimed 27 m at 66.7 km/h; measured inner-half line 51.50 m (110.3 km/h at 1.82 g). T2: claimed 26-27 m at 66.7 km/h; measured 50.55 m. T6: claimed 26.5 m at 65.4 km/h; measured 73.53 m (131.8 km/h). T7: claimed 24 m at 59.0 km/h; measured 36.49 m (~92 km/h). The claimed penalties of 38.7, 53.7 and 35.2 km/h are between 2x and 30x overstated. At T1 the author's own free-line figure (48.85 m) is SMALLER than the correctly computed pinned line (51.50 m), so in the author's own frame the defender is faster than the attacker.",
+   "severity": "major",
+   "fix": "Recompute every 'pinned inside' figure with the inner-half corridor, then re-derive concept, overtaking[*].why_it_sticks, risks[0] and T6's and T7's stated purposes from the corrected numbers. This is the load-bearing arithmetic of the whole proposal: 'THE SWITCHBACK IS THE DOMINANT MOVE' is not supported by the published geometry."
+  },
+  {
+   "rule": "brief Part 4 item 6 - a corner's claimed speed must be consistent with its radius. T6's stated purpose does not survive its own geometry.",
+   "required": "line radius from the corridor, not from a heuristic cap",
+   "actual": "T6 is a 50 deg bend of 30 m centreline radius through 9 m of road. The geometric maximum line radius is 121.56 m; 1.86 g on that line is 169.5 km/h, i.e. well above the kart's top speed, so T6 is FLAT OUT. The document claims a 60 m line at 119.1 km/h and 1.86 g, an 8.4 m braking zone, entry 132.4 -> apex 119.1, 'the fastest corner on the circuit without run-off', and 'a kart pinned on the inside here is on a 26.5 m radius'. The 60.0 m is exactly 2x the centreline radius - the author's own admitted cap (risks[6]) - and it is the only thing producing the corner. My independent profile takes T6 at 133.2 km/h with no braking event at all.",
+   "severity": "major",
+   "fix": "Either accept that T6 is a flat kink and stop claiming it as a corner, or tighten it. To make a real 1.86 g corner at ~119 km/h through 9 m of road at 50 deg of deflection the centreline radius has to come down to roughly 12-14 m, which puts it past #137's cliff - so the honest options are to increase the deflection angle substantially or to delete T6's stated purpose."
+  },
+  {
+   "rule": "Same, T7. Its claimed slowness is the premise of the circuit's primary overtaking argument.",
+   "required": "line radius from the corridor",
+   "actual": "T7 is 102 deg at 28 m through 10 m of road. Geometric maximum line radius 49.98 m (numeric 49.95 m); at the lock sweep's ~1.81 g for that radius the apex is 107-109 km/h. The document claims 41.29 m and 94.2 km/h and calls T7 'deliberately slow ... the lowest speed on the lap outside the hairpin' so that 'the field concertinas onto the start straight' - which is the mechanism the whole T1 overtaking case rests on. 13-15 km/h of the claimed concertina is not there.",
+   "severity": "major",
+   "fix": "Tighten T7 (a 22 m radius at 102 deg through 10 m gives a ~40 m line and ~95 km/h) or restate the tow argument at 107 km/h."
+  },
+  {
+   "rule": "One elevation profile per circuit. The document publishes two and they are different roads.",
+   "required": "the vertical-curve schedule and the per-segment grade list must describe the same surface; both must close",
+   "actual": "The segment grade list closes to -5.116e-05 m with a 14.5872 m range - both figures reported in `measured` and both correct. Integrating the eight published vertical curves at their published stations and transition lengths gives a profile that does NOT close: +0.601189 m of error, and a range of 12.6240 m. The two profiles disagree by up to 2.0947 m. The cause is that the vertical curves are deliberately displaced from the segment-list grade breaks to keep them out of corners (e.g. the break at s = 1051.630 is implemented as a curve at 1008.0-1039.0, 12.6 m early; the break at s = 1164.712 as a curve at 1110.0-1126.0, 38.7 m early; the break at s = 445.743 as a curve at 475.7-509.0, 30 m late). The intent is right; the bookkeeping was never reconciled.",
+   "severity": "major",
+   "fix": "Make the vertical-curve schedule the authority, re-solve the free straight lengths against IT, and derive the per-segment grades from the schedule rather than publishing both independently. The reported 14.5872 m elevation range is a property of a profile the design does not actually specify."
+  },
+  {
+   "rule": "R = V^2/K, and 'the value of R must be adequately increased along approach, release, braking and curved sections' (T1 s7.2). The crest at s = 475.7 has no margin and its assumed speed comes from a corner speed that is understated.",
+   "required": "R >= V^2/15 at the true speed, increased in a release section",
+   "actual": "Chosen R = 950 m against the author's own required 908 m - a 4.6% margin, the tightest on the lap, and the author says it is 'held near the minimum on purpose'. But the 116.7 km/h it is worked against is derived from T2's apex of 104.5 km/h, and T2's geometric line radius is 67.60 m, not the 48.85 m used. On an independent profile the station reaches 132.0 km/h, which demands R = 1161 m. The chosen 950 m would then be 18% under the legal minimum. The curve also sits 30 m after T2's exit - a release section, where the same article says R must be increased, and this one is at the floor.",
+   "severity": "major",
+   "fix": "Raise the crest to at least 1,200 m (it costs 42 m of the Rim approach's 139.5 m at a 3.5% grade change, which fits), or move it further from T2's exit, or both. This is the one vertical curve on the lap that a corner-speed revision can push illegal."
+  },
+  {
+   "rule": "Longest straight max 200 m (T3 Grade 1 table). Met in the letter, defeated in effect.",
+   "required": "<= 200 m",
+   "actual": "Geometric straights are 198.0 m and 195.0 m, both legal. But the author's own count is '276.7 m of uninterrupted full throttle' from T2's exit to T4's braking point (Rim approach + T3 + Plunge, all of it on a -4% descent), and segments 10 + 11 + 12 form 237.79 m of continuously 'effectively flat' road because T5 at R90 is, by the brief's own vocabulary, a direction change and not a corner. My independent profile's longest run with no braking event is 380 m, from T4's exit to T7's braking point, because T6 is flat.",
+   "severity": "major",
+   "fix": "Not a regulation breach - the regulation says 'straight' and these are not straights. But the 200 m cap exists to cap terminal speed, and a 276.7 m downhill full-throttle run defeats it. Either put a genuine braking event in the Rim approach / Plunge sequence (tightening T3 does it) or state plainly that the cap is being satisfied on a technicality."
+  },
+  {
+   "rule": "Report measurements, not derivations presented as measurements (sectors).",
+   "required": "three sector times measured from the speed profile",
+   "actual": "All three sectors are reported as exactly 14.306 s, and 3 x 14.306 = 42.918 = the claimed lap time to four decimal places, at boundaries that are round to the half-metre (470.5 and 850.5 m). Three independent integrations of a speed profile do not land on the same millisecond. My profile at the same boundaries gives 12.764 / 13.422 / 13.546 s - a 0.78 s spread.",
+   "severity": "minor",
+   "fix": "Either solve the boundaries for equal time and publish the non-round stations that fall out, or publish the three unequal times at the round stations. Not both."
+  },
+  {
+   "rule": "'Time at the grip ceiling' must use the racing line's arc length, not the centreline's.",
+   "required": "arc = R_line * theta",
+   "actual": "T3: '91.19 m of arc = 2.52 s' is the CENTRELINE arc (55 m x 95 deg) divided by the RACING-LINE speed. On the author's own 71.76 m line the arc is 118.98 m and the exposure is 3.29 s, not 2.52 - i.e. the corner is 30% worse than reported on the rollover margin the document calls the smallest anywhere. T6: '0.79 s' is 26.18 m of centreline; on the claimed 60 m line the arc is 52.36 m and the figure doubles to 1.58 s.",
+   "severity": "minor",
+   "fix": "Recompute both with R_line * theta."
+  },
+  {
+   "rule": "Reported minimum separation must be the true minimum.",
+   "required": "the minimum over the whole lap",
+   "actual": "Author reports 30.476 m at s = 764.7 / 805.1. The true minimum at 0.05 m walk resolution is 30.3725 m at s = 764.92 / 804.93, 40.02 m apart along the lap. The >100 m figure is 34.2008 m (author: 34.216 m) at s = 739.36 / 839.39 (author: 739.2 / 839.6). Both are optimistic by ~0.1 m and both pass by a wide margin.",
+   "severity": "minor",
+   "fix": "Sample finer. Note also that the true minimum occurs at 40.02 m of arc separation - 0.02 m inside the brief's own 40 m exemption. The gate is being passed on the edge of its own exclusion window."
+  },
+  {
+   "rule": "Lap time must be reproducible from the published geometry.",
+   "required": "an independent quasi-static profile should land near 42.918 s",
+   "actual": "39.731 s, 7.4% quick, with a top speed of 142.1 km/h against the claimed 137.8. The whole gap is the racing-line radii: the author caps them at 2x the centreline radius (admitted in risks[6]) and the geometric optima are 8% higher at T3, 42% at T1, 38% at T2, 21% at T7, 103% at T6 and 94% at T5.",
+   "severity": "minor",
+   "fix": "Drop the 2x cap and use the closed form. The ORDERING of the corners survives; the absolute numbers, the braking zones and every 'entry_kmh' do not."
+  },
+  {
+   "rule": "T4's published braking window must match its own grade-corrected arithmetic.",
+   "required": "consistent numbers",
+   "actual": "Published braking zone 42.5 m, window 722.5-765.0 m. Recomputed 136.6 -> 47.5 km/h at 1.53 g is 42.18 m flat and 43.31 m on the -4% descent, and the document itself states the descent costs 2.6% of braking authority. The window is 0.8 m short of its own figure. T3's 'a 4.8 m brush of the brake at most' recomputes to 4.60 m flat / 4.73 m on the descent.",
+   "severity": "minor",
+   "fix": "Trivial, but it is arithmetic the document did itself and then did not apply."
+  },
+  {
+   "rule": "Width is a published field; the tapers are not.",
+   "required": "the geometry that was verified must be the geometry that is specified",
+   "actual": "Every taper in the design (9->12 m into T1, 12->9->12 m along the back straight, 9->10 m into T4, 10->9 m out of T7) exists only inside prose `note` strings. Each segment carries a single scalar `width_m`. So the first-corner width check, the min-separation check and the racing-line radii were all computed against constant widths, and the 12 m at T1's entry is asserted for the whole 69.8 m of the corner rather than for the widened part of it.",
+   "severity": "minor",
+   "fix": "Give segments a width profile, or state that width_m is the corner's width throughout and that the taper is a straight-side property."
+  },
+  {
+   "rule": "Verge min 1.80 m both sides over the whole length; edge lines max 120 mm; run-off slope max +10% with no negative slope (T1 s7.5).",
+   "required": "specified everywhere",
+   "actual": "The 1.80 m verge appears only inside the seven corner `runoff` strings. Nothing in the document specifies a verge along any straight, an edge-line width, or a run-off cross-slope anywhere. The gravel beds are correctly specified as >= 2 m wide, 300 mm deep and not below track level.",
+   "severity": "minor",
+   "fix": "Carry verge width, edge-line width and run-off slope as fields, not as corner prose."
+  },
+  {
+   "rule": "Internal prose consistency.",
+   "required": "-",
+   "actual": "Segment 6's note says it 'carries the lap's only crest'. The published schedule has six convex curves, and T6's own entry depends on one of the others ('the exit is blind over a 1,550 m convex vertical curve' at s = 1008). T5's entry/apex/exit (116.5 / 143.9 / 125.4) describes a corner that decelerates 18.5 km/h from apex to exit with no braking event, while calling itself 'taken flat'.",
+   "severity": "minor",
+   "fix": "-"
+  },
+  {
+   "rule": "Reported length is the plan length; the regulation measures the centreline including the longitudinal profile (T1 s11).",
+   "required": "state which",
+   "actual": "Plan length 1302.558 m; 3D centreline length 1303.096 m. The difference, 0.54 m, is inside the regulation's own 1 m accuracy and inside the 1,100-1,400 m band either way.",
+   "severity": "minor",
+   "fix": "State that the published figure is the plan length."
+  }
+ ],
+ "corner_checks": [
+  {
+   "name": "T1 The Anvil",
+   "segments": [
+    1,
+    2
+   ],
+   "shape": "compound R32/50 deg then R50/48 deg, 98 deg total, right, 12 m",
+   "claimed_line_radius_m": 48.85,
+   "measured_geometric_line_radius_m": 69.2,
+   "claimed_apex_kmh": 105.4,
+   "apex_at_measured_line_and_1p86g_kmh": 127.9,
+   "g_at_claimed_apex_on_claimed_line": 1.789,
+   "g_at_claimed_apex_on_centreline_R32": 2.73,
+   "claimed_pinned_inside_radius_m": 27.0,
+   "measured_pinned_inner_half_radius_m": 51.5,
+   "braking_claimed_m": 18.8,
+   "braking_recomputed_m": 18.85,
+   "runoff_arithmetic": "14.14 m required at 105.4 km/h, 15 deg, 0.80 g assumed; 15 m built. Consistent with the stated model.",
+   "verdict": "radius/speed pair is internally consistent and inside the lock sweep. The line radius is understated by 42% and the defensive radius by a factor of 1.9. Direction change 98 deg > 80 deg so run-off on the axis is mandatory and is provided."
+  },
+  {
+   "name": "T2 The Kettle",
+   "segments": [
+    4,
+    5
+   ],
+   "shape": "compound R50/48 deg then R32/52 deg, 100 deg total, right, 12 m",
+   "claimed_line_radius_m": 48.85,
+   "measured_geometric_line_radius_m": 67.6,
+   "claimed_apex_kmh": 104.5,
+   "apex_at_measured_line_and_1p86g_kmh": 126.4,
+   "g_at_claimed_apex_on_claimed_line": 1.777,
+   "claimed_pinned_inside_radius_m": 26.5,
+   "measured_pinned_inner_half_radius_m": 50.55,
+   "braking_claimed_m": 20.8,
+   "braking_recomputed_m": 20.75,
+   "runoff_arithmetic": "13.90 m required, 15 m built. Consistent.",
+   "verdict": "same two errors as T1. Additionally its understated apex is what feeds the crest at s=475.7 its 116.7 km/h assumption, which is the one vertical curve with no margin."
+  },
+  {
+   "name": "T3 The Rim",
+   "segments": [
+    7
+   ],
+   "shape": "R55, 95 deg, left, 9 m",
+   "claimed_line_radius_m": 71.76,
+   "measured_geometric_line_radius_m": 78.24,
+   "claimed_apex_kmh": 130.3,
+   "apex_at_measured_line_and_1p86g_kmh": 136.0,
+   "g_at_claimed_apex_on_claimed_line": 1.862,
+   "claimed_time_at_ceiling_s": 2.52,
+   "recomputed_time_at_ceiling_s": 3.29,
+   "braking_claimed_m": 4.8,
+   "braking_recomputed_m": 4.73,
+   "runoff_arithmetic": "17.36 m required at 130.3 km/h, 12 deg; 20 m built. Consistent.",
+   "verdict": "the best-argued corner on the lap. The 1.86 g / 71.76 m / 130.3 km/h triple is arithmetically exact. Two caveats: the exposure is 3.29 s not 2.52 s once the racing line's own arc length is used, which makes the 23% rollover margin worse than reported; and at 78.24 m the corner is 1.76 m short of the brief's own 80 m 'effectively flat' threshold, so it is the hinge on which the 276.7 m full-throttle run turns."
+  },
+  {
+   "name": "T4 The Cellar",
+   "segments": [
+    9
+   ],
+   "shape": "R16, 175 deg, right, 10 m",
+   "claimed_line_radius_m": 19.56,
+   "measured_geometric_line_radius_m": 21.46,
+   "claimed_apex_kmh": 47.5,
+   "g_at_claimed_apex_on_claimed_line": 0.907,
+   "sweep_row_it_is_interpolated_against": "18.99 m / 46.0 km/h / 0.88 g, recorded at 0.25 lock and 0.30 THROTTLE",
+   "braking_claimed_m": 42.5,
+   "braking_recomputed_m": "42.18 flat, 43.31 on the -4% descent",
+   "runoff_arithmetic": "11.10 m required at 47.5 km/h square-on; 14 m built. Total brake failure needs 91.76 m forward and 101.55 m reversed - the author states this and states it is not built. Honest.",
+   "verdict": "sound, and the honest-limit disclosure is the best thing in the document. The single-arc-tangent-to-both-straights model degenerates at 175 deg (it wants 124.8 m of straight either side and there is 88.5 / 111.8) - that is a model artefact, not a defect, because a hairpin's line is bounded by the outer edge radius, 21 m, which the corridor provides."
+  },
+  {
+   "name": "T5 The Ramp",
+   "segments": [
+    11
+   ],
+   "shape": "R90, 30 deg, right, 9 m",
+   "claimed_line_radius_m": 180.0,
+   "measured_geometric_line_radius_m": 349.63,
+   "claimed_apex_kmh": 143.9,
+   "problem": "143.9 km/h is the kart's measured flat-ground top speed, claimed at the apex of a +4.3833% climb, above the document's own stated forward maximum of 137.8 km/h, above both its own entry (116.5) and exit (125.4), and against its own prose ('Taken flat at 116-126 km/h'). Independent profile: 117.4 km/h at entry, ~126 at exit.",
+   "verdict": "the corner is correctly identified as a non-corner. The apex speed field is wrong and takes the 0.90 g figure with it."
+  },
+  {
+   "name": "T6 The Shelf",
+   "segments": [
+    13
+   ],
+   "shape": "R30, 50 deg, left, 9 m",
+   "claimed_line_radius_m": 60.0,
+   "measured_geometric_line_radius_m": 121.56,
+   "claimed_apex_kmh": 119.1,
+   "apex_at_measured_line_and_1p86g_kmh": 169.5,
+   "independent_profile_apex_kmh": 133.2,
+   "claimed_pinned_inside_radius_m": 26.5,
+   "measured_pinned_inner_half_radius_m": 73.53,
+   "verdict": "fails. 60.0 m is exactly 2x the centreline radius, i.e. the author's own heuristic cap, and nothing else produces it. The corridor allows 121.56 m, at which the corner is flat out for this kart. Every claim attached to T6 - 1.86 g, 0.79 s at the ceiling, an 8.4 m braking zone, 'the fastest corner without run-off', 'a kart pinned on the inside is on 26.5 m at 65.4 km/h', 'the one place where narrowness is the design' - is downstream of a radius the geometry does not support."
+  },
+  {
+   "name": "T7 The Gate",
+   "segments": [
+    15
+   ],
+   "shape": "R28, 102 deg, right, 10 m",
+   "claimed_line_radius_m": 41.29,
+   "measured_geometric_line_radius_m": 49.98,
+   "claimed_apex_kmh": 94.2,
+   "apex_at_measured_line_kmh": "107-109 (1.81-1.86 g)",
+   "claimed_pinned_inside_radius_m": 24.0,
+   "measured_pinned_inner_half_radius_m": 36.49,
+   "braking_claimed_m": 22.2,
+   "braking_recomputed_m": 22.04,
+   "runoff_arithmetic": "11.29 m required at 94.2 km/h, 15 deg; 12 m built. Consistent.",
+   "verdict": "the corner exists to be slow and it is not as slow as claimed. 13-15 km/h of the concertina that feeds T1's tow is not there."
+  }
+ ],
+ "author_discrepancies": [
+  "total_length_m: claimed 1302.5585, measured 1302.558455. Matches.",
+  "closure_error_m: claimed 0.001026, measured 0.001025991 at the prescribed step 0.25 m. Matches exactly. (At step 0.10 m it is 0.002133 m - the figure is step-dependent, which the author's own note acknowledges. Both are three orders inside the 1.0 m gate.)",
+  "final_heading_deg: claimed 360.0, measured 360.000000000. Corner angles sum to exactly +360.0 deg. Matches.",
+  "longest_straight_m: claimed 198.0 (segments 16+0 joined). Measured 198.0. Matches. Longest single segment 195.0 m, matches.",
+  "min_separation_m: claimed 30.476 m at s = 764.7 / 805.1. Measured true minimum 30.3725 m at s = 764.92 / 804.93. Author 0.104 m optimistic; stations off by ~0.2 m. Immaterial to the verdict.",
+  "min separation for pairs >100 m apart: claimed 34.216 m at 739.2 / 839.6; measured 34.2008 m at 739.36 / 839.39.",
+  "elevation_closure_m: claimed 5.116e-05, measured -5.116e-05 from the segment grade list. Matches (sign given correctly in the author's own note).",
+  "elevation_range_m: claimed 14.5872, measured 14.5872 from the segment grade list. Matches. BUT the eight published vertical curves integrate to a 12.6240 m range that fails to close by 0.601189 m, and the two published profiles differ by up to 2.0947 m. The reported figure describes only one of the two roads the document specifies.",
+  "bounding_box_m: claimed [377.5, 331.74], measured [377.496, 331.736]. Matches.",
+  "start_to_first_corner_m 110.0 and last_corner_to_start_m 88.0: both match; both legal forward and reversed.",
+  "estimated_lap_time_s: claimed 42.918. Independent quasi-static profile on geometric racing lines gives 39.731 s, 7.4% quick. Entirely attributable to the 2x-centreline racing-line cap.",
+  "extra.top_speed_reached_forward_kmh: claimed 137.8, while corners[4].apex_kmh claims 143.9 at T5. The document contradicts itself by 6.1 km/h. Independent profile reaches 142.1 km/h.",
+  "racecraft.md line 107 states outright 'it never reaches its 143.9 km/h top speed anywhere on the forward lap'. racecraft.json's T5 says apex_kmh 143.9. The prose companion and the data file directly contradict each other on the same fact.",
+  "racecraft.md repeats the JSON's other soft numbers verbatim (48.85 / 42.4 / 27.0 m at T1; 'costs you thirty-eight km/h'; 'the lap's only crest'; T6 'pinned on the inside is 65.4 km/h - a 53.7 km/h loss'; T7 'defending here costs 35 km/h') and adds one more: the T1 outside line is given as R 40 m in the switchback table while the same corner's free line is given as 48.85 m one table earlier. All are downstream of the same two errors.",
+  "sectors: all three reported as exactly 14.306 s, summing to exactly the claimed lap time, at round boundaries (470.5, 850.5). This is lap/3, not three measurements. Independent profile at the same boundaries: 12.764 / 13.422 / 13.546 s.",
+  "racing-line radii understated against the corridor at every corner: T3 71.76 vs 78.24 (-8%), T4 19.56 vs 21.46 (-9%), T7 41.29 vs 49.98 (-17%), T2 48.85 vs 67.60 (-28%), T1 48.85 vs 69.20 (-29%), T5 180 vs 349.63 (-49%), T6 60 vs 121.56 (-51%). The author discloses the 2x cap in risks[6] but the corner entries state the numbers as geometry ('the 9 m width takes the line out to 71.76 m').",
+  "pinned-inside radii understated by 1.5x to 2.8x at every corner where the claim is made: T1 27 vs 51.50, T2 26.5 vs 50.55, T6 26.5 vs 73.53, T7 24 vs 36.49.",
+  "T3 'held for 91.19 m of arc = 2.52 s': that is the centreline arc divided by the racing-line speed. On the author's own 71.76 m line the arc is 118.98 m and the exposure is 3.29 s.",
+  "T6 'held for only 0.79 s': centreline arc again. On the claimed 60 m line it is 1.58 s.",
+  "T4 braking: published 42.5 m and a 722.5-765.0 window; recomputed 42.18 m flat and 43.31 m with the -4% descent the document itself accounts for. 0.8 m short of its own number.",
+  "T3 braking: published 'a 4.8 m brush'; recomputed 4.60 m flat, 4.73 m on the descent.",
+  "vertical curves: all eight required-radius figures reproduce to within 1.0 m of the author's numbers at the author's own assumed speeds, and all eight transition lengths reproduce to within 0.05 m. All eight fit inside the straight that hosts them, and no gradient change falls inside any corner - verified independently against both the segment list and the schedule. This part of the document is sound arithmetic; what is wrong is the speeds it is fed and the fact that it does not agree with the segment grades.",
+  "run-off: all seven sizings reproduce exactly against the author's stated model (0.80 g gravel, 12-15 deg departure, 90 deg at the hairpin): T1 14.14, T2 13.90, T3 17.36, T4 11.10, T7 11.29 m required, and the brake-failure figures 91.76 m forward / 101.55 m reversed. Every one matches to 0.05 m. The constants are assumed and the author says so.",
+  "laps_in_a_30_km_final 23: 30000/1302.558 = 23.03. Matches. grade_1_capacity 46.5: 1302.558/28 = 46.52. Matches.",
+  "reverse braking zones: claimed 48.5 m (T4 reversed), recomputed 48.69 m at 143.7 -> 47.5 km/h on the -4.3833% descent. Claimed 19.0 m (T2 reversed), recomputed 19.32 m. Claimed 19.5 m (T1 reversed), recomputed 19.64 m. All consistent.",
+  "grid and start furniture: rows at 5/13/21/29 m before the line with 8 m pitch, lights at s = 8.0 m = 13.0 m ahead of the front row (10-15 m rule), 3.0 m up (2.5-3.5 m), spanning 9 m. All reproduce exactly. Starting-straight gradient +0.5% against a 2% cap.",
+  "pit lane: entry at s = 1100 (25 deg, 4 m), exit at s = 40 (20 deg, 3.5 m), both inside the 30 deg and 3-4 m rules. A straight chord between the two stubs is 165.30 m long and stays 16.66 m clear of the track's inner edge round the T7 loop, so the lane physically fits with room for the 6 m separation. The claim that it does not cross the racing line holds for both stubs, since T1 and T7 are both right-handers and the line into each runs down the left."
+ ],
+ "notes": [
+  "HARD GATES: all pass. Closure 0.001026 m (< 1.0), heading exactly +360 deg, length 1302.558 m (in 1,100-1,400), longest straight 198.0 m (<= 200), minimum separation 30.3725 m (>= 14, and >= the width-aware 15.5 m requirement at that station with 14.40 m of slack at the worst pair), elevation closes to -5.1e-05 m (<= 0.05), every vertical curve fits in its host straight and none falls inside a corner, no gradient change inside any corner, start line 110 m to the first corner and 88 m from the last, starting straight 198 m, first corner 50 deg and 12 m, widths 9-12 m everywhere, camber 2.0% throughout, banking 3-6% with no adverse section, starting-straight gradient +0.5%. Run-off is provided on the axis of all five corners over 80 deg and correctly omitted at the two under it.",
+  "The geometry is real and it closes. What is not real is a large part of the racecraft argument built on top of it. Two of the seven corners (T6, T7) have stated purposes their radii cannot deliver, one (T5) carries an impossible apex speed, and every defensive-line penalty in the document is computed from the inside-EDGE radius instead of the largest arc that fits the inner half of the road - which is the single arithmetic error that most of the prose depends on.",
+  "The 2x-centreline racing-line cap is disclosed once, in risks[6], and then contradicted throughout the corner entries, which present the capped numbers as measured geometry. It is the root cause of the lap time gap, of T5's and T6's radii, and of the crest at s=475.7 being sized for 116.7 km/h.",
+  "Credit where it is due: the run-off arithmetic reproduces to 0.05 m at every corner, the vertical-curve schedule's required radii and transition lengths reproduce to within 1 m and 0.05 m, no gradient change sits inside a corner, the T4 brake-failure honesty ('91.7 m forward, 101.5 m reversed, not buildable, handed to the barrier') is exactly the right disclosure, and the reverse-direction 'what_breaks' list correctly identifies the pit lane's 155 deg merge as geometry rather than furniture. The outside_scope_concerns list is the strongest part of the submission and three of its items (no slipstream model anywhere; the elevation load-swing identity a_vert = K/12.96 regardless of speed; the quarter-lock cliff sentence contradicting the row below it) are correct and worth acting on independently of this layout.",
+  "The reverse layout is argued, not measured. Its lap time (42.612 s), its top speed (143.7 km/h) and its three overtaking spots are asserted; none is reproducible from the document. Its strongest claim - that reversed T4 is the best passing corner on the property - survives my checks: 111.75 m of -4.3833% descent to ~143 km/h with a 48.69 m braking zone into a 10 m hairpin entry is real and the forward direction has nothing like it.",
+  "T4's line-radius model note: the single-arc-tangent-to-both-straights construction degenerates above about 160 deg of deflection (it demands 124.8 m of approach either side at T4 and there is 88.5 / 111.8 m). The realistic bound for a hairpin is the outer edge radius, 21 m, which the corridor supplies. Not counted as a violation."
+ ]
+}

@@ -1,0 +1,217 @@
+{
+  "lens": "Terrain-led",
+  "verdict": "major issues",
+
+  "measured": {
+    "walk": "brief's walk() verbatim, step 0.25 m; cross-checked at step 0.05 m",
+    "total_length_plan_m": 1340.9695,
+    "total_length_3d_m": 1341.703,
+    "closure_error_m": 0.016952,
+    "final_heading_deg": 360.0,
+    "sum_of_corner_angles_deg": 360.0,
+    "bounding_box_m": [399.40, 360.39],
+    "longest_straight_plan_m": 196.92,
+    "longest_straight_3d_m": 197.197,
+    "longest_straight_where": "Il Salto, segments 4+5+6+7 merged, begins 327.48 m",
+    "merged_straight_runs_m": [196.92, 194.34, 188.26, 157.48, 153.87, 63.88, 37.59],
+    "second_longest_3d_m": 194.743,
+    "min_separation_m": 33.764,
+    "min_separation_where": "d=1231.66 m (La Rampa, near the top) against d=1271.69 m (Il Banco Sud), 40.03 m apart along the lap",
+    "min_separation_clear_ground_m": 24.26,
+    "next_closest_pairs_m": [36.20, 37.74, 38.09, 39.31, 39.50],
+    "start_to_first_corner_m": 113.130,
+    "last_corner_to_start_m": 75.130,
+    "starting_straight_merged_m": 188.265,
+    "starting_straight_grade_pct": -0.70,
+    "first_corner_angle_deg": 45.0,
+    "first_corner_width_m": 12.0,
+    "elevation_closure_m": -0.000037,
+    "elevation_range_m": 11.4202,
+    "elevation_min_m": -10.795,
+    "elevation_max_m": 0.625,
+    "widths_m": [9.0, 10.0, 11.0, 12.0, 14.0],
+    "min_width_m": 9.0,
+    "straight_cambers_pct": [2.0, 2.5],
+    "corner_bankings_pct": [4.0, 5.0, 6.0, 7.0],
+    "gradient_changes": 6,
+    "lap_time_forward_s": 44.23,
+    "lap_time_reverse_s": 44.10,
+    "speed_model": "independent recalibration, a = a0*(1 - (v/vmax)^2) with vmax = 143.9 km/h and a0 = 7.616 m/s^2 fitted to 0-100 km/h in 4.50 s; grade term -g*sin(theta). Reproduces the author's stated speeds at 9 of 10 checkpoints to within 2 km/h."
+  },
+
+  "hard_gates": {
+    "closes_under_1m": true,
+    "heading_full_loop": true,
+    "length_in_1100_1400": true,
+    "longest_straight_under_200": true,
+    "min_separation_over_14": true,
+    "start_to_first_corner_over_50": true,
+    "last_corner_to_start_over_70": true,
+    "first_corner_over_45deg": true,
+    "starting_straight_120_200": true,
+    "starting_straight_grade_under_2pct": true,
+    "elevation_closes_under_0.05m": true,
+    "width_over_8m_everywhere": true,
+    "camber_1.5_to_3.0_on_straights": true,
+    "banking_0_to_10_in_corners": true,
+    "adverse_camber_present": false
+  },
+
+  "violations": [
+    {
+      "rule": "The reverse layout is not legal. The two Il Salto vertical curves OVERLAP by ~13 m driven backwards. Author states 'All six vertical curves pass in reverse as well as forwards' and 'Both directions now pass.'",
+      "required": "Consecutive vertical curves must not overlap; each gradient change laid on R = V^2/K at the speed actually taken there, in BOTH authored directions (the author's own stated criterion).",
+      "actual": "Reverse, the -3.00%/-8.00% break (fwd d=400.44) is taken at 134.2 km/h -> R=1200.5 m, L=60.03 m, half 30.02 m. The -0.70%/-3.00% break (fwd d=369.46) is taken at ~136 km/h -> R=1232.9 m, L=28.36 m, half 14.18 m. Sum of half-lengths 44.20 m against 30.98 m of road between the breaks: OVERLAP 13.21 m. Robust to speed: even at a conservative 120 km/h for both breaks the overlap is 4.06 m. Forward the same pair clears by only 1.73-2.07 m. The author computed R=1201 m and L=60 m for the 5.00% break in reverse (my figures agree to 0.5 m) and then never checked the 2.30% break in reverse at all.",
+      "severity": "major",
+      "fix": "The 30.98 m constant -3.00% band cannot survive reverse. Either lengthen it to >= 45 m (which pushes Il Salto's merged straight from 196.92 m to ~211 m and blows the 200 m cap, so a corner has to go in), or abandon the two-break story and lay the whole 7.30% as ONE curve on R=1200 m, L=87.6 m, which then has to be checked against the reverse T2 braking zone below."
+    },
+    {
+      "rule": "The reverse layout's T2 braking zone still overlaps a vertical curve - the exact defect the author claims to have fixed.",
+      "required": "Art 7.2: R 'must be adequately increased along approach, release, braking and curved sections.' The author's what_breaks says version 2 'put the following break's transition 11.4 m inside the reverse braking zone for T2' and that it was fixed.",
+      "actual": "Reverse, T2-reversed turn-in is at reverse-station 1013.49 m. Braking 136.4 -> 66.2 km/h at 1.523 g effective (uphill) needs 36.7 m, so the zone opens at 976.79 m. The 2.30% vertical curve at reverse-station 971.51 m ends at 985.69 m. OVERLAP 8.92 m, on a curve built at exactly the minimum radius. Not fixed - reduced from 11.4 m to 8.9 m.",
+      "severity": "major",
+      "fix": "Same fix as above, plus more distance between the last gradient break and T2. The author's own outside_scope note already proves increasing R makes this worse, not better, so the only remedy is plan length."
+    },
+    {
+      "rule": "Forward: La Conca cannot hold the compression's vertical curve AND T3's braking zone. The author's braking arithmetic is wrong by 2.3x and their stated margin has the wrong sign.",
+      "required": "Author's risks[1]: 'La Conca is 41.98 m and has to hold 36.7 m of the compression's vertical curve plus 3.8 m of braking for T3. That is 1.5 m of margin.'",
+      "actual": "Braking 138 -> 125 km/h at 1.53 g is d = (38.333^2 - 34.722^2) / (2*1.53*9.80665) = 8.79 m, not 3.8 m. The compression's curve (V=135.4, K=20, R=916.66, L=73.33) ends at d=519.09; T3 turn-in is at d=524.396, a gap of 5.315 m. The braking zone opens at 515.60. OVERLAP 3.48 m. Real margin -3.48 m, not +1.5 m. My independent grid solver gives 8.4 m of braking and 2.92 m of overlap - same sign, same order.",
+      "severity": "major",
+      "fix": "The author's own alternative is already written down: open T3 from 62 m to 70 m, which removes the braking entirely. It costs ~30 m of lap (1341 -> 1371, still legal) and makes T3 flat. Otherwise lengthen La Conca by 4 m and take it out of the face."
+    },
+    {
+      "rule": "Art 7.2: R 'must be adequately increased along approach, release, braking and curved sections. Wherever possible, changes in gradient should be avoided altogether in these sections.' Every vertical curve here is at exactly the minimum, by explicit policy, and five of six sit in a section the article names.",
+      "required": "Increased R (unquantified) in approach / release / braking / curved sections; gradient changes avoided there where possible.",
+      "actual": "All six curves are at exactly R = V^2/K (recomputed vertical accelerations 0.1180 g convex, 0.1574 g concave - the legal maxima, to 4 decimal places). Placement: d=482.42 (concave, min R) overlaps T3's braking zone by 3.48 m. d=961.13 (convex, min R) puts 2.73 m of curve inside T5's 79.4 m arc. d=1251.70 (convex, min R) sits ENTIRELY inside T7's arc - 9.02 m in each half. Reverse: d=235.57 (concave, min R) is deliberately placed inside the T6-reversed braking zone and sold as the reverse lap's best passing place. Reverse d=971.51 (convex, min R) is 8.92 m inside the T2-reversed braking zone. The .md states the policy outright: 'Both compressions on this circuit are built at the minimum radius... There was no reason not to.' There is a reason: this article.",
+      "severity": "major",
+      "fix": "Pick a documented increase factor for curves in the named sections (highway practice is 1.5-2x) and re-site. T7's crest-at-the-apex is the one worth defending explicitly rather than fixing - but it must be argued as a 'special circumstance', not presented as compliant."
+    },
+    {
+      "rule": "Five of seven corners exceed the measured 1.86 g ceiling on their CENTERLINE radius at the claimed apex speed. The layout is entirely dependent on a design-line convention the author himself calls the largest uncertainty in the document.",
+      "required": "ARCHITECTURE 11 / ADR-0046 validation: 'no radius the kart cannot take.' track.json stores the centerline radius.",
+      "actual": "v^2/r on the centerline at the claimed apex/exit speed: T1 55 m @119 = 2.026 g; T3 62 m @125 = 1.983 g; T5 65 m @128 = 1.983 g; T4 26 m @80 = 1.937 g; T6 34 m @91 = 1.916 g. All above 1.86 g. On the author's design line R+(W-1.40)/2 they become 1.848 / 1.854 / 1.860 / 1.559 / 1.701 g - i.e. the three fast corners land at 99.4%, 99.7% and 100.0% of the measured ceiling. That is not margin, that is solving backwards to the limit. Also: the lock sweep's largest measured row is 58.49 m at 1.84 g; the 1.86 g figure comes from a different measurement, and T1 (60.3 m), T3 (66.3 m) and T5 (69.3 m) are all EXTRAPOLATIONS past the largest radius the sweep contains.",
+      "severity": "major",
+      "fix": "Take 3-4 km/h out of T1/T3/T5 or add 4-6 m of centerline radius to each. A design where the three fast corners are simultaneously at 100% of a single measured number will fail the first time drive.sh re-measures that number."
+    },
+    {
+      "rule": "Art 7.4: the deceleration lane and the exit lane must not cross the racing line. The justification given is direction-specific and fails in reverse, which ADR-0046 and GAMEDESIGN 10 make a first-class layout.",
+      "required": "Non-crossing in both authored directions, or a second pit complex.",
+      "actual": "start_area.notes argues both junctions are on the RIGHT and safe because 'a kart exiting T7, a right-hander, tracks out to the LEFT, and a kart entering T1, also a right-hander, turns in from the LEFT.' Reversed, T7 and T1 are both LEFT-handers: a kart exiting T1-reversed tracks out to the RIGHT, straight across the exit-lane junction at 62.0 m, and a kart approaching T7-reversed turns in from the RIGHT, straight across the deceleration-lane junction at 1273.8 m. Both junctions sit on the reverse racing line. The document checks run-off, kerbs and sector marks in reverse and never checks the pit lane.",
+      "severity": "major",
+      "fix": "Move both junctions to the left, or accept that the reverse layout needs its own pit complex - which the author already concedes for T7's mandatory axial run-off, so the cost is already on the books."
+    },
+    {
+      "rule": "Forward: the two Il Salto crests are effectively one crest. The stated clearance is an 18x overstatement.",
+      "required": "vertical_curves[1].note: 'Half-length 21.6 m against 30.98 m of lead-in band before it.' what_breaks: the fix was 'a 2.30% band and a 5.00% band with a 31 m lead-in between them.'",
+      "actual": "The first curve consumes 7.67 m of that 30.98 m band. True constant-grade road between the two curves is 1.729 m (2.07 m by my grid solver's slightly lower speeds). There is no 31 m lead-in; there is a 1.7 m flat spot between two convex curves. The 58.7 m / 1.86 s sight-distance figure is computed from a single isolated 43.17 m parabola and does not describe this profile.",
+      "severity": "minor",
+      "fix": "State the real number. It is also the direct cause of the reverse overlap above."
+    },
+    {
+      "rule": "T3's run-off is not proportional to its approach speed - author's own admission, quantified here.",
+      "required": "ARCHITECTURE 11 'run-off proportional to approach speed'; art 7.5 numeric simulation.",
+      "actual": "Straight-on from the 125 km/h apex: 10 m apron at 0.45 g sheds 88 m2/s2, 35 m of gravel at 0.75 g sheds 515, leaving v = 24.5 m/s = 88 km/h at the barrier. The author states 82 m of gravel is needed and 35 is provided, then argues the departure angle is shallow. That argument is not made numerically anywhere.",
+      "severity": "minor",
+      "fix": "Either widen the gravel on the pan (there is room - the pan is 300x250 m and this is the stated reason T3 is out there) or produce the departure-angle arithmetic."
+    },
+    {
+      "rule": "Verges are never specified. Art 7.5 requires 1.80 m of even, non-negative-slope verge on both sides for the whole length.",
+      "required": "min 1.80 m both sides, whole length, grass or compacted over >= 1 m.",
+      "actual": "No verge width appears in any segment record or in the corner run-off notes, which start at 6-10 m of 'apron'. The unaddressed case is La Rampa: 9 m wide - the narrowest road on the circuit - on made ground climbing 11.42 m, with no verge, no embankment spec and no edge protection given. It is also the run-up to the circuit's second overtaking spot.",
+      "severity": "minor",
+      "fix": "Add verge width per segment and say what holds up the ramp embankment."
+    },
+    {
+      "rule": "Regulation boundaries taken exactly, with zero tolerance.",
+      "required": "First corner >= 45 deg and 8-12 m wide; longest straight <= 200 m; last corner to line >= 70 m.",
+      "actual": "T1 is exactly 45.0 deg and exactly 12.0 m - simultaneously on the floor of one clause and the ceiling of another. Longest straight 196.92 m plan / 197.197 m measured the way art 11 measures official length (plan + profile), so 2.80 m of margin, not 3.08. Last corner to line 75.13 m, 5.13 m of margin.",
+      "severity": "minor",
+      "fix": "Give T1 47-48 deg and 11.5 m. Nothing here is a violation yet; all three are one smoothing pass from becoming one."
+    }
+  ],
+
+  "corner_checks": [
+    { "name": "T1", "radius_m": 55.0, "angle_deg": 45.0, "width_m": 12.0, "claimed_apex_kmh": 119,
+      "centerline_g": 2.026, "design_line_radius_m": 60.30, "design_line_g": 1.848,
+      "sweep_speed_at_line_radius_kmh": 119.4, "sweep_verdict": "EXTRAPOLATED - 60.3 m is beyond the sweep's largest row (58.49 m)",
+      "braking_recomputed_m": 9.07, "braking_claimed_m": null, "straight_before_m": 188.265,
+      "verdict": "consistent on the design-line convention only; over 1.86 g on the centerline; author's 'well under a fifth of lock' contradicts the sweep, which needs 0.25 lock for 58.49 m" },
+    { "name": "T2", "radius_m": 22.0, "angle_deg": 45.0, "width_m": 11.0, "claimed_apex_kmh": 67,
+      "centerline_g": 1.605, "design_line_radius_m": 26.80, "design_line_g": 1.318,
+      "sweep_g": 1.286, "sweep_speed_kmh": 66.2,
+      "braking_recomputed_m": 36.72, "braking_claimed_m": 37, "straight_before_m": 153.87,
+      "verdict": "clean. Speed derived correctly from the sweep, braking correct to 0.3 m" },
+    { "name": "T3", "radius_m": 62.0, "angle_deg": 90.0, "width_m": 10.0, "claimed_apex_kmh": 125,
+      "centerline_g": 1.983, "design_line_radius_m": 66.30, "design_line_g": 1.854,
+      "sweep_verdict": "EXTRAPOLATED past 58.49 m",
+      "braking_recomputed_m": 8.79, "braking_claimed_m": 3.8, "straight_before_m": 41.98,
+      "verdict": "BRAKING DISTANCE WRONG BY 2.3x. Zone overlaps the compression's vertical curve by 3.48 m. Also over 1.86 g on the centerline. Mandatory axial run-off correctly identified (90 deg) and correctly admitted to be under-sized" },
+    { "name": "T4", "radius_m": 26.0, "angle_deg": 85.0, "width_m": 14.0, "claimed_apex_kmh": 80,
+      "centerline_g": 1.937, "design_line_radius_m": 32.30, "design_line_g": 1.559,
+      "sweep_g": 1.572, "sweep_speed_kmh": 80.4,
+      "braking_recomputed_m": 32.51, "braking_claimed_m": 33, "straight_before_m": 157.48,
+      "verdict": "clean on the design line and the best-argued corner in the document. The 14 m -> 32.3 m -> 1.59 g chain checks exactly. Over 1.86 g on the centerline. 85 deg > 80 so axial run-off mandatory - correctly identified and provided" },
+    { "name": "T5", "radius_m": 65.0, "angle_deg": -70.0, "width_m": 10.0, "claimed_exit_kmh": 128,
+      "centerline_g": 1.983, "design_line_radius_m": 69.30, "design_line_g": 1.860,
+      "sweep_verdict": "EXTRAPOLATED past 58.49 m",
+      "braking_recomputed_m": 0.0, "straight_before_m": 63.88,
+      "verdict": "exactly 100.0% of the measured 1.86 g ceiling at the exit, with zero margin, on an extrapolated line radius. Rollover margin 1.31x checks (1.860/2.43 = 0.765). 70 deg < 80 so no mandatory axial run-off - correct. A 2.73 m tail of a vertical curve sits inside the arc, unremarked" },
+    { "name": "T6", "radius_m": 34.0, "angle_deg": 75.0, "width_m": 10.0, "claimed_apex_kmh": 91,
+      "centerline_g": 1.916, "design_line_radius_m": 38.30, "design_line_g": 1.701,
+      "sweep_g": 1.661, "sweep_speed_kmh": 89.7,
+      "braking_recomputed_m": 22.16, "straight_before_m": 37.59,
+      "verdict": "consistent within 1.5 km/h. Over 1.86 g on the centerline. Run-off exit-speed claim wrong: 67.4 km/h at the barrier, not 'about 55'" },
+    { "name": "T7", "radius_m": 18.0, "angle_deg": 90.0, "width_m": 11.0, "claimed_apex_kmh": 56,
+      "centerline_g": 1.371, "design_line_radius_m": 22.80, "design_line_g": 1.082,
+      "sweep_g": 1.078, "sweep_speed_kmh": 55.9,
+      "braking_recomputed_m": 37.29, "braking_claimed_m": 33, "straight_before_m": 194.34,
+      "verdict": "geometry and sweep agree to 0.1 km/h and 0.004 g. Two internal contradictions: the document says 'turning at about 0.97 g' in two places and '1.06 g' in a third; measured 1.082. Braking uphill at 1.61 g gives 33.6 m (author 33, fine) but the correct effective figure is 1.53 + 0.078 = 1.608 g only on the ramp grade - the last 0 m before turn-in is still ramp, so 33.6 m stands. 90 deg combined -> axial run-off mandatory, correctly identified. The entire 18.05 m vertical curve sits inside the arc: a deliberate, argued art 7.2 exception, not a compliant placement" }
+  ],
+
+  "author_discrepancies": [
+    "REVERSE LEGALITY, the headline claim: 'All six vertical curves pass in reverse as well as forwards' and 'Both directions now pass' are FALSE. The two Il Salto curves overlap by 13.21 m in reverse. The author computed R=1201 m / L=60 m for the 5.00% break backwards (I get 1200.5 / 60.03, agreement to 0.5 m) and then never ran the 2.30% break backwards at all.",
+    "REVERSE T2 BRAKING: the defect the author says was fixed ('11.4 m inside the reverse braking zone') is still present at 8.92 m.",
+    "T3 BRAKING DISTANCE: claimed 3.8 m, actual 8.79 m at their own 138->125 km/h and 1.53 g. Consequence: risks[1]'s '1.5 m of margin' at La Conca is actually -3.48 m of overlap. This is the author's self-declared tightest constraint in the design and the arithmetic under it is wrong.",
+    "IL SALTO LEAD-IN: 'a 31 m lead-in between them' and 'Half-length 21.6 m against 30.98 m of lead-in band before it'. The first curve eats 7.67 m of that band; true clearance between the two curves is 1.729 m.",
+    "MIN SEPARATION: reported 33.93 m, measured 33.764 m at 0.05 m sampling (33.755 m at 0.25 m). Location matches (1231.66 vs 1271.69). Clear ground 24.26 m, not 24.4.",
+    "MIN-SEPARATION ELEVATION: 'Both are within 1 m of each other in elevation there.' Computed from their own profile: -0.939 m on the ramp against +0.485 m on Il Banco Sud = 1.42 m.",
+    "SECTOR 1 MARK: 'sits 21 m before the compression's vertical curve begins'. The curve begins at 445.75 m; the mark at 461.0 m is 15.25 m INSIDE it. 21.4 m is the distance to the break POINT, not to where the curve starts.",
+    "SECTOR 2 MARK: 'clear of T5's exit by 20 m'. T5 exits at 961.129 m and the mark is at 975.0 m: 13.87 m. Their own '14 m into La Sponda' in the same sentence is correct and contradicts the 20 m.",
+    "REVERSE SECTOR JUSTIFICATION: 'forward's 975 m mark mirrors to 366 m, which is 24 m inside T5-reversed'. T5-reversed spans reverse-stations 379.84-459.25 m. 365.97 m is 13.87 m BEFORE its turn-in, on a straight. The stated reason for authoring separate reverse splits is wrong.",
+    "T6 RUN-OFF: 'reaches the barrier at about 55 km/h'. From 91 km/h through 6 m of apron at 0.45 g and 16 m of gravel at 0.75 g the kart arrives at 67.4 km/h. Their own T2/T4/T5/T7 run-off arithmetic checks to within 2 km/h, so this one is an isolated slip.",
+    "REVERSE T2 BRAKING DISTANCE: '29 m of uphill braking at 1.54 g effective'. From their own 134 km/h crest speed to 67 km/h at 1.537 g that is 34.4 m. 29 m corresponds to an entry of 126 km/h.",
+    "REVERSE T6 BRAKING DISTANCE: 'the zone stretches to 33 m' at 1.45 g. From 132 to 91 km/h at 1.452 g that is 24.8 m.",
+    "T7 LATERAL G: 'turning at 0.97 g' (corners[T7].provokes and terrain.md section 4) against 'about 1.06 g' (cliff_note). Measured on their own design line: 1.082 g. Three different numbers for one corner.",
+    "terrain.md SECTION 4: 'You are on the bench, in sixth, doing about 133 km/h at the line.' Their own speed model - which I reproduced independently to within 2 km/h at nine other checkpoints - gives 110.5 km/h at the line. 133 km/h is the T1 turn-in speed, 113 m later. terrain.json has it right; the prose does not.",
+    "STEERING LOCK: T1 and T3 are described as 'well under a fifth of lock'. The sweep's largest measured row is 58.49 m at a QUARTER of lock; 60.3 m and 66.3 m are extrapolations off the end of it and there is no data point below 0.25 lock anywhere in the sweep.",
+    "LENGTH DEFINITION: all lengths are plan lengths. Art 11 defines the official length as plan and profile combined. Measured that way the lap is 1341.703 m, Il Salto is 197.197 m (2.80 m of margin to the 200 m cap, not 3.08) and La Rampa's run is 194.743 m. Nothing breaks; the receipt is measuring a different quantity than the regulation.",
+    "GRAVEL BED SPEC: 'a 22 m gravel bed at the art 8.2 minimum 2 m width and 300 mm depth' (T2). 22 m and '2 m width' are the same dimension in the article's sense. Repeated at T4 (28 m), T5 (22 m), T6 (16 m), T7 (22 m). The transverse extent of every gravel bed on the circuit is therefore unstated.",
+    "EXACT MATCHES, for the record: total length 1340.97 (1340.9695), closure 0.017 (0.016952), heading 360.000, longest straight 196.92, elevation closure -0.000037, elevation range 11.42 (11.4202), bbox 399.4 x 360.4 (399.40 x 360.39), start-to-first-corner 113.13, last-corner-to-line 75.13, starting straight 188.26, all seven merged straight runs, all six vertical-curve radii and transition lengths to within 0.6 m, the 0.157 g / 0.118 g cap, the 1.790 s sight-time floor, the 1.86 s and 1.97 s crest times, and every run-off stopping figure except T6. The plan geometry and the vertical-curve arithmetic in isolation are sound. What fails is where those curves were put, and the reverse direction."
+  ],
+
+  "notes": [
+    "Verdict rationale: nothing on the brief's fatal list is blown. The lap closes to 17 mm, is 1340.97 m, no straight exceeds 200 m, minimum separation is 33.76 m against a 14 m requirement, elevation closes to 3.7e-5 m, every width is >= 9 m, every camber is 2.0-2.5% and every banking 4-7%. There is no adverse camber. It is a legal plan and a legal transverse section. It is not a legal longitudinal profile in reverse, and its two tightest longitudinal constraints forward both fail on arithmetic the author got wrong.",
+    "The speed model is the strongest part of the submission and I want that on the record because it makes the failures harder to excuse. Fitting a = a0*(1-(v/vmax)^2) to the repo's own 143.9 km/h and 4.50 s reproduces the author's claimed speeds at Il Salto's crest (113.5 vs 113.8), the bottom of the face (135.3 vs 135.4), the end of La Conca (138.3 vs 138), T4's entry (139.9 vs 138), T5's entry (113.7 vs 113), the ramp foot (117.9 vs 118.1) and the ramp top (131.5 vs 130). They did the work. They then did not run it in reverse on the one curve that mattered.",
+    "The design-line convention R + (W - 1.40)/2 is doing more load-bearing work than any other assumption in the document, and the author says so himself in risks[4]. Every corner speed, every vertical-curve radius (which depends on the speed) and the entire #137 argument sits on it. Five of seven corners are illegal against 1.86 g on the centerline and legal against it on the design line, and three of those land between 99.4% and 100.0% of the ceiling. If drive.sh re-measures 1.80 g instead of 1.86, T1, T3 and T5 all need re-cutting and four of the six vertical curves need re-radiusing behind them.",
+    "The T7 vertical curve inside the corner arc is the one placement I would defend. The reasoning is explicit, the arithmetic is right (211.7 m radius, 18.05 m curve inside two 14.14 m halves, 0.118 g of unloading), and it is the only place on the circuit where an 8.51% break fits at all. But it must be presented as an art 7.2 exception under 'special circumstances', not as compliance - the article says R must be increased in curved sections and this one is at the bare minimum in the tightest corner on the lap.",
+    "Il Salto is 196.92 m of dead-straight road containing 132.28 m of vertical curve. The '200 m longest straight' rule and the vertical-radius rule are in direct competition here and the author solved it by stacking three grade changes into one straight with 1.7 m and 23.7 m of clearance between them. That is the structural weakness, and it is what makes the reverse direction fail: run the same road 20 km/h faster and there is nowhere for the curves to go.",
+    "Elevation-range claim checks: 11.4202 m, min -10.795 at the ramp foot (d=1105.40), max +0.625 at T7a's exit (d=1251.70). The argument that the range is capped by the return ramp is correct - 146.31 m of climbing road at 7.8056% is 11.4202 m exactly, and the ramp plus its foot is 194.34 m against the 200 m cap.",
+    "Capacity, grid, lights and pit geometry all check numerically forward: L/28 = 47.9 capped to 36; grid rows 1326.0-1338.0 m inside the 75.13 m straight; lights 12.0 m ahead of row 1 (in 10-15) at 3.0 m (in 2.5-3.5) and 9.03 m past the line; deceleration lane 7.96 m after T7b's exit at 20 deg and 3.5 m wide (both inside art 7.2/7.4); exit lane 51.13 m before T1. The grid pitch and offset are flagged by the author as invented and that flag is correct - Appendix 9/10/15 are not in REFERENCES.md.",
+    "Sector splits sum correctly (14.67 + 15.69 + 13.65 = 44.01) and are monotonic, and the reverse splits are genuinely non-mirrored. Only the three justifying sentences are wrong.",
+    "The lap-time estimate is honest. My own forward/backward pass over a 0.25 m grid with the same sweep caps gives 44.23 s forward and 44.10 s reverse against their 44.01 and 43.90 - a 0.5% difference, same sign on the forward/reverse gap. Their 'expect 47-49 s driven' hedge is the right hedge.",
+    "Nothing in this file was edited. All measurements come from /private/tmp/.../scratchpad/verify/vt.py, vt2.py and vt3.py."
+  ],
+
+  "brief_concerns": [
+    "The brief's vertical-radius table repeats REFERENCES.md's one wrong cell and adds one of its own. 21.2^2/20 = 22.47 -> 22 m, printed as 23 m in both. 81.3^2/20 = 330.48 -> 330 m, printed as 331 m in the brief where REFERENCES.md correctly has 330. Every other cell checks. The author caught both; I confirm both.",
+    "The self-intersection test '>= 14 m between centerlines' is derived from 6 m of clear ground plus two half-widths of 8 m. It is only correct for an 8 m track. This proposal has a 14 m corner and a 12 m corner: the correct requirement at T4 against a 10 m neighbour is 6 + 7 + 5 = 18 m, not 14. Not binding here (33.76 m measured) but the rule as written will pass an illegal wide-corner layout in some future proposal. Make the check width-aware.",
+    "The brief never says whether segment length_m is a plan length or a slope length. The walk it mandates is a 2D plan walk, so length_m must be plan - but art 11 defines the official circuit length as plan and profile combined, and the 200 m longest-straight cap is presumably against that. On this proposal the difference is +0.73 m on the lap and +0.28 m on the longest straight; on a design with 12% grades it would matter. State the convention.",
+    "The 1.86 g figure and the lock sweep are two different measurements and the brief presents them as one vocabulary. The sweep's best row is 1.84 g at 58.49 m; 1.86 g comes from drive.sh's 'best sustained lateral'. Any corner with a line radius above 58.49 m - which is three of the seven here - is designed by extrapolating off the end of the sweep onto a number the sweep never reaches. The brief's own warning ('the sweep overrides the table at small radii') is the wrong way round for this class of design: the gap that bit this proposal is at LARGE radii, where there is no data at all.",
+    "The mandated walk() applies the heading increment before the position increment inside a corner (h += A/n, then x += ...). That is a phase-shifted inscribed polyline, not a chord-accurate arc: each corner is integrated with a half-step of lead. At 0.25 m on an 18 m radius the error is ~1e-4 m and irrelevant, but it means the 'closure error < 1.0 m' gate is partly measuring the integrator rather than the design, and two designs with identical true geometry and different segment counts will report different closure errors. Cheap fix: advance the heading by A/(2n) before and after the position step.",
+    "The brief lists 'run-off MANDATORY on the axis of any direction change over 80 deg' and gives no guidance on compound corners. T7 here is authored as two 45 deg segments; neither individually crosses 80 deg but the pair does. This proposal handled it correctly, but a validator written against the segment list would not, and ADR-0046's validation pass will have the same hole. Worth saying explicitly: the threshold is against the corner, not the segment.",
+    "The brief requires the reverse layout to be described and its overtaking spots named, but does not require the reverse direction to be VERIFIED numerically - the Part 4 checklist is forward-only. This proposal's single largest defect is a reverse-direction vertical-curve overlap, and it only surfaced because I ran the checklist backwards on my own initiative. If the other three proposals were checked forward-only, the comparison is not apples to apples. Put 'run every Part 4 check in both directions' in the brief.",
+    "Art 7.4's 'must not cross the racing line' is not in the brief's Part 1 list at all (only the 3-4 m width and the 30 deg angle are). It is in REFERENCES.md. It is also direction-dependent, which is how this proposal's pit lane passed its own review and fails mine.",
+    "The brief's corner-speed table at the 1.86 g ceiling is consistently 0.1 km/h low (r=40 gives 97.3 not 97.2, r=55 gives 114.1 not 114.0, r=80 gives 137.6 not 137.5, r=120 gives 168.5 not 168.4) - truncated rather than rounded. Cosmetic, but it is a table designers will subtract from.",
+    "Braking distances in Part 2 all check exactly at 1.53 g: 44.0, 49.1, 30.6, 23.4, 19.8 m. No issues there."
+  ]
+}

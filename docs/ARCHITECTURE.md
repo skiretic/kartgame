@@ -357,8 +357,15 @@ The first track is fictional, so plausibility has to be enforced deliberately ra
 - 1,000–1,500 m lap length (typical for a KZ circuit)
 - Minimum corner radius sane against the speed the physics actually reaches in that gear
 - Run-off proportional to approach speed
-- At least two genuine overtaking spots — a long straight into a heavy braking zone
-- Elevation change, both for looks and because it loads the tires
+- At least two genuine overtaking spots — a long straight into a heavy braking zone.
+  **"Heavy" is not available**: at the measured 1.53 g, 143.9 km/h to 40 km/h is
+  49 m, so a kart braking zone is 20–50 m and a passing place is made of a tow, an
+  entry wide enough for two lines, and an exit that punishes the defender
+- Elevation change, for looks and for visibility. **Not for load** — that clause
+  read "because it loads the tires" and the regulation's own vertical-radius rule
+  forbids it: substituting `R = V²/K` into `v²/R` gives `a = K/12.96`, which is
+  0.157 g in a compression and 0.118 g over a crest **at any speed**. See
+  `REFERENCES.md`
 - Validation pass: closed loop, no self-intersection, no radius the kart physically cannot take
 
 **Most of that list is now a regulation rather than taste**, and the figures are in

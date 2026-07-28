@@ -1,0 +1,406 @@
+{
+ "lens": "Rhythm and lap architecture",
+ "verdict": "major issues",
+ "measured": {
+  "total_length_m": 1367.2232,
+  "exact_arc_sum_m": 1367.2232,
+  "closure_error_m": 0.000478,
+  "closure_end_xy_m": [
+   -0.000199,
+   0.000435
+  ],
+  "final_heading_deg": -360.0,
+  "longest_straight_m": 186.684,
+  "longest_straight_where": "segments 7+8+9, Climb lower+middle+upper, d=581.769 to 768.453",
+  "next_longest_straights_m": [
+   164.649,
+   156.662,
+   127.121,
+   87.499,
+   77.15
+  ],
+  "min_separation_centerline_m": 30.9236,
+  "min_separation_where": "d=541.20 (T3 turn-in tangent) and d=581.27 (T3 exit tangent), 40.07 m apart along the lap",
+  "min_separation_edge_to_edge_m": 18.9236,
+  "min_separation_along_gt_60m_m": 37.7642,
+  "start_to_first_corner_m": 87.499,
+  "last_corner_to_start_m": 77.15,
+  "starting_straight_total_m": 164.649,
+  "first_corner_direction_change_deg": 100.0,
+  "first_corner_width_m": 12.0,
+  "elevation_closure_m": -5.98e-06,
+  "elevation_range_m": 7.3929,
+  "elevation_high_m": 1.4597,
+  "elevation_high_at_m": 243.29,
+  "elevation_low_m": -5.9332,
+  "elevation_low_at_m": 628.94,
+  "min_width_m": 9.0,
+  "max_width_m": 12.0,
+  "camber_on_straights_pct": [
+   2.0
+  ],
+  "banking_in_corners_pct": [
+   3.0,
+   4.0,
+   5.0,
+   6.0,
+   7.0,
+   8.0,
+   9.0
+  ],
+  "start_straight_grade_pct": 0.6,
+  "bounding_box_m": [
+   418.5,
+   344.3
+  ],
+  "sector_time_sum_s": 46.495,
+  "author_lap_time_s": 47.081,
+  "independent_quasi_static_lap_time_s": 43.396,
+  "corners_exceeding_1_86g_on_centerline_at_claimed_apex": [
+   "T1 1.988",
+   "T4 2.623",
+   "T5 2.223",
+   "T7 2.030",
+   "T8a 1.965"
+  ],
+  "corners_exceeding_1_86g_on_centerline_at_claimed_exit": [
+   "T1 2.021",
+   "T4 2.782",
+   "T5 2.223",
+   "T7 2.030",
+   "T8b 1.952"
+  ]
+ },
+ "violations": [
+  {
+   "rule": "CIK-FIA vertical radius, reverse layout (R = V^2/K, K=15 convex / K=20 concave)",
+   "required": "Each vertical curve must satisfy R >= V^2/K in BOTH directions, with K set by the curve's own shape, and 'adequately increased' in braking sections",
+   "actual": "reverse.character claims 'Every one of the six vertical curves swaps profile when the direction reverses - a crest becomes a valley', and computes the reverse minima 847.4 / 627.8 / 728.5 / 767.7 / 317.6 / 627.5 m by swapping K=15 and K=20. That is geometrically false: vertical curvature d2z/ds2 is invariant under s -> L-s, so a crest is a crest driven either way and K does not change. Under the correct test (same K, reverse speed) VC2 at d=628.940 is concave with R=900 m; reversed it sits inside the author's own 41.5 m uphill braking zone at their own stated ~138 km/h, requiring 138^2/20 = 952.2 m. 900 < 952. VC5 (convex, R=650 m) falls to 1.06x at ~96 km/h reversed. 'Checked, all six pass' is not true.",
+   "severity": "major",
+   "fix": "Re-derive the reverse requirement with the same K per curve and the reverse speed profile. VC2 needs R >= ~1000 m (or the reverse braking point moved clear of it); VC5 wants more than 650 m. Do not swap K."
+  },
+  {
+   "rule": "Reported number must be the one that was computed - corner lock ceiling (#137 quarter-lock boundary)",
+   "required": "T4 esse-constrained line r=42.5 m: quarter-lock ceiling by the same interpolation used for every other corner",
+   "actual": "corners[T4].cliff_note reports 'the ceiling drops to 100.0 km/h - exactly the design speed, no margin'. 100.23 km/h is the GRIP ceiling at r=42.5 m. The lock ceiling is 94.88 km/h. I reproduced 12 of the 13 lock ceilings quoted in the document to within 0.1 km/h from the drive_probe.gd 0.25-lock rows (18.99/46.0, 32.64/81.3, 58.49/116.9) by linear interpolation and extrapolation - T1 148.41 vs 148.4, T3 67.49 vs 67.5 and 53.50 vs 53.5, T5 100.53 vs 100.3, T6b 86.20 vs 86.2 and 53.80 vs 53.8, T7 109.48 vs 109.4, T8b 138.54 vs 138.6 and 118.98 vs 119.0, T2 292.5 vs 292.6. T4's esse figure is the single exception and it is the one that carries a conclusion.",
+   "severity": "major",
+   "fix": "T4's esse line is 5.1 km/h PAST #137's boundary at the 100 km/h design speed, not on it. Either relabel cliff_relation from 'on the boundary' to 'over the boundary', or drop the T4 design speed to ~94 km/h, or open T4's radius / widen the link so the esse line exceeds 46.2 m."
+  },
+  {
+   "rule": "Stated distances must be measurable from the geometry",
+   "required": "corners[T5].runoff: 'The inside of this corner is 18.4 m from Link T7-T8 at the closest, so the run-off on the inside axis is shared ground and gets a barrier rather than depth.'",
+   "actual": "Measured minimum centerline distance from segment 13 (T5) to segments 20-21 (Link T7-T8) is 152.645 m. The closest approach between anything in the T4-T5 esse and anything in the T7-T8 area is 71.53 m (Link T5-T6 to T7). The 18.4 m figure also contradicts the author's own measured.min_separation_m of 30.924 m, which they correctly locate at T3. The run-off restriction it justifies is invented.",
+   "severity": "major",
+   "fix": "Delete the shared-ground claim. T5's inside has 150+ m of clear land and can take a full-depth run-off; the barrier-instead-of-depth decision has no basis."
+  },
+  {
+   "rule": "Every corner speed must be checked against radius (ARCHITECTURE section 11 validation)",
+   "required": "The reverse layout's stated hardest corner - T8 reversed, a decreasing-radius 130 deg right at a 132 km/h turn-in - needs a grip and lock check",
+   "actual": "No radius/g arithmetic is given for it anywhere in rhythm.json or rhythm.md. Taken as one line through the 130 deg compound at 12 m width using the author's own formula (e=(12-1.4)/2, theta=130), the widest single arc is 58.06 m: 2.362 g at 132 km/h, grip ceiling 117.1 km/h, lock ceiling 116.3 km/h. Even crediting the entry arc alone (R=60, full-width line 95.05 m) the kart is at 1.44 g while still braking for the tightening arc. The 132 km/h turn-in looks 15+ km/h optimistic and is the one number the reverse layout rests on.",
+   "severity": "major",
+   "fix": "Run the compound-line construction for reversed T8 and publish it. If it lands near 117 km/h, the reverse layout's opening corner is slower than the forward T1 and the 'hardest corner on either layout' claim goes with it."
+  },
+  {
+   "rule": "Sector times must sum to the lap time",
+   "required": "15.049 + 16.048 + 15.398 = measured.estimated_lap_time_s",
+   "actual": "sum = 46.495 s against a claimed 47.081 s. 0.586 s / 1.24% unaccounted. Sector distances do sum correctly (538.000 + 415.000 + 414.222 = 1367.222) and each sector's stated average speed is consistent with its own stated time, so the error is between the sector pass and the lap pass.",
+   "severity": "minor",
+   "fix": "Re-run one pass and publish both from it. The sector split is an M5 deliverable and a 1.2% mismatch in the receipt is the kind of thing a reviewer checks first."
+  },
+  {
+   "rule": "Reported closure error must match the walk",
+   "required": "rhythm.json measured.closure_error_m",
+   "actual": "rhythm.json says 0.000208 m. The brief's walk at step=0.25 gives 0.000478 m (end x=-0.000199, y=+0.000435). rhythm.md's own receipt block (line 332) says 0.000478, so the two author files disagree and the JSON is the wrong one. Immaterial at 0.5 mm, but it is a reported measurement that is not the measurement.",
+   "severity": "minor",
+   "fix": "Copy the number out of the same run that produced the .md receipt."
+  },
+  {
+   "rule": "Gearbox figures must come from gearbox.h",
+   "required": "corners[T3]: 'first gear at the apex - 12,300 rpm on gearbox.h's tooth counts'",
+   "actual": "gearbox.h gives total_ratio(1) = (75/18)(33/13)(25/18) = 14.6902 and chassis.h REAR_WHEEL_RADIUS = 0.1475 m, so 52 km/h in 1st is 13,737 rpm, not 12,300. 12,300 rpm in 1st is 46.6 km/h. rhythm.md's own gear table (line 189) gives 1st as 34.1-53.0 km/h, which is correct and is inconsistent with the 12,300 figure on the same line. Every other gearbox number checks exactly: 85 km/h in 3rd = 13,270 rpm, 4th spans 70.5-109.6 km/h, 143.9 km/h = 13,865 rpm in 6th, 145.3 km/h at 14,000.",
+   "severity": "minor",
+   "fix": "The consequence matters more than the number: the hairpin apex sits at 98% of the 14,000 limiter and the 53 km/h exit is exactly on it, so 1st cannot be held through the corner as the text implies. Either say so or move the apex speed down."
+  },
+  {
+   "rule": "Uniqueness claim about sustained load duration",
+   "required": "concept: 'the only place on the lap with more than 2.5 s of continuous lateral load'; corners[T1]: 'no other corner on the lap holds load for more than 2.63 s'; rhythm.md line 73: 'the next longest is T8b at 2.63 s'",
+   "actual": "Arc durations at the author's own speeds: T1 2.985 s, T8b 3.373 s at its 95 km/h apex and 2.953 s at the arc mean, T6a+T6b 3.142 s, T3 2.791 s. The 2.63 s figure is T8b evaluated at its 122 km/h EXIT speed, the fastest point in the arc, which is the reading that minimises it. Three other corners exceed 2.5 s.",
+   "severity": "minor",
+   "fix": "Restate as g-seconds or as 'the longest arc at more than 1.3 g', which is true. As written it is false three times over."
+  },
+  {
+   "rule": "Distance from braking point to the corner that settles the move",
+   "required": "overtaking[T1].why_it_sticks: 'The pass is decided by T2, 355 m after the braking point'",
+   "actual": "T1's braking point is at d=75.6 (12.0 m zone into an 87.499 m straight); T2's turn-in is at d=343.645, i.e. 268.0 m later; T2's exit is at 414.331, 338.7 m later. Neither is 355 m. 355.6 m is the unrelated hypothetical-straight figure from the concept text, reused.",
+   "severity": "minor",
+   "fix": "Use 268 m. The argument survives it."
+  },
+  {
+   "rule": "Sector mark clearances",
+   "required": "sectors[2]: 'The mark is at d=953.0 in Link T5-T6, 20.5 m clear of T5's exit and 20.5 m clear of T6a's turn-in'",
+   "actual": "T5's exit tangent is at d=898.487, so the mark is 54.513 m clear of it, not 20.5. The T6a figure is right (973.523 - 953.0 = 20.52 m). The symmetry the sentence claims does not exist.",
+   "severity": "minor",
+   "fix": "54.5 m and 20.5 m."
+  },
+  {
+   "rule": "Length of the straight T2 exists to break",
+   "required": "concept and corners[T2]: 'Shelf + Shelf B without it is a 355.6 m straight'",
+   "actual": "Removing T2 and joining the tangents gives 156.662 + 68.87 (the 45 deg chord at R=90) + 127.121 = 352.65 m; simply deleting the arc gives 283.78 m. Neither is 355.6 m (which is 156.662 + 127.121 + 70.686, i.e. the arc counted as if it were straight).",
+   "severity": "minor",
+   "fix": "352.7 m. Still 76% over the 200 m cap, so the justification for T2 stands."
+  },
+  {
+   "rule": "Length of the descent to T3",
+   "required": "elevation.story: 'the descent to T3 is 297.9 m at -1.92%'",
+   "actual": "Crest at d=243.290 to T3's turn-in at d=541.452 is 298.162 m.",
+   "severity": "minor",
+   "fix": "298.2 m."
+  },
+  {
+   "rule": "Length of the level shelf",
+   "required": "elevation.story: 'The level shelf at the top (-2.12 m, 126.3 m of it including T4)'",
+   "actual": "Segments 9+10+11 at 0.00% grade sum to 63.171 + 47.124 + 16.235 = 126.530 m.",
+   "severity": "minor",
+   "fix": "126.5 m."
+  },
+  {
+   "rule": "Kart width allowance must be applied consistently",
+   "required": "corners[T5]: 'crossing the full 9.5 m of usable road in that distance at 104 km/h demands 3.07 g'",
+   "actual": "The 3.07 g arithmetic is correct for 9.5 m (a = 4y/t^2, t = 32.470/28.889 = 1.1239 s), but 9.5 m is the mean raw width of T4/link/T5 (10, 10, 9) with no kart-width deduction, while every line-radius figure in the document deducts 1.400 m. On the same basis the crossing is 7.6-8.6 m and the demand is 2.46-2.78 g.",
+   "severity": "minor",
+   "fix": "Use 8.1 m and 2.62 g. The conclusion (well above 1.86 g, so both corners are driven from mid-track) is unchanged."
+  },
+  {
+   "rule": "Line radii must be derivable from the published geometry",
+   "required": "corners[T8b]: 'Half-width line through T8b is 74.2 m'",
+   "actual": "The author's own formula at half width (e = (12 - 1.4)/4 = 2.65, theta = 85 deg) gives 77.52 m. Every other line radius in the document reproduces to 0.1 m, including T6b's 36.2 m half-width figure computed exactly this way. The dependent figures (132.5 grip, 138.6 lock, 1.58 g) are all self-consistent with 74.2, so it is used consistently - it just cannot be derived.",
+   "severity": "minor",
+   "fix": "State the extra constraint (presumably the T8a entry arc eating the width) or publish 77.5 m."
+  },
+  {
+   "rule": "Every corner gets a check",
+   "required": "corner_checks for all ten arcs",
+   "actual": "T8a (R=45 m, 45 deg, 12 m, claimed 106 km/h entry) and T6a (R=60 m, 35 deg, 9 m, claimed 101 km/h) get no radius/speed arithmetic at all. T8a carries 1.965 g on the centerline at its claimed entry speed - the second highest entry loading on the lap - and is rescued only by a full-width line radius of 179.0 m that the compound with T8b will not actually allow.",
+   "severity": "minor",
+   "fix": "Publish the compound line construction for T8a+T8b as one corner, forward and reversed."
+  }
+ ],
+ "corner_checks": [
+  {
+   "name": "T1 - Ronda",
+   "radius_centerline_m": 57.0,
+   "angle_deg": -100.0,
+   "width_m": 12.0,
+   "claimed_apex_kmh": 120,
+   "claimed_entry_kmh": 138,
+   "claimed_exit_kmh": 121,
+   "line_radius_full_width_m": 81.37,
+   "line_radius_half_width_m": 69.19,
+   "lateral_g_centerline_at_apex": 1.988,
+   "lateral_g_full_width_line": 1.392,
+   "lock_ceiling_full_width_kmh": 148.4,
+   "grip_ceiling_full_width_kmh": 138.7,
+   "lock_ceiling_centerline_kmh": 114.8,
+   "verdict": "PASS on the full-width line (1.39 g, +28.4 km/h of lock margin). Fails 1.988 g on the centerline. Author's 81.4 m line radius, 65.3 m defender radius, 1.39/1.73 g and the 0.665/0.367 friction-ellipse headroom all reproduce exactly."
+  },
+  {
+   "name": "T2 - Il Filo",
+   "radius_centerline_m": 90.0,
+   "angle_deg": 45.0,
+   "width_m": 9.0,
+   "claimed_apex_kmh": 136,
+   "claimed_entry_kmh": 140,
+   "claimed_exit_kmh": 137,
+   "line_radius_full_width_m": 186.04,
+   "line_radius_half_width_m": 138.02,
+   "lateral_g_centerline_at_apex": 1.617,
+   "lateral_g_full_width_line": 0.782,
+   "lock_ceiling_full_width_kmh": 292.6,
+   "grip_ceiling_full_width_kmh": 209.7,
+   "lock_ceiling_centerline_kmh": 160.3,
+   "verdict": "PASS everywhere. Line radius 186.0 m and 0.78 g reproduce. Honestly labelled as a regulation artefact."
+  },
+  {
+   "name": "T3 - Il Pozzo",
+   "radius_centerline_m": 16.5,
+   "angle_deg": -140.0,
+   "width_m": 12.0,
+   "claimed_apex_kmh": 52,
+   "claimed_entry_kmh": 141,
+   "claimed_exit_kmh": 53,
+   "line_radius_full_width_m": 27.31,
+   "line_radius_half_width_m": 21.9,
+   "lateral_g_centerline_at_apex": 1.289,
+   "lateral_g_full_width_line": 0.779,
+   "lock_ceiling_full_width_kmh": 67.5,
+   "grip_ceiling_full_width_kmh": 80.3,
+   "lock_ceiling_centerline_kmh": 39.6,
+   "verdict": "PASS on the line (+15.5 km/h lock margin), +1.5 km/h on the 21.9 m defensive line - the author states this and it is right. Braking recomputes to 44.95 m at -1.917% against the claimed 45.0. Exit at 53 km/h is exactly on the 14,000 rpm limiter in 1st, which the text does not say."
+  },
+  {
+   "name": "T4 - Rampa",
+   "radius_centerline_m": 30.0,
+   "angle_deg": -90.0,
+   "width_m": 10.0,
+   "claimed_apex_kmh": 100,
+   "claimed_entry_kmh": 121,
+   "claimed_exit_kmh": 103,
+   "line_radius_full_width_m": 55.06,
+   "line_radius_half_width_m": 42.53,
+   "lateral_g_centerline_at_apex": 2.623,
+   "lateral_g_full_width_line": 1.43,
+   "lock_ceiling_full_width_kmh": 112.2,
+   "grip_ceiling_full_width_kmh": 114.1,
+   "lock_ceiling_centerline_kmh": 74.5,
+   "verdict": "OVER THE BOUNDARY, not on it. Esse-constrained line 42.5 m: lock ceiling 94.88 km/h against a 100 km/h design speed, i.e. 5.1 km/h past #137. The author's quoted 100.0 is the grip ceiling at that radius. Centerline is 2.623 g at the apex and 2.782 g at the claimed exit - the worst on the lap. Braking 11.81 m reproduces."
+  },
+  {
+   "name": "T5 - Sella",
+   "radius_centerline_m": 34.0,
+   "angle_deg": 85.0,
+   "width_m": 9.0,
+   "claimed_apex_kmh": 98,
+   "claimed_entry_kmh": 108,
+   "claimed_exit_kmh": 98,
+   "line_radius_full_width_m": 59.13,
+   "line_radius_half_width_m": 46.56,
+   "lateral_g_centerline_at_apex": 2.223,
+   "lateral_g_full_width_line": 1.278,
+   "lock_ceiling_full_width_kmh": 117.8,
+   "grip_ceiling_full_width_kmh": 118.2,
+   "lock_ceiling_centerline_kmh": 83.2,
+   "verdict": "PASS. Esse line 46.56 m gives lock 100.53 (author 100.3) against 98 km/h - +2.5 km/h, thin and correctly described. Centerline 2.223 g. The 3.07 g lane-change figure is arithmetically right on a 9.5 m crossing but the width allowance is inconsistent with the rest of the document."
+  },
+  {
+   "name": "T6a - Vigna entry",
+   "radius_centerline_m": 60.0,
+   "angle_deg": -35.0,
+   "width_m": 9.0,
+   "claimed_apex_kmh": null,
+   "claimed_entry_kmh": 101,
+   "claimed_exit_kmh": null,
+   "line_radius_full_width_m": 220.41,
+   "line_radius_half_width_m": 140.2,
+   "lateral_g_centerline_at_apex": 1.338,
+   "lateral_g_full_width_line": 0.365,
+   "lock_ceiling_full_width_kmh": 339.9,
+   "grip_ceiling_full_width_kmh": 228.3,
+   "lock_ceiling_centerline_kmh": 119.0,
+   "verdict": "PASS but unchecked by the author. 1.338 g on the centerline at the claimed 101 km/h entry."
+  },
+  {
+   "name": "T6b - Vigna apex",
+   "radius_centerline_m": 22.0,
+   "angle_deg": -85.0,
+   "width_m": 10.0,
+   "claimed_apex_kmh": 64,
+   "claimed_entry_kmh": 101,
+   "claimed_exit_kmh": 65,
+   "line_radius_full_width_m": 50.43,
+   "line_radius_half_width_m": 36.22,
+   "lateral_g_centerline_at_apex": 1.465,
+   "lateral_g_full_width_line": 0.64,
+   "lock_ceiling_full_width_kmh": 105.8,
+   "grip_ceiling_full_width_kmh": 109.2,
+   "lock_ceiling_centerline_kmh": 53.8,
+   "verdict": "PASS on the half-width line (36.2 m, +22.2 km/h). 10.2 km/h over pinned inside at 22.0 m - the author's #137-detector claim reproduces exactly. Note that with no approach straight (T6a runs straight into it) a clamped line construction gives a much tighter usable radius than 36.2 m; the author's own outside_scope_concern #1 proposes exactly that clamp and then does not apply it to their own compound."
+  },
+  {
+   "name": "T7 - Chiave",
+   "radius_centerline_m": 28.0,
+   "angle_deg": 90.0,
+   "width_m": 10.0,
+   "claimed_apex_kmh": 85,
+   "claimed_entry_kmh": 90,
+   "claimed_exit_kmh": 85,
+   "line_radius_full_width_m": 53.06,
+   "line_radius_half_width_m": 40.53,
+   "lateral_g_centerline_at_apex": 2.03,
+   "lateral_g_full_width_line": 1.071,
+   "lock_ceiling_full_width_kmh": 109.4,
+   "grip_ceiling_full_width_kmh": 112.0,
+   "lock_ceiling_centerline_kmh": 69.3,
+   "verdict": "PASS on the line (+24.4 km/h). Centerline 2.030 g. Reaching the claimed 90 km/h entry from a 65 km/h T6b exit over 31.128 m of link needs 4.8 m/s2 of tractive acceleration (0.49 g) at 65-90 km/h, and the 'about 95 km/h' limit in the same paragraph needs 5.95 m/s2 (0.61 g). Nothing in the repo measures mid-range acceleration; the only sourced figure is the launch-limited 0-100 in 4.50 s. Unsubstantiated rather than wrong."
+  },
+  {
+   "name": "T8a - Uscita entry",
+   "radius_centerline_m": 45.0,
+   "angle_deg": -45.0,
+   "width_m": 12.0,
+   "claimed_apex_kmh": null,
+   "claimed_entry_kmh": 106,
+   "claimed_exit_kmh": null,
+   "line_radius_full_width_m": 178.95,
+   "line_radius_half_width_m": 111.98,
+   "lateral_g_centerline_at_apex": 1.965,
+   "lateral_g_full_width_line": 0.494,
+   "lock_ceiling_full_width_kmh": 282.8,
+   "grip_ceiling_full_width_kmh": 205.7,
+   "lock_ceiling_centerline_kmh": 98.3,
+   "verdict": "UNCHECKED by the author. 1.965 g on the centerline at the claimed 106 km/h entry. The isolated full-width line of 179.0 m is not available because T8b follows with no straight."
+  },
+  {
+   "name": "T8b - Uscita exit",
+   "radius_centerline_m": 60.0,
+   "angle_deg": -85.0,
+   "width_m": 12.0,
+   "claimed_apex_kmh": 95,
+   "claimed_entry_kmh": 106,
+   "claimed_exit_kmh": 122,
+   "line_radius_full_width_m": 95.05,
+   "line_radius_half_width_m": 77.52,
+   "lateral_g_centerline_at_apex": 1.184,
+   "lateral_g_full_width_line": 1.578,
+   "lock_ceiling_full_width_kmh": 167.2,
+   "grip_ceiling_full_width_kmh": 149.9,
+   "lock_ceiling_centerline_kmh": 119.0,
+   "verdict": "PASS forward (1.58 g at the 122 km/h exit on the author's 74.2 m line, +16.5 km/h of lock margin). Centerline at the 122 km/h exit is 1.952 g. REVERSED, as the lap's first corner at a claimed 132 km/h turn-in into a closing 60->45 m compound, it is never checked and my single-arc construction gives 58.06 m / 2.362 g / ceilings of 117 km/h."
+  }
+ ],
+ "author_discrepancies": [
+  "measured.closure_error_m = 0.000208 m in rhythm.json; the brief's walk gives 0.000478 m, which is what rhythm.md's own receipt block states. The JSON understates it 2.3x. (Both are far inside the 1.0 m gate.)",
+  "measured.total_length_m = 1367.222; exact arc sum and the 0.25 m walk both give 1367.2232. Rounding only.",
+  "measured.estimated_lap_time_s = 47.081 s; the three sector times published in sectors[] sum to 46.495 s. 0.586 s / 1.24% unreconciled.",
+  "corners[T1].provokes: 'no other corner on the lap holds load for more than 2.63 s'. Measured at the author's own speeds: T8b 3.373 s at its apex and 2.953 s at the arc mean, T6a+T6b 3.142 s, T3 2.791 s. 2.63 s is T8b evaluated at its fastest point.",
+  "concept: 'the only place on the lap with more than 2.5 s of continuous lateral load' - same error, three corners exceed 2.5 s.",
+  "corners[T4].cliff_note: esse line ceiling '100.0 km/h - exactly the design speed'. 100.23 is the grip ceiling; the lock ceiling at r=42.5 m is 94.88, so the design speed is 5.1 km/h over. Every other lock ceiling in the document reproduces to 0.1 km/h; this one does not.",
+  "corners[T5].runoff: 'The inside of this corner is 18.4 m from Link T7-T8 at the closest'. Measured 152.645 m. Off by a factor of 8.3, and it contradicts the author's own min_separation of 30.924 m.",
+  "corners[T3].provokes: '12,300 rpm on gearbox.h's tooth counts' at a 52 km/h apex in 1st. gearbox.h + chassis.h give 13,737 rpm. rhythm.md's own gear table on the same line (1st = 34.1-53.0 km/h) is right and contradicts it.",
+  "overtaking[T1].why_it_sticks: 'decided by T2, 355 m after the braking point'. Measured 268.0 m to T2's turn-in, 338.7 m to its exit.",
+  "sectors[2]: mark '20.5 m clear of T5's exit'. Measured 54.513 m. (The 20.5 m to T6a's turn-in is right.)",
+  "concept and corners[T2]: 'Shelf + Shelf B without it is a 355.6 m straight'. Joining the tangents gives 352.65 m; deleting the arc gives 283.78 m. 355.6 m is the arc length counted as if it were straight.",
+  "elevation.story: 'the descent to T3 is 297.9 m'. Measured 298.162 m.",
+  "elevation.story: 'the level shelf ... 126.3 m of it including T4'. Measured 126.530 m.",
+  "corners[T8b].cliff_note: 'Half-width line through T8b is 74.2 m'. The author's own formula gives 77.52 m at half width. Not derivable, though used consistently.",
+  "corners[T5].provokes: 'the full 9.5 m of usable road'. 9.5 m is the raw mean width with no kart-width deduction, inconsistent with the 1.400 m allowance used in every line-radius calculation in the same document.",
+  "reverse.character: 'Every one of the six vertical curves swaps profile when the direction reverses'. Vertical curvature is invariant under direction reversal; a crest is a crest either way. The six 'reverse minima' derived from swapping K are therefore all computed with the wrong constant, and 'Checked, all six pass' is unsupported. Under the correct test VC2 fails (900 m against 952 m needed at the author's own reverse speed).",
+  "reverse.character: reversed T8 'entered at 132 km/h ... the hardest corner on either layout' carries no radius, g or lock arithmetic anywhere in either file.",
+  "measured.min_separation_where says 'Checked at 0.5 m sampling over all 2,735 pairs of samples separated by more than 40 m of circular arc length'. At 0.5 m sampling a 1367 m lap has ~2,735 samples, and the number of pairs more than 40 m apart is ~3.6 million, not 2,735. The stated method describes counting samples, not pairs. The RESULT is nevertheless correct - I reproduce 30.9236 m at exactly d=541.20/581.27."
+ ],
+ "notes": [
+  "FORWARD GEOMETRY IS CLEAN. Total 1367.2232 m (inside 1,100-1,400). Closure 0.000478 m. Final heading exactly -360.000000 deg. Longest straight 186.684 m (segments 7+8+9), under the 200 m cap with 13.3 m to spare; the next three are 164.649 m (the start straight, correctly measured across the start/finish wrap), 156.662 m and 127.121 m. Start line to T1 87.499 m (>=50), last corner to line 77.150 m (>=70), whole start straight 164.649 m (120-200), T1 100 deg (>=45) at 12.0 m (8-12). Widths 9-12 m everywhere (>=8). Camber 2.0% on every straight (1.5-3.0). Banking 3-9% in every corner (0-10), none adverse.",
+  "SEPARATION IS COMFORTABLE. Minimum centerline distance between samples more than 40 m apart along the lap is 30.9236 m, at d=541.20 and d=581.27 - the two ends of the hairpin, 40.07 m apart along the lap, i.e. an artefact of the 40 m threshold catching a hairpin's own mouth rather than two separate bits of track. Raise the threshold to 60 m and the minimum is 37.7642 m. Worst edge-to-edge clear ground anywhere is 18.92 m against a 6 m requirement. There is no self-intersection and nothing close to one.",
+  "ELEVATION IS THE STRONGEST PART OF THE PROPOSAL AND IT IS FULLY VERIFIED IN THE FORWARD DIRECTION. Closure -5.98e-6 m. Range 7.3929 m, high +1.4597 m at d=243.29, low -5.9332 m at d=628.94 - all three match the author exactly. All six vertical curves: chosen R over required R = 1.42x, 1.91x, 1.34x, 2.08x, 1.53x, 2.55x, and every transition half-length (20.15, 31.15, 32.50, 6.00, 9.10, 14.40 m) fits inside both adjacent segments. Start straight 0.60% against a 2% cap, and the nearest gradient break to the start line is 225.4 m back, so the standing-start grid genuinely sits on one plane. The drama is at the hairpin, which is what the R = V^2/K constraint forces and the author says so.",
+  "BRAKING REPRODUCES. d = (u^2 - v^2)/(2*(1.53 + grade)*g): T3 44.38 m flat and 44.95 m at -1.917% against the claimed 45.0; T4 11.81 m against 11.8; T1 11.89 m against 12.0; reversed T3 41.49 m uphill against 41.5. The author has the grade sign the right way round, which is easy to get wrong.",
+  "THE RACING-LINE FORMULA IS CORRECT. concept states R_line = R + e(1+k)/(k-1) with e = (W-1.400)/2 and k = sec(theta/2). That is algebraically identical to the standard construction R - e + 2e/(1 - cos(theta/2)), and it reproduces every line radius the author quotes to 0.1 m: T1 81.37, T2 186.04, T3 27.31/21.90, T4 55.06, T5 59.13, T6b 50.43/36.22, T7 53.06. The one exception is T8b's 74.2 m.",
+  "THE LOCK MODEL IS CONSISTENT AND UNDECLARED. Every 'quarter-lock ceiling' in the document is linear interpolation/extrapolation of drive_probe.gd's three 0.25-lock rows (18.99 m/46.0 km/h, 32.64/81.3, 58.49/116.9). I reproduce 12 of 13 to within 0.1 km/h. The method is never stated in the document - it should be, because it is extrapolated 40% beyond the largest sampled radius at T1 and the author's own risks[1] and outside_scope_concerns[4] correctly point out that the three sample points confound lock with throttle. That caveat is the most valuable thing in this submission and it undermines every corner speed in it, including mine.",
+  "CENTERLINE VS RACING LINE IS THE REAL EXPOSURE. Five of the ten arcs exceed 1.86 g on the centerline at their own claimed apex speed (T1 1.988, T4 2.623, T5 2.223, T7 2.030, T8a 1.965) and six exceed it at their claimed exit speed. Every one is rescued by a correctly computed racing line except T4. A validator reading track.json's stored centerline - which is what ARCHITECTURE section 11 and ADR-0046 describe - rejects this circuit, and the author flags this as outside_scope_concern #1 rather than hiding it. That is the right call and the concern is correct.",
+  "IN TRAFFIC IS WHERE T4 BITES. Half-width lock margins at the claimed apex speeds: T4 -5.1 km/h, T3 +1.5, T5 +2.5, T7 +7.2, T1 +11.6, T6b +22.2, T8b +48.1. On an 8-kart grid with two named overtaking spots, T4 is the only corner where the kart that yields the line is past #137 rather than approaching it.",
+  "REVERSE IS HALF THE JOB AND IT IS THE WEAKER HALF. The forward lap is measured; the reverse lap is asserted. The vertical-curve check is done with the wrong constant and one curve fails when redone; the hardest corner has no arithmetic; the reverse sector times are explicitly not computed (which the author states honestly and justifies well). GAMEDESIGN section 10 makes reverse a first-class case and this proposal treats it as a discussion section.",
+  "LAP TIME IS NOT A CHECKABLE NUMBER HERE. My own quasi-static integration - clamped line radii, 1.53 g braking, a 30 kW/175 kg tractive model and crude drag - returns 43.396 s, four seconds under the author's 47.081. Neither figure is worth defending; the author says so in risks[0] and expects 51-55 s from the real solver. What is checkable is that the three published sector times do not add up to the published lap time.",
+  "SITE DENSITY. 418.5 x 344.3 m of ground for 1,367 m of track, with a 30.92 m minimum separation against an 18 m requirement at the local widths. The author raises this against themselves in risks[4]. It is not a violation; it is a loop that never folds back on itself, and a reviewer will notice that a 1.37 km kart circuit occupying 14 hectares is not what a real one looks like.",
+  "The author's ten outside_scope_concerns are the best part of the submission and several are correct and load-bearing: the centerline-validation trap, the linear-vs-quadratic run-off sizing, the flat 14 m separation constant in this brief being wrong above 8 m width, the 50+70=120 reading that reconciles the three starting-straight rows, and the confounded lock sweep. The rev-limited top speed observation (145.3 km/h at 14,000 rpm in 6th against 143.9 measured = 13,865 rpm) reproduces exactly from gearbox.h and chassis.h and is worth a ticket."
+ ],
+ "brief_concerns": [
+  "THE BRIEF'S OWN WORKED EXAMPLE OF A LIE IS NOT A LIE. Part 4 item 6 says 'a corner claimed at 90 km/h on a 20 m radius is 3.2 g and is a lie'. That is true on the centerline and false on the road: at 12 m width and 90 deg, the widest line through a 20 m centerline radius is 50.9 m (e=(12-1.400)/2, k=sec45), which is 1.25 g at 90 km/h. The brief instructs every verifier to apply a test that its own example fails, and it is the same defect the brief's Part 3 validation bullet ('no radius the kart cannot take') carries. Specify which curve the check is against, and if it is the centerline, say that the threshold is not 1.86 g.",
+  "THE 40 m SELF-INTERSECTION THRESHOLD FLAGS A HAIRPIN AGAINST ITSELF. A 140 deg corner of radius 16.5 m has 40.3 m of arc, so its own entry and exit tangents are 'more than 40 m apart along the lap' and 30.9 m apart in plan. That pair is this layout's reported worst, and it is not two bits of track - it is one corner's mouth. Raise the threshold to about 60 m (which here moves the minimum to 37.8 m) or exclude pairs whose along-lap separation is less than the enclosing corner's arc length.",
+  "THE 14 m CONSTANT IS ONLY RIGHT AT THE 8 m FLOOR. The regulation is 6 m of clear ground between asphalt edges, so the requirement is 6 + (w_a + w_b)/2. This layout runs 12 m at T1, T3, T8 and the start straight, where the true requirement is 18 m, not 14 m. Stating it as a flat 14 m will pass an illegal layout that a compact infield would produce.",
+  "THE VERTICAL-RADIUS TABLE DISAGREES WITH THE BINDING DOCUMENT BY 1 m. The brief gives 81.3 km/h -> compression 331 m; docs/REFERENCES.md line 1917 gives 330, and 81.3^2/20 = 330.46. Same row, 21.2 km/h -> compression 23 m, where 21.2^2/20 = 22.47, which rounds to 22. Every other cell in the table reproduces exactly. REFERENCES.md is the binding document per CLAUDE.md, so the brief should not be the one carrying the rounded-up values.",
+  "THE LOCK SWEEP CANNOT SUPPORT THE INSTRUCTION BUILT ON IT. Part 4 item 6 says 'check v^2/r against 1.86 g AND against the steering-lock sweep', but the sweep's three 0.25-lock rows differ in throttle (0.30, 0.60, 1.00) as well as in settled radius, so radius, speed, lateral g and throttle all move together and no relation of the form 'at radius r this kart holds v' can be extracted from them. Every proposal - and every verifier, including me - has to invent an interpolation to comply. The brief should either publish the interpolation it wants, or ask for the lock-held-fixed sweep first. This is the single largest source of uncertainty in every number in this review.",
+  "'STARTING STRAIGHT' IS UNDEFINED AND THE THREE ROWS ONLY RECONCILE ONE WAY. Starting straight 120-200 m, start line to first corner min 50 m, last corner to start line min 70 m: 50 + 70 = 120 exactly, so 'starting straight' must mean last-corner-exit to first-corner-entry with the line somewhere inside it. Read the other way, this layout's 87.499 m from the line to T1 fails a 120 m minimum while being perfectly legal. Part 4 asks verifiers to check both without saying they are the same straight.",
+  "THE WALK FUNCTION APPLIES THE HEADING INCREMENT BEFORE THE POSITION STEP IN CORNERS (h += A/n, then x,y advance). That inscribes the arc rather than centering it, so the closure error it reports contains a discretisation term as well as a design term. At step=0.25 the term is sub-millimetre and harmless here, but the brief presents 'closure error < 1.0 m' as a property of the layout when part of it is a property of the integrator. Total arc length is unaffected - I get 1367.2232 from both the walk and the exact sum.",
+  "THE ELEVATION CLOSURE TEST IS PIECEWISE-CONSTANT-GRADE. sum(grade_fraction * segment_length) = 0 ignores the vertical curves entirely; it is only area-neutral because a symmetric parabolic curve gives back what it takes. That happens to be true for all six curves here, but the brief should say the test is on the tangent profile, not on the driven surface, or a proposal with an asymmetric curve will pass a test it should not.",
+  "THE BRIEF'S QUOTED AUTHOR RECEIPT DOES NOT MATCH THE FILE. I was told 'the author's own receipt claimed closure 0.000478 m'. rhythm.json's measured.closure_error_m says 0.000208; rhythm.md's receipt block says 0.000478. The brief took the .md figure. Both are inside the gate, but if the orchestration is quoting receipts back to verifiers it should quote the machine-readable one, which is the one that is wrong.",
+  "MINOR, AND THE BRIEF IS RIGHT: I recomputed the braking table (44.0 / 49.1 / 30.6 / 23.4 / 19.8 m) and the 1.86 g corner-speed table (59.5 / 68.8 / 84.2 / 97.2 / 114.0 / 137.5 / 168.4 km/h) and every cell reproduces to 0.1. So does the 143.9 / 120 / 100 / 46.0 rows of the vertical-radius table."
+ ]
+}

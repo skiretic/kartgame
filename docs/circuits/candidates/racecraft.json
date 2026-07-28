@@ -1,0 +1,265 @@
+{
+  "lens": "racecraft",
+  "working_name": "Sabliere",
+  "concept": "The organising idea is that the two passing corners are the SAME two corners in both directions, and they are made that way by geometry rather than by furniture. T1 (the Anvil) and T2 (the Kettle) sit at the two ends of the 195 m back straight, and each of them has a long straight on BOTH sides - T1 has the 198 m start/finish straight before it and the back straight after it, T2 has the back straight before it and 319 m of near-flat-out running after it. A corner flanked by long straights is a passing corner whichever way you drive it: the tow is on one side and the punishing drive is on the other, and reversing the lap only swaps which is which. That is the answer to the constraint that usually kills a racecraft-led design, and it is why this layout does not need to find two new overtaking spots for the reverse direction - it inherits them.\n\nThe two corners are then made opposite in sense so the reverse lap is a different circuit rather than the same one backwards. T1 is compound and OPENS (R32 for 50 deg, then R50 for 48 deg): the classic pass-and-drive-away corner, tight and wide on entry where two lines fit, releasing onto the straight so whoever won the corner gets the exit. T2 is compound and CLOSES (R50 for 48 deg, then R32 for 52 deg): the dive-bomb corner, an open entry you can throw a kart into and a tightening exit that punishes the one who is on the outside when the road runs out. Driven the other way each becomes the other, so each direction gets exactly one clean passing corner and one fight.\n\nThe part that is specific to THIS kart, and the reason the layout is what it is: because of #137 the penalty for being pinned on the inside line is enormous. At T1 the free racing line is a 48.85 m radius held at 105.4 km/h; a defender who covers the inside and cannot open the wheel because there is a kart alongside is on a 27 m radius at 66.7 km/h. That is a 38.7 km/h loss, against maybe 10-12 km/h in a car, and over the 195 m back straight the kart that yielded the inside and took the outside line arrives at T2's braking point 0.553 s and 21.1 m ahead. So on this circuit THE SWITCHBACK IS THE DOMINANT MOVE, the outside line wins side-by-side corners, and defending is expensive in a way a driver has to learn. Everything else on the lap exists to deliver karts to those two corners in a state where that fight is possible: T7 is deliberately slow (94.2 km/h) so the field concertinas onto the start straight, T3 is deliberately fast (130.3 km/h at 1.86 g for 2.5 s) so it separates them again, and T6 is deliberately narrow and quick so that fighting there costs both karts the tow.",
+
+  "segments": [
+    { "index": 0, "kind": "straight", "label": "S/F straight, start line to T1",
+      "length_m": 110.000, "width_m": 9.0, "camber_pct": 2.0, "grade_pct": 0.5,
+      "note": "widens 9 -> 12 m over its last 50 m, outward, so T1's inside edge stays a clean 26 m arc" },
+    { "index": 1, "kind": "corner", "label": "T1a  The Anvil, entry",
+      "radius_m": 32.0, "angle_deg": 50.0, "width_m": 12.0, "banking_pct": 6.0, "grade_pct": 0.5 },
+    { "index": 2, "kind": "corner", "label": "T1b  The Anvil, exit",
+      "radius_m": 50.0, "angle_deg": 48.0, "width_m": 12.0, "banking_pct": 6.0, "grade_pct": 0.5 },
+    { "index": 3, "kind": "straight", "label": "Back straight",
+      "length_m": 195.000, "width_m": 9.0, "camber_pct": 2.0, "grade_pct": -0.5,
+      "note": "tapers 12 -> 9 m over its first 50 m and 9 -> 12 m over its last 50 m; 95 m at 9 m in the middle" },
+    { "index": 4, "kind": "corner", "label": "T2a  The Kettle, entry",
+      "radius_m": 50.0, "angle_deg": 48.0, "width_m": 12.0, "banking_pct": 6.0, "grade_pct": -0.5 },
+    { "index": 5, "kind": "corner", "label": "T2b  The Kettle, exit",
+      "radius_m": 32.0, "angle_deg": 52.0, "width_m": 12.0, "banking_pct": 6.0, "grade_pct": -0.5 },
+    { "index": 6, "kind": "straight", "label": "Rim approach",
+      "length_m": 139.516, "width_m": 9.0, "camber_pct": 2.0, "grade_pct": -4.0,
+      "note": "tapers 12 -> 9 m over its first 50 m; carries the lap's only crest, at 30 m in" },
+    { "index": 7, "kind": "corner", "label": "T3  The Rim",
+      "radius_m": 55.0, "angle_deg": -95.0, "width_m": 9.0, "banking_pct": 5.0, "grade_pct": -4.0 },
+    { "index": 8, "kind": "straight", "label": "The Plunge",
+      "length_m": 88.513, "width_m": 9.0, "camber_pct": 2.0, "grade_pct": -4.0,
+      "note": "tapers 9 -> 10 m over its last 30 m into the hairpin" },
+    { "index": 9, "kind": "corner", "label": "T4  The Cellar",
+      "radius_m": 16.0, "angle_deg": 175.0, "width_m": 10.0, "banking_pct": 4.0, "grade_pct": -1.0 },
+    { "index": 10, "kind": "straight", "label": "Cellar climb",
+      "length_m": 111.751, "width_m": 9.0, "camber_pct": 2.0, "grade_pct": 4.3833,
+      "note": "tapers 10 -> 9 m over its first 30 m" },
+    { "index": 11, "kind": "corner", "label": "T5  The Ramp",
+      "radius_m": 90.0, "angle_deg": 30.0, "width_m": 9.0, "banking_pct": 3.0, "grade_pct": 4.3833 },
+    { "index": 12, "kind": "straight", "label": "Upper climb",
+      "length_m": 78.920, "width_m": 9.0, "camber_pct": 2.0, "grade_pct": 5.0 },
+    { "index": 13, "kind": "corner", "label": "T6  The Shelf",
+      "radius_m": 30.0, "angle_deg": -50.0, "width_m": 9.0, "banking_pct": 4.0, "grade_pct": 3.0 },
+    { "index": 14, "kind": "straight", "label": "Gate approach",
+      "length_m": 86.902, "width_m": 9.0, "camber_pct": 2.0, "grade_pct": 1.5,
+      "note": "pit deceleration lane leaves the right edge at s = 1100 m, 25 deg, 4 m wide, chicane at its mouth" },
+    { "index": 15, "kind": "corner", "label": "T7  The Gate",
+      "radius_m": 28.0, "angle_deg": 102.0, "width_m": 10.0, "banking_pct": 6.0, "grade_pct": 0.5 },
+    { "index": 16, "kind": "straight", "label": "S/F straight, T7 to start line",
+      "length_m": 88.000, "width_m": 9.0, "camber_pct": 2.0, "grade_pct": 0.5,
+      "note": "tapers 10 -> 9 m over its first 40 m; grid occupies s = 1273.6 to 1297.6 m; pit exit rejoins the right edge at s = 40 m, past the line" }
+  ],
+
+  "measured": {
+    "total_length_m": 1302.5585,
+    "closure_error_m": 0.001026,
+    "closure_error_note": "Measured by re-running the prescribed walk at step 0.25 m over the segment list EXACTLY AS PUBLISHED ABOVE, i.e. with the free straight lengths rounded to 3 decimal places. The unrounded closure solve returns 1.311e-11 m; the 1.03 mm here is entirely the rounding of segments 6, 8, 10, 12 and 14, which are the five lengths the closure solve owns. Both are far inside the 1.0 m requirement, and the published number is the one that matters because it is the one a reader can reproduce.",
+    "final_heading_deg": 360.000000,
+    "longest_straight_m": 198.0,
+    "min_separation_m": 30.476,
+    "min_separation_where": "s = 764.7 m (last meter of The Plunge) against s = 805.1 m (inside T4 The Cellar), 40.3 m apart along the lap - i.e. the hairpin measured against its own approach. Between two genuinely different parts of the circuit (>100 m apart along the lap) the closest approach is 34.216 m, at s = 739.2 m (The Plunge) against s = 839.6 m (Cellar climb). With 9 m and 10 m road widths that leaves 21.0 m and 24.7 m of clear ground between asphalt edges, against a 6 m regulation minimum.",
+    "elevation_closure_m": 5.116e-05,
+    "elevation_closure_note": "Also from the published segment list: sum(grade_fraction * segment_length) = -5.116e-05 m. The unrounded solve returns -2.165e-15 m; the difference is the same length rounding. Requirement is 0.05 m.",
+    "elevation_range_m": 14.5872,
+    "start_to_first_corner_m": 110.0,
+    "last_corner_to_start_m": 88.0,
+    "estimated_lap_time_s": 42.918,
+    "bounding_box_m": [377.50, 331.74],
+    "extra": {
+      "longest_single_straight_segment_m": 195.0,
+      "longest_straight_is": "segments 16 + 0 joined - the start/finish straight, T7 exit to T1 entry, 198.0 m, 2.0 m inside the 200 m cap",
+      "reverse_lap_time_s": 42.612,
+      "top_speed_reached_forward_kmh": 137.8,
+      "top_speed_reached_reverse_kmh": 143.7,
+      "longest_braking_zone_forward_m": 42.5,
+      "longest_braking_zone_reverse_m": 48.5,
+      "laps_in_a_30_km_final": 23,
+      "grade_1_capacity_L_over_28": 46.5,
+      "walk_step_m": 0.25
+    }
+  },
+
+  "corners": [
+    { "name": "T1  The Anvil", "segment_indices": [1, 2], "radius_m": 32.0, "angle_deg": 98.0, "hand": "right",
+      "provokes": "The switchback, and with it #137's cost in a racing context rather than a skidpad one. The free line is 48.85 m at 105.4 km/h (1.79 g); a defender who is genuinely alongside and cannot open the wheel is on 27 m at 66.7 km/h. This is the corner that answers whether #137 makes side-by-side racing possible or a lottery.",
+      "entry_kmh": 135.8, "apex_kmh": 105.4, "exit_kmh": 105.4, "gear": "5th on the brakes, 3rd at the apex, 4th before the exit",
+      "cliff_relation": "on the boundary",
+      "cliff_note": "The 32 m centerline radius puts the free line at 48.85 m, comfortably inside the sweep's 50.95 m / 1.82 g row. The INSIDE edge is a 26 m arc, and a kart pinned there runs 27 m at 66.7 km/h - past the boundary and scrubbing. The corner deliberately straddles it: the fast line is safe and the defensive line is not.",
+      "kerb": "Red/white 1 m alternation at the T1a apex, inside edge, 30 mm. Exit kerb on the outside of T1b's release, 40 m long. The apex kerb serves both directions; the exit kerb does not and the reverse layout authors its own.",
+      "runoff": "1.80 m verge + 15 m gravel bed (2 m min width, 300 mm depth, not below track level) on the corner axis + Type C tire barrier with a conveyor-belt face. Sized against a 105.4 km/h apex departure at a 15 deg angle: 14.1 m of gravel at an ASSUMED 0.80 g stops the kart before the barrier. Mandatory here because the direction change is 98 deg, over the 80 deg threshold.",
+      "rollover_note": "Right-hander, so it loads the 2.81 g side. 1.79 g leaves a 36% margin. It is the reverse layout that makes this a left-hander at the same speed, dropping the margin to 26% - which is why the reverse run has to be measured and not assumed." },
+
+    { "name": "T2  The Kettle", "segment_indices": [4, 5], "radius_m": 32.0, "angle_deg": 100.0, "hand": "right",
+      "provokes": "The decreasing-radius trap, and traction out of a tightening corner with a locked axle. An open R50 entry invites a late brake and a dive; the R32 second half is where the kart that took too much entry speed runs out of road, and the exit is under power on a 32 m radius with no differential.",
+      "entry_kmh": 137.8, "apex_kmh": 104.5, "exit_kmh": 104.5, "gear": "5th on the brakes, 3rd through the second half",
+      "cliff_relation": "on the boundary",
+      "cliff_note": "Same 32 m minimum radius as T1 and the same 26 m inside edge, but reached on the EXIT rather than the entry, which is the harder half - the driver has to add lock while opening the throttle. A kart that arrives 8-10 km/h hot has to add lock past the point where the sweep says it stops paying.",
+      "kerb": "Apex kerb at the T2b inside, 25 m. Deliberately NO exit kerb: the exit feeds the longest full-throttle run of the lap and a kerb strike there with a locked axle would pitch the kart into 276 m of consequence.",
+      "runoff": "1.80 m verge + 15 m gravel + Type C tire barrier on the axis. Sized against a 104.5 km/h apex departure at 15 deg -> 13.9 m required. Mandatory: 100 deg direction change.",
+      "rollover_note": "Right-hander, 1.78 g, 2.81 g side, 37% margin." },
+
+    { "name": "T3  The Rim", "segment_indices": [7], "radius_m": 55.0, "angle_deg": -95.0, "hand": "left",
+      "provokes": "#32 - the inside rear visibly lifting - under the longest sustained lateral load on the circuit. 71.76 m racing line at 130.3 km/h is 1.86 g, exactly the measured sustained ceiling, held for 91.19 m of arc = 2.52 s, and it is a LEFT so it sits on the 2.43 g rollover threshold rather than the 2.81 g one. This is the corner where the kart is closest to tipping and it is the only one on the lap that holds that state long enough to see.",
+      "entry_kmh": 137.0, "apex_kmh": 130.3, "exit_kmh": 130.3, "gear": "6th throughout, a 4.8 m brush of the brake at most",
+      "cliff_relation": "safe side",
+      "cliff_note": "55 m centerline is the sweet spot the sweep names - between the 58.49 m / 1.84 g and 50.95 m / 1.82 g rows - and the 9 m width takes the line out to 71.76 m. Well inside a quarter of lock. Nothing about #137 is being tested here; the tire model and the roll stiffness are.",
+      "kerb": "Apex kerb only, 60 m of it, 30 mm and low-profile. At 130 km/h in a left-hander at 1.86 g a normal 50 mm kerb would be a rollover trigger, not a track limit.",
+      "runoff": "1.80 m verge + 20 m gravel + Type B foam mattress. Sized against a 130.3 km/h departure at a shallow 12 deg (a fast corner is left tangentially, not squarely) -> 17.3 m required. Mandatory: 95 deg direction change.",
+      "rollover_note": "THE rollover corner. 1.86 g against a 2.43 g left-hand threshold is a 23% margin, the smallest anywhere on the circuit in either direction. If the tire model's grip ceiling is ever raised, T3 is the first thing to re-measure, and it is the corner that decides whether that change is shippable." },
+
+    { "name": "T4  The Cellar", "segment_indices": [9], "radius_m": 16.0, "angle_deg": 175.0, "hand": "right",
+      "provokes": "The gearbox, bottom to top, and the launch-like traction case - #38's clutch modulation and #40's auto-shift, transplanted into a race. 47.5 km/h at the bottom of a 14.6 m drop, then 111.75 m of 4.38% climb back up through the box. It is also the only place on the lap with a 42.5 m braking zone.",
+      "entry_kmh": 136.6, "apex_kmh": 47.5, "exit_kmh": 47.5, "gear": "6th to 2nd on the brakes, 2nd at the apex, 3rd/4th/5th up the climb",
+      "cliff_relation": "past the cliff",
+      "cliff_note": "A 16 m centerline with 10 m of road puts the widest line at 19.56 m, which is the sweep's 18.99 m / 46.0 km/h / 0.88 g row almost exactly. The kart is scrubbing here and it is meant to - this is the lap's one deliberate visit to the wrong side of #137, and unlike the test track's 11 m hairpin it is reachable without stopping dead. A driver who tries to carry an extra 10 km/h in finds 12 m and 24.3 km/h.",
+      "kerb": "Full apex kerb, 45 m, and an exit kerb on the outside of the release because the locked axle will put a kart wide there under power. Both survive the reversal - a hairpin's inside is its inside either way - which makes T4 the only corner whose curbs the reverse layout can share verbatim.",
+      "runoff": "1.80 m verge + 14 m gravel + Type A air fence on the axis. Sized against a 47.5 km/h apex departure straight on (90 deg) -> 11.1 m required. THE HONEST LIMIT: a total brake failure arrives here at 136.6 km/h forward and 143.7 km/h reversed, needing 91.7 m and 101.5 m of gravel respectively. That is not buildable and is not built; it is handed to the barrier, and the regulation's own answer - a numeric impact simulation - is not something this project can run.",
+      "rollover_note": "0.91 g. Nowhere near anything. The hairpin is a traction and gearbox corner, not a load corner." },
+
+    { "name": "T5  The Ramp", "segment_indices": [11], "radius_m": 90.0, "angle_deg": 30.0, "hand": "right",
+      "provokes": "Placement under acceleration with no grip penalty - the corner that costs nothing if you get it right and costs the whole climb if you get it wrong. Taken flat at 116-126 km/h on a 4.38% climb, mid-gearchange, with the kart light on the front.",
+      "entry_kmh": 116.5, "apex_kmh": 143.9, "exit_kmh": 125.4, "gear": "4th into 5th",
+      "cliff_relation": "safe side",
+      "cliff_note": "180 m line radius. Under an eighth of lock. It is a direction change, not a corner.",
+      "kerb": "Apex kerb, 20 m, low. It is there to be used, not avoided.",
+      "runoff": "Under 80 deg, so no mandatory axis run-off. 1.80 m verge + 6 m compacted ground + Type C tire barrier on the outside.",
+      "rollover_note": "0.90 g at the limit line. Irrelevant." },
+
+    { "name": "T6  The Shelf", "segment_indices": [13], "radius_m": 30.0, "angle_deg": -50.0, "hand": "left",
+      "provokes": "The corner you must not fight in, and it is built so that trying is obviously wrong. 60 m racing line at 119.1 km/h and 1.86 g through a 9 m road at the top of the climb, over a crest so the exit is blind. A kart pinned on the inside here is on a 26.5 m radius at 65.4 km/h - a 53.7 km/h loss - and then has to reach T7 and the start straight from there.",
+      "entry_kmh": 132.4, "apex_kmh": 119.1, "exit_kmh": 119.1, "gear": "5th, taken with a lift not a brake",
+      "cliff_relation": "safe side on the line, past the cliff off it",
+      "cliff_note": "The free line is 60 m - the sweet spot again. The 9 m width is what makes the defensive line unaffordable: there is no room to be both defensive and quick, which is exactly the intent. The road is narrow here on purpose and it is the one place on the lap where narrowness is the design.",
+      "kerb": "Apex kerb, 20 m. No exit kerb - the exit is blind over a 1,550 m convex vertical curve and a kerb the driver cannot see is a trap, not a track limit.",
+      "runoff": "Under 80 deg, so no mandatory axis run-off, but it is the fastest corner on the circuit without one. 1.80 m verge + 10 m compacted ground + Type C tire barrier, sized generously against the 119.1 km/h apex speed rather than against the regulation, because the regulation does not require anything here at all.",
+      "rollover_note": "1.86 g in a LEFT-hander - the same number and the same 2.43 g threshold as T3, but held for only 0.79 s rather than 2.52 s. Transient rather than sustained, which per ADR-0034 is a different quantity and a safer one." },
+
+    { "name": "T7  The Gate", "segment_indices": [15], "radius_m": 28.0, "angle_deg": 102.0, "hand": "right",
+      "provokes": "The tow. This corner exists to be slow - 94.2 km/h, the lowest speed on the lap outside the hairpin - so that the field concertinas onto the 198 m start straight and T1 has traffic to work with. It also punishes defending harder than anywhere except T6: pinned inside is a 24 m radius at 59.0 km/h against 94.2 on the line, and the loss is paid out over the longest straight of the lap.",
+      "entry_kmh": 132.4, "apex_kmh": 94.2, "exit_kmh": 94.2, "gear": "5th to 3rd, 3rd through, 4th before the line",
+      "cliff_relation": "on the boundary",
+      "cliff_note": "28 m centerline with 10 m of road gives a 41.29 m line at 1.69 g. The inside edge is 23 m and a kart pinned to it is at 59.0 km/h. This is the second-hardest defensive penalty on the circuit and the one with the longest payout.",
+      "kerb": "Apex kerb, 35 m, and a 25 m exit kerb - the exit is onto a straight with a start line on it and the track limit needs to be unambiguous.",
+      "runoff": "1.80 m verge + 12 m gravel + Type C tire barrier. Sized against a 94.2 km/h apex departure at 15 deg -> 11.3 m required. Mandatory: 102 deg direction change.",
+      "rollover_note": "1.69 g, right-hander, 2.81 g threshold, 40% margin. The most comfortable of the four hard corners." }
+  ],
+
+  "overtaking": [
+    { "where": "T1 The Anvil, forward direction. The pass is MADE here.",
+      "mechanism": "The 198 m start/finish straight is the longest on the circuit and it is entered at 94.2 km/h out of a deliberately slow T7, so a following kart has the full straight to use the tow. The braking zone is short - 18.8 m from 135.8 to 105.4 km/h - so the move is not an out-braking move; it is a positioning move made on the straight and completed by being on the inside when the road turns. The road widens from 9 to 12 m over the last 50 m of the straight, OUTWARD, so the 26 m inside edge stays where it is and the extra 3 m of asphalt is the attacker's second line. Two 1,400 mm karts side by side occupy 2.8 m of a 12 m road; what the width actually buys is that the outside kart has a 40 m radius available instead of running out of asphalt at 36.",
+      "tow_length_m": 198.0, "braking_zone_m": 18.8, "entry_width_m": 12.0,
+      "why_it_sticks": "It half does, and that is the design. The exit feeds 195 m of back straight, so a defender who covered the inside comes out at 66.7 km/h against the attacker's 92.2 and is 21.1 m behind by T2's braking point - the pass sticks completely against a defender who committed. But a defender who took the compromise line rather than the pinned one exits at 95.8 km/h and is only 12 m down, which is inside tow range, and T2 is 195 m away. So T1 is where you take the place and T2 is where you find out if you keep it." },
+
+    { "where": "T2 The Kettle, forward direction. The pass STICKS here.",
+      "mechanism": "195 m of back straight, entered at 105 km/h, gives the same tow as T1's. The entry is the open half of the corner - R50, 12 m wide, tapering up from 9 m over the straight's last 50 m - so a kart can be thrown at it from a long way back and still make the first apex. The braking zone is 20.8 m. What makes it a passing corner rather than a wreck is that the closing R32 second half is where the two lines resolve: the kart that took the inside on entry has to hold 26-27 m through the tightening, at 66.7 km/h, while the kart that yielded and stayed outside is on 40+ m at 92 km/h and gets the exit.",
+      "tow_length_m": 195.0, "braking_zone_m": 20.8, "entry_width_m": 12.0,
+      "why_it_sticks": "Because the exit feeds 276.7 m of uninterrupted full throttle - the Rim approach, T3 taken flat at 130 km/h, and the Plunge - before the next braking point. That is the longest drive on the circuit and it is 59% longer than what a T1 pass buys. A compromised exit out of T2 is paid for over more than a quarter of the lap, and there is no corner in between where the road gives it back." },
+
+    { "where": "T4 The Cellar, forward direction. The dive-bomb, and the lowest-percentage move on the lap.",
+      "mechanism": "The approach is 276.7 m of flat-out running - Rim approach, T3, Plunge - all of it downhill at 4%, arriving at 136.6 km/h, and the braking zone is 42.5 m, more than twice either of the designated passing corners'. The road widens 9 -> 10 m over the Plunge's last 30 m. The 4% descent also shortens the leader's braking as much as the follower's, so the advantage is entirely in commitment, not in geometry.",
+      "tow_length_m": 276.7, "braking_zone_m": 42.5, "entry_width_m": 10.0,
+      "why_it_sticks": "Poorly, which is why it is listed third. The exit is 47.5 km/h onto a 4.38% climb with a locked rear axle, and whoever has the inside also has the traction, so a pass that lands usually holds - but a pass that is half-landed at the apex leaves two karts on a 19 m line at 47 km/h with no differential, which is where the contact happens. The 10 m width and the full apex-and-exit kerbing exist to make that survivable rather than to encourage it." },
+
+    { "where": "T4 The Cellar, REVERSE direction. The best overtaking spot on the property, and it only exists backwards.",
+      "mechanism": "Reversed, the Cellar climb becomes a 111.75 m descent at -4.38% entered at 140 km/h out of a reversed T5, and the kart reaches its full 143.7 km/h top speed on it - the only place in either direction where it does. The braking zone is 48.5 m, the longest anywhere. Same 10 m entry width, same hairpin, completely different corner.",
+      "tow_length_m": 111.8, "braking_zone_m": 48.5, "entry_width_m": 10.0,
+      "why_it_sticks": "The exit is onto 319 m of climbing full-throttle running - the reversed Plunge at +4%, T3 as an opening uphill right, and the reversed Rim approach - before the next braking point. Longest tow-in AND longest drive-out on the same corner. This is the single strongest argument for shipping the reverse layout: it is not a variation, it contains a passing corner the forward lap does not have." },
+
+    { "where": "T2 The Kettle, REVERSE direction.",
+      "mechanism": "Reversed, T2 runs R32 into R50 - an OPENING corner instead of a closing one, which is the classic pass-and-drive-away shape. Approached up 139.5 m of +4% climb at 136.5 km/h with a 19 m braking zone, 12 m wide on entry.",
+      "tow_length_m": 139.5, "braking_zone_m": 19.0, "entry_width_m": 12.0,
+      "why_it_sticks": "Exit onto the 195 m back straight, which is the longest drive of the reverse lap after the T4 sequence. Same corner, opposite sense, and it has swapped roles with T1 exactly as intended." },
+
+    { "where": "T1 The Anvil, REVERSE direction.",
+      "mechanism": "Reversed, T1 runs R50 into R32 - a closing corner, the fight corner. 195 m of back straight for the tow, 19.5 m of braking, 12 m entry.",
+      "tow_length_m": 195.0, "braking_zone_m": 19.5, "entry_width_m": 12.0,
+      "why_it_sticks": "Exit onto the 198 m start/finish straight - the longest straight on the circuit - so even a fragile pass out of a tightening corner is worth making. Reverse's version of T1 is the one that starts the argument that the start straight and reversed-T7 finish." }
+  ],
+
+  "elevation": {
+    "story": "The site is a worked-out sand quarry and the lap uses it the only way the regulation permits: the elevation lives entirely in the slow half. The plateau - start straight, T1, back straight, T2 - is essentially flat at +/-0.5%, because a gradient change at 138 km/h needs a 1,270 m vertical radius and a 1,302 m lap cannot afford one. The road then falls away over a single crest 30 m into the Rim approach and descends 12.8 m at a constant 4% through the circuit's fastest corner and into the hairpin at the quarry floor, 13.7 m below the start line. From there it climbs 4.38% out of the Cellar, steepens to 5% over the Upper climb, and eases back onto the plateau through T6 and T7. Total range 14.587 m; the profile closes to 2.2e-15 m.\n\nWhat the elevation is FOR, in driving terms, is three things and none of them is grip. First, VISIBILITY: T3 is entered over a crest and its exit is not visible from its entry, T6's exit is blind over a convex curve, and the hairpin is out of sight from the top of the Plunge. Second, BRAKING DISTANCE: the 4% descent into T4 costs 2.6% of braking authority and the 4.38% climb out of it gives it back, which is a small but real difference between the forward and reverse braking points at the same corner. Third, the single crest at s = 475.7 m is placed at 950 m radius - only 4.6% above the legal minimum - to make the road drop away under a kart at 117 km/h, which is the one moment on the lap where elevation is felt as load rather than seen as scenery.\n\nAnd the honest finding: on a kart circuit the regulation caps how much elevation can ever load a tire. R = V^2/K is algebraically a cap on vertical acceleration, because a_vert = v^2/R and R_min = V^2/K, so a_vert at the legal minimum is K/12.96 m/s^2 REGARDLESS OF SPEED - 1.157 m/s^2 (0.118 g) over any crest and 1.543 m/s^2 (0.157 g) in any compression. The maximum load swing available to a legal Grade 1 kart circuit is therefore -11.8% / +15.7% of static, anywhere, at any speed, and the regulation then tells you to increase R in braking and curved sections, which reduces it further. Eight vertical curves on this lap, all placed inside straights, none inside a corner.",
+    "vertical_curves": [
+      { "at_distance_m": 195.0, "delta_grade_pct": -1.0, "profile": "convex", "speed_kmh": 111.5,
+        "required_radius_m": 829.5, "chosen_radius_m": 1300.0, "transition_length_m": 13.0, "ok": true,
+        "note": "In the Back straight (179.8-374.8 m), 15 m past T1's exit. R increased 57% over the minimum because it sits in a release section. 0.076 g of unloading - deliberately gentle, the plateau is meant to feel flat." },
+      { "at_distance_m": 475.7, "delta_grade_pct": -3.5, "profile": "convex", "speed_kmh": 116.7,
+        "required_radius_m": 908.0, "chosen_radius_m": 950.0, "transition_length_m": 33.3, "ok": true,
+        "note": "The crest. In the Rim approach (445.7-585.3 m), occupying 475.7-509.0, ending 76 m before T3's entry so no gradient change is in the corner. Held near the minimum on purpose: this is a pure acceleration section, not a braking one, and 950 m gives 0.101 g of unloading - the biggest single load event elevation produces anywhere on the lap." },
+      { "at_distance_m": 750.0, "delta_grade_pct": 3.0, "profile": "concave", "speed_kmh": 73.0,
+        "required_radius_m": 266.4, "chosen_radius_m": 450.0, "transition_length_m": 13.5, "ok": true,
+        "note": "The compression at the bottom of the Plunge, occupying 750.0-763.5, ending 1.5 m before T4. DELIBERATELY inside the braking zone (which runs 722.5-765.0) at 1.69x the minimum radius: 0.093 g of extra load arriving at the moment the brakes are hardest. The regulation says 'wherever possible' avoid this; this is the one place the design says it is not possible, and says why." },
+      { "at_distance_m": 816.0, "delta_grade_pct": 5.3833, "profile": "concave", "speed_kmh": 51.6,
+        "required_radius_m": 133.3, "chosen_radius_m": 350.0, "transition_length_m": 18.8, "ok": true,
+        "note": "Valley floor to climb, in the Cellar climb's first 18.8 m. 2.63x the minimum because it is a corner-release section. 0.060 g." },
+      { "at_distance_m": 978.0, "delta_grade_pct": 0.6167, "profile": "convex", "speed_kmh": 126.2,
+        "required_radius_m": 1061.9, "chosen_radius_m": 1500.0, "transition_length_m": 9.3, "ok": true,
+        "note": "Climb steepening, in the Upper climb (972.7-1051.6 m). Trivially small." },
+      { "at_distance_m": 1008.0, "delta_grade_pct": -2.0, "profile": "convex", "speed_kmh": 132.2,
+        "required_radius_m": 1164.2, "chosen_radius_m": 1550.0, "transition_length_m": 31.0, "ok": true,
+        "note": "Occupies 1008.0-1039.0, ending 4.2 m before T6's braking point (1043.2) and 12.6 m before the corner. This is the crest that makes T6's exit blind, and it clears the braking zone by design." },
+      { "at_distance_m": 1082.0, "delta_grade_pct": -1.5, "profile": "convex", "speed_kmh": 120.2,
+        "required_radius_m": 962.9, "chosen_radius_m": 1400.0, "transition_length_m": 21.0, "ok": true,
+        "note": "In the Gate approach (1077.8-1164.7 m), 4.2 m past T6's exit, occupying 1082.0-1103.0." },
+      { "at_distance_m": 1110.0, "delta_grade_pct": -1.0, "profile": "convex", "speed_kmh": 124.9,
+        "required_radius_m": 1039.9, "chosen_radius_m": 1600.0, "transition_length_m": 16.0, "ok": true,
+        "note": "Occupies 1110.0-1126.0, leaving 38.7 m to T7 of which the last 22.2 m is the braking zone. R increased 54% because it is an approach section. The plateau is regained here and the start straight is a single +0.5% from T7's exit through the line to T1 - well inside the 2% starting-straight cap, and with no gradient change anywhere on it." }
+    ]
+  },
+
+  "reverse": {
+    "character": "It is a different circuit, and the reason is that the two compound corners swap sense while the hairpin swaps role entirely. Forward, T1 opens and T2 closes; reversed, T1 closes and T2 opens, so the clean pass-and-drive-away corner and the dive-bomb trade places and the driver's whole approach to the back straight inverts. Forward, T4 is a slow hairpin at the end of a long descent and a mediocre passing spot; reversed, it is at the end of a 111.75 m downhill run on which the kart reaches its full 143.7 km/h top speed - the only place in either direction that it does - with a 48.5 m braking zone, the longest on the property. T3 changes from a flat-out downhill LEFT held at the 1.86 g ceiling for 2.5 s into a climbing, opening RIGHT taken from 110 to 128 km/h under power, which is not the same corner in any sense that matters. And because every hand inverts, the reverse lap puts its big sustained loads on the 2.43 g rollover side that the forward lap keeps for T3 and T6 alone - so the reverse layout is measurably closer to tipping the kart and has to be validated separately rather than inferred. Reverse lap 42.612 s against forward 42.918 s: near-identical pace, entirely different lap.",
+    "overtaking_spots": [
+      "T4 The Cellar, reversed - 111.75 m of -4.38% descent to 143.7 km/h, 48.5 m of braking, 10 m entry, exiting onto 319 m of climbing full throttle. Best overtaking corner on the circuit and it does not exist in the forward direction.",
+      "T2 The Kettle, reversed - now an opening R32-into-R50 corner, 139.5 m of climbing tow, 19 m braking, 12 m entry, exiting onto the 195 m back straight.",
+      "T1 The Anvil, reversed - now a closing R50-into-R32 corner, 195 m tow, 19.5 m braking, 12 m entry, exiting onto the 198 m start/finish straight. The third, and the one that decides the last lap."
+    ],
+    "what_breaks": "1. RUN-OFF AT T4 IS SIZED FOR THE WRONG SPEED. Forward, a total brake failure arrives at 136.6 km/h; reversed, at 143.7. The reversed case needs 101.5 m of gravel against the forward case's 91.7, and neither is built - but the reverse layout has to state the larger number or the document lies. 2. THE PIT LANE DOES NOT REVERSE AT ALL. The deceleration lane leaves the Gate approach's right edge at 25 deg to the direction of travel; driven the other way that same asphalt is a 155 deg merge, and Part 1 section 7.2 caps the angle at 30 deg. The reverse layout needs its OWN entry and exit stubs - that is geometry, not furniture, and ADR-0046's 'the geometry is shared, nothing else is assumed to be' does not cover it. 3. EXIT KERBS BECOME ENTRY KERBS. Apex kerbs sit on a corner's inside and survive the reversal untouched; the exit kerbs at T1b, T4 and T7 become entry kerbs struck at a different speed and a different angle, and T2's deliberate absence of an exit kerb becomes a deliberate absence of an entry one, which is not the same decision. Every kerb outside an apex is authored twice. 4. SECTOR MARKS DO NOT TRANSLATE. Equal-TIME thirds forward fall at s = 470.5 and 850.5 m; reversed they fall at reverse-s 477.5 and 841.0 m, which is forward-s 825.1 and 461.6 m. Different points. Both happen to land on straights in both directions, which was checked and not assumed - reverse-s 841.0 sits 24.1 m from T2b's exit, and had the split fallen 25 m earlier it would have been mid-corner. 5. THE GRID MIRRORS. Forward, pole is on the right column because T1 is a right-hander; reversed, T7 is the first corner and it is a left, so pole moves to the left column and the four rows run the other way from the line. 6. BRAKING BOARDS ARE ENTIRELY DIRECTIONAL - every one of them is on the wrong side of its corner in the other layout. 7. GEARING. Forward tops out at 137.8 km/h and reverse at 143.7, so one final-drive setting cannot be right for both; the reverse layout wants a taller top gear and the shared default is a compromise in whichever direction it was not chosen for."
+  },
+
+  "sectors": [
+    { "start_m": 0.0, "end_m": 470.5,
+      "rationale": "The plateau and both passing corners - start straight, T1, back straight, T2 - ending 24.8 m past T2's exit, on a straight, before the crest. 14.306 s. This is the racing sector: if a driver has gained or lost a place it happened here, and the split reads it cleanly." },
+    { "start_m": 470.5, "end_m": 850.5,
+      "rationale": "The descent - the crest, the Rim approach, T3 at the grip ceiling, the Plunge, the hairpin - ending 36.7 m up the Cellar climb, on a straight. 14.306 s. This is the commitment sector; it contains the fastest corner and the slowest and nothing in between." },
+    { "start_m": 850.5, "end_m": 1302.559,
+      "rationale": "The climb and the return - T5, Upper climb, T6, Gate approach, T7 and the run to the line. 14.306 s. This is the gearbox-and-exit sector, and because it ends at the start line it is the one that predicts whether the tow into T1 exists next lap." }
+  ],
+
+  "start_area": {
+    "grid_description": "8 slots in 4 staggered rows of 2, on the 9 m section of the start/finish straight behind the line. Rows at s = 1297.559, 1289.559, 1281.559 and 1273.559 m, i.e. 5, 13, 21 and 29 m before the line, 8 m row pitch. Two columns at +/-2.5 m from the centerline, which puts a 1,400 mm kart's outer edge 3.2 m from center and 1.3 m inside the edge line. Pole is the RIGHT column because T1 is a right-hander and the right column is the inside line into it. The back row sits 59.0 m past T7's exit and 19 m past the end of the 10 -> 9 m width taper, so the whole grid is on constant-width, constant-grade (+0.5%) road. Starting lights at s = 8.0 m - 13 m ahead of the front row, inside the 10-15 m rule - at 3.0 m above the track, spanning the full 9 m. The reverse layout mirrors all of it about the line: rows at s = +5, +13, +21, +29 m, pole on the LEFT column because reversed T7 is a left-hander.",
+    "pit_entry_m": 1100.0,
+    "pit_exit_m": 40.0,
+    "notes": "The deceleration lane leaves the RIGHT edge of the Gate approach at s = 1100.0 m at 25 deg (cap is 30), 4 m wide, with a chicane at its mouth per Part 1 section 7.2. It does not cross the racing line because T7 is a right-hander and the line into it runs down the LEFT of the road. The exit lane rejoins the RIGHT edge of the start/finish straight at s = 40.0 m, 40 m past the start line and 70 m before T1's entry, at 20 deg, 3.5 m wide - also clear of the line, for the same reason at T1. The pit lane itself runs inside the T7 loop on the plateau. Start-line placement is the tightest-constrained thing on the circuit: the whole start/finish straight is 198.0 m (2.0 m inside the 200 m cap on any straight, and inside the 120-200 m starting-straight band), the line sits 88.0 m past T7 and 110.0 m before T1, and BOTH directions clear the 50 m and 70 m minima on the same physical line - reversed it is 88.0 m to the first corner and 110.0 m from the last."
+  },
+
+  "risks": [
+    "THE CENTRAL MECHANIC RESTS ON AN UNRESOLVED DEFECT. The switchback dominance - outside line beats pinned inside by 25.5 km/h at T1 and by 21.1 m over the back straight - is a direct consequence of #137. If #137 is fixed and the kart holds 1.86 g at any radius, the same comparison becomes 96.9 vs 79.5 km/h, a 17.4 km/h edge instead of 38.7, and the switchback stops being automatic. The layout still works - the widths, tows and exit drives are all still right - but its racing character changes materially, and every number in this document should be re-measured the day #137 closes.",
+    "THERE IS NO SLIPSTREAM IN THE SIMULATION, so the tow this design is built around does not currently exist. See outside_scope_concerns; it is the single largest threat to the whole proposal and it is not a track problem.",
+    "T1 AND T2 ARE THE SAME HAND, and separated by one straight. That means the kart that yields the inside at T1 and takes the outside line exits on the LEFT of the back straight, which is already the correct side for T2's entry. The switchback is therefore rewarded twice, and a T1 pass may turn out to be worth nothing. The mitigation is that T2's entry is the open R50 half, so a kart on the inside of the back straight can still brake later and make the first apex - but that is an argument, not a measurement, and it needs two AI karts to settle.",
+    "T3 SITS EXACTLY AT THE MEASURED GRIP CEILING for 2.52 s in a left-hander with a 2.43 g rollover threshold - a 23% margin, the smallest anywhere. Worse, the brief's headline sustained figure (1.86 g) and the lock sweep's own best row (1.84 g) disagree by 0.02 g, which moves T3's apex speed by 0.7 km/h. That is small, but it means T3 is designed against a number the project is not internally consistent about, and the corner is the one that would show it first.",
+    "THE RUN-OFF ARITHMETIC RESTS ON TWO ASSUMED CONSTANTS. Gravel deceleration at 0.80 g and departure angles of 12-15 deg are engineering judgment, not measurements and not sourced - the regulation's actual answer is a numeric impact simulation this project cannot run. Every run-off width in this document is only as good as those two numbers, and at T4 the honest answer (91.7 m forward, 101.5 m reverse for a total brake failure) is simply not buildable.",
+    "TWO VERTICAL CURVES ARE IN PLACES THE REGULATION SAYS TO AVOID 'WHEREVER POSSIBLE'. The compression at s = 750 m is inside T4's braking zone by choice, at 1.69x the minimum radius, because a compression at the bottom of a plunge is the only place elevation produces a felt load at kart speeds. The crest at s = 1008 m clears T6's braking zone by 4.2 m, which is a margin and not a comfort. Both are defensible; neither is free.",
+    "THE 42.918 s LAP TIME IS A CENTERLINE ESTIMATE from a curvature-limited quasi-static profile with a fictional acceleration curve fitted to two measured points (143.9 km/h top speed, 4.50 s to 100 km/h). Treat the ORDERING of the corners as trustworthy and the absolute number as decoration until a real kart drives it. The racing-line radii are geometric optima capped at 2x the centerline radius, which is a heuristic and not a measurement.",
+    "THE HAIRPIN'S 47.5 km/h APEX SPEED IS INTERPOLATED FROM THE SINGLE MEASURED POINT AT 18.99 m, which was recorded at 0.25 lock and 0.30 THROTTLE - a low-throttle equilibrium, not a scrub. Nothing in the sweep measures a kart trying hard at a 16-20 m radius. T4's whole speed profile inherits that gap.",
+    "1,302.6 m IS A SHORT LAP for the amount of content in it. Nine corners in 1,302 m at 109 km/h average means a corner every 4.8 s, and a 23-lap Final is 16.5 minutes of that. If it reads as busy rather than rhythmic, the fix is to lengthen the Rim approach and the Cellar climb, both of which are already the free variables the closure solve uses."
+  ],
+
+  "outside_scope_concerns": [
+    "THERE IS NO SLIPSTREAM MODEL ANYWHERE IN THE PROJECT, AND EVERY OVERTAKING ARGUMENT DEPENDS ON ONE. `src/core/vehicle.h` carries a single drag term - AIR_DENSITY 1.2 and a 0.7 m^2 Cd*A - applied per kart with no awareness of any other kart, and grepping docs/ and src/ for slipstream, draft or tow returns nothing. ARCHITECTURE.md section 6's Aero row says 'Light drag, negligible downforce' and stops. Worked out: at 138 km/h the drag on this kart is 617 N = 3.53 m/s^2 of deceleration, so a 25% reduction in the tow is worth up to +0.88 m/s^2, which over a 195 m straight is up to 4.5 m/s of closing and 11.4 m of gap - realistically 2-3 m/s and 6-10 m once the tow's decay with distance is accounted for, and that is exactly the difference between arriving alongside and arriving behind. Without it, EVERY layout in this exercise loses its passing spots and the 8-kart field will run in a procession. ROADMAP M5's line item 'two real overtaking spots' cannot be satisfied by track geometry alone. This wants a ticket before M5 is accepted, and it wants deciding before M7 writes the AI's overtaking logic against a physics that cannot produce an overtake.",
+
+    "ARCHITECTURE.md SECTION 11 SAYS ELEVATION IS 'BOTH FOR LOOKS AND BECAUSE IT LOADS THE TIRES', AND THE REGULATION IT NOW CITES PROVES THE SECOND HALF NEARLY WRONG. R = V^2/K is algebraically a cap on vertical acceleration: a_vert = v^2/R, and at R = R_min = V^2/K the speed cancels, leaving a_vert = K/12.96 m/s^2 for V in km/h. That is 1.157 m/s^2 (0.118 g) over any crest and 1.543 m/s^2 (0.157 g) in any compression, INDEPENDENT OF SPEED - so the maximum load swing a legal Grade 1 kart circuit can produce anywhere is -11.8% / +15.7% of static, and the same article then instructs designers to increase R in approach, release, braking and curved sections, which reduces it further. Elevation on a kart circuit is a visibility and scenery feature. It is not a tire-loading feature, and a session that reads section 11 will size its elevation for an effect the rules forbid. The sentence should be corrected or qualified, and this identity is worth putting in REFERENCES.md next to the vertical-radius table because it is the thing the table is actually saying.",
+
+    "THE BRIEF'S HEADLINE CLAIM ABOUT #137 CONTRADICTS THE SWEEP DIRECTLY BELOW IT, AND THE SAME SENTENCE IS IN scripts/track/track_layout.gd's HEADER. 'PAST A QUARTER OF LOCK THE KART FALLS OFF A CLIFF' is stated in capitals, and the very next row of the same table is 0.40 lock at full throttle settling at 50.95 m and holding 1.82 g - more than a quarter of lock, no cliff, essentially the same lateral g as the 0.25-lock row. The cliff is between 0.40 and 0.60 lock, not at 0.25. What the data supports is subtler and more useful: settled radius is a function of lock AND speed jointly, which is why 0.25 lock at full throttle gives a BIGGER radius (58.49 m) than 0.40 lock at full throttle (50.95 m). Anyone designing a corner to sit 'exactly on the quarter-lock boundary' is designing against a boundary that is not where the sentence says it is.",
+
+    "THE SAME TABLE'S 'r ~ 15-25 m PAST THE BOUNDARY, THE KART SCRUBS, 45-65 km/h AND FALLING' IS ASSERTED, NOT MEASURED. The only measured point in that radius band is 18.99 m at 46.0 km/h holding 0.88 g, and it was taken at 0.25 lock and 0.30 THROTTLE - a low-throttle equilibrium on the safe side of the lock range, not a scrub. There is no measurement anywhere of a kart trying hard at a 15-25 m radius. Every hairpin speed in every proposal in this exercise, including mine, is interpolated across that hole. It is a one-scenario addition to drive_probe.gd's sweep (0.35 and 0.45 lock at full throttle) and it would settle a design question four separate documents currently guess at.",
+
+    "REFERENCES.md's GRADE 1 ROW 'LENGTH OF STARTING STRAIGHT 120-200 m' IS AMBIGUOUS, AND THE STRICT READING IS PROVABLY IMPOSSIBLE FOR A REVERSIBLE CIRCUIT. If the row means the portion AFTER the start line, a reversible layout needs >=120 m after the line in both directions plus >=70 m before it in both, which is >=240 m of straight - and the same table caps the longest straight at 200 m. So the strict reading makes a reversible Grade 1 circuit impossible, and GAMEDESIGN.md section 10 makes reverse a first-class case. The whole-straight reading is the only coherent one, and it is independently supported by the fact that it makes the separate 'distance start line -> 1st corner min 50 m' row non-redundant (under the strict reading, 120 > 50 makes that row dead text). REFERENCES.md should state which reading it means; this layout is built on the whole-straight one and would have to move its start line by 22 m under the other.",
+
+    "scripts/track/track_ribbon.gd's `TRACK_WIDTH = 8.0` IS A SINGLE CONSTANT AND ADR-0046's SCHEMA MAKES WIDTH A PER-CONTROL-POINT FIELD. Nothing in ROADMAP.md M5's line items says the ribbon becomes width-varying, and it is the one change that makes an overtaking corner possible. REFERENCES.md's own circuit section says widening the two overtaking corners is 'a free plausibility gain' - it is free in regulation terms and not free in code terms, and the gap is currently invisible because the test track is a fixed-width instrument that never needed it. This proposal runs 9 m base with 12 m through T1 and T2 and 10 m through T4 and T7, with 30-50 m tapers; none of that can be built today.",
+
+    "ADR-0046 DOES NOT COVER THE PIT LANE'S REVERSAL, AND ITS OWN FRAMING IS WHAT BREAKS. The ADR lists 'repair area, pit entry' under `furniture` and says each layout names 'its own sector order, grid placement and racing-line seed', concluding 'the geometry is shared; nothing else is assumed to be'. But a deceleration lane peeling off at 25 deg to the direction of travel becomes a 155 deg merge when the direction reverses, and Part 1 section 7.2 caps the angle at 30 deg. So the reverse layout needs its own lane stubs - actual asphalt, not a furniture placement - which means either the spline owns a Y at both ends of the pit lane or `layouts` must be able to name different pit GEOMETRY. This is the same class of argument the ADR already makes for curbs, one level deeper, and it should be settled before gentrack.py is written rather than after.",
+
+    "ROADMAP.md M5's ACCEPT CLAUSE CANNOT TEST ITS OWN LINE ITEM. 'First fictional circuit built to section 11 constraints: 1,000-1,500 m, two real overtaking spots, elevation change' is a line item; the accept clause is about collision, materials, scatter, lightmaps and rejecting a self-intersecting spline. There is no probe that can measure whether an overtaking spot works, and there cannot be one until M7 puts a second kart on the circuit - and per the first concern above, possibly not even then. Either the accept clause should defer the overtaking claim to M7, or M5 should assert the GEOMETRIC preconditions instead (entry width at the passing corners, tow length before them, full-throttle distance after them), which is testable today and is what the project's culture of 'close issues with measured numbers' would want.",
+
+    "ARCHITECTURE.md SECTION 6.4's KZ REFERENCE TABLE GIVES 0-100 km/h AT ~3.5 s AND THE KART MEASURES 4.50 s (issue #121, known, 'all launch'). Every straight length in a track design is sized against acceleration, and the gap is 22%. This circuit's 198 m and 195 m straights reach 135.8 and 137.8 km/h with the current kart; with a kart that does 0-100 in 3.5 s they will reach top speed with road to spare, which changes the braking points, the tow arithmetic and the run-off sizing at four corners. That is not a reason to wait - it is a reason for the track document to record which kart it was designed against, the way REFERENCES.md's vertical-radius table now records which kart it was worked against. Commit 27d8fb3 ('the vertical-radius table was worked against the M3a kart, not the one that drives') is the same defect, already found once, in a different table.",
+
+    "MINOR, BUT IT WILL BITE SOMEONE: the brief states 'Best sustained lateral 1.86 g' while the lock sweep it prints two paragraphs later tops out at 1.84 g. If 1.86 comes from a skidpad scenario and 1.84 from the lock sweep they are two different measurements and should be labeled as such - ADR-0034 already had to separate a peak figure from a sustained one in this exact table, and this is a smaller instance of the same problem. It matters here because T3 is designed to sit at whichever number is right, and 0.02 g is 0.7 km/h of apex speed."
+  ]
+}
