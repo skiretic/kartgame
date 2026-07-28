@@ -109,6 +109,10 @@ const SURFACE_GRASS := 2
 
 var _args: Dictionary = {}
 var _kart: KartBody
+## Where this run's assist state came from — a stored `settings.cfg`, a command
+## line, or a scripted run that is not allowed to read one.
+## `scripts/game/assist_settings.gd` resolves it and this holds the report.
+var _assists: Dictionary = {}
 ## The human at the controls. ADR-0040: `KartBody` no longer reads the `Input`
 ## singleton, so without this node the kart coasts and the pad does nothing.
 var _driver: PlayerDriver
@@ -161,6 +165,12 @@ func _ready() -> void:
 	add_child(preload("res://scenes/ui/telemetry.tscn").instantiate())
 
 	_set_camera_mode(Cmdline.as_string(_args, "camera", "chase"))
+
+	# The only thing this scene prints, and it earns the line: every §6.4 figure is
+	# measured here, so a run has to be able to say whether the assists it drove
+	# with came from a file nobody mentioned. A stored preference silently moving a
+	# validation number is the failure this whole path was built to avoid.
+	print("proving ground: %s" % AssistSettings.describe(_assists).strip_edges())
 
 
 # --- construction ----------------------------------------------------------
@@ -482,11 +492,17 @@ func _build_kart() -> void:
 	# and only one of the two mixes was ever judged.
 	EngineVoiceRig.attach_listener(_kart)
 
+	# The assists: whatever the driver last chose, then whatever this command says.
 	# `--auto-shift=off` starts in the manual box, so a session that is about the
-	# gearbox does not begin by reaching for a key. Defaults to the assist's own
-	# default rather than to a literal, so this flag cannot become a second owner
-	# of what "on" means.
-	_kart.auto_shift = Cmdline.as_bool(_args, "auto-shift", _kart.auto_shift)
+	# gearbox does not begin by reaching for a key.
+	#
+	# **This scene is the one that made the rule** inside `assist_settings.gd`.
+	# Every §6.4 figure is measured here and `shoot.sh` drives it from `--throttle`
+	# and friends, so a `settings.cfg` in `user://` with auto-shift off would move
+	# a validation number and a published still without appearing in either
+	# command. The helper skips the stored file whenever the input is scripted, and
+	# says which rule it applied rather than deciding quietly.
+	_assists = AssistSettings.apply(_kart, _args)
 
 	_physics_draw = PhysicsDraw.new()
 	_physics_draw.name = "PhysicsDraw"
@@ -723,8 +739,13 @@ func _process(_delta: float) -> void:
 	# two triggers are already throttle and brake. An unassisted launch needs clutch
 	# modulation (#38) and a digital clutch cannot supply it, so "assists off" on a
 	# pad would be a mode nobody can drive away in.
+	#
+	# Remembered on the way out, so the next launch starts where the driver left
+	# it. There is no session in this scene to keep in step — `test_track.gd` has
+	# that half of the fix and the reason it needed one.
 	if _kart != null and Input.is_action_just_pressed(&"auto_shift_toggle"):
 		_kart.auto_shift = not _kart.auto_shift
+		AssistSettings.remember(_kart)
 	# `look_back` has been bound in `project.godot` and printed in this HUD since
 	# M3a, and until now **nothing read it** — C and Triangle did nothing at all.
 	# That is the exact failure CLAUDE.md's driving section opens with, one level

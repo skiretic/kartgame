@@ -275,7 +275,7 @@ void KartBody::_ready() {
 		UtilityFunctions::push_error(
 				"KartBody '", get_name(),
 				"' has no CollisionShape3D child. A RigidBody3D with no shape falls through "
-				"the world without reporting anything. The shape is the scene's to add — see "
+				"the world without reporting anything. The shape is the scene's to add - see "
 				"kart_body.h, 'What this node does NOT own'.");
 	}
 

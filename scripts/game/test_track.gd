@@ -173,6 +173,10 @@ var _hud: Label
 var _driving_hud: Control
 var _tuning: KartTuning
 var _tuning_panel: TuningPanel
+## Where this run's assist state came from — a stored `settings.cfg`, a command
+## line, or neither. `scripts/game/assist_settings.gd` resolves it and this holds
+## the report so `_report` can print which rule won.
+var _assists: Dictionary = {}
 ## The session, its runner and its timing screen. ROADMAP M3c. The scene assembles
 ## them and owns none of the rules — `scripts/game/session_runner.gd` does.
 var _session: KartSession
@@ -563,11 +567,16 @@ func _build_kart() -> void:
 	# and only one of the two mixes was ever judged.
 	EngineVoiceRig.attach_listener(_kart)
 
+	# The assists: whatever the driver last chose, then whatever this command says.
 	# `--auto-shift=off` starts in the manual box, so a session that is about the
-	# gearbox does not begin by reaching for a key. Defaults to the assist's own
-	# default rather than to a literal, so this flag cannot become a second owner
-	# of what "on" means.
-	_kart.auto_shift = Cmdline.as_bool(_args, "auto-shift", _kart.auto_shift)
+	# gearbox does not begin by reaching for a key.
+	#
+	# This line used to be the `Cmdline.as_bool` alone, and the flag it read was the
+	# only way the assist could ever be anything but on — `settings.cfg` could
+	# already store the choice and nothing loaded it, so G worked for one process
+	# and the next launch was automatic again. `assist_settings.gd` owns the order
+	# now, and owns the rule that keeps a stored preference out of a scripted still.
+	_assists = AssistSettings.apply(_kart, _args)
 
 	# `--steer-gamma` is **not** applied here. It used to be, in the line this
 	# comment replaces, and that line was the second owner of the constant that
@@ -1022,6 +1031,10 @@ func _report() -> void:
 			SessionRunner.SECTOR_COUNT, _layout.length(), _grid_distance(),
 			_runner.state_name(),
 		])
+	# Where those assists came from. The session line above says what the run is
+	# configured with; this one says who decided, which is the question that could
+	# not be answered at all until `settings.cfg` was actually read.
+	print(AssistSettings.describe(_assists))
 	if Cmdline.as_bool(_args, "validate", false):
 		# ARCHITECTURE.md §11's M5 validation item, pulled forward: "closed loop, no
 		# self-intersection". O(n^2) over 900 samples, so it is opt-in rather than
@@ -1051,8 +1064,20 @@ func _process(_delta: float) -> void:
 	# two triggers are already throttle and brake. An unassisted launch needs clutch
 	# modulation (#38) and a digital clutch cannot supply it, so "assists off" on a
 	# pad would be a mode nobody can drive away in.
+	#
+	# Three things move together here and the middle one is the defect this
+	# replaced. The toggle used to set `_kart.auto_shift` alone, so `_session` went
+	# on reporting whatever it copied at build time: the boot line printed one
+	# state, the HUD printed the other, and `session.h` mixed the stale flag into
+	# `config_hash_hex()`. ADR-0041 puts the whole configuration in the replay, so a
+	# lap recorded after a toggle would re-sim with the assist back on and shift in
+	# gears the driver never selected — a config bug wearing a determinism failure's
+	# clothes. The session is told, and the hash on the HUD moves when it should.
 	if _kart != null and Input.is_action_just_pressed(&"auto_shift_toggle"):
 		_kart.auto_shift = not _kart.auto_shift
+		if _session != null:
+			_session.set_auto_shift(_kart.auto_shift)
+		AssistSettings.remember(_kart)
 	# `look_back` has been bound in `project.godot` and printed in this HUD since
 	# M3a, and until now **nothing read it** — C and Triangle did nothing at all.
 	# That is the exact failure CLAUDE.md's driving section opens with, one level
