@@ -170,7 +170,8 @@ Every bodywork row in §Bodywork cites back to this block rather than re-quoting
 it. All from the pinned PDF, Art. 9.5: 9.5.2/9.5.3/9.5.4 on PDF page 24, 9.5.5.1 on PDF page 25.
 
 **9.5.2 Front fairing**
-> Minimum width: 1.000 mm. Maximum width: overall rear width […]
+> Minimum width: 1.000 mm. Maximum width: overall rear width of the front
+> wheel/front axle unit.
 > Maximum gap between the front wheels and the back of the fairing: 180.0 mm.
 > Front overhang: 680 mm maximum, see TD n°2.1.
 > The front fairing must be placed no higher than the front wheels and must not
@@ -222,6 +223,26 @@ and the pod's outer face must lie between `x_datum(y) - 40` and `x_datum(y)`.
 `sidepod_x` is a single constant, so the pods are currently parallel-sided and
 482 mm out — 118 to 160 mm inboard of where they belong, per side. Real pods
 splay outward toward the back for this reason, which had been read as styling.
+
+Note also that the fairing's **maximum** width is *"the overall rear width of the
+front wheel/front axle unit"*, so the ceiling is `track_front` **1240**, not 1400.
+This document dropped that qualifier once and 1400 is the wrong number.
+
+**The datum has two readings and they differ by 11 mm; a pod that spends the full
+40 mm is illegal under one of them.** The arithmetic above places the datum points
+at the wheel *axis* planes, y ±525. The article's literal words are the outer
+front **edge** of each wheel — the tire's forward face, at y +665 and y −672.5 —
+which gives
+
+    x_datum_literal(y) = 671.0 - 0.0767 * y      # same plan angle to within 0.03 deg
+
+i.e. **11 mm outboard** of the axis-plane reading everywhere. A face placed 40 mm
+inboard of the axis-plane datum is 51 mm inboard of the literal one, and 51 > 40.
+So the usable inset budget is **29 mm, not 40**, and every pod dimension in
+§Bodywork is specified against that narrower band. This is not an amendment to the
+article — it is the same article read two ways, and the spec takes the conservative
+intersection because a scrutineer holding a straightedge to the tire is the
+literal reading.
 
 **9.5.5.1 Rear wheel protection**
 > Width: minimum 1.340 mm, maximum that of the overall rear width, at any time
