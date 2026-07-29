@@ -1,0 +1,13 @@
+[gd_scene format=3 uid="uid://vy08taq83h"]
+
+[ext_resource type="Script" uid="uid://3kdtpy73q7ih" path="res://tools/bake/circuit_bake.gd" id="1_circuitbake"]
+[ext_resource type="LightmapGIData" uid="uid://d3bypk3yghpm5" path="res://scenes/game/valdirone.lmbake" id="2_vdhus"]
+
+[node name="ValdironeBake" type="Node3D" unique_id=1996262812]
+script = ExtResource("1_circuitbake")
+
+[node name="LightmapGI" type="LightmapGI" parent="." unique_id=1268782507]
+quality = 2
+bounces = 2
+max_texture_size = 4096
+light_data = ExtResource("2_vdhus")

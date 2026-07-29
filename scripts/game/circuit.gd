@@ -96,10 +96,13 @@ extends Node3D
 ## that matters and adding more static bodies beside a racing line is a way to move
 ## a measured figure for a decoration.
 ##
-## **No pit lane.** The stations are in the file and the *asphalt* is not:
-## reversed, a deceleration lane at 20° to the direction of travel is a 160° merge
-## over Part I art 7.4's 30° cap, so each layout needs its own stubs. That is
-## geometry rather than furniture and it is its own piece of work. Issue #181.
+## **The pit lane's asphalt is built** since issue #181, and it needs no call from
+## here: `_build_track()`'s loop over `surface_meshes()` picks the `PitLane` entry
+## up like any other surface and gives it its own `StaticBody3D`. One shared lane
+## plus four per-layout gores, because reversed, a deceleration lane at 20° to the
+## direction of travel is a 160° merge over Part I **§7.2**'s 30° cap — §7.2, not
+## §7.4, which is where five places in this repo had it. `KartTrack.pit_lane()` and
+## `pit_stubs()` publish the stations for anything that wants them.
 
 const DEFAULT_TRACK := "res://data/tracks/valdirone_nuova.track.json"
 const TRACK_MESH_PATH := "res://assets/generated/valdirone_nuova.glb"
