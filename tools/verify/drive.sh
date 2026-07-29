@@ -2,7 +2,7 @@
 #
 # Run the M3a driving scenarios and check that they are reproducible.
 #
-#     tools/verify/drive.sh                       # all three scenarios, twice each
+#     tools/verify/drive.sh                       # all four scenarios, twice each
 #     tools/verify/drive.sh --scenario=skidpad    # one of them
 #     tools/verify/drive.sh --once                # skip the determinism half
 #
