@@ -51,8 +51,9 @@ Ours, placeholder until the series is named (naming is open on purpose):
     --series-deep:    a dark saturated blue-black   (chrome, screen-document ground)
     --series-accent:  one vivid color, not FIA's green (live values, progress, focus)
     --paper:          warm white                     (paper-document ground)
-    --panel-yellow:   number-panel yellow            (Art. 3.7; exact value from a
-                                                      panel photograph, F3/F4)
+    --panel-yellow:   #d7c354                        (Art. 3.7; sampled from F3/F4 —
+                                                      three lightings bracket it,
+                                                      provisional, REFERENCES.md)
 
 Rules, all sourced from what the references do:
 

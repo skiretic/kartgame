@@ -2264,5 +2264,12 @@ no logo, no copy of the chrome, and not the FIA's exact navy/green pair.
 2. **Race-control signage and the light-panel standard in use.** The standard
    document is linked from the circuit-regulations pass; a photograph of the
    panels lit at a kart race is not in hand.
-3. **The panel yellow's measured value** — to be sampled from F3/F4 rather
-   than picked.
+3. ~~The panel yellow's measured value.~~ **Sampled from F3/F4**: median of
+   yellow-masked pixels reads `rgb(202,175,51)` on F3's shaded side panel,
+   `rgb(240,205,96)` on its sunlit nose panel, and `rgb(215,195,84)` on F4's
+   side panel — a distinctly less saturated yellow than a picked
+   "panel yellow" (blue channel ~50–95, never 0). Working value
+   **`#d7c354`**, the mid sample. INFERRED as reflectance: three photographs,
+   three unknown lighting conditions and white balances, bracketing rather
+   than measuring — a real albedo needs a calibrated shot or the paint
+   standard, so the value is provisional and recorded as such.
