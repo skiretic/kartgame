@@ -3442,3 +3442,62 @@ things to interleave in one gate.
 - Nothing here starts building. The design phase ends when Anthony says it
   does; this ADR exists so that when he does, the first commit has a plan to
   disagree with instead of a blank page.
+
+## ADR-0054 — The kart is a KZ, which is Group 1, so Art. 8 governs it and not Art. 9
+
+**Status:** accepted, 2026-07-29. Supersedes nothing; corrects an assumption that
+had never been written down and so was never checked.
+
+**Context.** `docs/KART_SPEC.md` was written against **Art. 9, Group 2**, in six of
+its seven sections. A recheck pass aimed at primary sources found that wrong. Art.
+1 of the pinned 2026 technical regulations, PDF p. 1:
+
+> **Group 1** — KZ: Cylinder capacity of 125 cm3
+> **Group 2** — KZ2, OK, OK-N, OK-Junior, OK-N Junior, …
+
+This project has called its subject a KZ shifter kart since M0, in CLAUDE.md, in
+ARCHITECTURE.md and in every commit. Art. **8.10** is headed *"KZ engine"*. So the
+kart is a KZ, the kart is Group 1, and its article is **Art. 8**.
+
+Nobody chose Art. 9. It was assumed, because Art. 9 is where the dimensions are
+written out longhand and Art. 8 is two pages of cross-references — so a reader
+searching the PDF for "1010.0 - 1070.0 mm" lands in Art. 9 and never sees that Art.
+8.1.1 says the same thing for a different group.
+
+**Decision.** The kart is a **KZ, Group 1, Art. 8**. Citations for delegated
+clauses take the form `Art. 8.5.2 → 9.5.2`, which records both the governing
+article and where the figure is actually written.
+
+**Consequences, and the reason this is cheap.** Art. 8 delegates nearly everything:
+8.5.1→4.10.2, 8.5.2→9.5.2, 8.5.3→9.5.3, 8.10→9.10, 8.11→9.12.1, 8.12→9.13.1,
+8.13→9.14.1, 8.14→9.15.1, 8.15→9.16.1, 8.16→9.17, 8.17→9.18.1. Art. 8.1.1, 8.2 and
+8.3 restate 9.1.1, 9.2 and 9.3 word for word, and Art. 5.3.1 and 4.13.1 are both
+headed *"In Groups 1 & 2"*. **No dimension in the spec changes.** Five things do:
+
+1. **Brakes are free.** Art. 8.6: *"Brakes are free in Group 1, but must comply
+   with Articles 4.12 et seq. of the TR. They must be produced by a manufacturer
+   with a valid brake homologation."* A KZ is **not required to have front brakes**.
+   The spec models four because every real KZ has four, and that is now an
+   `estimated` design choice carrying its reasoning rather than a requirement.
+2. **Rear wheel protection delegates only to the wheel-cover variant**, 8.5.5.2 →
+   9.5.5.2. Group 1 has no plain 8.5.5.1. The spec describes the plain protection,
+   which is a KZ2 part. Open — see #197.
+3. **No anti-roll-bar restriction.** 8.1.2 omits 9.1.2's *"Anti-roll bars must only
+   be connected to the main tubes"*, so the torsion bar's Envelope is `none`.
+4. **Five-inch rims are a rule, not a habit.** Art. 8.7: *"In Group 1, only 5-inch
+   rims are allowed with CIK-FIA homologated 5-inch tyres."* `rim_diameter`'s
+   comment was flagged as false in general; for Group 1 it is exactly true and now
+   sourced.
+5. **The 170 kg is sourced.** Art. 8.9: *"Total (incl. driver) KZ: 170.0 kg
+   minimum"* — the figure the solver already uses, which had no citation until now.
+
+Two dangling cross-references in the FIA's own text turned up on the way, both in
+Art. 8: **8.5.4.1 → "Article 9.5.4.1"** and **8.4.2.1 → "Article 9.4.2.1"**, neither
+of which exists. Cite 9.5.4 and 9.4.2. That makes three such dangles found in this
+document's lifetime, so it is a property of the source rather than bad luck.
+
+**Why it is recorded as a decision and not a bug fix.** An unwritten assumption
+cannot be checked, and this one survived from M0 to M5 because it was never a
+sentence anybody could disagree with. The spec's own §1 rule — an article number is
+an externally-sourced constant — turns out to apply one level up: so is the
+*article set*.

@@ -85,6 +85,67 @@ and the mirrored caption is what put `radiator_x` at +0.308 beside `engine_x` at
 is read off a photograph, this document states the viewpoint and states which way
 it was mirrored.
 
+## 2b. Which class this kart is, and which article governs it — KZ is Group 1
+
+**The recheck pass found that this document was citing the wrong group's article
+throughout, and it was right to.** Art. 1, PDF p. 1, *Categories, groups and
+classes*:
+
+> **Group 1** — KZ: Cylinder capacity of 125 cm3
+> **Group 2** — KZ2, OK, OK-N, OK-Junior, OK-N Junior, E-Karting Junior, …
+
+So **KZ is Group 1 and is governed by Art. 8. KZ2 is Group 2, governed by Art. 9.**
+This project calls its subject a KZ shifter kart, everywhere, and Art. **8.10** is
+headed *"KZ engine"*, which settles it: **the kart is a KZ, and Art. 8 is its
+article.** Every section of this document except §20 had asserted Group 2.
+
+**Almost nothing moves, because Art. 8 is a delegating article.** It is two pages
+that mostly point at Art. 9:
+
+    8.5.1 Material          -> See Article 4.10.2
+    8.5.2 Front fairing     -> See Article 9.5.2
+    8.5.3 Front panel       -> See Article 9.5.3
+    8.10  KZ engine         -> See Article 9.10
+    8.11  Carburettor       -> See Article 9.12.1
+    8.12  Intake silencer   -> See Article 9.13.1
+    8.13  Ignition system   -> See Article 9.14.1
+    8.14  Exhaust           -> See Article 9.15.1
+    8.15  Exhaust silencer  -> See Article 9.16.1
+    8.16  Radiator(s)       -> See Article 9.17
+    8.17  Gearing           -> See Article 9.18.1
+
+and Art. 8.1.1/8.2/8.3 restate 9.1.1/9.2/9.3 word for word. Art. 5.3.1 and 4.13.1
+are headed *"In Groups 1 & 2"* and apply directly. **So no dimension in this
+document changes.** The correct citation form for a delegated clause is
+`Art. 8.5.2 → 9.5.2`, and the sections use it.
+
+**Five places where Group 1 genuinely differs, and these do change things:**
+
+| | Group 1 (KZ, ours) | what the document had |
+| --- | --- | --- |
+| brakes | **8.6: *"Brakes are free in Group 1, but must comply with Articles 4.12 et seq. of the TR. They must be produced by a manufacturer with a valid brake homologation."*** | 9.6's four-wheel requirement. §20 already had this right and cited 8.6. **A KZ is not required to have front brakes** — it has them because every KZ does, which is an `estimated` design choice and must say so. |
+| rear wheel protection | **8.5.5.2 → 9.5.5.2**, *"with wheel covers"*. Group 1 has **no plain 8.5.5.1 at all.** | §50 specified against **9.5.5.1**. The 1340 minimum width lives in 9.5.5.1; 9.5.5.2 adds the wheel-cover clauses on top. Needs reconciling — see the open item below. |
+| side bodywork | 8.5.4.1 → *"See Article 9.5.4.1"*, **which does not exist** | §50 cites 9.5.4, which is the right article. The dangling reference is the FIA's, and it is the **second** one found here: Art. 8.4.2.1 → *"Article 9.4.2.1"* is also nonexistent. |
+| chassis requirements | 8.1.2 has **no anti-roll-bar clause** | §10.10's torsion-bar Envelope cites 9.1.2's *"Anti-roll bars must only be connected to the main tubes"*. For a KZ that clause does not apply, so the torsion bar's Envelope is `none`. |
+| wheels | **8.7: *"In Group 1, only 5-inch rims are allowed with CIK-FIA homologated 5-inch tyres."*** | §20 flagged `rim_diameter`'s comment "the only rim size karting uses" as false in general. For **Group 1 it is exactly true**, and now sourced. |
+
+And one figure Art. 8 carries that appears nowhere else, which the physics has been
+using unsourced all along:
+
+> **8.9 Mass of kart** — Total (incl. driver) **KZ: 170.0 kg minimum**
+
+That is `sourced`, and it is the 170 kg the solver already uses.
+
+**Open item, and it is a decision rather than a measurement.** Group 1's rear
+protection delegates only to the *wheel-cover* variant. Either this kart runs the
+wheel-cover bodywork — which adds mandatory geometry: two M8 bolts per cover at
+≥75 mm horizontal spacing, ≥20 mm radial clearance to the tire, covers extending
+20–30 mm beyond the rear wheels' outer plane and 20–40 mm above their highest
+point — or it runs the plain protection §50 specified, which is a **KZ2** part. The
+spec currently describes the plain one. Flagged rather than silently resolved,
+because it changes five parts and the answer is a design choice about what the kart
+*is*.
+
 ## 3. Frozen, and verified rather than assumed
 
 These four are frozen because every §6.4 driving figure and every `drive.sh`
@@ -167,7 +228,7 @@ elsewhere in this document:
 ## 4. The bodywork envelope, quoted once
 
 Every bodywork row in §Bodywork cites back to this block rather than re-quoting
-it. All from the pinned PDF, Art. 9.5: 9.5.2/9.5.3/9.5.4 on PDF page 24, 9.5.5.1 on PDF page 25.
+it. All from the pinned PDF, Art. 9.5: 9.5.2 and 9.5.3 on PDF page 24, 9.5.4 spanning pp. 24-25 with its datum sentence on p. 25, 9.5.5.1 on p. 25.
 
 **9.5.2 Front fairing**
 > Minimum width: 1.000 mm. Maximum width: overall rear width of the front
@@ -262,24 +323,42 @@ literal reading.
 > Front and side protections are compulsory. They must be made of magnetic steel
 > round tubing and be homologated with the bodywork.
 
-**Art. 9.4.1 Front bumper** (PDF p. 23). Two bars, at two different heights, and
-an earlier version of this section got both the height and the attachment spacing
-wrong — see the correction note below.
+**Art. 9.4.1 Front bumper** — **two bars, with two different diameters, two
+straight lengths, two attachment spacings and two height bands.** Starts PDF p. 22
+and continues on p. 23. This document got this article wrong twice before reading
+it whole; see the correction note below.
+
+*Upper bar* (p. 22):
+> The front bumper consists of two elements: an upper bar with a minimum diameter
+> of 16.0 mm and two corner bends with one constant radius. The straight length
+> between the bends must be 375.0 mm minimum and 395.0 mm maximum.
+> The bar must be fixed to two welded chassis frame attachments, which must be
+> **550.0 mm apart** and centred on the kart's longitudinal axis.
+
+*Upper bar height* (p. 23):
 > Height: 200.0 mm minimum and 250.0 mm maximum from the ground (measured to the
-> tubing top).  ← **upper** bar
+> tubing top).
+
+*Lower bar* (p. 23):
 > [a] lower bar with a minimum diameter of 20.0 mm and two corner bends with one
 > constant radius. The straight length between the bends must be 295.0 mm minimum
 > and 315.0 mm maximum.
-> Height: 70.0 mm minimum and 110.0 mm maximum (measured to the tube top).
-> ← **lower** bar
 > The bar must be fixed to two welded chassis frame attachments, which must be
 > **450.0 mm apart** and centred on the kart's longitudinal axis. The attachments
 > must be horizontally and vertically parallel to the kart's axis and allow for a
 > 50.0 mm insertion of the bar.
+> Height: 70.0 mm minimum and 110.0 mm maximum (measured to the tube top).
 > Front overhang: 350.0 mm minimum.
 > Both bars must be connected by the front bumper support.
 > The front bumper must be independent from the pedal attachment and allow for the
 > mounting of the mandatory front fairing.
+
+So, tabulated, because reading it as one bar is what caused both errors:
+
+| | diameter | straight length | attachment spacing | height, tube top |
+| --- | --- | --- | --- | --- |
+| upper bar | ≥16.0 | 375.0–395.0 | **550.0** | 200.0–250.0 |
+| lower bar | ≥20.0 | 295.0–315.0 | **450.0** | 70.0–110.0 |
 
 **Art. 9.4.2 Side bumpers** (PDF p. 23)
 > The side bumper consists of two elements of magnetic steel round tubing that are
@@ -299,35 +378,30 @@ Front overhang carries **two** limits in two different articles and they are not
 the same kind of number: 9.4.1 sets a **minimum of 350** on the front bumper, and
 9.5.2 sets a **maximum of 680** on the front fairing. Both apply.
 
-**Correction, and it is the §7.2/§7.4 failure happening inside this document.**
-Two numbers above were wrong when first written here and were relayed to two
-section agents before being caught:
+**Correction history, kept rather than tidied away, because the shape of the
+mistake is the lesson.** Art. 9.4 has now been read three times here:
 
-1. The attachment spacing was quoted as **550.0 mm**. The text says **450.0 mm**
-   for the front bumper and **500.0 ± 5 mm** for the side bumpers. There is no 550
-   anywhere in Art. 9.4. §5b separately claims the OTK M4 form's 550 mm tube
-   spacing "matches Art. 9.4.1" — it does not; the form's **450** is the one that
-   matches, and the 550 is an unregulated second pair.
-2. The **160 mm minimum** was attributed to 9.4.1 and to the *front* bumper. It
-   belongs to **9.4.2**, and it governs the **side** bumper's upper bar. The front
-   bumper's own limits are 200–250 (upper) and 70–110 (lower), both to the tube
-   **top**.
+1. First pass quoted an attachment spacing of 550 and attributed a 160 mm minimum
+   to the front bumper.
+2. Second pass "corrected" both: it declared *"there is no 550 anywhere in Art.
+   9.4"* and withdrew §5b's cross-check against the OTK M4 form. **The 160 mm
+   correction was right — that clause is 9.4.2 and governs the side bar. The 550
+   correction was wrong**, and it was wrong because the article's text is split
+   across a page break: the upper bar's sentences are on p. 22 and the lower bar's
+   on p. 23, so a reader who starts on p. 23 sees one bar, one spacing, and
+   concludes the other number was invented.
+3. Third pass, above, read both pages.
 
-The practical consequence is the opposite of what was relayed: a front nose bar
-with its tube center at z 150 — top 160 — is not a legal minimum, it is **50 mm
-above the 110 mm ceiling** on the lower bar and 40 mm below the 200 mm floor on the
-upper. §Bodywork's "nose hoop demand" is specified against the withdrawn number and
-is superseded by §Chassis, which places the lower bar's top at 95 and the upper
-bar's top at 225. **The fairing picks up on the upper bar**, which is the only one
-in the right height band to carry it.
+The OTK M4 form's cross-check therefore **stands and is stronger than first
+claimed**: the form dimensions Ø20×1.5 tubing at 450 mm and Ø16×1.5 at 550 mm,
+matching both bars on **both** spacing *and* diameter. A form and the text agreeing
+on four numbers is the best corroboration in this document.
 
-Both errors were caught by a section agent reading the PDF rather than reading
-this file, which is the entire reason §1 forbids citing project text.
-
-**Do not cite Art. 9.5.4.1 for side bodywork — it does not exist.** The FIA's own
-text has a dangling cross-reference: Art. 8.5.4.1 (PDF p. 21) says "See Article
-9.5.4.1", and the article set is 9.5.4 with a 9.5.4.2 for the wheel-cover
-variant. The correct citation for the pod datum is **9.5.4**.
+The practical outcome for the nose, which two sections were briefed against
+incorrectly: a front bar with its tube center at z 150 (top 160) is **50 mm above
+the lower bar's 110 ceiling and 40 mm below the upper bar's 200 floor** — the one
+height band a front bar may not occupy. §Chassis places the lower bar's top at 95
+and the upper at 225, both legal, and **the fairing picks up on the upper bar.**
 
 ## 5. Overall length — the number this whole document was blocked on
 
@@ -388,9 +462,15 @@ KZ is **Group 2**. Art. 5.3.1 *Radiator*, PDF page 15, verbatim, Groups 1 & 2:
 > front or rear of the radiator(s). This device may be adjustable, but it must not
 > be detachable when the kart is in motion or comprise dangerous parts.
 
-Art. 5.3.2 *Water pump*, same page: *"In Groups 1 & 2, the water pump must be
-mechanically [driven]"* — which is what makes the axle-driven toothed belt the
-correct choice rather than a styling one.
+Art. 5.3.2 *Water pump*, same page, quoted without substitution because an earlier
+version of this line replaced its tail with "[driven]" and thereby made the article
+appear to *force* the axle drive:
+
+> In Groups 1 & 2, the water pump must be mechanically controlled either by the
+> engine or by the rear wheel axle.
+
+It **permits either**. The axle-driven toothed belt is therefore practice, and the
+spec's choice, not a requirement — and it says so.
 
 Four hard constraints fall out, all `derived` from the quote with the rear axle at
 y −525:
