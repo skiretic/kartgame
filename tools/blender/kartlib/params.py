@@ -267,11 +267,28 @@ class KartParams:
     radiator_thickness: float = 0.040
     """Core depth through the face — see `radiator_width`."""
 
-    radiator_x: float = 0.308
-    """Lateral center. Puts the core's inboard edge just outside the seat shell
-    at x 0.165 and its outboard edge just inside the right side bar at 0.432."""
+    radiator_x: float = 0.365
+    """Lateral center, as a **magnitude**: which side it lands on is
+    `powertrain.RADIATOR_SIDE`, and the radiator is on the kart's **left**.
 
-    radiator_y: float = 0.000
+    Was 0.308 on the right, which is where the engine is (`engine_x` 0.319). The
+    two were 11 mm apart and the radiator was built through the exhaust, through
+    the gear lever and through the right sidepod — 593 intersecting triangle
+    pairs in total, all one bug.
+
+    0.365 is measured off V4, the plan-view reference, scaled against the
+    steering wheel: 320 mm of `wheel_diameter` covers 310 px in that frame, so
+    1.032 mm/px. The core reads 242 mm from the centerline at its inboard edge
+    and 500 mm at its outboard, a 258 mm span that is `radiator_width` 265 to
+    within the measurement error — the size was right and only the placement was
+    wrong."""
+
+    radiator_y: float = -0.235
+    """Fore-aft center. Also measured off V4 against the same scale: the core
+    spans y -0.076 to -0.426 there, beside the seat and well behind the kart's
+    mid-point. It was 0.000, i.e. 250 mm too far forward, which put it level with
+    the driver's knees instead of the driver's hip."""
+
     radiator_z: float = 0.320
     """Center of the core, in the plane it is raked into. Chosen so the low edge
     clears the floor tray's top at z 0.069 and the high edge stays forward of the

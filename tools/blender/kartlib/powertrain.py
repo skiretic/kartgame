@@ -433,6 +433,30 @@ length, so it is not a free number, but it does not vary with detail level: a fi
 is part of the radiator's shape, not of its resolution.
 """
 
+RADIATOR_SIDE: float = -1.0
+"""Which side of the kart the radiator stands on: -1 is the kart's **left**.
+
+Measured off the references, not chosen. V4 is a plan view with the front at the
+top, so image right is the kart's right: the engine is at image right and the
+radiator at image left. V3 (dead-rear) and V8 (dead-front) both agree once each
+is mirrored for its own viewpoint, which is three independent photographs of two
+different manufacturers.
+
+This was `+1` by omission -- the basis below simply assumed a right-side part --
+and `engine_x` is `+0.319`, so the radiator was built 11 mm from the engine, on
+top of the exhaust and through the gear lever. The audit found 167 triangle pairs
+of shifter inside the core, 130 of exhaust chamber inside it and 296 of right
+sidepod inside it and the engine. All three were the same bug.
+
+`docs/REFERENCES.md`'s V3 caption says "radiator and engine between the seat and
+the right rear" and is wrong for the same reason: written off a rear-view photo
+without mirroring it.
+
+At -1 the basis determinant is -1, because a part on the left genuinely is the
+mirror of the part on the right. That is handled where the geometry is built
+rather than by patching signs into dimensions: see `_reverse_if_mirrored`.
+"""
+
 RADIATOR_CAP_RADIUS: float = 0.019
 RADIATOR_CAP_HEIGHT: float = 0.041
 RADIATOR_CAP_ALONG: float = -0.62
@@ -464,15 +488,25 @@ BRACKET_DIAMETER: float = 0.016
 rather than off the frame, and here it has to be: the exhaust belly occupies the
 whole volume between the radiator's underside and the main rail."""
 
-BRACKET_LOWER_LOCAL: tuple[float, float, float] = (-1.0, 0.34, -0.52)
-BRACKET_UPPER_LOCAL: tuple[float, float, float] = (-1.0, 0.34, 0.44)
+BRACKET_LOWER_LOCAL: tuple[float, float, float] = (-1.0, 1.15, -0.52)
+BRACKET_UPPER_LOCAL: tuple[float, float, float] = (-1.0, 1.15, 0.44)
 BRACKET_LOWER_SEAT: tuple[float, float, float] = (0.180, -0.150, 0.135)
 BRACKET_UPPER_SEAT: tuple[float, float, float] = (0.180, -0.235, 0.330)
-"""Where the two brackets meet the radiator and where they meet the seat's right
-wing. The radiator ends are **fractions of the radiator's own half-extents in
-its own frame** rather than world points, so they stay on the back of the core
-when the rake or the size changes — which is the whole reason the radiator is
-built in a frame at all.
+"""Where the two brackets meet the radiator and where they meet the seat's
+wing on whichever side `RADIATOR_SIDE` puts the radiator. The radiator ends are
+**fractions of the radiator's own half-extents in its own frame** rather than
+world points, so they stay on the back of the core when the rake or the size
+changes — which is the whole reason the radiator is built in a frame at all.
+
+The lateral fraction is 1.15, i.e. just **past** the core's inboard edge, and
+that matters: at 0.34 the bracket started inside the fin pack. It went unnoticed
+while `radiator_y` was 0.000, because the bracket then ran almost straight
+inboard and stayed behind the core face the whole way. Moving the radiator 235 mm
+aft to where V4 puts it left the seat wing forward of the core, so the upper
+bracket crossed from behind the face to in front of it — straight through 47
+triangles of core and 145 of fin. Anchoring outboard of the core's own edge makes
+the bracket independent of where the radiator sits, which is the property that
+was missing rather than the specific number.
 
 Lower and upper, because that is what they are once the core is raked into the
 seat's plane: both leave the core's **back** face and run rearward and inboard
@@ -1951,7 +1985,7 @@ def _radiator_frame(p: P.KartParams) -> tuple[Matrix, Vector]:
     # Columns are where local +x, +y and +z land. At rake 0 this is a vertical
     # panel facing straight up the track; the rake tips its top rearward.
     normal = Vector((0.0, cos_rake, sin_rake))
-    inboard = Vector((-1.0, 0.0, 0.0))
+    inboard = Vector((-RADIATOR_SIDE, 0.0, 0.0))
     up_slant = Vector((0.0, -sin_rake, cos_rake))
 
     basis = Matrix((
@@ -1959,7 +1993,8 @@ def _radiator_frame(p: P.KartParams) -> tuple[Matrix, Vector]:
         (normal.y, inboard.y, up_slant.y),
         (normal.z, inboard.z, up_slant.z),
     ))
-    return basis, Vector((p.radiator_x, p.radiator_y, p.radiator_z))
+    center = Vector((RADIATOR_SIDE * abs(p.radiator_x), p.radiator_y, p.radiator_z))
+    return basis, center
 
 
 def _radiator_world(
@@ -1967,6 +2002,24 @@ def _radiator_world(
 ) -> Vector:
     """A point given in the radiator's frame, in world coordinates."""
     return center + basis @ Vector(local)
+
+
+def _reverse_if_mirrored(bm: bmesh.types.BMesh, basis: Matrix) -> None:
+    """Undo the winding flip a mirrored basis introduces.
+
+    `RADIATOR_SIDE = -1` makes the frame a mirror rather than a rotation, so its
+    determinant is -1 and every face pushed through it comes out inside out. That
+    is invisible in a render -- Blender's materials do not backface cull and the
+    exporter writes `doubleSided: true`, which is the trap `genkart.check_face_
+    winding` exists for and which hid inverted `build.box` output for two
+    milestones. So it is corrected here, at the one place the mirror is
+    introduced, rather than being left for the gate to complain about.
+
+    One call over every face: `bmesh.ops.reverse_faces` rebuilds the face table
+    per call, so reversing them one at a time is quadratic for no reason.
+    """
+    if basis.determinant() < 0.0:
+        bmesh.ops.reverse_faces(bm, faces=list(bm.faces))
 
 
 def _radiator_block(
@@ -1992,6 +2045,7 @@ def _radiator_block(
     local_center = Vector(tuple((high[axis] + low[axis]) * 0.5 for axis in range(3)))
     bm = bmesh.new()
     build.box(bm, size, center + basis @ local_center, rotation=basis)
+    _reverse_if_mirrored(bm, basis)
     obj = build.object_from_bmesh(name, bm, collection, material=material)
     if bevel:
         build.bevel_object(obj, context.detail)
@@ -2040,6 +2094,7 @@ def _radiator_cap(
     )
     for vertex in bm.verts:
         vertex.co = origin + basis @ vertex.co
+    _reverse_if_mirrored(bm, basis)
     cap = build.object_from_bmesh(
         "radiator_cap", bm, collection, material=material, shade_smooth=True
     )
@@ -2192,7 +2247,11 @@ def _radiator(
         ("upper", BRACKET_UPPER_LOCAL, BRACKET_UPPER_SEAT),
     ):
         start = attach(local)
-        end = Vector(seat)
+        # The seat wing is a world point and it was authored on the right, where
+        # the radiator used to be. `frame.py` mirrors the seat struts, so the
+        # matching wing exists on whichever side the radiator is; without this
+        # the brackets reached across the kart and ran through the core itself.
+        end = Vector((RADIATOR_SIDE * seat[0], seat[1], seat[2]))
         _tube_object(
             "radiator_bracket_%s" % label,
             (
@@ -2218,11 +2277,19 @@ def _radiator(
     ):
         start = attach(local)
         end = Vector(fitting)
+        # The radiator is on the left and the engine is on the right, so a hose
+        # has to cross the kart. A straight chord does it through the driver:
+        # `seat_shell` spans x +-0.164 and y -0.262..+0.240, and the midpoint
+        # landed inside it -- 142 triangle pairs, measured. Real karts take these
+        # behind the seat back, which is also the shortest way across, so the
+        # waypoint is pinned aft of the shell rather than interpolated.
+        behind_seat = -(p.seat_width * 0.5 + abs(p.seat_y) + 0.030)
+        waypoint = Vector((0.0, min(behind_seat, start.y, end.y), (start.z + end.z) * 0.5))
         _tube_object(
             "radiator_hose_%s" % label,
             (
                 tuple(start),
-                tuple(start.lerp(end, 0.5) + Vector((0.0, 0.012, 0.010))),
+                tuple(waypoint),
                 tuple(end),
             ),
             HOSE_DIAMETER,
