@@ -1,0 +1,893 @@
+{
+ "schema_version": 1,
+ "meta": {
+  "name": "Self-intersecting negative control",
+  "length_m": 1105.486678,
+  "grade": 1,
+  "net_turn_deg": 360.0,
+  "designed_from": "tools/circuits/author_track.py, build_self_intersecting()",
+  "authored_by": "tools/circuits/author_track.py",
+  "note": "DELIBERATELY BROKEN, in exactly one way: the road crosses itself. Everything else about it is legal, so a validator that reports anything but the crossing is finding the wrong thing. tools/verify/circuit.sh fails if this file loads."
+ },
+ "spline": [
+  {
+   "distance_m": 0.0,
+   "position": [
+    0.0,
+    -0.0
+   ],
+   "heading_deg": 0.0,
+   "curvature_1pm": 0.0,
+   "width_m": 8.0,
+   "crown_pct": 2.0,
+   "bank_pct": 0.0,
+   "elevation_m": 0.0,
+   "grade_pct": 0.0,
+   "segment": 0
+  },
+  {
+   "distance_m": 25.0,
+   "position": [
+    0.0,
+    -25.0
+   ],
+   "heading_deg": 0.0,
+   "curvature_1pm": 0.0,
+   "width_m": 8.0,
+   "crown_pct": 2.0,
+   "bank_pct": 0.0,
+   "elevation_m": 0.0,
+   "grade_pct": 0.0,
+   "segment": 0
+  },
+  {
+   "distance_m": 50.0,
+   "position": [
+    0.0,
+    -50.0
+   ],
+   "heading_deg": 0.0,
+   "curvature_1pm": 0.0,
+   "width_m": 8.0,
+   "crown_pct": 2.0,
+   "bank_pct": 0.0,
+   "elevation_m": 0.0,
+   "grade_pct": 0.0,
+   "segment": 0
+  },
+  {
+   "distance_m": 75.0,
+   "position": [
+    0.0,
+    -75.0
+   ],
+   "heading_deg": 0.0,
+   "curvature_1pm": 0.022222222,
+   "width_m": 8.0,
+   "crown_pct": 0.0,
+   "bank_pct": 5.0,
+   "elevation_m": 0.0,
+   "grade_pct": 0.0,
+   "segment": 1
+  },
+  {
+   "distance_m": 98.561945,
+   "position": [
+    6.028857,
+    -97.5
+   ],
+   "heading_deg": 30.0,
+   "curvature_1pm": 0.022222222,
+   "width_m": 8.0,
+   "crown_pct": 0.0,
+   "bank_pct": 5.0,
+   "elevation_m": 0.0,
+   "grade_pct": 0.0,
+   "segment": 1
+  },
+  {
+   "distance_m": 122.12389,
+   "position": [
+    22.5,
+    -113.971143
+   ],
+   "heading_deg": 60.0,
+   "curvature_1pm": 0.022222222,
+   "width_m": 8.0,
+   "crown_pct": 0.0,
+   "bank_pct": 5.0,
+   "elevation_m": 0.0,
+   "grade_pct": 0.0,
+   "segment": 1
+  },
+  {
+   "distance_m": 145.685835,
+   "position": [
+    45.0,
+    -120.0
+   ],
+   "heading_deg": 90.0,
+   "curvature_1pm": 0.022222222,
+   "width_m": 8.0,
+   "crown_pct": 0.0,
+   "bank_pct": 5.0,
+   "elevation_m": 0.0,
+   "grade_pct": 0.0,
+   "segment": 1
+  },
+  {
+   "distance_m": 169.24778,
+   "position": [
+    67.5,
+    -113.971143
+   ],
+   "heading_deg": 120.0,
+   "curvature_1pm": 0.022222222,
+   "width_m": 8.0,
+   "crown_pct": 0.0,
+   "bank_pct": 5.0,
+   "elevation_m": 0.0,
+   "grade_pct": 0.0,
+   "segment": 1
+  },
+  {
+   "distance_m": 192.809725,
+   "position": [
+    83.971143,
+    -97.5
+   ],
+   "heading_deg": 150.0,
+   "curvature_1pm": 0.022222222,
+   "width_m": 8.0,
+   "crown_pct": 0.0,
+   "bank_pct": 5.0,
+   "elevation_m": 0.0,
+   "grade_pct": 0.0,
+   "segment": 1
+  },
+  {
+   "distance_m": 216.371669,
+   "position": [
+    90.0,
+    -75.0
+   ],
+   "heading_deg": 180.0,
+   "curvature_1pm": 0.022222222,
+   "width_m": 8.0,
+   "crown_pct": 0.0,
+   "bank_pct": 5.0,
+   "elevation_m": 0.0,
+   "grade_pct": 0.0,
+   "segment": 1
+  },
+  {
+   "distance_m": 239.933614,
+   "position": [
+    83.971143,
+    -52.5
+   ],
+   "heading_deg": 210.0,
+   "curvature_1pm": 0.022222222,
+   "width_m": 8.0,
+   "crown_pct": 0.0,
+   "bank_pct": 5.0,
+   "elevation_m": 0.0,
+   "grade_pct": 0.0,
+   "segment": 1
+  },
+  {
+   "distance_m": 263.495559,
+   "position": [
+    67.5,
+    -36.028857
+   ],
+   "heading_deg": 240.0,
+   "curvature_1pm": 0.022222222,
+   "width_m": 8.0,
+   "crown_pct": 0.0,
+   "bank_pct": 5.0,
+   "elevation_m": 0.0,
+   "grade_pct": 0.0,
+   "segment": 1
+  },
+  {
+   "distance_m": 287.057504,
+   "position": [
+    45.0,
+    -30.0
+   ],
+   "heading_deg": 270.0,
+   "curvature_1pm": 0.0,
+   "width_m": 8.0,
+   "crown_pct": 2.0,
+   "bank_pct": 0.0,
+   "elevation_m": 0.0,
+   "grade_pct": 0.0,
+   "segment": 2
+  },
+  {
+   "distance_m": 311.057504,
+   "position": [
+    21.0,
+    -30.0
+   ],
+   "heading_deg": 270.0,
+   "curvature_1pm": 0.0,
+   "width_m": 8.0,
+   "crown_pct": 2.0,
+   "bank_pct": 0.0,
+   "elevation_m": 0.0,
+   "grade_pct": 0.0,
+   "segment": 2
+  },
+  {
+   "distance_m": 335.057504,
+   "position": [
+    -3.0,
+    -30.0
+   ],
+   "heading_deg": 270.0,
+   "curvature_1pm": 0.0,
+   "width_m": 8.0,
+   "crown_pct": 2.0,
+   "bank_pct": 0.0,
+   "elevation_m": 0.0,
+   "grade_pct": 0.0,
+   "segment": 2
+  },
+  {
+   "distance_m": 359.057504,
+   "position": [
+    -27.0,
+    -30.0
+   ],
+   "heading_deg": 270.0,
+   "curvature_1pm": 0.0,
+   "width_m": 8.0,
+   "crown_pct": 2.0,
+   "bank_pct": 0.0,
+   "elevation_m": 0.0,
+   "grade_pct": 0.0,
+   "segment": 2
+  },
+  {
+   "distance_m": 383.057504,
+   "position": [
+    -51.0,
+    -30.0
+   ],
+   "heading_deg": 270.0,
+   "curvature_1pm": 0.0,
+   "width_m": 8.0,
+   "crown_pct": 2.0,
+   "bank_pct": 0.0,
+   "elevation_m": 0.0,
+   "grade_pct": 0.0,
+   "segment": 2
+  },
+  {
+   "distance_m": 407.057504,
+   "position": [
+    -75.0,
+    -30.0
+   ],
+   "heading_deg": 270.0,
+   "curvature_1pm": -0.022222222,
+   "width_m": 8.0,
+   "crown_pct": 0.0,
+   "bank_pct": -5.0,
+   "elevation_m": 0.0,
+   "grade_pct": 0.0,
+   "segment": 3
+  },
+  {
+   "distance_m": 430.619449,
+   "position": [
+    -97.5,
+    -23.971143
+   ],
+   "heading_deg": 240.0,
+   "curvature_1pm": -0.022222222,
+   "width_m": 8.0,
+   "crown_pct": 0.0,
+   "bank_pct": -5.0,
+   "elevation_m": 0.0,
+   "grade_pct": 0.0,
+   "segment": 3
+  },
+  {
+   "distance_m": 454.181394,
+   "position": [
+    -113.971143,
+    -7.5
+   ],
+   "heading_deg": 210.0,
+   "curvature_1pm": -0.022222222,
+   "width_m": 8.0,
+   "crown_pct": 0.0,
+   "bank_pct": -5.0,
+   "elevation_m": 0.0,
+   "grade_pct": 0.0,
+   "segment": 3
+  },
+  {
+   "distance_m": 477.743339,
+   "position": [
+    -120.0,
+    15.0
+   ],
+   "heading_deg": 180.0,
+   "curvature_1pm": 0.0,
+   "width_m": 8.0,
+   "crown_pct": 2.0,
+   "bank_pct": 0.0,
+   "elevation_m": 0.0,
+   "grade_pct": 0.0,
+   "segment": 4
+  },
+  {
+   "distance_m": 502.743339,
+   "position": [
+    -120.0,
+    40.0
+   ],
+   "heading_deg": 180.0,
+   "curvature_1pm": 0.0,
+   "width_m": 8.0,
+   "crown_pct": 2.0,
+   "bank_pct": 0.0,
+   "elevation_m": 0.0,
+   "grade_pct": 0.0,
+   "segment": 4
+  },
+  {
+   "distance_m": 527.743339,
+   "position": [
+    -120.0,
+    65.0
+   ],
+   "heading_deg": 180.0,
+   "curvature_1pm": 0.0,
+   "width_m": 8.0,
+   "crown_pct": 2.0,
+   "bank_pct": 0.0,
+   "elevation_m": 0.0,
+   "grade_pct": 0.0,
+   "segment": 4
+  },
+  {
+   "distance_m": 552.743339,
+   "position": [
+    -120.0,
+    90.0
+   ],
+   "heading_deg": 180.0,
+   "curvature_1pm": 0.0,
+   "width_m": 8.0,
+   "crown_pct": 2.0,
+   "bank_pct": 0.0,
+   "elevation_m": 0.0,
+   "grade_pct": 0.0,
+   "segment": 4
+  },
+  {
+   "distance_m": 577.743339,
+   "position": [
+    -120.0,
+    115.0
+   ],
+   "heading_deg": 180.0,
+   "curvature_1pm": 0.0,
+   "width_m": 8.0,
+   "crown_pct": 2.0,
+   "bank_pct": 0.0,
+   "elevation_m": 0.0,
+   "grade_pct": 0.0,
+   "segment": 4
+  },
+  {
+   "distance_m": 602.743339,
+   "position": [
+    -120.0,
+    140.0
+   ],
+   "heading_deg": 180.0,
+   "curvature_1pm": 0.0,
+   "width_m": 8.0,
+   "crown_pct": 2.0,
+   "bank_pct": 0.0,
+   "elevation_m": 0.0,
+   "grade_pct": 0.0,
+   "segment": 4
+  },
+  {
+   "distance_m": 627.743339,
+   "position": [
+    -120.0,
+    165.0
+   ],
+   "heading_deg": 180.0,
+   "curvature_1pm": 0.022222222,
+   "width_m": 8.0,
+   "crown_pct": 0.0,
+   "bank_pct": 5.0,
+   "elevation_m": 0.0,
+   "grade_pct": 0.0,
+   "segment": 5
+  },
+  {
+   "distance_m": 651.305284,
+   "position": [
+    -126.028857,
+    187.5
+   ],
+   "heading_deg": 210.0,
+   "curvature_1pm": 0.022222222,
+   "width_m": 8.0,
+   "crown_pct": 0.0,
+   "bank_pct": 5.0,
+   "elevation_m": 0.0,
+   "grade_pct": 0.0,
+   "segment": 5
+  },
+  {
+   "distance_m": 674.867229,
+   "position": [
+    -142.5,
+    203.971143
+   ],
+   "heading_deg": 240.0,
+   "curvature_1pm": 0.022222222,
+   "width_m": 8.0,
+   "crown_pct": 0.0,
+   "bank_pct": 5.0,
+   "elevation_m": 0.0,
+   "grade_pct": 0.0,
+   "segment": 5
+  },
+  {
+   "distance_m": 698.429174,
+   "position": [
+    -165.0,
+    210.0
+   ],
+   "heading_deg": 270.0,
+   "curvature_1pm": 0.022222222,
+   "width_m": 8.0,
+   "crown_pct": 0.0,
+   "bank_pct": 5.0,
+   "elevation_m": 0.0,
+   "grade_pct": 0.0,
+   "segment": 5
+  },
+  {
+   "distance_m": 721.991118,
+   "position": [
+    -187.5,
+    203.971143
+   ],
+   "heading_deg": 300.0,
+   "curvature_1pm": 0.022222222,
+   "width_m": 8.0,
+   "crown_pct": 0.0,
+   "bank_pct": 5.0,
+   "elevation_m": 0.0,
+   "grade_pct": 0.0,
+   "segment": 5
+  },
+  {
+   "distance_m": 745.553063,
+   "position": [
+    -203.971143,
+    187.5
+   ],
+   "heading_deg": 330.0,
+   "curvature_1pm": 0.022222222,
+   "width_m": 8.0,
+   "crown_pct": 0.0,
+   "bank_pct": 5.0,
+   "elevation_m": 0.0,
+   "grade_pct": 0.0,
+   "segment": 5
+  },
+  {
+   "distance_m": 769.115008,
+   "position": [
+    -210.0,
+    165.0
+   ],
+   "heading_deg": 360.0,
+   "curvature_1pm": 0.022222222,
+   "width_m": 8.0,
+   "crown_pct": 0.0,
+   "bank_pct": 5.0,
+   "elevation_m": 0.0,
+   "grade_pct": 0.0,
+   "segment": 5
+  },
+  {
+   "distance_m": 792.676953,
+   "position": [
+    -203.971143,
+    142.5
+   ],
+   "heading_deg": 390.0,
+   "curvature_1pm": 0.022222222,
+   "width_m": 8.0,
+   "crown_pct": 0.0,
+   "bank_pct": 5.0,
+   "elevation_m": 0.0,
+   "grade_pct": 0.0,
+   "segment": 5
+  },
+  {
+   "distance_m": 816.238898,
+   "position": [
+    -187.5,
+    126.028857
+   ],
+   "heading_deg": 420.0,
+   "curvature_1pm": 0.022222222,
+   "width_m": 8.0,
+   "crown_pct": 0.0,
+   "bank_pct": 5.0,
+   "elevation_m": 0.0,
+   "grade_pct": 0.0,
+   "segment": 5
+  },
+  {
+   "distance_m": 839.800843,
+   "position": [
+    -165.0,
+    120.0
+   ],
+   "heading_deg": 450.0,
+   "curvature_1pm": 0.0,
+   "width_m": 8.0,
+   "crown_pct": 2.0,
+   "bank_pct": 0.0,
+   "elevation_m": 0.0,
+   "grade_pct": 0.0,
+   "segment": 6
+  },
+  {
+   "distance_m": 863.800843,
+   "position": [
+    -141.0,
+    120.0
+   ],
+   "heading_deg": 450.0,
+   "curvature_1pm": 0.0,
+   "width_m": 8.0,
+   "crown_pct": 2.0,
+   "bank_pct": 0.0,
+   "elevation_m": 0.0,
+   "grade_pct": 0.0,
+   "segment": 6
+  },
+  {
+   "distance_m": 887.800843,
+   "position": [
+    -117.0,
+    120.0
+   ],
+   "heading_deg": 450.0,
+   "curvature_1pm": 0.0,
+   "width_m": 8.0,
+   "crown_pct": 2.0,
+   "bank_pct": 0.0,
+   "elevation_m": 0.0,
+   "grade_pct": 0.0,
+   "segment": 6
+  },
+  {
+   "distance_m": 911.800843,
+   "position": [
+    -93.0,
+    120.0
+   ],
+   "heading_deg": 450.0,
+   "curvature_1pm": 0.0,
+   "width_m": 8.0,
+   "crown_pct": 2.0,
+   "bank_pct": 0.0,
+   "elevation_m": 0.0,
+   "grade_pct": 0.0,
+   "segment": 6
+  },
+  {
+   "distance_m": 935.800843,
+   "position": [
+    -69.0,
+    120.0
+   ],
+   "heading_deg": 450.0,
+   "curvature_1pm": 0.0,
+   "width_m": 8.0,
+   "crown_pct": 2.0,
+   "bank_pct": 0.0,
+   "elevation_m": 0.0,
+   "grade_pct": 0.0,
+   "segment": 6
+  },
+  {
+   "distance_m": 959.800843,
+   "position": [
+    -45.0,
+    120.0
+   ],
+   "heading_deg": 450.0,
+   "curvature_1pm": -0.022222222,
+   "width_m": 8.0,
+   "crown_pct": 0.0,
+   "bank_pct": -5.0,
+   "elevation_m": 0.0,
+   "grade_pct": 0.0,
+   "segment": 7
+  },
+  {
+   "distance_m": 983.362788,
+   "position": [
+    -22.5,
+    113.971143
+   ],
+   "heading_deg": 420.0,
+   "curvature_1pm": -0.022222222,
+   "width_m": 8.0,
+   "crown_pct": 0.0,
+   "bank_pct": -5.0,
+   "elevation_m": 0.0,
+   "grade_pct": 0.0,
+   "segment": 7
+  },
+  {
+   "distance_m": 1006.924733,
+   "position": [
+    -6.028857,
+    97.5
+   ],
+   "heading_deg": 390.0,
+   "curvature_1pm": -0.022222222,
+   "width_m": 8.0,
+   "crown_pct": 0.0,
+   "bank_pct": -5.0,
+   "elevation_m": 0.0,
+   "grade_pct": 0.0,
+   "segment": 7
+  },
+  {
+   "distance_m": 1030.486678,
+   "position": [
+    0.0,
+    75.0
+   ],
+   "heading_deg": 360.0,
+   "curvature_1pm": 0.0,
+   "width_m": 8.0,
+   "crown_pct": 2.0,
+   "bank_pct": 0.0,
+   "elevation_m": 0.0,
+   "grade_pct": 0.0,
+   "segment": 8
+  },
+  {
+   "distance_m": 1055.486678,
+   "position": [
+    0.0,
+    50.0
+   ],
+   "heading_deg": 360.0,
+   "curvature_1pm": 0.0,
+   "width_m": 8.0,
+   "crown_pct": 2.0,
+   "bank_pct": 0.0,
+   "elevation_m": 0.0,
+   "grade_pct": 0.0,
+   "segment": 8
+  },
+  {
+   "distance_m": 1080.486678,
+   "position": [
+    0.0,
+    25.0
+   ],
+   "heading_deg": 360.0,
+   "curvature_1pm": 0.0,
+   "width_m": 8.0,
+   "crown_pct": 2.0,
+   "bank_pct": 0.0,
+   "elevation_m": 0.0,
+   "grade_pct": 0.0,
+   "segment": 8
+  }
+ ],
+ "corners": [
+  {
+   "name": "C1",
+   "from_m": 75.0,
+   "to_m": 287.057504,
+   "apex_arc_from_m": 75.0,
+   "apex_arc_to_m": 287.057504,
+   "hand": "right",
+   "direction_change_deg": 270.0,
+   "min_radius_m": 45.0,
+   "width_m": 8.0,
+   "line_radius_m": 45.56619,
+   "defender_line_radius_m": 45.0,
+   "grip_ceiling_kmh": 103.786453,
+   "lock_ceiling_kmh": 103.786453,
+   "apex_kmh": 103.786453,
+   "reverse_apex_kmh": 103.786453,
+   "runoff": {
+    "side": "left",
+    "apron_m": 10.0,
+    "outfield_m": 20.0,
+    "outfield": "grass",
+    "barrier": "tire_type_c",
+    "sized_for": "forward",
+    "approach_kmh": 118.786453
+   }
+  },
+  {
+   "name": "C2",
+   "from_m": 407.057504,
+   "to_m": 477.743339,
+   "apex_arc_from_m": 407.057504,
+   "apex_arc_to_m": 477.743339,
+   "hand": "left",
+   "direction_change_deg": 90.0,
+   "min_radius_m": 45.0,
+   "width_m": 8.0,
+   "line_radius_m": 64.23381,
+   "defender_line_radius_m": 45.0,
+   "grip_ceiling_kmh": 123.225659,
+   "lock_ceiling_kmh": 123.225659,
+   "apex_kmh": 123.225659,
+   "reverse_apex_kmh": 123.225659,
+   "runoff": {
+    "side": "right",
+    "apron_m": 10.0,
+    "outfield_m": 20.0,
+    "outfield": "grass",
+    "barrier": "tire_type_c",
+    "sized_for": "forward",
+    "approach_kmh": 138.225659
+   }
+  },
+  {
+   "name": "C3",
+   "from_m": 627.743339,
+   "to_m": 839.800843,
+   "apex_arc_from_m": 627.743339,
+   "apex_arc_to_m": 839.800843,
+   "hand": "right",
+   "direction_change_deg": 270.0,
+   "min_radius_m": 45.0,
+   "width_m": 8.0,
+   "line_radius_m": 45.56619,
+   "defender_line_radius_m": 45.0,
+   "grip_ceiling_kmh": 103.786453,
+   "lock_ceiling_kmh": 103.786453,
+   "apex_kmh": 103.786453,
+   "reverse_apex_kmh": 103.786453,
+   "runoff": {
+    "side": "left",
+    "apron_m": 10.0,
+    "outfield_m": 20.0,
+    "outfield": "grass",
+    "barrier": "tire_type_c",
+    "sized_for": "forward",
+    "approach_kmh": 118.786453
+   }
+  },
+  {
+   "name": "C4",
+   "from_m": 959.800843,
+   "to_m": 1030.486678,
+   "apex_arc_from_m": 959.800843,
+   "apex_arc_to_m": 1030.486678,
+   "hand": "left",
+   "direction_change_deg": 90.0,
+   "min_radius_m": 45.0,
+   "width_m": 8.0,
+   "line_radius_m": 64.23381,
+   "defender_line_radius_m": 45.0,
+   "grip_ceiling_kmh": 123.225659,
+   "lock_ceiling_kmh": 123.225659,
+   "apex_kmh": 123.225659,
+   "reverse_apex_kmh": 123.225659,
+   "runoff": {
+    "side": "right",
+    "apron_m": 10.0,
+    "outfield_m": 20.0,
+    "outfield": "grass",
+    "barrier": "tire_type_c",
+    "sized_for": "forward",
+    "approach_kmh": 138.225659
+   }
+  }
+ ],
+ "elevation": {
+  "vertical_curves": []
+ },
+ "surfaces": [],
+ "furniture": {
+  "start_line": {
+   "distance_m": 0.0,
+   "width_m": 0.3
+  }
+ },
+ "layouts": [
+  {
+   "name": "forward",
+   "direction": "forward",
+   "sector_marks_m": [
+    368.495559,
+    736.991118
+   ],
+   "checkpoints_m": [
+    0.0,
+    92.12389,
+    184.24778,
+    276.371669,
+    368.495559,
+    460.619449,
+    552.743339,
+    644.867229,
+    736.991118,
+    829.115008,
+    921.238898,
+    1013.362788
+   ],
+   "grid": {
+    "slots": 8,
+    "pole_side": "right",
+    "positions": [
+     {
+      "position": 1,
+      "distance_m": 1101.486678,
+      "lateral_m": 3.0
+     },
+     {
+      "position": 2,
+      "distance_m": 1097.486678,
+      "lateral_m": -3.0
+     },
+     {
+      "position": 3,
+      "distance_m": 1093.486678,
+      "lateral_m": 3.0
+     },
+     {
+      "position": 4,
+      "distance_m": 1089.486678,
+      "lateral_m": -3.0
+     },
+     {
+      "position": 5,
+      "distance_m": 1085.486678,
+      "lateral_m": 3.0
+     },
+     {
+      "position": 6,
+      "distance_m": 1081.486678,
+      "lateral_m": -3.0
+     },
+     {
+      "position": 7,
+      "distance_m": 1077.486678,
+      "lateral_m": 3.0
+     },
+     {
+      "position": 8,
+      "distance_m": 1073.486678,
+      "lateral_m": -3.0
+     }
+    ]
+   },
+   "racing_line_seed": [],
+   "corner_speeds_kmh": [],
+   "vertical_curve_speeds_kmh": []
+  }
+ ]
+}

@@ -165,9 +165,9 @@ func _process(_delta: float) -> void:
 ## that matters too, which is that it is a **second owner of the row list**: the count
 ## was `ROW_H * 8.0` against a layout that emits 10.44 rows once the two 0.72-height
 ## labels and the four history rows are counted, and it would have gone wrong again
-## the first time somebody added a row. The sector strip is `best_sectors().size()`
-## wide and `SessionRunner.SECTOR_COUNT` is a placeholder until ADR-0046's
-## `track.json` authors real splits, so that day was coming.
+## the first time somebody added a row. The sector strip is `timer.sector_count()`
+## wide and that number is the *track's* since ADR-0046 — three on Valdirone because
+## its file says three — so that day came.
 ##
 ## Running the layout twice costs one extra pass over a dozen rows and cannot drift.
 ## `_measuring` suppresses every draw call while still advancing the pen.
@@ -272,7 +272,13 @@ func _draw_lap(timer: KartLapTimer) -> void:
 func _draw_sectors(timer: KartLapTimer) -> void:
 	var sectors := timer.best_sectors()
 	_label("BEST SECTORS")
-	var columns := maxi(sectors.size(), 1)
+	# **The column count is the track's, not the best lap's.** `best_sectors()` is
+	# empty until a valid lap exists, so a strip sized from it showed one column all
+	# out lap and then jumped to three — and on a circuit that authored two splits it
+	# would have jumped to a number the driver had no reason to expect. `sector_count()`
+	# is the layout's own figure from the moment the timer is begun, which is what
+	# ADR-0046 made data.
+	var columns := maxi(timer.sector_count(), 1)
 	var width := (_panel.size.x - PAD * 2.0 * _s) / float(columns)
 	for index in columns:
 		var at := Vector2(_panel.position.x + PAD * _s + width * float(index + 1) - 4.0 * _s,

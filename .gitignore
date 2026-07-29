@@ -78,3 +78,16 @@ __pycache__/
 # The unit-test binary. Built by tests/run.sh into bin/, which is already
 # ignored above, but named here so it is obvious it is not meant to be shipped.
 /bin/tests/
+
+# Godot import sidecars for files under docs/ that are documentation rather than
+# resources.
+#
+# `docs/circuits/*.csv` are the design's walked centerline and speed profile. They
+# are read by `tools/circuits/render_circuit.py` with Python and by a human with
+# their eyes; nothing loads them through `res://`. Godot's CSV importer picks them
+# up anyway on the first editor import and drops a `.import` beside each, which is
+# then untracked noise in `git status` forever.
+#
+# Anchored with a leading slash, which is the whole lesson of issue #106: a bare
+# pattern matched `tools/shots/` once and kept an entire harness out of the repo.
+/docs/**/*.import

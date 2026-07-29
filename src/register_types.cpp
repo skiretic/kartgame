@@ -9,6 +9,7 @@
 #include "session/kart_ghost.h"
 #include "session/kart_profile.h"
 #include "session/kart_session.h"
+#include "track/kart_track.h"
 #include "tuning/tuning_registry.h"
 #include "vehicle/kart_body.h"
 #include "vehicle/player_driver.h"
@@ -121,6 +122,17 @@ void initialize_kartgame_module(ModuleInitializationLevel p_level) {
 	// and there must not be one. ADR-0040's producer table says otherwise in one
 	// line and ADR-0041 is the later decision.
 	GDREGISTER_CLASS(kartgame::KartGhost);
+
+	// The circuit. ROADMAP M5, ADR-0046, issue #63.
+	//
+	// RefCounted rather than Node, and deliberately: a track is a *definition*
+	// that several things read - the scene builds colliders from it, the session
+	// runner takes checkpoints and sector marks from it, and `gentrack.py` reads
+	// the same file to build the mesh. Making it a Node would put the definition in
+	// one place in the tree and invite every other reader to go looking for it
+	// there, which is how `settings.cfg` ended up saveable, loadable and never once
+	// loaded.
+	GDREGISTER_CLASS(kartgame::KartTrack);
 }
 
 void uninitialize_kartgame_module(ModuleInitializationLevel p_level) {

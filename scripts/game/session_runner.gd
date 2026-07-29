@@ -5,7 +5,7 @@ extends Node
 ##
 ##     var runner := SessionRunner.new()
 ##     add_child(runner)
-##     runner.configure(session, kart, driver, layout)
+##     runner.configure(session, kart, driver, course)
 ##     runner.begin()
 ##
 ## `GAMEDESIGN.md` §2: *"A session is the only thing the game actually runs.
@@ -150,13 +150,18 @@ const TRANSITIONS: Dictionary = {
 
 # --- timing --------------------------------------------------------------------
 
-## Sectors, before anybody has authored splits.
+## Sectors, for a course that has authored none.
 ##
 ## Three, which `lap_timing.h` calls *"the convention every timing screen in the
-## sport uses"*. They are placed by `KartLapTimer.begin_even`, and that is a
-## **placeholder that says so by being one line**: ADR-0046 puts real splits in
-## `track.json` and M5 writes that schema. When it does, this becomes
-## `begin_marks(track.sector_marks, length, step)` and nothing else here moves.
+## sport uses"*. They are placed by `KartLapTimer.begin_even`, and it is still what
+## `test_track.tscn` gets: it is a diagnostic instrument built in code, it has no
+## `track.json`, and thirds are as meaningful a partition of it as anything else.
+##
+## **A circuit does not come through here.** ADR-0046 puts real splits and real
+## checkpoints in `track.json`, M5 wrote that schema, and `configure()` calls
+## `begin_track()` with both lists whenever the course publishes them — issue #180.
+## A `SECTOR_COUNT` that applied to Valdirone would be a timing screen measuring
+## thirds of a circuit whose designer chose 524 m and 902 m for a reason.
 const SECTOR_COUNT := 3
 
 ## How long `HELD` will wait for the kart to land before releasing it anyway.
@@ -190,8 +195,30 @@ const ODOMETER_STEP_LIMIT_FACTOR := 2.0
 var _session: KartSession
 var _kart: KartBody
 var _driver: PlayerDriver
-var _layout: TrackLayout
+
+## Where the kart is on the track, and how the lap is divided. See `configure()`
+## for the four methods this object has to have and the three it may have.
+##
+## Not typed, and the reason is that the two things that can be one are a GDScript
+## `TrackLayout` (`test_track.tscn`, built in code) and a `KartTrack` (a circuit,
+## read from `track.json`). They share no base class and cannot be made to — one is
+## a `Node3D` script and the other is a `RefCounted` in the GDExtension — so the
+## contract is checked in `_first_problem()` rather than declared. A session refused
+## for a missing method names the method.
+var _course: Object
+
 var _timer: KartLapTimer
+
+## Whether the course publishes a width per station. Latched at `configure()`
+## rather than asked per tick, because `_measure_off_track` runs every tick of every
+## session and `has_method` on a GDExtension class is a string lookup.
+var _course_has_width := false
+
+## Whether the course authored its own sector marks and checkpoints, so the timer
+## was begun with `begin_track` rather than with `SECTOR_COUNT` even thirds.
+## Reported in `result()` so a lap time carries whether it was split by a designer
+## or by arithmetic.
+var _authored_marks := false
 
 var _state := STATE_SETUP
 var _refusal := ""
@@ -269,8 +296,31 @@ signal session_finished(result: Dictionary)
 ## Every argument is required and none of them is looked up by name or by group. A
 ## runner that found its own kart would be a second place that decides which kart a
 ## session is about, and eight karts in one scene is on the roadmap.
+##
+## ## What `course` has to be
+##
+## Two unrelated classes are handed in here — `TrackLayout`, which `test_track.gd`
+## builds in code, and `KartTrack`, which reads `track.json` — so the argument is a
+## duck type checked at `configure()` rather than a static one. Four methods are
+## required and a session is refused by name without them:
+##
+##     length() -> float                       the lap, meters
+##     project(Vector3, float) -> Dictionary   {distance, lateral, gap, heading}
+##
+## and three are optional, each of which turns a placeholder into the authored
+## thing:
+##
+##     sector_marks() -> PackedFloat64Array    splits, excluding the start line
+##     checkpoints() -> PackedFloat64Array     anti-cut stations
+##     sample(float) -> Dictionary             {width} at a station
+##
+## **`sector_marks` and `checkpoints` are taken together or not at all.** They are
+## one partition of one lap: taking the splits and dropping the checkpoints is a
+## timing screen that reads right and a cut detector with 380 m holes in it, and
+## taking the checkpoints and dropping the splits is the reverse. A course that
+## publishes one and not the other is refused rather than half-wired.
 func configure(
-	session: KartSession, kart: KartBody, driver: PlayerDriver, layout: TrackLayout
+	session: KartSession, kart: KartBody, driver: PlayerDriver, course: Object
 ) -> bool:
 	if _state != STATE_SETUP:
 		push_error("SessionRunner: configure() after the session started, in state %s"
@@ -280,7 +330,7 @@ func configure(
 	_session = session
 	_kart = kart
 	_driver = driver
-	_layout = layout
+	_course = course
 
 	var problem := _first_problem()
 	if problem != "":
@@ -288,16 +338,31 @@ func configure(
 		_enter(STATE_REFUSED)
 		return false
 
+	_course_has_width = _course.has_method("sample")
+	# Both methods are present or neither is — `_first_problem()` refused the mixed
+	# case above — and a course that publishes two empty lists has authored no
+	# partition, which is the even-thirds fallback rather than a one-sector lap.
+	_authored_marks = _course.has_method("sector_marks") \
+		and (not _course.sector_marks().is_empty() or not _course.checkpoints().is_empty())
+
 	_timer = KartLapTimer.new()
 	var step := 1.0 / float(Engine.physics_ticks_per_second)
-	if not _timer.begin_even(_layout.length(), SECTOR_COUNT, step):
-		# `begin_even` has already said what was wrong with the numbers. What this
-		# adds is that the session is refused rather than run with a timer that
-		# answers `advance()` with an error every tick — which `KartLapTimer::advance`
-		# warns about once and then stays quiet about forever.
-		_refusal = "the lap cannot be timed: %.3f m in %d sectors" % [
-			_layout.length(), SECTOR_COUNT,
-		]
+	var length: float = _course.length()
+	if _authored_marks:
+		var sectors: PackedFloat64Array = _course.sector_marks()
+		var checkpoints: PackedFloat64Array = _course.checkpoints()
+		if not _timer.begin_track(sectors, checkpoints, length, step):
+			# `begin_track` has already printed which of the two lists is wrong and what
+			# the ceilings are. What this adds is that the session is refused rather than
+			# run with a timer that answers `advance()` with an error every tick — which
+			# `KartLapTimer::advance` warns about once and then stays quiet about forever.
+			_refusal = "the lap cannot be timed: %d authored sector marks and %d checkpoints on %.3f m" % [
+				sectors.size(), checkpoints.size(), length,
+			]
+			_enter(STATE_REFUSED)
+			return false
+	elif not _timer.begin_even(length, SECTOR_COUNT, step):
+		_refusal = "the lap cannot be timed: %.3f m in %d sectors" % [length, SECTOR_COUNT]
 		_enter(STATE_REFUSED)
 		return false
 
@@ -332,8 +397,25 @@ func configure(
 ## is the coupling this whole file exists to avoid. What is refused is the two things
 ## that genuinely do not exist yet, and both name themselves.
 func _first_problem() -> String:
-	if _session == null or _kart == null or _driver == null or _layout == null:
-		return "configure() wants a session, a kart, a driver and a layout"
+	if _session == null or _kart == null or _driver == null or _course == null:
+		return "configure() wants a session, a kart, a driver and a course"
+	# The duck type, named method by method. `configure()`'s header lists the seven
+	# and says which three are optional; a missing *required* one is otherwise a
+	# `nil` returned from `length()` on the first tick of the first session, and the
+	# stack trace names this file rather than the scene that handed the wrong object
+	# in.
+	for method in ["length", "project"]:
+		if not _course.has_method(method):
+			return "the course %s has no %s() — see SessionRunner.configure()" % [
+				_course.get_class(), method,
+			]
+	# Half a partition is worse than none: splits with no checkpoints is a cut
+	# detector with holes in it, and checkpoints with no splits is a timing screen
+	# that reads as one sector on a circuit that authored three.
+	if _course.has_method("sector_marks") != _course.has_method("checkpoints"):
+		return "the course %s publishes one of sector_marks() and checkpoints() and not the other" % (
+			_course.get_class()
+		)
 	if not _session.is_valid():
 		# `SessionConfig::is_valid()` is total and cheap and `KartSession` exposes it
 		# precisely so both a menu and the runner can call it. `session.h` says so.
@@ -450,7 +532,7 @@ func notify_respawn() -> void:
 		return
 	# Globally, with no hint, because the hint is exactly what has just been
 	# invalidated.
-	var placed := _layout.project(_kart.global_position, -1.0)
+	var placed: Dictionary = _course.project(_kart.global_position, -1.0)
 	_hint = placed["distance"]
 	_timer.respawn(_hint)
 	# The lap dies here and the session does not, in Practice.
@@ -505,7 +587,7 @@ func _tick_held() -> void:
 
 ## Arm the timer from where the kart actually came to rest and hand over the input.
 func _release() -> void:
-	var placed := _layout.project(_kart.global_position, -1.0)
+	var placed: Dictionary = _course.project(_kart.global_position, -1.0)
 	_hint = placed["distance"]
 	_arm_distance = _hint
 	# The first `advance()` is what arms the marks — `LapTimer::arm_marks_from` — so
@@ -519,7 +601,7 @@ func _release() -> void:
 func _tick_running() -> void:
 	_session_ticks += 1
 
-	var placed := _layout.project(_kart.global_position, _hint)
+	var placed: Dictionary = _course.project(_kart.global_position, _hint)
 	var distance: float = placed["distance"]
 	_advance_odometer(distance)
 	_hint = distance
@@ -608,7 +690,7 @@ func _limit_met() -> bool:
 
 ## Add this tick's travel to the odometer, ignoring anything too large to be travel.
 func _advance_odometer(distance: float) -> void:
-	var total := _layout.length()
+	var total: float = _course.length()
 	var step := distance - _hint
 	# The short way round, so the tick that crosses the start line is a small forward
 	# step rather than a whole lap backwards. `lap_timing.h`'s `circular_delta` makes
@@ -656,8 +738,21 @@ func _advance_odometer(distance: float) -> void:
 ## *center*, which puts the threshold half a tire outside the true line — more
 ## generous than the regulation, and erring toward not striking out a lap is the
 ## right direction for a rule this project admits is its own.
+##
+## ## The width is the course's, not a constant, wherever the course has one
+##
+## `TrackRibbon.TRACK_WIDTH` is 8.0 and it is the *test track's* width, which is a
+## single number because that scene is built in code with one. Valdirone is not:
+## `track.json` tapers it station by station and it measures **9.0 m to 14.0 m**, so
+## a constant 8 m would strike out a lap for putting a wheel on asphalt the design
+## widened on purpose — half a meter inside the line at the narrowest and three
+## meters inside it at the widest, which on a 14 m corner is most of the racing line.
+## So the width comes from `sample()` when the course has one.
 func _measure_off_track(placed: Dictionary) -> bool:
 	var half_width := TrackRibbon.TRACK_WIDTH * 0.5
+	if _course_has_width:
+		var frame: Dictionary = _course.sample(placed["distance"])
+		half_width = float(frame["width"]) * 0.5
 	var right := TrackLayout.right(placed["heading"])
 	var centerline_lateral: float = placed["lateral"]
 	var origin := _kart.global_position
@@ -900,4 +995,11 @@ func _build_result() -> void:
 		"best_sectors": _timer.best_sectors() if _timer != null else PackedFloat64Array(),
 		"optimal_lap_s": _timer.optimal_lap() if _timer != null else -1.0,
 		"flagged_at_tick": _flag_tick,
+		# How the lap was divided, and by whom. A sector time means nothing without
+		# both: three splits from `track.json` and three splits from `SECTOR_COUNT` are
+		# the same shape and not the same measurement, and a saved best that does not
+		# record which it was cannot be compared against anything later.
+		"sector_count": _timer.sector_count() if _timer != null else 0,
+		"mark_count": _timer.mark_count() if _timer != null else 0,
+		"authored_marks": _authored_marks,
 	}

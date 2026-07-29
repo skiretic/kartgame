@@ -289,9 +289,25 @@ public:
 	// anybody has authored splits for it, and `lap_timing.h` says so.
 	bool begin_even(double p_length_m, int p_sectors, double p_step_s);
 
-	// Authored marks, in meters from the start line, ascending, first at zero.
-	// Refuses a layout that cannot be timed rather than reporting nonsense splits.
+	// Authored marks, in meters from the start line, ascending, first at zero. Every
+	// one of them starts a sector, so this is the form for a layout that has splits
+	// and no separate anti-cut stations. Refuses a layout that cannot be timed rather
+	// than reporting nonsense splits.
 	bool begin_marks(const godot::PackedFloat64Array &p_marks, double p_length_m, double p_step_s);
+
+	// A circuit's two authored lists, straight off `KartTrack.sector_marks()` and
+	// `KartTrack.checkpoints()`, in the selected layout's own stations.
+	//
+	// **They are not the same list and this is the only entry point that knows it.**
+	// `lap_timing.h`'s `LapMarks` header has the argument: every mark has to be
+	// crossed in order or the lap was cut, and only the sector marks may put a split
+	// on the screen. Handing both lists to `begin_marks` reported Valdirone as a
+	// sixteen-sector circuit.
+	//
+	// `p_sector_marks` excludes the start line, because `track.json` writes it that
+	// way; `p_checkpoints` normally includes 0.0 and it merges into the line.
+	bool begin_track(const godot::PackedFloat64Array &p_sector_marks,
+			const godot::PackedFloat64Array &p_checkpoints, double p_length_m, double p_step_s);
 
 	void reset();
 
@@ -312,6 +328,17 @@ public:
 	double lap_time() const;
 	int sector() const;
 	double sector_time() const;
+
+	// How many sectors the lap is divided into, and how many marks have to be
+	// crossed to complete it. **A HUD must ask rather than assume three**: ADR-0046
+	// makes the count data, Valdirone's three come from its file, and a screen that
+	// drew a fixed number of rows would show a blank sector on a circuit with two.
+	// The two numbers differ by the checkpoint count, which is why both are exposed.
+	int sector_count() const;
+	int mark_count() const;
+	// Where the marks are, meters from the start line, ascending. For a probe that
+	// wants to check the timer against the file, and for a track map.
+	godot::PackedFloat64Array marks() const;
 	int laps_completed() const;
 	double distance() const;
 	godot::String current_reason() const;

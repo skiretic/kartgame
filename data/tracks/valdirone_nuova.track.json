@@ -1,0 +1,2052 @@
+{
+ "schema_version": 1,
+ "meta": {
+  "name": "Valdirone Nuova",
+  "length_m": 1375.119417,
+  "grade": 1,
+  "net_turn_deg": -360.0,
+  "designed_from": "docs/circuits/valdirone_nuova.json",
+  "authored_by": "tools/circuits/author_track.py",
+  "note": "Generated. Edit the design and re-run; a hand edit here will fail the position checksum in src/core/track.h."
+ },
+ "spline": [
+  {
+   "distance_m": 0.0,
+   "position": [
+    0.0,
+    -0.0
+   ],
+   "heading_deg": 0.0,
+   "curvature_1pm": 0.0,
+   "width_m": 12.0,
+   "crown_pct": 2.0,
+   "bank_pct": 0.0,
+   "elevation_m": 0.0,
+   "grade_pct": 0.787098,
+   "segment": 0,
+   "note": "Rettifilo del Banco - start line to T1"
+  },
+  {
+   "distance_m": 33.999449,
+   "position": [
+    0.0,
+    -33.999449
+   ],
+   "heading_deg": 0.0,
+   "curvature_1pm": 0.0,
+   "width_m": 12.0,
+   "crown_pct": 2.0,
+   "bank_pct": 0.0,
+   "elevation_m": 0.267609,
+   "grade_pct": 0.787098,
+   "segment": 0
+  },
+  {
+   "distance_m": 67.998899,
+   "position": [
+    0.0,
+    -67.998899
+   ],
+   "heading_deg": 0.0,
+   "curvature_1pm": 0.0,
+   "width_m": 12.0,
+   "crown_pct": 2.0,
+   "bank_pct": 0.0,
+   "elevation_m": 0.535218,
+   "grade_pct": 0.787098,
+   "segment": 0
+  },
+  {
+   "distance_m": 87.998899,
+   "position": [
+    0.0,
+    -87.998899
+   ],
+   "heading_deg": 0.0,
+   "curvature_1pm": -0.01754386,
+   "width_m": 12.0,
+   "crown_pct": 1.0,
+   "bank_pct": -2.5,
+   "elevation_m": 0.692637,
+   "grade_pct": 0.787098,
+   "segment": 1,
+   "note": "T1 - Ronda"
+  },
+  {
+   "distance_m": 107.998899,
+   "position": [
+    -3.472921,
+    -107.591035
+   ],
+   "heading_deg": -20.103782,
+   "curvature_1pm": -0.01754386,
+   "width_m": 12.0,
+   "crown_pct": 0.0,
+   "bank_pct": -5.0,
+   "elevation_m": 0.850057,
+   "grade_pct": 0.787098,
+   "segment": 1
+  },
+  {
+   "distance_m": 142.714971,
+   "position": [
+    -24.306143,
+    -134.690565
+   ],
+   "heading_deg": -55.0,
+   "curvature_1pm": -0.01754386,
+   "width_m": 12.0,
+   "crown_pct": 0.0,
+   "bank_pct": -5.0,
+   "elevation_m": 1.123307,
+   "grade_pct": 0.787098,
+   "segment": 1
+  },
+  {
+   "distance_m": 177.431043,
+   "position": [
+    -56.896754,
+    -144.998805
+   ],
+   "heading_deg": -89.896218,
+   "curvature_1pm": -0.01754386,
+   "width_m": 12.0,
+   "crown_pct": 0.0,
+   "bank_pct": -5.0,
+   "elevation_m": 1.396556,
+   "grade_pct": 0.787098,
+   "segment": 1
+  },
+  {
+   "distance_m": 197.431043,
+   "position": [
+    -76.495148,
+    -141.561378
+   ],
+   "heading_deg": -110.0,
+   "curvature_1pm": 0.0,
+   "width_m": 12.0,
+   "crown_pct": 1.0,
+   "bank_pct": -2.5,
+   "elevation_m": 1.553976,
+   "grade_pct": 0.787098,
+   "segment": 2,
+   "note": "Il Banco - the shelf, pre-crest"
+  },
+  {
+   "distance_m": 210.114186,
+   "position": [
+    -88.413404,
+    -137.223488
+   ],
+   "heading_deg": -110.0,
+   "curvature_1pm": 0.0,
+   "width_m": 11.492674,
+   "crown_pct": 1.634157,
+   "bank_pct": -0.914607,
+   "elevation_m": 1.653804,
+   "grade_pct": 0.787098,
+   "segment": 2
+  },
+  {
+   "distance_m": 217.431043,
+   "position": [
+    -95.289001,
+    -134.720975
+   ],
+   "heading_deg": -110.0,
+   "curvature_1pm": 0.0,
+   "width_m": 11.2,
+   "crown_pct": 2.0,
+   "bank_pct": -0.0,
+   "elevation_m": 1.697307,
+   "grade_pct": 0.402,
+   "segment": 2
+  },
+  {
+   "distance_m": 222.431043,
+   "position": [
+    -99.987464,
+    -133.010875
+   ],
+   "heading_deg": -110.0,
+   "curvature_1pm": 0.0,
+   "width_m": 11.0,
+   "crown_pct": 2.0,
+   "bank_pct": 0.0,
+   "elevation_m": 1.710828,
+   "grade_pct": 0.138842,
+   "segment": 2
+  },
+  {
+   "distance_m": 261.291616,
+   "position": [
+    -136.504458,
+    -119.719776
+   ],
+   "heading_deg": -110.0,
+   "curvature_1pm": 0.0,
+   "width_m": 11.0,
+   "crown_pct": 2.0,
+   "bank_pct": 0.0,
+   "elevation_m": 1.367376,
+   "grade_pct": -1.906451,
+   "segment": 3,
+   "note": "Il Banco - the shelf, post-crest"
+  },
+  {
+   "distance_m": 283.221903,
+   "position": [
+    -157.112186,
+    -112.219176
+   ],
+   "heading_deg": -110.0,
+   "curvature_1pm": 0.0,
+   "width_m": 11.0,
+   "crown_pct": 2.0,
+   "bank_pct": 0.0,
+   "elevation_m": 0.822724,
+   "grade_pct": -3.060677,
+   "segment": 3
+  },
+  {
+   "distance_m": 305.152189,
+   "position": [
+    -177.719914,
+    -104.718576
+   ],
+   "heading_deg": -110.0,
+   "curvature_1pm": 0.0,
+   "width_m": 11.0,
+   "crown_pct": 2.0,
+   "bank_pct": 0.0,
+   "elevation_m": 0.024946,
+   "grade_pct": -4.214902,
+   "segment": 3
+  },
+  {
+   "distance_m": 312.469046,
+   "position": [
+    -184.595511,
+    -102.216064
+   ],
+   "heading_deg": -110.0,
+   "curvature_1pm": 0.0,
+   "width_m": 11.0,
+   "crown_pct": 1.634157,
+   "bank_pct": 0.914607,
+   "elevation_m": -0.297541,
+   "grade_pct": -4.6,
+   "segment": 3
+  },
+  {
+   "distance_m": 325.152189,
+   "position": [
+    -196.513767,
+    -97.878173
+   ],
+   "heading_deg": -110.0,
+   "curvature_1pm": 0.023809524,
+   "width_m": 11.0,
+   "crown_pct": 1.0,
+   "bank_pct": 2.5,
+   "elevation_m": -0.880966,
+   "grade_pct": -4.6,
+   "segment": 4,
+   "note": "T2 - Lama"
+  },
+  {
+   "distance_m": 345.152189,
+   "position": [
+    -216.203478,
+    -95.684181
+   ],
+   "heading_deg": -82.716295,
+   "curvature_1pm": 0.023809524,
+   "width_m": 10.0,
+   "crown_pct": 0.0,
+   "bank_pct": 5.0,
+   "elevation_m": -1.800966,
+   "grade_pct": -4.6,
+   "segment": 4
+  },
+  {
+   "distance_m": 367.460444,
+   "position": [
+    -236.572199,
+    -104.121181
+   ],
+   "heading_deg": -52.283705,
+   "curvature_1pm": 0.023809524,
+   "width_m": 10.0,
+   "crown_pct": 0.0,
+   "bank_pct": 5.0,
+   "elevation_m": -2.827145,
+   "grade_pct": -4.6,
+   "segment": 4
+  },
+  {
+   "distance_m": 387.460444,
+   "position": [
+    -248.94354,
+    -119.595297
+   ],
+   "heading_deg": -25.0,
+   "curvature_1pm": 0.0,
+   "width_m": 10.0,
+   "crown_pct": 1.25,
+   "bank_pct": 2.5,
+   "elevation_m": -3.747145,
+   "grade_pct": -4.6,
+   "segment": 5,
+   "note": "La Discesa - the tow"
+  },
+  {
+   "distance_m": 407.460444,
+   "position": [
+    -257.395905,
+    -137.721452
+   ],
+   "heading_deg": -25.0,
+   "curvature_1pm": 0.0,
+   "width_m": 11.0,
+   "crown_pct": 2.5,
+   "bank_pct": -0.0,
+   "elevation_m": -4.667145,
+   "grade_pct": -4.6,
+   "segment": 5
+  },
+  {
+   "distance_m": 429.815293,
+   "position": [
+    -266.843473,
+    -157.981826
+   ],
+   "heading_deg": -25.0,
+   "curvature_1pm": 0.0,
+   "width_m": 11.0,
+   "crown_pct": 2.5,
+   "bank_pct": 0.0,
+   "elevation_m": -5.695468,
+   "grade_pct": -4.6,
+   "segment": 5
+  },
+  {
+   "distance_m": 452.170142,
+   "position": [
+    -276.29104,
+    -178.2422
+   ],
+   "heading_deg": -25.0,
+   "curvature_1pm": 0.0,
+   "width_m": 11.0,
+   "crown_pct": 2.5,
+   "bank_pct": 0.0,
+   "elevation_m": -6.723791,
+   "grade_pct": -4.6,
+   "segment": 6,
+   "note": "La Discesa - the braking zone"
+  },
+  {
+   "distance_m": 477.170142,
+   "position": [
+    -286.856497,
+    -200.899895
+   ],
+   "heading_deg": -25.0,
+   "curvature_1pm": 0.0,
+   "width_m": 12.0,
+   "crown_pct": 2.5,
+   "bank_pct": 0.0,
+   "elevation_m": -7.873791,
+   "grade_pct": -4.6,
+   "segment": 6
+  },
+  {
+   "distance_m": 502.169908,
+   "position": [
+    -297.421855,
+    -223.557378
+   ],
+   "heading_deg": -25.0,
+   "curvature_1pm": 0.0,
+   "width_m": 12.0,
+   "crown_pct": 2.5,
+   "bank_pct": 0.0,
+   "elevation_m": -9.023781,
+   "grade_pct": -4.6,
+   "segment": 7,
+   "note": "La Discesa - the widening"
+  },
+  {
+   "distance_m": 515.388819,
+   "position": [
+    -303.008408,
+    -235.53778
+   ],
+   "heading_deg": -25.0,
+   "curvature_1pm": 0.0,
+   "width_m": 12.528759,
+   "crown_pct": 2.5,
+   "bank_pct": 0.0,
+   "elevation_m": -9.63185,
+   "grade_pct": -4.6,
+   "segment": 7
+  },
+  {
+   "distance_m": 527.169792,
+   "position": [
+    -307.987262,
+    -246.214967
+   ],
+   "heading_deg": -25.0,
+   "curvature_1pm": -0.066666667,
+   "width_m": 13.0,
+   "crown_pct": 1.25,
+   "bank_pct": -3.5,
+   "elevation_m": -10.173775,
+   "grade_pct": -4.6,
+   "segment": 8,
+   "note": "T3a - Il Pozzo, entry half"
+  },
+  {
+   "distance_m": 532.331737,
+   "position": [
+    -310.92305,
+    -250.429809
+   ],
+   "heading_deg": -44.717177,
+   "curvature_1pm": -0.066666667,
+   "width_m": 13.430157,
+   "crown_pct": 0.702301,
+   "bank_pct": -5.033558,
+   "elevation_m": -10.411225,
+   "grade_pct": -4.6,
+   "segment": 8
+  },
+  {
+   "distance_m": 538.950764,
+   "position": [
+    -316.451577,
+    -253.971082
+   ],
+   "heading_deg": -70.0,
+   "curvature_1pm": -0.066666667,
+   "width_m": 13.981748,
+   "crown_pct": 0.0,
+   "bank_pct": -7.0,
+   "elevation_m": -10.660936,
+   "grade_pct": -2.945243,
+   "segment": 8
+  },
+  {
+   "distance_m": 539.169792,
+   "position": [
+    -316.657935,
+    -254.044489
+   ],
+   "heading_deg": -70.836624,
+   "curvature_1pm": -0.066666667,
+   "width_m": 14.0,
+   "crown_pct": 0.0,
+   "bank_pct": -7.0,
+   "elevation_m": -10.667326,
+   "grade_pct": -2.890486,
+   "segment": 8
+  },
+  {
+   "distance_m": 550.731737,
+   "position": [
+    -327.921153,
+    -253.47031
+   ],
+   "heading_deg": -115.0,
+   "curvature_1pm": -0.066666667,
+   "width_m": 14.0,
+   "crown_pct": 0.0,
+   "bank_pct": -7.0,
+   "elevation_m": -10.834425,
+   "grade_pct": -0.0,
+   "segment": 9,
+   "note": "T3b - Il Pozzo, exit half"
+  },
+  {
+   "distance_m": 562.512709,
+   "position": [
+    -335.677268,
+    -245.005995
+   ],
+   "heading_deg": -160.0,
+   "curvature_1pm": -0.066666667,
+   "width_m": 14.0,
+   "crown_pct": 0.0,
+   "bank_pct": -7.0,
+   "elevation_m": -10.660936,
+   "grade_pct": 2.945243,
+   "segment": 9
+  },
+  {
+   "distance_m": 569.131737,
+   "position": [
+    -336.518164,
+    -238.494612
+   ],
+   "heading_deg": -185.282823,
+   "curvature_1pm": -0.066666667,
+   "width_m": 14.0,
+   "crown_pct": 0.702301,
+   "bank_pct": -5.033558,
+   "elevation_m": -10.411225,
+   "grade_pct": 4.6,
+   "segment": 9
+  },
+  {
+   "distance_m": 574.293682,
+   "position": [
+    -335.176495,
+    -233.536419
+   ],
+   "heading_deg": -205.0,
+   "curvature_1pm": 0.0,
+   "width_m": 14.0,
+   "crown_pct": 1.25,
+   "bank_pct": -3.5,
+   "elevation_m": -10.173775,
+   "grade_pct": 4.6,
+   "segment": 10,
+   "note": "La Rampa - the climb, lower"
+  },
+  {
+   "distance_m": 586.074654,
+   "position": [
+    -330.197641,
+    -222.859232
+   ],
+   "heading_deg": -205.0,
+   "curvature_1pm": 0.0,
+   "width_m": 12.821903,
+   "crown_pct": 2.5,
+   "bank_pct": -0.0,
+   "elevation_m": -9.63185,
+   "grade_pct": 4.6,
+   "segment": 10
+  },
+  {
+   "distance_m": 604.293682,
+   "position": [
+    -322.497948,
+    -206.347185
+   ],
+   "heading_deg": -205.0,
+   "curvature_1pm": 0.0,
+   "width_m": 11.0,
+   "crown_pct": 2.5,
+   "bank_pct": 0.0,
+   "elevation_m": -8.793775,
+   "grade_pct": 4.6,
+   "segment": 10
+  },
+  {
+   "distance_m": 641.487974,
+   "position": [
+    -306.778961,
+    -172.637709
+   ],
+   "heading_deg": -205.0,
+   "curvature_1pm": 0.0,
+   "width_m": 11.0,
+   "crown_pct": 2.5,
+   "bank_pct": 0.0,
+   "elevation_m": -7.082838,
+   "grade_pct": 4.6,
+   "segment": 10
+  },
+  {
+   "distance_m": 675.804093,
+   "position": [
+    -292.276342,
+    -141.536743
+   ],
+   "heading_deg": -205.0,
+   "curvature_1pm": 0.0,
+   "width_m": 11.0,
+   "crown_pct": 2.5,
+   "bank_pct": 0.0,
+   "elevation_m": -5.831406,
+   "grade_pct": 2.693549,
+   "segment": 11,
+   "note": "La Rampa - the climb, upper"
+  },
+  {
+   "distance_m": 710.120211,
+   "position": [
+    -277.773724,
+    -110.435777
+   ],
+   "heading_deg": -205.0,
+   "curvature_1pm": 0.0,
+   "width_m": 9.039079,
+   "crown_pct": 2.5,
+   "bank_pct": 0.0,
+   "elevation_m": -5.234195,
+   "grade_pct": 0.787098,
+   "segment": 11
+  },
+  {
+   "distance_m": 710.804093,
+   "position": [
+    -277.484703,
+    -109.815971
+   ],
+   "heading_deg": -205.0,
+   "curvature_1pm": 0.0,
+   "width_m": 9.0,
+   "crown_pct": 2.5,
+   "bank_pct": 0.0,
+   "elevation_m": -5.228812,
+   "grade_pct": 0.787098,
+   "segment": 11
+  },
+  {
+   "distance_m": 718.995505,
+   "position": [
+    -274.022862,
+    -102.39203
+   ],
+   "heading_deg": -205.0,
+   "curvature_1pm": 0.0,
+   "width_m": 9.0,
+   "crown_pct": 2.5,
+   "bank_pct": 0.0,
+   "elevation_m": -5.164338,
+   "grade_pct": 0.787098,
+   "segment": 11
+  },
+  {
+   "distance_m": 735.314333,
+   "position": [
+    -267.126228,
+    -87.602148
+   ],
+   "heading_deg": -205.0,
+   "curvature_1pm": 0.045454545,
+   "width_m": 9.0,
+   "crown_pct": 1.25,
+   "bank_pct": 3.5,
+   "elevation_m": -5.035892,
+   "grade_pct": 0.787098,
+   "segment": 12,
+   "note": "T4 - Il Ciglione"
+  },
+  {
+   "distance_m": 751.633162,
+   "position": [
+    -266.083226,
+    -71.689019
+   ],
+   "heading_deg": -162.5,
+   "curvature_1pm": 0.045454545,
+   "width_m": 9.0,
+   "crown_pct": -0.0,
+   "bank_pct": 7.0,
+   "elevation_m": -4.907447,
+   "grade_pct": 0.787098,
+   "segment": 12
+  },
+  {
+   "distance_m": 753.80636,
+   "position": [
+    -266.837942,
+    -69.652022
+   ],
+   "heading_deg": -156.840223,
+   "curvature_1pm": 0.045454545,
+   "width_m": 9.0,
+   "crown_pct": 0.0,
+   "bank_pct": 7.0,
+   "elevation_m": -4.890342,
+   "grade_pct": 0.787098,
+   "segment": 12
+  },
+  {
+   "distance_m": 767.95199,
+   "position": [
+    -276.064999,
+    -59.251988
+   ],
+   "heading_deg": -120.0,
+   "curvature_1pm": 0.0,
+   "width_m": 9.0,
+   "crown_pct": 1.0,
+   "bank_pct": 3.5,
+   "elevation_m": -4.779002,
+   "grade_pct": 0.787098,
+   "segment": 13,
+   "note": "Link T4-T5"
+  },
+  {
+   "distance_m": 782.09762,
+   "position": [
+    -288.315474,
+    -52.179173
+   ],
+   "heading_deg": -120.0,
+   "curvature_1pm": 0.0,
+   "width_m": 9.707281,
+   "crown_pct": 2.0,
+   "bank_pct": 0.0,
+   "elevation_m": -4.667662,
+   "grade_pct": 0.787098,
+   "segment": 13
+  },
+  {
+   "distance_m": 783.67688,
+   "position": [
+    -289.683152,
+    -51.389543
+   ],
+   "heading_deg": -120.0,
+   "curvature_1pm": 0.0,
+   "width_m": 9.786244,
+   "crown_pct": 2.0,
+   "bank_pct": 0.0,
+   "elevation_m": -4.655232,
+   "grade_pct": 0.787098,
+   "segment": 13
+  },
+  {
+   "distance_m": 787.95199,
+   "position": [
+    -293.385507,
+    -49.251988
+   ],
+   "heading_deg": -120.0,
+   "curvature_1pm": 0.0,
+   "width_m": 10.0,
+   "crown_pct": 1.659798,
+   "bank_pct": -0.510304,
+   "elevation_m": -4.621583,
+   "grade_pct": 0.787098,
+   "segment": 13
+  },
+  {
+   "distance_m": 796.24325,
+   "position": [
+    -300.565949,
+    -45.106358
+   ],
+   "heading_deg": -120.0,
+   "curvature_1pm": -0.016666667,
+   "width_m": 10.0,
+   "crown_pct": 1.0,
+   "bank_pct": -1.5,
+   "elevation_m": -4.556322,
+   "grade_pct": 0.787098,
+   "segment": 14,
+   "note": "T5a - Vigna, entry arc"
+  },
+  {
+   "distance_m": 808.809621,
+   "position": [
+    -310.713785,
+    -37.733523
+   ],
+   "heading_deg": -132.0,
+   "curvature_1pm": -0.016666667,
+   "width_m": 10.0,
+   "crown_pct": -0.0,
+   "bank_pct": -3.0,
+   "elevation_m": -4.457413,
+   "grade_pct": 0.787098,
+   "segment": 14
+  },
+  {
+   "distance_m": 821.375992,
+   "position": [
+    -319.106968,
+    -28.411949
+   ],
+   "heading_deg": -144.0,
+   "curvature_1pm": -0.045454545,
+   "width_m": 10.0,
+   "crown_pct": 0.0,
+   "bank_pct": -5.5,
+   "elevation_m": -4.358503,
+   "grade_pct": 0.787098,
+   "segment": 15,
+   "note": "T5b - Vigna, apex arc"
+  },
+  {
+   "distance_m": 833.942362,
+   "position": [
+    -323.272715,
+    -16.736627
+   ],
+   "heading_deg": -176.727273,
+   "curvature_1pm": -0.045454545,
+   "width_m": 10.0,
+   "crown_pct": 0.0,
+   "bank_pct": -8.0,
+   "elevation_m": -4.259593,
+   "grade_pct": 0.787098,
+   "segment": 15
+  },
+  {
+   "distance_m": 835.007013,
+   "position": [
+    -323.307757,
+    -15.672657
+   ],
+   "heading_deg": -179.5,
+   "curvature_1pm": -0.045454545,
+   "width_m": 10.0,
+   "crown_pct": 0.0,
+   "bank_pct": -8.0,
+   "elevation_m": -4.251213,
+   "grade_pct": 0.787098,
+   "segment": 15
+  },
+  {
+   "distance_m": 848.638035,
+   "position": [
+    -319.329939,
+    -2.861991
+   ],
+   "heading_deg": -215.0,
+   "curvature_1pm": 0.0,
+   "width_m": 10.0,
+   "crown_pct": 1.0,
+   "bank_pct": -4.0,
+   "elevation_m": -4.143924,
+   "grade_pct": 0.787098,
+   "segment": 16,
+   "note": "Il Traverso - Vigna to Le Forbici"
+  },
+  {
+   "distance_m": 862.269056,
+   "position": [
+    -311.511507,
+    8.303888
+   ],
+   "heading_deg": -215.0,
+   "curvature_1pm": 0.0,
+   "width_m": 10.545241,
+   "crown_pct": 2.0,
+   "bank_pct": -0.0,
+   "elevation_m": -4.036634,
+   "grade_pct": 0.787098,
+   "segment": 16
+  },
+  {
+   "distance_m": 873.638035,
+   "position": [
+    -304.990529,
+    17.61681
+   ],
+   "heading_deg": -215.0,
+   "curvature_1pm": 0.0,
+   "width_m": 11.0,
+   "crown_pct": 2.0,
+   "bank_pct": 0.0,
+   "elevation_m": -3.947149,
+   "grade_pct": 0.787098,
+   "segment": 16
+  },
+  {
+   "distance_m": 908.588467,
+   "position": [
+    -284.943784,
+    46.246528
+   ],
+   "heading_deg": -215.0,
+   "curvature_1pm": 0.0,
+   "width_m": 11.0,
+   "crown_pct": 2.0,
+   "bank_pct": 0.0,
+   "elevation_m": -3.672055,
+   "grade_pct": 0.787098,
+   "segment": 16
+  },
+  {
+   "distance_m": 928.588467,
+   "position": [
+    -273.472255,
+    62.629568
+   ],
+   "heading_deg": -215.0,
+   "curvature_1pm": -0.03125,
+   "width_m": 11.0,
+   "crown_pct": 1.0,
+   "bank_pct": -3.0,
+   "elevation_m": -3.514636,
+   "grade_pct": 0.787098,
+   "segment": 17,
+   "note": "T6 - Forbice A"
+  },
+  {
+   "distance_m": 948.588467,
+   "position": [
+    -257.777921,
+    74.496977
+   ],
+   "heading_deg": -250.809862,
+   "curvature_1pm": -0.03125,
+   "width_m": 11.0,
+   "crown_pct": -0.0,
+   "bank_pct": -6.0,
+   "elevation_m": -3.357216,
+   "grade_pct": 0.787098,
+   "segment": 17
+  },
+  {
+   "distance_m": 956.847052,
+   "position": [
+    -249.716179,
+    76.180674
+   ],
+   "heading_deg": -265.596803,
+   "curvature_1pm": -0.03125,
+   "width_m": 11.0,
+   "crown_pct": 0.0,
+   "bank_pct": -6.0,
+   "elevation_m": -3.292213,
+   "grade_pct": 0.787098,
+   "segment": 17
+  },
+  {
+   "distance_m": 976.061422,
+   "position": [
+    -231.25939,
+    71.987935
+   ],
+   "heading_deg": -300.0,
+   "curvature_1pm": 0.0,
+   "width_m": 11.0,
+   "crown_pct": 1.0,
+   "bank_pct": -3.0,
+   "elevation_m": -3.140977,
+   "grade_pct": 0.787098,
+   "segment": 18,
+   "note": "Le Forbici - the crossing"
+  },
+  {
+   "distance_m": 995.275792,
+   "position": [
+    -214.619258,
+    62.38075
+   ],
+   "heading_deg": -300.0,
+   "curvature_1pm": 0.0,
+   "width_m": 11.0,
+   "crown_pct": 2.0,
+   "bank_pct": 0.0,
+   "elevation_m": -2.989741,
+   "grade_pct": 0.787098,
+   "segment": 18
+  },
+  {
+   "distance_m": 1014.490162,
+   "position": [
+    -197.979125,
+    52.773565
+   ],
+   "heading_deg": -300.0,
+   "curvature_1pm": 0.03125,
+   "width_m": 11.0,
+   "crown_pct": 1.0,
+   "bank_pct": 3.0,
+   "elevation_m": -2.838505,
+   "grade_pct": 0.787098,
+   "segment": 19,
+   "note": "T7 - Forbice B"
+  },
+  {
+   "distance_m": 1033.704532,
+   "position": [
+    -179.522336,
+    48.580827
+   ],
+   "heading_deg": -265.596803,
+   "curvature_1pm": 0.03125,
+   "width_m": 11.0,
+   "crown_pct": -0.0,
+   "bank_pct": 6.0,
+   "elevation_m": -2.687269,
+   "grade_pct": 0.787098,
+   "segment": 19
+  },
+  {
+   "distance_m": 1041.963118,
+   "position": [
+    -171.460594,
+    50.264523
+   ],
+   "heading_deg": -250.809862,
+   "curvature_1pm": 0.03125,
+   "width_m": 11.0,
+   "crown_pct": 0.0,
+   "bank_pct": 6.0,
+   "elevation_m": -2.622266,
+   "grade_pct": 0.787098,
+   "segment": 19
+  },
+  {
+   "distance_m": 1061.963118,
+   "position": [
+    -155.76626,
+    62.131932
+   ],
+   "heading_deg": -215.0,
+   "curvature_1pm": 0.0,
+   "width_m": 11.0,
+   "crown_pct": 1.0,
+   "bank_pct": 3.0,
+   "elevation_m": -2.464847,
+   "grade_pct": 0.787098,
+   "segment": 20,
+   "note": "Link T7-T8"
+  },
+  {
+   "distance_m": 1081.963118,
+   "position": [
+    -144.294731,
+    78.514973
+   ],
+   "heading_deg": -215.0,
+   "curvature_1pm": 0.0,
+   "width_m": 11.0,
+   "crown_pct": 2.0,
+   "bank_pct": -0.0,
+   "elevation_m": -2.307427,
+   "grade_pct": 0.787098,
+   "segment": 20
+  },
+  {
+   "distance_m": 1102.513556,
+   "position": [
+    -132.507484,
+    95.348907
+   ],
+   "heading_deg": -215.0,
+   "curvature_1pm": 0.0,
+   "width_m": 11.0,
+   "crown_pct": 2.0,
+   "bank_pct": 0.0,
+   "elevation_m": -2.145675,
+   "grade_pct": 0.787098,
+   "segment": 20
+  },
+  {
+   "distance_m": 1123.063994,
+   "position": [
+    -120.720237,
+    112.18284
+   ],
+   "heading_deg": -215.0,
+   "curvature_1pm": 0.0,
+   "width_m": 11.0,
+   "crown_pct": 2.0,
+   "bank_pct": 0.0,
+   "elevation_m": -1.983923,
+   "grade_pct": 0.787098,
+   "segment": 20
+  },
+  {
+   "distance_m": 1141.91355,
+   "position": [
+    -109.908576,
+    127.623492
+   ],
+   "heading_deg": -215.0,
+   "curvature_1pm": -0.022222222,
+   "width_m": 11.0,
+   "crown_pct": 1.0,
+   "bank_pct": -2.0,
+   "elevation_m": -1.835559,
+   "grade_pct": 0.787098,
+   "segment": 21,
+   "note": "T8a - Uscita, entry arc"
+  },
+  {
+   "distance_m": 1156.91355,
+   "position": [
+    -99.434385,
+    138.263779
+   ],
+   "heading_deg": -234.098593,
+   "curvature_1pm": -0.022222222,
+   "width_m": 12.0,
+   "crown_pct": 0.204225,
+   "bank_pct": -3.591549,
+   "elevation_m": -1.717494,
+   "grade_pct": 0.787098,
+   "segment": 21
+  },
+  {
+   "distance_m": 1160.763106,
+   "position": [
+    -96.223447,
+    140.385081
+   ],
+   "heading_deg": -239.0,
+   "curvature_1pm": -0.022222222,
+   "width_m": 12.0,
+   "crown_pct": -0.0,
+   "bank_pct": -4.0,
+   "elevation_m": -1.687194,
+   "grade_pct": 0.787098,
+   "segment": 21
+  },
+  {
+   "distance_m": 1179.612662,
+   "position": [
+    -78.530854,
+    146.477129
+   ],
+   "heading_deg": -263.0,
+   "curvature_1pm": -0.014285714,
+   "width_m": 12.0,
+   "crown_pct": 0.0,
+   "bank_pct": -5.0,
+   "elevation_m": -1.53883,
+   "grade_pct": 0.787098,
+   "segment": 22,
+   "note": "T8b - Uscita, exit arc"
+  },
+  {
+   "distance_m": 1198.462218,
+   "position": [
+    -59.739657,
+    146.242854
+   ],
+   "heading_deg": -278.428571,
+   "curvature_1pm": -0.014285714,
+   "width_m": 12.0,
+   "crown_pct": 0.0,
+   "bank_pct": -6.0,
+   "elevation_m": -1.390465,
+   "grade_pct": 0.787098,
+   "segment": 22
+  },
+  {
+   "distance_m": 1238.291368,
+   "position": [
+    -24.048974,
+    129.805179
+   ],
+   "heading_deg": -311.029174,
+   "curvature_1pm": -0.014285714,
+   "width_m": 12.0,
+   "crown_pct": 0.0,
+   "bank_pct": -6.0,
+   "elevation_m": -1.076971,
+   "grade_pct": 0.787098,
+   "segment": 22
+  },
+  {
+   "distance_m": 1278.120518,
+   "position": [
+    -2.837759,
+    96.727899
+   ],
+   "heading_deg": -343.629777,
+   "curvature_1pm": -0.014285714,
+   "width_m": 12.0,
+   "crown_pct": 0.0,
+   "bank_pct": -6.0,
+   "elevation_m": -0.763476,
+   "grade_pct": 0.787098,
+   "segment": 22
+  },
+  {
+   "distance_m": 1298.120518,
+   "position": [
+    -0.0,
+    76.998899
+   ],
+   "heading_deg": -360.0,
+   "curvature_1pm": 0.0,
+   "width_m": 12.0,
+   "crown_pct": 1.0,
+   "bank_pct": -3.0,
+   "elevation_m": -0.606057,
+   "grade_pct": 0.787098,
+   "segment": 23,
+   "note": "Rettifilo del Banco - run to the line"
+  },
+  {
+   "distance_m": 1318.120518,
+   "position": [
+    -0.0,
+    56.998899
+   ],
+   "heading_deg": -360.0,
+   "curvature_1pm": 0.0,
+   "width_m": 12.0,
+   "crown_pct": 2.0,
+   "bank_pct": 0.0,
+   "elevation_m": -0.448637,
+   "grade_pct": 0.787098,
+   "segment": 23
+  },
+  {
+   "distance_m": 1346.619968,
+   "position": [
+    -0.0,
+    28.499449
+   ],
+   "heading_deg": -360.0,
+   "curvature_1pm": 0.0,
+   "width_m": 12.0,
+   "crown_pct": 2.0,
+   "bank_pct": 0.0,
+   "elevation_m": -0.224319,
+   "grade_pct": 0.787098,
+   "segment": 23
+  }
+ ],
+ "corners": [
+  {
+   "name": "T1 - Ronda",
+   "from_m": 87.998899,
+   "to_m": 197.431043,
+   "apex_arc_from_m": 87.998899,
+   "apex_arc_to_m": 197.431043,
+   "hand": "left",
+   "direction_change_deg": 110.0,
+   "min_radius_m": 57.0,
+   "width_m": 12.0,
+   "line_radius_m": 76.56,
+   "defender_line_radius_m": 62.49,
+   "grip_ceiling_kmh": 134.5,
+   "lock_ceiling_kmh": 141.8,
+   "apex_kmh": 134.5,
+   "reverse_apex_kmh": 134.5,
+   "provokes": "Sustained lateral load, and the friction ellipse in traffic.",
+   "runoff": {
+    "side": "right",
+    "apron_m": 10.0,
+    "outfield_m": 24.0,
+    "outfield": "grass",
+    "barrier": "continuous_conveyor",
+    "sized_for": "reverse",
+    "approach_kmh": 138.0,
+    "note": "Departure angle off a 76.56 m line is about 11 deg, so Part I section 8's small-impact-angle case: a smooth continuous barrier with a conveyor face."
+   },
+   "line_radius_construction": "rho = R + h(1+cos(theta/2))/(1-cos(theta/2)), h = (W - 1.400)/2, R the tightest arc and theta the whole direction change"
+  },
+  {
+   "name": "T2 - Lama",
+   "from_m": 325.152189,
+   "to_m": 387.460444,
+   "apex_arc_from_m": 325.152189,
+   "apex_arc_to_m": 387.460444,
+   "hand": "right",
+   "direction_change_deg": 85.0,
+   "min_radius_m": 42.0,
+   "width_m": 10.0,
+   "line_radius_m": 70.43,
+   "defender_line_radius_m": 51.4,
+   "grip_ceiling_kmh": 129.0,
+   "lock_ceiling_kmh": 133.3,
+   "apex_kmh": 129.0,
+   "reverse_apex_kmh": 122.8,
+   "provokes": "Issue #139 - a wheel driven at a kerb above 120 km/h.",
+   "runoff": {
+    "side": "left",
+    "apron_m": 12.0,
+    "outfield_m": 3.0,
+    "outfield": "gravel",
+    "barrier": "tire_type_c",
+    "sized_for": "forward",
+    "approach_kmh": 142.5,
+    "note": "Gravel at 5/15 granulometry and 300 mm depth, then a Type C tire barrier with 500 mm behind it."
+   },
+   "line_radius_construction": "rho = R + h(1+cos(theta/2))/(1-cos(theta/2)), h = (W - 1.400)/2, R the tightest arc and theta the whole direction change"
+  },
+  {
+   "name": "T3 - Il Pozzo",
+   "from_m": 527.169792,
+   "to_m": 574.293682,
+   "apex_arc_from_m": 527.169792,
+   "apex_arc_to_m": 550.731737,
+   "hand": "left",
+   "direction_change_deg": 180.0,
+   "min_radius_m": 15.0,
+   "width_m": 14.0,
+   "line_radius_m": 21.3,
+   "defender_line_radius_m": 14.3,
+   "grip_ceiling_kmh": 71.0,
+   "lock_ceiling_kmh": 52.0,
+   "apex_kmh": 52.0,
+   "reverse_apex_kmh": 52.0,
+   "provokes": "The gearbox, bottom to top, and the one place on the circuit where braking is the overtaking mechanism.",
+   "runoff": {
+    "side": "right",
+    "apron_m": 14.0,
+    "outfield_m": 3.0,
+    "outfield": "gravel",
+    "barrier": "foam_type_b",
+    "sized_for": "forward",
+    "approach_kmh": 140.8,
+    "note": "The honest limit, stated by the design: a total brake failure arrives at 140.8 km/h and needs about 105 m of gravel at 0.75 g. That is not buildable and is not built; it is handed to the barrier."
+   },
+   "line_radius_construction": "rho = R + h(1+cos(theta/2))/(1-cos(theta/2)), h = (W - 1.400)/2, R the tightest arc and theta the whole direction change"
+  },
+  {
+   "name": "T4 - Il Ciglione",
+   "from_m": 735.314333,
+   "to_m": 767.95199,
+   "apex_arc_from_m": 735.314333,
+   "apex_arc_to_m": 767.95199,
+   "hand": "right",
+   "direction_change_deg": 85.0,
+   "min_radius_m": 22.0,
+   "width_m": 9.0,
+   "line_radius_m": 47.13,
+   "defender_line_radius_m": 30.0,
+   "grip_ceiling_kmh": 105.5,
+   "lock_ceiling_kmh": 101.3,
+   "apex_kmh": 101.3,
+   "reverse_apex_kmh": 101.3,
+   "provokes": "Issue #39 - engine braking shaping the entry - over a crest, uphill, in a 9 m road.",
+   "runoff": {
+    "side": "left",
+    "apron_m": 6.0,
+    "outfield_m": 20.0,
+    "outfield": "gravel",
+    "barrier": "tire_type_c",
+    "sized_for": "forward",
+    "approach_kmh": 125.4,
+    "note": "Free from the landform: the axis points into the cut face the climb was excavated from. Apron graded at art 7.5's maximum 10% up-slope, then rising gravel, then a tire barrier against the rock."
+   },
+   "line_radius_construction": "rho = R + h(1+cos(theta/2))/(1-cos(theta/2)), h = (W - 1.400)/2, R the tightest arc and theta the whole direction change"
+  },
+  {
+   "name": "T5 - Vigna",
+   "from_m": 796.24325,
+   "to_m": 848.638035,
+   "apex_arc_from_m": 821.375992,
+   "apex_arc_to_m": 848.638035,
+   "hand": "left",
+   "direction_change_deg": 95.0,
+   "min_radius_m": 22.0,
+   "width_m": 10.0,
+   "line_radius_m": 44.21,
+   "defender_line_radius_m": 28.8,
+   "grip_ceiling_kmh": 102.2,
+   "lock_ceiling_kmh": 97.2,
+   "apex_kmh": 97.2,
+   "reverse_apex_kmh": 97.2,
+   "provokes": "Issue #137, exposed to a bad line and only to a bad line.",
+   "runoff": {
+    "side": "right",
+    "apron_m": 10.0,
+    "outfield_m": 18.0,
+    "outfield": "grass",
+    "barrier": "tire_type_c",
+    "sized_for": "reverse",
+    "approach_kmh": 123.6,
+    "note": "On each of the two tangent axes; the reverse approach is the binding case."
+   },
+   "line_radius_construction": "rho = R + h(1+cos(theta/2))/(1-cos(theta/2)), h = (W - 1.400)/2, R the tightest arc and theta the whole direction change"
+  },
+  {
+   "name": "T6 - Forbice A",
+   "from_m": 928.588467,
+   "to_m": 976.061422,
+   "apex_arc_from_m": 928.588467,
+   "apex_arc_to_m": 976.061422,
+   "hand": "left",
+   "direction_change_deg": 85.0,
+   "min_radius_m": 32.0,
+   "width_m": 11.0,
+   "line_radius_m": 47.87,
+   "defender_line_radius_m": 42.81,
+   "grip_ceiling_kmh": 106.4,
+   "lock_ceiling_kmh": 102.3,
+   "apex_kmh": 102.3,
+   "reverse_apex_kmh": 102.3,
+   "provokes": "Half of the matched pair.",
+   "runoff": {
+    "side": "both",
+    "apron_m": 10.0,
+    "outfield_m": 18.0,
+    "outfield": "grass",
+    "barrier": "tire_type_c",
+    "sized_for": "forward",
+    "approach_kmh": 121.5,
+    "note": "Asphalt on BOTH sides - an esse throws a kart off in either direction, and this is the one place on the circuit where the run-off has to be symmetric. The design gives the apron only; the outfield width is this tool's, matched to T5."
+   },
+   "line_radius_construction": "rho = R + h(1+cos(theta/2))/(1-cos(theta/2)), h = (W - 1.400)/2, R the tightest arc and theta the whole direction change"
+  },
+  {
+   "name": "T7 - Forbice B",
+   "from_m": 1014.490162,
+   "to_m": 1061.963118,
+   "apex_arc_from_m": 1014.490162,
+   "apex_arc_to_m": 1061.963118,
+   "hand": "right",
+   "direction_change_deg": 85.0,
+   "min_radius_m": 32.0,
+   "width_m": 11.0,
+   "line_radius_m": 47.87,
+   "defender_line_radius_m": 42.81,
+   "grip_ceiling_kmh": 106.4,
+   "lock_ceiling_kmh": 102.3,
+   "apex_kmh": 102.3,
+   "reverse_apex_kmh": 102.3,
+   "provokes": "The other half, and the lateral transient.",
+   "runoff": {
+    "side": "both",
+    "apron_m": 10.0,
+    "outfield_m": 18.0,
+    "outfield": "grass",
+    "barrier": "tire_type_c",
+    "sized_for": "reverse",
+    "approach_kmh": 128.0,
+    "note": "The other half of the matched pair, built identically so the comparison is between the corners and not between their run-off. The design gives no dimensions for this one beyond 'built for reverse'; they are T6's."
+   },
+   "line_radius_construction": "rho = R + h(1+cos(theta/2))/(1-cos(theta/2)), h = (W - 1.400)/2, R the tightest arc and theta the whole direction change"
+  },
+  {
+   "name": "T8 - Uscita",
+   "from_m": 1141.91355,
+   "to_m": 1298.120518,
+   "apex_arc_from_m": 1141.91355,
+   "apex_arc_to_m": 1179.612662,
+   "hand": "left",
+   "direction_change_deg": 145.0,
+   "min_radius_m": 45.0,
+   "width_m": 12.0,
+   "line_radius_m": 54.86,
+   "defender_line_radius_m": 46.28,
+   "grip_ceiling_kmh": 113.9,
+   "lock_ceiling_kmh": 111.9,
+   "apex_kmh": 111.9,
+   "reverse_apex_kmh": 111.9,
+   "provokes": "Issue #32, and the exit that owns the next lap.",
+   "runoff": {
+    "side": "right",
+    "apron_m": 14.0,
+    "outfield_m": 26.0,
+    "outfield": "grass",
+    "barrier": "tire_type_c",
+    "sized_for": "reverse",
+    "approach_kmh": 142.2,
+    "note": "Forward approach 124.3 km/h, reverse 142.2 - 1.31x the kinetic energy - so the reverse figure is the one built, against the 10 m plus 16 m the forward case alone would need. The concrete case for run-off being a per-layout field."
+   },
+   "line_radius_construction": "rho = R + h(1+cos(theta/2))/(1-cos(theta/2)), h = (W - 1.400)/2, R the tightest arc and theta the whole direction change"
+  }
+ ],
+ "elevation": {
+  "vertical_curves": [
+   {
+    "at_m": 261.291616,
+    "profile": "convex",
+    "K": 15.0,
+    "radius_m": 1900.0,
+    "length_m": 102.35486,
+    "grade_in_pct": 0.787098,
+    "grade_out_pct": -4.6,
+    "speed_forward_kmh": 138.5,
+    "speed_reverse_kmh": 132.5,
+    "vertical_acceleration_g": 0.079,
+    "note": "The crest, on the boundary between the two halves of Il Banco. Half-length 51.18 m against 63.86 m of shelf either side, so it clears T1's exit tangent by 12.68 m and T2's turn-in by 12.68 m; T2's braking zone is 9.5 m, so it clears the braking point by 3.2 m. 1.48x forward and 1.62x reverse. This is the tightest fit on the circuit and it is what caps the elevation range."
+   },
+   {
+    "at_m": 550.731737,
+    "profile": "concave",
+    "K": 20.0,
+    "radius_m": 400.0,
+    "length_m": 36.8,
+    "grade_in_pct": -4.6,
+    "grade_out_pct": 4.6,
+    "speed_forward_kmh": 52.0,
+    "speed_reverse_kmh": 52.0,
+    "vertical_acceleration_g": 0.053,
+    "note": "The compression, and the only vertical curve on the circuit inside a corner arc. It is a deliberate art 7.2 exception and is argued as one rather than reported as compliant: a 9.20% grade break is the whole descent-to-climb transition and there is nowhere else on the lap it fits. At the hairpin it is taken at 52.0 km/h in both directions, needs 135.06 m of radius, gets 400 m (2.96x) and occupies 36.80 m inside a 47.12 m arc - 5.16 m clear of each tangent point. It is CONCAVE, so it adds 0.053 g of load at the slowest point on the circuit rather than removing it, which is the benign direction. Terrain put a CONVEX 8.51% break inside its tightest corner and unloaded the driven axle by 0.118 g at the apex; this does the opposite."
+   },
+   {
+    "at_m": 675.804093,
+    "profile": "convex",
+    "K": 15.0,
+    "radius_m": 1800.0,
+    "length_m": 68.632238,
+    "grade_in_pct": 4.6,
+    "grade_out_pct": 0.787098,
+    "speed_forward_kmh": 114.7,
+    "speed_reverse_kmh": 122.0,
+    "vertical_acceleration_g": 0.065,
+    "note": "The top of La Rampa. Half-length 34.32 m against 101.51 m of climb before it and 59.51 m of shelf after, so it ends 25.19 m before T4's turn-in and 10.7 m before T4's braking point. 2.05x forward and 1.81x reverse. Sight distance over it is sqrt(2R)(sqrt(0.75) + sqrt(0.15)) = 75.9 m, which at 125.4 km/h is 2.18 s: the corner is late, not hidden, and this document does not claim otherwise."
+   }
+  ],
+  "note": "K does not swap when the layout reverses: d2z/ds2 is invariant under s -> L-s, so a crest is a crest driven either way and only the speed changes."
+ },
+ "surfaces": [
+  {
+   "from_m": 112.869841,
+   "to_m": 172.560101,
+   "side": "left",
+   "type": "curb",
+   "width_m": 1.0,
+   "height_m": 0.03,
+   "profile": "rippled",
+   "note": "T1 Ronda, inside kerb over the middle 60 deg of the arc"
+  },
+  {
+   "from_m": 344.306316,
+   "to_m": 368.306316,
+   "side": "right",
+   "type": "curb",
+   "width_m": 1.0,
+   "height_m": 0.03,
+   "profile": "vertical",
+   "note": "T2 Lama, the reference kerb - the only one on the circuit struck above 120 km/h"
+  },
+  {
+   "from_m": 367.460444,
+   "to_m": 402.460444,
+   "side": "left",
+   "type": "curb",
+   "width_m": 1.0,
+   "height_m": 0.02,
+   "profile": "flat",
+   "note": "T2 Lama, flat exit strip on the outside - running wide is a track-limits call, not a launch"
+  },
+  {
+   "from_m": 527.169792,
+   "to_m": 574.293682,
+   "side": "left",
+   "type": "curb",
+   "width_m": 1.0,
+   "height_m": 0.03,
+   "profile": "rippled",
+   "note": "T3 Il Pozzo, full inside kerb through both 90 deg halves"
+  },
+  {
+   "from_m": 574.293682,
+   "to_m": 589.293682,
+   "side": "left",
+   "type": "curb",
+   "width_m": 1.0,
+   "height_m": 0.03,
+   "profile": "flat",
+   "note": "T3 Il Pozzo, flat exit kerb up the first 15 m of La Rampa - reversed it is an entry kerb at 52 km/h"
+  },
+  {
+   "from_m": 735.314333,
+   "to_m": 767.95199,
+   "side": "right",
+   "type": "curb",
+   "width_m": 1.0,
+   "height_m": 0.03,
+   "profile": "rippled",
+   "note": "T4 Il Ciglione, inside kerb over the whole arc"
+  },
+  {
+   "from_m": 821.375992,
+   "to_m": 848.638035,
+   "side": "left",
+   "type": "curb",
+   "width_m": 1.0,
+   "height_m": 0.03,
+   "profile": "rippled",
+   "note": "T5 Vigna, apex arc only - a kerb on T5a's inside would straighten the compound"
+  },
+  {
+   "from_m": 940.456706,
+   "to_m": 964.193183,
+   "side": "left",
+   "type": "curb",
+   "width_m": 1.0,
+   "height_m": 0.025,
+   "profile": "rippled",
+   "note": "T6 - Forbice A, apex kerb - identical profile to its twin, because the test is a comparison"
+  },
+  {
+   "from_m": 1026.358401,
+   "to_m": 1050.094879,
+   "side": "right",
+   "type": "curb",
+   "width_m": 1.0,
+   "height_m": 0.025,
+   "profile": "rippled",
+   "note": "T7 - Forbice B, apex kerb - identical profile to its twin, because the test is a comparison"
+  },
+  {
+   "from_m": 1141.91355,
+   "to_m": 1141.91355,
+   "side": "left",
+   "type": "curb",
+   "width_m": 1.0,
+   "height_m": 0.025,
+   "profile": "flat",
+   "note": "T8a Uscita, built at the reverse layout's 25 mm flat rather than the forward layout's 30 mm rippled - one kerb, gentler case wins. ADR-0049"
+  },
+  {
+   "from_m": 1141.91355,
+   "to_m": 1206.328795,
+   "side": "left",
+   "type": "curb",
+   "width_m": 1.0,
+   "height_m": 0.03,
+   "profile": "rippled",
+   "note": "T8b Uscita, the first 40 deg of the opening arc"
+  }
+ ],
+ "furniture": {
+  "start_line": {
+   "distance_m": 0.0,
+   "width_m": 0.3
+  },
+  "lights": {
+   "distance_m": 10.0,
+   "height_m": 3.0,
+   "span_m": 12.0,
+   "note": "Design's figures, quoted from Part I art 7.7: 10-15 m ahead of the front row, 2.5-3.5 m above the track."
+  }
+ },
+ "layouts": [
+  {
+   "name": "forward",
+   "direction": "forward",
+   "sector_marks_m": [
+    524.0,
+    902.0
+   ],
+   "checkpoints_m": [
+    0.0,
+    98.222816,
+    196.445631,
+    294.668447,
+    392.891262,
+    491.114078,
+    589.336893,
+    687.559709,
+    785.782524,
+    884.00534,
+    982.228155,
+    1080.450971,
+    1178.673786,
+    1276.896602
+   ],
+   "grid": {
+    "slots": 8,
+    "pole_side": "left",
+    "pole_note": "Pole takes the inside of the first corner: left. The design measures that at 13.0 km/h of corner ceiling forward.",
+    "positions": [
+     {
+      "position": 1,
+      "distance_m": 1371.119417,
+      "lateral_m": -3.0
+     },
+     {
+      "position": 2,
+      "distance_m": 1367.119417,
+      "lateral_m": 3.0
+     },
+     {
+      "position": 3,
+      "distance_m": 1363.119417,
+      "lateral_m": -3.0
+     },
+     {
+      "position": 4,
+      "distance_m": 1359.119417,
+      "lateral_m": 3.0
+     },
+     {
+      "position": 5,
+      "distance_m": 1355.119417,
+      "lateral_m": -3.0
+     },
+     {
+      "position": 6,
+      "distance_m": 1351.119417,
+      "lateral_m": 3.0
+     },
+     {
+      "position": 7,
+      "distance_m": 1347.119417,
+      "lateral_m": -3.0
+     },
+     {
+      "position": 8,
+      "distance_m": 1343.119417,
+      "lateral_m": 3.0
+     }
+    ]
+   },
+   "pit_entry_m": 1305.0,
+   "pit_exit_m": 62.0,
+   "pit_note": "Stations only. A deceleration lane at 20 deg to the direction of travel is a 160 deg merge driven the other way, over Part I art 7.4's 30 deg cap, so each layout needs its own stubs and no pit-lane asphalt is generated yet. Issue #181.",
+   "racing_line_seed": [
+    {
+     "at_m": 87.998899,
+     "lateral_m": 5.3
+    },
+    {
+     "at_m": 142.714971,
+     "lateral_m": -5.3
+    },
+    {
+     "at_m": 197.431043,
+     "lateral_m": 5.3
+    },
+    {
+     "at_m": 325.152189,
+     "lateral_m": -4.3
+    },
+    {
+     "at_m": 356.306316,
+     "lateral_m": 4.3
+    },
+    {
+     "at_m": 387.460444,
+     "lateral_m": -4.3
+    },
+    {
+     "at_m": 527.169792,
+     "lateral_m": 6.3
+    },
+    {
+     "at_m": 538.950764,
+     "lateral_m": -6.3
+    },
+    {
+     "at_m": 574.293682,
+     "lateral_m": 6.3
+    },
+    {
+     "at_m": 735.314333,
+     "lateral_m": -3.8
+    },
+    {
+     "at_m": 751.633162,
+     "lateral_m": 3.8
+    },
+    {
+     "at_m": 767.95199,
+     "lateral_m": -3.8
+    },
+    {
+     "at_m": 796.24325,
+     "lateral_m": 4.3
+    },
+    {
+     "at_m": 835.007013,
+     "lateral_m": -4.3
+    },
+    {
+     "at_m": 848.638035,
+     "lateral_m": 4.3
+    },
+    {
+     "at_m": 928.588467,
+     "lateral_m": 4.8
+    },
+    {
+     "at_m": 952.324945,
+     "lateral_m": -4.8
+    },
+    {
+     "at_m": 976.061422,
+     "lateral_m": 4.8
+    },
+    {
+     "at_m": 1014.490162,
+     "lateral_m": -4.8
+    },
+    {
+     "at_m": 1038.22664,
+     "lateral_m": 4.8
+    },
+    {
+     "at_m": 1061.963118,
+     "lateral_m": -4.8
+    },
+    {
+     "at_m": 1141.91355,
+     "lateral_m": 5.3
+    },
+    {
+     "at_m": 1160.763106,
+     "lateral_m": -5.3
+    },
+    {
+     "at_m": 1298.120518,
+     "lateral_m": 5.3
+    }
+   ],
+   "corner_speeds_kmh": [
+    {
+     "corner": "T1 - Ronda",
+     "at_m": 87.998899,
+     "apex_kmh": 134.5
+    },
+    {
+     "corner": "T2 - Lama",
+     "at_m": 325.152189,
+     "apex_kmh": 129.0
+    },
+    {
+     "corner": "T3 - Il Pozzo",
+     "at_m": 527.169792,
+     "apex_kmh": 52.0
+    },
+    {
+     "corner": "T4 - Il Ciglione",
+     "at_m": 735.314333,
+     "apex_kmh": 101.3
+    },
+    {
+     "corner": "T5 - Vigna",
+     "at_m": 821.375992,
+     "apex_kmh": 97.2
+    },
+    {
+     "corner": "T6 - Forbice A",
+     "at_m": 928.588467,
+     "apex_kmh": 102.3
+    },
+    {
+     "corner": "T7 - Forbice B",
+     "at_m": 1014.490162,
+     "apex_kmh": 102.3
+    },
+    {
+     "corner": "T8 - Uscita",
+     "at_m": 1141.91355,
+     "apex_kmh": 111.9
+    }
+   ],
+   "vertical_curve_speeds_kmh": [
+    138.5,
+    52.0,
+    114.7
+   ],
+   "estimated_lap_time_s": 44.82
+  },
+  {
+   "name": "reverse",
+   "direction": "reverse",
+   "sector_marks_m": [
+    473.0,
+    862.0
+   ],
+   "checkpoints_m": [
+    0.0,
+    98.222816,
+    196.445631,
+    294.668447,
+    392.891262,
+    491.114078,
+    589.336893,
+    687.559709,
+    785.782524,
+    884.00534,
+    982.228155,
+    1080.450971,
+    1178.673786,
+    1276.896602
+   ],
+   "grid": {
+    "slots": 8,
+    "pole_side": "right",
+    "pole_note": "Pole takes the inside of the first corner: right. The design measures that at 13.0 km/h of corner ceiling forward.",
+    "positions": [
+     {
+      "position": 1,
+      "distance_m": 1371.119417,
+      "lateral_m": 3.0
+     },
+     {
+      "position": 2,
+      "distance_m": 1367.119417,
+      "lateral_m": -3.0
+     },
+     {
+      "position": 3,
+      "distance_m": 1363.119417,
+      "lateral_m": 3.0
+     },
+     {
+      "position": 4,
+      "distance_m": 1359.119417,
+      "lateral_m": -3.0
+     },
+     {
+      "position": 5,
+      "distance_m": 1355.119417,
+      "lateral_m": 3.0
+     },
+     {
+      "position": 6,
+      "distance_m": 1351.119417,
+      "lateral_m": -3.0
+     },
+     {
+      "position": 7,
+      "distance_m": 1347.119417,
+      "lateral_m": 3.0
+     },
+     {
+      "position": 8,
+      "distance_m": 1343.119417,
+      "lateral_m": -3.0
+     }
+    ]
+   },
+   "pit_entry_m": 1305.0,
+   "pit_exit_m": 62.0,
+   "pit_note": "Stations only. A deceleration lane at 20 deg to the direction of travel is a 160 deg merge driven the other way, over Part I art 7.4's 30 deg cap, so each layout needs its own stubs and no pit-lane asphalt is generated yet. Issue #181.",
+   "racing_line_seed": [
+    {
+     "at_m": 76.998899,
+     "lateral_m": -5.3
+    },
+    {
+     "at_m": 214.356311,
+     "lateral_m": 5.3
+    },
+    {
+     "at_m": 233.205867,
+     "lateral_m": -5.3
+    },
+    {
+     "at_m": 313.156299,
+     "lateral_m": 4.8
+    },
+    {
+     "at_m": 336.892777,
+     "lateral_m": -4.8
+    },
+    {
+     "at_m": 360.629255,
+     "lateral_m": 4.8
+    },
+    {
+     "at_m": 399.057995,
+     "lateral_m": -4.8
+    },
+    {
+     "at_m": 422.794473,
+     "lateral_m": 4.8
+    },
+    {
+     "at_m": 446.53095,
+     "lateral_m": -4.8
+    },
+    {
+     "at_m": 526.481383,
+     "lateral_m": -4.3
+    },
+    {
+     "at_m": 540.112404,
+     "lateral_m": 4.3
+    },
+    {
+     "at_m": 578.876167,
+     "lateral_m": -4.3
+    },
+    {
+     "at_m": 607.167427,
+     "lateral_m": 3.8
+    },
+    {
+     "at_m": 623.486255,
+     "lateral_m": -3.8
+    },
+    {
+     "at_m": 639.805084,
+     "lateral_m": 3.8
+    },
+    {
+     "at_m": 800.825735,
+     "lateral_m": -6.3
+    },
+    {
+     "at_m": 836.168653,
+     "lateral_m": 6.3
+    },
+    {
+     "at_m": 847.949625,
+     "lateral_m": -6.3
+    },
+    {
+     "at_m": 987.658973,
+     "lateral_m": 4.3
+    },
+    {
+     "at_m": 1018.813101,
+     "lateral_m": -4.3
+    },
+    {
+     "at_m": 1049.967228,
+     "lateral_m": 4.3
+    },
+    {
+     "at_m": 1177.688374,
+     "lateral_m": -5.3
+    },
+    {
+     "at_m": 1232.404446,
+     "lateral_m": 5.3
+    },
+    {
+     "at_m": 1287.120518,
+     "lateral_m": -5.3
+    }
+   ],
+   "corner_speeds_kmh": [
+    {
+     "corner": "T8 - Uscita",
+     "at_m": 233.205867,
+     "apex_kmh": 111.9
+    },
+    {
+     "corner": "T7 - Forbice B",
+     "at_m": 360.629255,
+     "apex_kmh": 102.3
+    },
+    {
+     "corner": "T6 - Forbice A",
+     "at_m": 446.53095,
+     "apex_kmh": 102.3
+    },
+    {
+     "corner": "T5 - Vigna",
+     "at_m": 553.743425,
+     "apex_kmh": 97.2
+    },
+    {
+     "corner": "T4 - Il Ciglione",
+     "at_m": 639.805084,
+     "apex_kmh": 101.3
+    },
+    {
+     "corner": "T3 - Il Pozzo",
+     "at_m": 847.949625,
+     "apex_kmh": 52.0
+    },
+    {
+     "corner": "T2 - Lama",
+     "at_m": 1049.967228,
+     "apex_kmh": 122.8
+    },
+    {
+     "corner": "T1 - Ronda",
+     "at_m": 1287.120518,
+     "apex_kmh": 134.5
+    }
+   ],
+   "vertical_curve_speeds_kmh": [
+    132.5,
+    52.0,
+    122.0
+   ],
+   "estimated_lap_time_s": 44.885
+  }
+ ]
+}

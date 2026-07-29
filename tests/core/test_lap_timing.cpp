@@ -246,18 +246,25 @@ TEST_CASE("the first reason to spoil a lap is the one reported") {
 	drive_lap(timer, 25.0, length); // out lap
 
 	// Off the road first, then a cut while out there — one that skips **every**
-	// intermediate mark, from 300 m straight to 900 m.
-	drive(timer, 0.0, 300.0, 25.0, length, /*off_track=*/true);
-	timer.advance(900.0, false); // jumps the marks at 400 and 800
+	// intermediate mark, from 250 m straight to 950 m.
+	drive(timer, 0.0, 250.0, 25.0, length, /*off_track=*/true);
+	timer.advance(950.0, false); // jumps the marks at 400 and 800
 	CHECK(timer.progress().reason == LapInvalidReason::OffTrack);
 
 	// **Crossing the line now awards nothing at all, and that is the rule rather
-	// than an edge case.** A lap needs one witness that the kart went round, and the
-	// only witness available is a mark consumed in order. This kart has none: it drove
-	// 300 m, vanished, and reappeared 600 m later. It did not do a lap, so it does not
-	// get one — the same reasoning that stops a kart parked on the line collecting a
-	// lap per wobble, since neither has a mark to show.
-	drive(timer, 900.0, length, 25.0, length);
+	// than an edge case.** A lap needs one witness that the kart went round: a mark
+	// consumed in order, or `LAP_TRAVEL_FRACTION` of the circuit actually driven. This
+	// kart has neither — it drove 250 m, vanished, reappeared 700 m later and drove
+	// another 250 m, which is 500 m of travel on a 1,200 m lap. It did not do a lap,
+	// so it does not get one, for the same reason a kart parked on the line collects
+	// nothing however many times it wobbles over.
+	//
+	// The numbers were 300 and 900 here until the arming condition was fixed for a
+	// cut over the *first* mark of the lap, which put this case at exactly 600 m of
+	// travel — precisely on the half-circuit arm, so it flipped to completing. Moved
+	// off the boundary rather than left sitting on it: a test that a rounding change
+	// could turn over is testing the boundary, and the boundary has its own case.
+	drive(timer, 950.0, length, 25.0, length);
 	CHECK(timer.laps_completed() == 1); // still just the out lap
 
 	// It self-heals on the next real lap, which crosses both marks and therefore
@@ -459,4 +466,308 @@ TEST_CASE("the test track's own length times out to something a driver would rec
 	REQUIRE(timer.best().is_valid());
 	CHECK(timer.best().time_s == doctest::Approx(46.8).epsilon(0.01));
 	MESSAGE("1,030 m at 22 m/s: " << timer.best().time_s << " s");
+}
+
+// --- authored marks: two lists, one ordered set ---------------------------------
+//
+// ADR-0046 puts sector marks and checkpoints in `track.json` as separate lists.
+// `from_stations` merges them, and everything below is a way that merge can be
+// wrong while still looking plausible on a timing screen.
+
+namespace {
+
+// Valdirone Nuova's forward layout, from `data/tracks/valdirone_nuova.track.json`.
+// Two authored sector marks and fourteen evenly spaced checkpoints, the first of
+// which is the start line.
+constexpr double VALDIRONE_LENGTH = 1375.119417;
+constexpr double VALDIRONE_SECTORS[] = { 524.0, 902.0 };
+constexpr double VALDIRONE_CHECKPOINTS[] = {
+	0.0, 98.222816, 196.445631, 294.668447, 392.891262, 491.114078, 589.336893,
+	687.559709, 785.782524, 884.00534, 982.228155, 1080.450971, 1178.673786,
+	1276.896602,
+};
+
+LapMarks valdirone_forward() {
+	return LapMarks::from_stations(VALDIRONE_LENGTH, VALDIRONE_SECTORS, 2,
+			VALDIRONE_CHECKPOINTS, 14);
+}
+
+} // namespace
+
+TEST_CASE("a circuit's two authored lists merge into one ordered set of marks") {
+	const LapMarks marks = valdirone_forward();
+	REQUIRE(marks.is_valid());
+
+	// 1 start line + 13 checkpoints past it + 2 sector marks. The fourteenth
+	// checkpoint is at 0.0 and merges into the line rather than becoming a mark on
+	// top of it — which would be a sector of zero length, and `is_valid` would have
+	// refused the whole layout.
+	CHECK(marks.mark_count == 16);
+	CHECK(marks.mark_m[0] == 0.0);
+	for (int i = 1; i < marks.mark_count; ++i) {
+		CHECK(marks.mark_m[i] > marks.mark_m[i - 1]);
+	}
+
+	// **Three sectors and not sixteen.** This is the whole point of the flag: every
+	// mark has to be crossed in order for the anti-cut check, and only the two
+	// authored splits plus the line may produce a time on the screen.
+	CHECK(marks.sector_count() == 3);
+	CHECK(marks.sector_length_m(0) == doctest::Approx(524.0));
+	CHECK(marks.sector_length_m(1) == doctest::Approx(902.0 - 524.0));
+	CHECK(marks.sector_length_m(2) == doctest::Approx(VALDIRONE_LENGTH - 902.0));
+	CHECK(marks.sector_length_m(0) + marks.sector_length_m(1) + marks.sector_length_m(2)
+			== doctest::Approx(VALDIRONE_LENGTH));
+
+	// The sector marks kept their authored stations exactly, rather than being
+	// rounded into a neighboring checkpoint.
+	CHECK(marks.mark_m[marks.mark_of_sector(1)] == 524.0);
+	CHECK(marks.mark_m[marks.mark_of_sector(2)] == 902.0);
+
+	// And the checkpoints between them are marks that start no sector.
+	const int before_first_split = marks.mark_of_sector(1) - 1;
+	CHECK(marks.checkpoint_only[before_first_split]);
+	CHECK(marks.sector_of_mark(before_first_split) == 0);
+	CHECK(marks.sector_of_mark(marks.mark_of_sector(1)) == 1);
+	CHECK(marks.sector_of_mark(marks.mark_count - 1) == 2);
+
+	MESSAGE("Valdirone forward: " << marks.mark_count << " marks, " << marks.sector_count()
+								  << " sectors of " << marks.sector_length_m(0) << " / "
+								  << marks.sector_length_m(1) << " / "
+								  << marks.sector_length_m(2) << " m");
+}
+
+TEST_CASE("the reverse layout is its own partition of the same road") {
+	// 473 and 862 rather than 524 and 902. A layout that reused the forward marks
+	// would put a split in a different corner of the same circuit and quietly report
+	// sector times nobody can compare against anything.
+	static constexpr double reverse_sectors[] = { 473.0, 862.0 };
+	const LapMarks marks = LapMarks::from_stations(VALDIRONE_LENGTH, reverse_sectors, 2,
+			VALDIRONE_CHECKPOINTS, 14);
+	REQUIRE(marks.is_valid());
+	CHECK(marks.mark_count == 16);
+	CHECK(marks.sector_count() == 3);
+	CHECK(marks.sector_length_m(0) == doctest::Approx(473.0));
+	CHECK(marks.sector_length_m(1) == doctest::Approx(862.0 - 473.0));
+}
+
+TEST_CASE("a checkpoint that lands on a sector mark is absorbed by it") {
+	static constexpr double sectors[] = { 400.0, 800.0 };
+
+	SUBCASE("exactly on it") {
+		static constexpr double checkpoints[] = { 0.0, 400.0, 800.0 };
+		const LapMarks marks = LapMarks::from_stations(1200.0, sectors, 2, checkpoints, 3);
+		REQUIRE(marks.is_valid());
+		CHECK(marks.mark_count == 3);
+		CHECK(marks.sector_count() == 3);
+	}
+	SUBCASE("a tenth of a millimeter short of it, which is what float rounding does") {
+		// The trap `LAP_MARK_MERGE_M` exists for, and the same one the schema's
+		// coincident-control-point rule exists for: two authored stations that mean the
+		// same place arrive separated by 0.0001 m, and the sector between them divides
+		// by nearly zero everywhere downstream.
+		static constexpr double checkpoints[] = { 0.0, 399.9999, 800.0001 };
+		const LapMarks marks = LapMarks::from_stations(1200.0, sectors, 2, checkpoints, 3);
+		REQUIRE(marks.is_valid());
+		CHECK(marks.mark_count == 3);
+		CHECK(marks.sector_count() == 3);
+		// **The sector mark's station wins, not the checkpoint's.** A split a hair off
+		// the design's own number is a split nobody authored.
+		CHECK(marks.mark_m[1] == 400.0);
+		CHECK(marks.mark_m[2] == 800.0);
+	}
+}
+
+TEST_CASE("from_stations refuses rather than clamping") {
+	// A clamped set is a cut detector with holes in it: the checkpoints that were
+	// dropped are exactly the ones a driver could then skip for free.
+	SUBCASE("more marks than there is room for") {
+		double many[LAP_MAX_MARKS + 4] = {};
+		for (int i = 0; i < LAP_MAX_MARKS + 4; ++i) {
+			many[i] = 10.0 * static_cast<double>(i + 1);
+		}
+		CHECK_FALSE(LapMarks::from_stations(1200.0, nullptr, 0, many, LAP_MAX_MARKS + 4)
+							.is_valid());
+	}
+	SUBCASE("a station at or past the length is the start line again") {
+		static constexpr double past[] = { 1200.0 };
+		CHECK_FALSE(LapMarks::from_stations(1200.0, past, 1, nullptr, 0).is_valid());
+	}
+	SUBCASE("a negative station is not on the lap") {
+		static constexpr double behind[] = { -1.0 };
+		CHECK_FALSE(LapMarks::from_stations(1200.0, behind, 1, nullptr, 0).is_valid());
+	}
+	SUBCASE("more sectors than a lap record can hold") {
+		// `LAP_MAX_SECTORS` splits plus the start line is one sector too many. Refused
+		// here rather than dropped by the bounds guard in `complete_lap`, which is what
+		// used to happen: the splits past the eighth vanished and the ones that remained
+		// did not add up to the lap time.
+		double splits[LAP_MAX_SECTORS] = {};
+		for (int i = 0; i < LAP_MAX_SECTORS; ++i) {
+			splits[i] = 100.0 * static_cast<double>(i + 1);
+		}
+		CHECK_FALSE(LapMarks::from_stations(1200.0, splits, LAP_MAX_SECTORS, nullptr, 0)
+							.is_valid());
+		CHECK(LapMarks::from_stations(1200.0, splits, LAP_MAX_SECTORS - 1, nullptr, 0)
+						.is_valid());
+	}
+	SUBCASE("a layout whose first mark is not a sector boundary") {
+		LapMarks marks = LapMarks::even(1200.0, 3);
+		marks.checkpoint_only[0] = true;
+		CHECK_FALSE(marks.is_valid());
+	}
+}
+
+TEST_CASE("a checkpoint is crossed for the ordering and produces no split") {
+	// The failure being ruled out: the driver sees three sector times that do not add
+	// up to the lap, because the checkpoints in between reset the sector clock.
+	const LapMarks marks = valdirone_forward();
+	REQUIRE(marks.is_valid());
+	LapTimer timer;
+	timer.begin(marks, STEP);
+
+	drive_lap(timer, 22.0, VALDIRONE_LENGTH); // out lap
+	drive_lap(timer, 22.0, VALDIRONE_LENGTH);
+
+	const LapRecord &lap = timer.last();
+	REQUIRE(lap.is_valid());
+	CHECK(lap.sector_count == 3);
+	const double sum = lap.sector_s[0] + lap.sector_s[1] + lap.sector_s[2];
+	// To the tick, because both sides are tick counts times the same step.
+	CHECK(sum == doctest::Approx(lap.time_s).epsilon(1e-12));
+	// And the splits are in the ratio of the sector lengths, which is what a constant
+	// speed means. Checked against the authored stations rather than against thirds.
+	CHECK(lap.sector_s[0] / lap.time_s == doctest::Approx(524.0 / VALDIRONE_LENGTH).epsilon(0.01));
+	CHECK(lap.sector_s[1] / lap.time_s
+			== doctest::Approx((902.0 - 524.0) / VALDIRONE_LENGTH).epsilon(0.01));
+	MESSAGE("Valdirone at 22 m/s: " << lap.time_s << " s, splits " << lap.sector_s[0] << " / "
+									<< lap.sector_s[1] << " / " << lap.sector_s[2]);
+}
+
+TEST_CASE("skipping a checkpoint-only mark costs the lap just as a sector mark would") {
+	// A cut that misses no *split* is still a cut. Checkpoints are the anti-cut
+	// resolution and a timer that only owed sector marks would let a driver skip 380 m
+	// of circuit between two of them for free.
+	const LapMarks marks = valdirone_forward();
+	LapTimer timer;
+	timer.begin(marks, STEP);
+	drive_lap(timer, 22.0, VALDIRONE_LENGTH); // out lap
+
+	// Round to 600 m, which is past the first split at 524 and past the checkpoint at
+	// 589.3, then appear at 900 m — under half a lap, so it is a discontinuity rather
+	// than a completed lap, and the checkpoints at 687.6 and 785.8 stay owed. Both are
+	// checkpoint-only marks; the split at 902 is still ahead and is crossed normally.
+	drive(timer, 0.0, 600.0, 22.0, VALDIRONE_LENGTH);
+	CHECK(timer.progress().reason == LapInvalidReason::Valid);
+	CHECK_FALSE(timer.advance(900.0, false));
+	CHECK(timer.progress().reason == LapInvalidReason::MissedMark);
+
+	drive(timer, 900.0, VALDIRONE_LENGTH, 22.0, VALDIRONE_LENGTH);
+	CHECK(timer.laps_completed() == 2);
+	CHECK(timer.last().reason == LapInvalidReason::MissedMark);
+	CHECK_FALSE(timer.best().is_valid());
+
+	// One lap and not the session.
+	drive_lap(timer, 22.0, VALDIRONE_LENGTH);
+	CHECK(timer.last().is_valid());
+}
+
+TEST_CASE("a cut over the first mark of the lap invalidates it rather than swallowing it") {
+	// Found by `circuit_probe.gd --case=timing`, and the failure was silent: the
+	// arming condition was "a mark has been consumed" whenever the layout had marks,
+	// the marks a cut skips deliberately stay owed, so a cut over the *first* mark
+	// left `next_mark_` at 1 for the rest of the lap and the lap never closed. The
+	// driver got no lap and no reason. `lap_timing.h` says in its own words that a cut
+	// must still complete its lap so the missed mark can strike it out.
+	const LapMarks marks = valdirone_forward();
+	LapTimer timer;
+	timer.begin(marks, STEP);
+	drive_lap(timer, 22.0, VALDIRONE_LENGTH); // out lap
+	REQUIRE(timer.laps_completed() == 1);
+
+	// The first mark past the line is the checkpoint at 98.2 m. Jump it.
+	drive(timer, 0.0, 78.0, 22.0, VALDIRONE_LENGTH);
+	CHECK_FALSE(timer.advance(118.0, false));
+	CHECK(timer.progress().reason == LapInvalidReason::MissedMark);
+	drive(timer, 118.0, VALDIRONE_LENGTH, 22.0, VALDIRONE_LENGTH);
+
+	// The lap exists, is on the screen, and says why it does not count.
+	CHECK(timer.laps_completed() == 2);
+	CHECK(timer.last().reason == LapInvalidReason::MissedMark);
+	CHECK(lap_time_exists(timer.last().time_s));
+	CHECK_FALSE(timer.best().is_valid());
+
+	// And the next lap is clean, because the mark is owed again from the line.
+	drive_lap(timer, 22.0, VALDIRONE_LENGTH);
+	CHECK(timer.last().is_valid());
+}
+
+TEST_CASE("the travel arm does not let a parked or cutting kart claim a lap") {
+	// The other half of the change above: `went_round` now accepts *either* witness,
+	// so the two cases that must still produce nothing are re-checked against the
+	// looser condition rather than assumed to be unaffected.
+	const double length = 1200.0;
+
+	SUBCASE("a kart jittering across the line banks no travel") {
+		LapTimer timer;
+		timer.begin(three_sectors(length), STEP);
+		double position = 1.0;
+		for (int i = 0; i < 400; ++i) {
+			position = (position > 0.5) ? length - 0.5 : 1.0;
+			timer.advance(position, false);
+		}
+		CHECK(timer.laps_completed() == 0);
+	}
+	SUBCASE("a kart that cuts most of the circuit banks none of what it flew over") {
+		LapTimer timer;
+		timer.begin(three_sectors(length), STEP);
+		drive_lap(timer, 25.0, length); // out lap
+		// 100 m driven, then a jump of 1,000 m, then 100 m driven. 200 m of travel on
+		// a 1,200 m lap is under the half-circuit arm, and no mark was consumed in
+		// order, so the line crossing produces nothing.
+		drive(timer, 0.0, 100.0, 25.0, length);
+		CHECK_FALSE(timer.advance(1100.0, false));
+		const int laps = drive(timer, 1100.0, length, 25.0, length);
+		CHECK(laps == 0);
+		CHECK(timer.laps_completed() == 1);
+	}
+	SUBCASE("and the arm is at half a circuit, measured from both sides of it") {
+		// The boundary itself, since two other cases sit near it. Marks at 0, 400 and
+		// 800; the cut starts before the first of them and lands past the last, so no
+		// mark is ever consumed in order and travel is the only witness there is.
+		for (const double driven : { 590.0, 610.0 }) {
+			LapTimer timer;
+			timer.begin(three_sectors(length), STEP);
+			drive_lap(timer, 25.0, length); // out lap
+			const double half = driven * 0.5;
+			drive(timer, 0.0, half, 25.0, length);
+			timer.advance(length - half, false);
+			drive(timer, length - half, length, 25.0, length);
+			// 590 m of travel is under 600 and produces nothing; 610 m is over it and
+			// produces a lap that exists and says it was cut.
+			CHECK(timer.laps_completed() == (driven > 600.0 ? 2 : 1));
+			if (driven > 600.0) {
+				CHECK(timer.last().reason == LapInvalidReason::MissedMark);
+			}
+		}
+	}
+}
+
+TEST_CASE("armed mid-lap, the timer reports a sector and not a mark index") {
+	// The bug this is here for reported "sector 11 of 3": `arm_marks_from` set the
+	// sector to `next_mark_ - 1`, which is a mark index, and with fourteen checkpoints
+	// in the list those two numbers stop being the same one.
+	const LapMarks marks = valdirone_forward();
+	LapTimer timer;
+	timer.begin(marks, STEP);
+
+	// A kart set down at 1,100 m: past the second split at 902, so sector 2 of 3.
+	timer.advance(1100.0, false);
+	CHECK(timer.progress().sector == 2);
+
+	SUBCASE("and a respawn re-arms it the same way") {
+		timer.respawn(600.0); // past 524, before 902
+		CHECK(timer.progress().sector == 1);
+		timer.respawn(10.0); // before the first split
+		CHECK(timer.progress().sector == 0);
+	}
 }

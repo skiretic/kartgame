@@ -1959,6 +1959,28 @@ gentle enough that it will move lap time far less than the geometry does. And
 wants one has to say why, which is the correct default for a field that will
 otherwise get an off-camber corner because it sounded interesting.
 
+**The starting grid, which is the one gap this pass could not close.** Part I §7.7
+describes the starting procedure and the light gantry and refers to **Appendix
+No. 10** for the grid itself. Appendices 9, 10 and 15 are referenced by the Part I
+text, are **not published on fiakarting.com**, and could not be located — the same
+trap as the track width, one level deeper: Part I's appendix section reads, in
+full, *"Annexes — Voir fiakarting.com"*, and the site does not carry them.
+
+So slot pitch, stagger, lateral offset and the front row's setback from the line
+are **ours**. They live in `src/core/circuit_reference.h` in a separate
+`kart::core::circuit::ours::` namespace, each with a `_SOURCED = false` beside it
+and each derived from a clearance a reader can check rather than chosen, and
+[ADR-0050](DECISIONS.md#adr-0050--the-starting-grid-is-ours-and-it-is-namespaced-so-it-reads-that-way)
+is the decision and the derivation table. The rule they are recorded under is §5
+item 10's, widened after ADR-0034: an externally-sourced constant invented in a
+planning session is indistinguishable from a measured one six months later, and
+this project has paid for that twice already.
+
+Two smaller figures are in the same namespace under the same rule, both because
+the regulation declines to give a number rather than because it was not found: the
+distance a banking change is made over (§7.2 says "an appropriate distance"), and
+the spacing of lap-validation checkpoints, which is not a regulation at all.
+
 **Run-off and verges.** T1 §7.5: the track *"must be bordered all along its length
 on both sides by compact verges having an even surface and having a minimum width
 of **1.80 m**"*, free of debris or gravel, *"grass-covered or compacted ground over

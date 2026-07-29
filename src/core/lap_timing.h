@@ -61,7 +61,15 @@ namespace kart::core {
 // Most marks a lap may have: a start line plus sector splits plus intermediate
 // checkpoints. Generous, because ADR-0046 makes the count data and a circuit that
 // wants eight checkpoints is a content decision rather than a code change.
-inline constexpr int LAP_MAX_MARKS = 16;
+//
+// **32 and not 16, because Valdirone Nuova needs exactly 16.** Its forward layout
+// authors two sector marks and fourteen checkpoints, one of which is the start
+// line, so the merged list is 1 + 13 + 2 = 16 marks — sitting precisely on the old
+// ceiling, where adding a single checkpoint to any circuit refuses the layout. The
+// array is 32 doubles per kart and the timer touches a handful of them per tick,
+// so the headroom costs nothing measurable and the alternative is a content edit
+// that fails at load with an arithmetic reason nobody expects.
+inline constexpr int LAP_MAX_MARKS = 32;
 
 // Most sectors a lap may be divided into. Three is the convention every timing
 // screen in the sport uses and what `GAMEDESIGN.md` §7's timing screens assume;
@@ -125,18 +133,51 @@ inline const char *lap_invalid_reason_name(LapInvalidReason reason) {
 	return "invalid";
 }
 
+// Two marks that land this close together are one mark, meters.
+//
+// A millimeter, and it is the same figure and the same reason as the schema's rule
+// for coincident control points: two authored stations that mean the same place
+// arrive separated by float rounding, and a sector of 0.0001 m divides by nearly
+// zero in every consumer downstream. The merge in `from_stations` is where a
+// checkpoint that was placed on top of a sector mark becomes that sector mark
+// rather than a second mark a tenth of a millimeter past it.
+inline constexpr double LAP_MARK_MERGE_M = 1e-3;
+
 // Where the timing marks are, in meters of arc length from the start line.
 //
 // `marks[0]` is the start line and is always 0.0. The rest ascend and are all
-// below `length_m`. Sector *k* runs from `marks[k]` to `marks[k + 1]`, and the
-// last sector closes the lap, so a layout with three sectors has three marks.
+// below `length_m`.
 //
-// One struct rather than three parallel arrays because a layout with its sector
-// count out of step with its mark count is the kind of thing that produces a
-// timing screen showing sector 4 of 3.
+// ## A mark is not a sector, and conflating them showed a timing screen 16 sectors
+//
+// ADR-0046 puts two independent lists in `track.json`, and they are independent
+// because they answer different questions. **Sector marks** are where the timing
+// screen splits the lap — Valdirone authors two, at 524 m and 902 m, chosen as a
+// diagnostic partition rather than as thirds. **Checkpoints** are the anti-cut
+// resolution — fourteen of them, evenly spaced, and `circuit_reference.h` sets the
+// spacing so that no legal line skips one. Both have to be crossed in order,
+// because that is how a cut is detected; only the sector marks may produce a split.
+//
+// This struct held one array and defined `sector_count()` as `mark_count`, which
+// is correct exactly while the two lists are the same list. Feeding it a real
+// circuit's merged marks reported sixteen sectors, wrote `sector_s[8..15]` off the
+// end of a `LAP_MAX_SECTORS` array — guarded, so it silently dropped them — and
+// left `optimal_lap_s` summing eight bests out of sixteen sectors that had none.
+//
+// So `checkpoint_only[i]` says a mark is an anti-cut checkpoint that starts no
+// sector. **The flag is inverted on purpose**: zero-initialization means "every
+// mark starts a sector", which is what a hand-built `LapMarks` and the authored-
+// marks path both meant before this existed, so nothing that predates the flag
+// changes behavior by acquiring it.
+//
+// One struct rather than parallel arrays because a layout with its sector count out
+// of step with its mark count is the kind of thing that produces a timing screen
+// showing sector 4 of 3.
 struct LapMarks {
 	double length_m = 0.0;
 	double mark_m[LAP_MAX_MARKS] = {};
+	// See above: false means this mark starts a sector.
+	bool checkpoint_only[LAP_MAX_MARKS] = {};
 	int mark_count = 0;
 
 	// Whether this describes a lap that can be timed. Checked rather than trusted:
@@ -153,6 +194,12 @@ struct LapMarks {
 		if (mark_m[0] != 0.0) {
 			return false;
 		}
+		// The start line opens sector 0. A layout whose first mark is a checkpoint has
+		// no sector at all until the second mark, so the first split of every lap would
+		// be attributed to a sector that had not started.
+		if (checkpoint_only[0]) {
+			return false;
+		}
 		for (int i = 1; i < mark_count; ++i) {
 			// Strictly ascending: two marks at the same arc length are one mark and a
 			// sector of zero length, which divides by nothing and reports a 0.000 split
@@ -161,19 +208,68 @@ struct LapMarks {
 				return false;
 			}
 		}
+		// More sectors than there is room to time. Refused here rather than clamped in
+		// `complete_lap`, which is what used to happen: the splits past the eighth were
+		// dropped by a bounds guard and the timing screen showed a lap whose sectors did
+		// not add up to it.
+		if (sector_count() > LAP_MAX_SECTORS) {
+			return false;
+		}
 		return mark_m[mark_count - 1] < length_m;
 	}
 
-	int sector_count() const { return mark_count; }
+	int sector_count() const {
+		int count = 0;
+		for (int i = 0; i < mark_count && i < LAP_MAX_MARKS; ++i) {
+			if (!checkpoint_only[i]) {
+				++count;
+			}
+		}
+		return count;
+	}
+
+	// Which sector the kart is in once it has crossed mark `index`.
+	//
+	// Computed rather than cached. The count is at most 32 and this is called on a
+	// mark crossing rather than per tick, and a cache would be a second copy of the
+	// flags that a hand edit in a test — or a `begin_marks` caller filling the arrays
+	// directly — could leave disagreeing with the first.
+	int sector_of_mark(int index) const {
+		if (index < 0 || index >= mark_count) {
+			return 0;
+		}
+		int sector = -1;
+		for (int i = 0; i <= index; ++i) {
+			if (!checkpoint_only[i]) {
+				++sector;
+			}
+		}
+		return sector < 0 ? 0 : sector;
+	}
+
+	// The mark that opens sector `index`, or -1.
+	int mark_of_sector(int index) const {
+		if (index < 0) {
+			return -1;
+		}
+		int sector = -1;
+		for (int i = 0; i < mark_count; ++i) {
+			if (!checkpoint_only[i] && ++sector == index) {
+				return i;
+			}
+		}
+		return -1;
+	}
 
 	// Length of sector `index`, meters. The last one wraps to the start line.
 	double sector_length_m(int index) const {
-		if (index < 0 || index >= mark_count) {
+		const int mark = mark_of_sector(index);
+		if (mark < 0) {
 			return 0.0;
 		}
-		const double from = mark_m[index];
-		const double to = (index + 1 < mark_count) ? mark_m[index + 1] : length_m;
-		return to - from;
+		const int next = mark_of_sector(index + 1);
+		const double to = next >= 0 ? mark_m[next] : length_m;
+		return to - mark_m[mark];
 	}
 
 	// Three equal sectors on a closed lap, which is what a circuit gets before
@@ -182,7 +278,7 @@ struct LapMarks {
 	// generated even split is a placeholder that says so by being one line.
 	static LapMarks even(double length_m, int sectors) {
 		LapMarks marks;
-		if (!(length_m > 0.0) || sectors < 1 || sectors > LAP_MAX_MARKS) {
+		if (!(length_m > 0.0) || sectors < 1 || sectors > LAP_MAX_SECTORS) {
 			return marks;
 		}
 		marks.length_m = length_m;
@@ -191,6 +287,98 @@ struct LapMarks {
 			marks.mark_m[i] = length_m * static_cast<double>(i) / static_cast<double>(sectors);
 		}
 		return marks;
+	}
+
+	// A layout's two authored lists, merged into one ordered set of marks.
+	//
+	// `sectors` are the split points and do **not** include the start line — that is
+	// how `track.json` writes them, because a sector mark at 0.0 would be the line
+	// twice. `checkpoints` are the anti-cut stations and normally *do* include 0.0,
+	// which merges into the start line rather than becoming a second mark on top of
+	// it.
+	//
+	// Returns an invalid `LapMarks` — check `is_valid()` — rather than a clamped one
+	// when the lists cannot be timed: over capacity, out of range, or unsorted after
+	// the merge. A caller that got a clamped set would be racing a lap missing the
+	// checkpoints that were dropped, which is a cut detector with holes in it.
+	static LapMarks from_stations(double length_m, const double *sectors, int sector_count,
+			const double *checkpoints, int checkpoint_count) {
+		LapMarks marks;
+		if (!(length_m > 0.0)) {
+			return marks;
+		}
+		marks.length_m = length_m;
+
+		// The start line, always, and always a sector boundary.
+		marks.mark_m[0] = 0.0;
+		marks.checkpoint_only[0] = false;
+		marks.mark_count = 1;
+
+		// **Sector marks are inserted first and keep their exact authored station.** A
+		// checkpoint within the merge tolerance of one is absorbed by it; doing this the
+		// other way round would let a checkpoint half a millimeter short of 524.0 become
+		// the sector mark, and the split a driver reads would not be the split the design
+		// document specifies.
+		for (int pass = 0; pass < 2; ++pass) {
+			const double *list = pass == 0 ? sectors : checkpoints;
+			const int count = pass == 0 ? sector_count : checkpoint_count;
+			if (list == nullptr) {
+				continue;
+			}
+			for (int i = 0; i < count; ++i) {
+				const double station = list[i];
+				if (!(station >= 0.0) || !(station < length_m)) {
+					// Off the lap. Refused rather than wrapped: a station past the length is an
+					// authoring error, and wrapping it would put a mark at a place the design
+					// never asked for.
+					return LapMarks();
+				}
+				if (!marks.insert(station, pass == 1)) {
+					return LapMarks();
+				}
+			}
+		}
+		return marks;
+	}
+
+private:
+	// Insert one station in order, merging into an existing mark within the
+	// tolerance. Returns false when there is no room. A sector mark that lands on a
+	// checkpoint promotes it — the union of the two lists is what has to be crossed,
+	// and a mark that is both is a sector boundary.
+	bool insert(double station, bool checkpoint) {
+		for (int i = 0; i < mark_count; ++i) {
+			const double gap = station - mark_m[i];
+			if (gap > LAP_MARK_MERGE_M) {
+				continue;
+			}
+			if (gap >= -LAP_MARK_MERGE_M) {
+				if (!checkpoint) {
+					mark_m[i] = station;
+					checkpoint_only[i] = false;
+				}
+				return true;
+			}
+			// Strictly before mark `i` and not touching it: open a hole and drop it in.
+			if (mark_count >= LAP_MAX_MARKS) {
+				return false;
+			}
+			for (int j = mark_count; j > i; --j) {
+				mark_m[j] = mark_m[j - 1];
+				checkpoint_only[j] = checkpoint_only[j - 1];
+			}
+			mark_m[i] = station;
+			checkpoint_only[i] = checkpoint;
+			++mark_count;
+			return true;
+		}
+		if (mark_count >= LAP_MAX_MARKS) {
+			return false;
+		}
+		mark_m[mark_count] = station;
+		checkpoint_only[mark_count] = checkpoint;
+		++mark_count;
+		return true;
 	}
 };
 
@@ -250,7 +438,7 @@ public:
 		// record nothing can ever beat.
 		reason_ = LapInvalidReason::OutLap;
 		for (int i = 0; i < LAP_MAX_SECTORS; ++i) {
-			sector_ticks_at_mark_[i] = 0;
+			sector_ticks_done_[i] = 0;
 		}
 		last_ = LapRecord();
 		best_ = LapRecord();
@@ -499,18 +687,27 @@ private:
 		}
 
 		// **The arming condition.** A lap needs one witness that the kart actually went
-		// round, and with intermediate marks that witness is a mark consumed in order:
-		// a parked kart has none however many times it nudges over the line, and
-		// neither does a kart that skipped every mark by cutting the infield. Both get
-		// nothing, which is correct — neither did a lap — and the cut self-heals,
+		// round, and there are two: a mark consumed in order, or enough forward travel
+		// banked. A parked kart has neither however many times it nudges over the line,
+		// and neither does a kart that skipped every mark by cutting the infield. Both
+		// get nothing, which is correct — neither did a lap — and the cut self-heals,
 		// because the taint survives until a lap does close.
 		//
-		// A layout with nothing but a start line has no such witness available, so it
-		// falls back to how far the kart drove. That is weaker on purpose: it is a
-		// fallback for a track nobody has authored splits for yet, not the main rule.
-		const bool went_round = marks_.mark_count > 1
-				? next_mark_ > 1
-				: lap_travel_m_ >= marks_.length_m * LAP_TRAVEL_FRACTION;
+		// **The travel arm is not just the no-marks fallback, and making it one was a
+		// bug.** This read `mark_count > 1 ? next_mark_ > 1 : travelled`, so a cut over
+		// the *first* mark of the lap left `next_mark_` at 1 for the whole lap — the
+		// marks a cut skipped stay owed, deliberately — and the lap never closed at all.
+		// The header two functions up says what should happen instead, in those words:
+		// *"a cut has to still complete its lap so that the missed mark can invalidate
+		// it — swallowing the lap entirely would leave a driver who cut a corner with no
+		// lap on the screen at all and no explanation."* On a fourteen-checkpoint circuit
+		// the first mark is 98 m past the line, so this is a cut anybody could make.
+		//
+		// `LAP_TRAVEL_FRACTION` is half a circuit and a discontinuity banks none of the
+		// distance it flew over, so a kart that cut enough to matter still fails both
+		// arms. `tools/verify/circuit_probe.gd --case=timing` is the gate that found it.
+		const bool went_round =
+				next_mark_ > 1 || lap_travel_m_ >= marks_.length_m * LAP_TRAVEL_FRACTION;
 		if (!went_round) {
 			return false;
 		}
@@ -584,22 +781,30 @@ private:
 			}
 		}
 		// And the sector the kart is standing in, so the first split is not attributed
-		// to sector 0 from halfway round the lap.
-		sector_ = next_mark_ - 1;
+		// to sector 0 from halfway round the lap. Not `next_mark_ - 1`: with checkpoints
+		// in the list that is a *mark* index, and on Valdirone it would report a kart
+		// sitting in sector 11 of 3.
+		sector_ = marks_.sector_of_mark(next_mark_ - 1);
 	}
 
+	// Consume a mark. Only a sector boundary closes a split — a checkpoint is crossed
+	// for the anti-cut ordering and leaves the running sector time alone, which is the
+	// whole reason the two lists stay distinguishable this far down.
 	void enter_sector(int mark_index) {
-		if (sector_ >= 0 && sector_ < LAP_MAX_SECTORS) {
-			sector_ticks_at_mark_[sector_] = sector_ticks_;
+		if (mark_index >= 0 && mark_index < LAP_MAX_MARKS && marks_.checkpoint_only[mark_index]) {
+			return;
 		}
-		sector_ = mark_index;
+		if (sector_ >= 0 && sector_ < LAP_MAX_SECTORS) {
+			sector_ticks_done_[sector_] = sector_ticks_;
+		}
+		sector_ = marks_.sector_of_mark(mark_index);
 		sector_ticks_ = 0;
 	}
 
 	void complete_lap() {
 		// Close the final sector before the totals are read.
 		if (sector_ >= 0 && sector_ < LAP_MAX_SECTORS) {
-			sector_ticks_at_mark_[sector_] = sector_ticks_;
+			sector_ticks_done_[sector_] = sector_ticks_;
 		}
 
 		++laps_done_;
@@ -607,7 +812,7 @@ private:
 		record.time_s = static_cast<double>(lap_ticks_) * step_s_;
 		record.sector_count = marks_.sector_count();
 		for (int i = 0; i < record.sector_count && i < LAP_MAX_SECTORS; ++i) {
-			record.sector_s[i] = static_cast<double>(sector_ticks_at_mark_[i]) * step_s_;
+			record.sector_s[i] = static_cast<double>(sector_ticks_done_[i]) * step_s_;
 		}
 		record.reason = reason_;
 		record.lap_number = laps_done_;
@@ -637,7 +842,7 @@ private:
 		lap_travel_m_ = 0.0;
 		reason_ = LapInvalidReason::Valid;
 		for (int i = 0; i < LAP_MAX_SECTORS; ++i) {
-			sector_ticks_at_mark_[i] = 0;
+			sector_ticks_done_[i] = 0;
 		}
 	}
 
@@ -646,7 +851,7 @@ private:
 
 	int64_t lap_ticks_ = 0;
 	int64_t sector_ticks_ = 0;
-	int64_t sector_ticks_at_mark_[LAP_MAX_SECTORS] = {};
+	int64_t sector_ticks_done_[LAP_MAX_SECTORS] = {};
 	int sector_ = 0;
 	int laps_done_ = 0;
 	int next_mark_ = 1;

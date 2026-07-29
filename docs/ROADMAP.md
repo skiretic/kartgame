@@ -431,15 +431,51 @@ Effort: M
 
 ## M5 — Track generation
 
-- `data/track.json` schema: control points with position, width, banking, elevation, surface spans, start grid
-- `tools/blender/gentrack.py` — surface, curbs, run-off, barriers, UV-per-meter, triplanar detail blending, lightmap UV2, LODs
-- C++ consumer: collision, checkpoints, racing line, material zones from the same file
-- Runtime scatter: seeded Poisson-disk props and foliage
-- Lightmap bake integration
-- First fictional circuit built to §11 constraints: 1,000–1,500 m, two real overtaking spots, elevation change
-- Validation: closed loop, no self-intersection, no radius the kart physically cannot take
+- [x] `data/tracks/*.track.json` schema: control points with position, width, banking, elevation, surface spans, corners, furniture and **two authored layouts**. [ADR-0046](DECISIONS.md#adr-0046--trackjson-owns-the-whole-track-and-furniture-is-placed-by-distance) is the decision, [`docs/TRACK_SCHEMA.md`](TRACK_SCHEMA.md) is the format, `src/core/track.h` is the executable copy. The spline stores **curvature** and checks position against it — [ADR-0048](DECISIONS.md#adr-0048--the-spline-stores-curvature-checks-position-and-interpolates-height-as-a-cubic), and the reason is that a corner sampled as a polyline has a radius that depends on the sampling rate
+- [x] `tools/blender/gentrack.py` — surface, kerbs, verge, run-off, barriers, edge lines and grid paint, UV-per-meter, lightmap UV2. **No LOD chain**, and that is [ADR-0026](DECISIONS.md#adr-0026--godot-generates-its-own-mesh-lods-a-decimated-gltf-chain-is-not-read) rather than an omission: Godot generates its own on import and cannot read a decimated chain out of glTF. `gentrack.sh --check` is the determinism gate and passes on both the `.glb` and the manifest
+- [x] C++ consumer: collision, checkpoints, sector marks, grid, projection and material zones from the same file — `src/track/kart_track.cpp`, `KartTrack`
+- [ ] Runtime scatter: seeded Poisson-disk props and foliage
+- [ ] Lightmap bake integration. The mesh carries the UV2 channel the bake needs, snaked into ten rows so a 98:1 ribbon does not become 98:1 texels
+- [x] First fictional circuit built to §11 constraints — **Valdirone Nuova**, 1,375.12 m, 8 corners, 12.55 m of elevation (#63). Designed and adversarially verified under `docs/circuits/`, authored into the schema by `tools/circuits/author_track.py`
+- [x] Validation: closed loop, no self-intersection, no radius the kart physically cannot take — twenty rules, part of `load` rather than a later pass, and `load` **refuses**
+- [ ] Triplanar detail blending on the surface material
+- [ ] Pit-lane asphalt. The stations are in the file and the geometry is not: reversed, a deceleration lane at 20° is a 160° merge over Part I art 7.4's 30° cap, so each layout needs its own stubs
 
 **Accept:** a track authored in `track.json` is driveable end to end with correct collision, materials, scatter, and a clean lightmap bake. Visual mesh and collision agree everywhere. Validation rejects a deliberately self-intersecting spline.
+
+**Measured** by `tools/verify/circuit.sh`, against `docs/circuits/valdirone_nuova.json`'s published figures — recomputed from the geometry rather than restated:
+
+| Figure | Design | Built | Delta |
+|---|---|---|---|
+| Lap length | 1,375.1318 m | **1,375.1194 m** | −0.0124 |
+| Longest straight | 165.00 m | **164.998 m** | −0.002 |
+| Start line to T1 | 88.00 m | **87.999 m** | −0.001 |
+| Last corner to line | 77.00 m | **76.999 m** | −0.001 |
+| Elevation range | 12.5473 m | **12.5471 m** | −0.0002 |
+| Worst ground slope | 8.95% | **8.889%** | −0.061 |
+| Width | 9–14 m | **9–14 m** | 0 |
+
+Every corner's radius, turn angle and racing-line radius is the design's exactly. The 12 mm on the lap is the design publishing its nine straight lengths rounded to two decimals: the closure was **re-solved** from those rounded values rather than the 1 mm gate being loosened to admit them, and both figures are inside the regulation's own 1 m accuracy for a published circuit length (Part I art 11).
+
+**Visual mesh and collision agree everywhere: 0.034 mm worst disagreement** over 56 sampled stations, three points across the road at each. They share no code — one is Python inside Blender and one is C++ inside the engine — so §11's "cannot drift apart" is a claim that needed a number, and `gentrack.py` writes the manifest that produces it.
+
+**Driveable end to end:** the kart put down at 40 stations round the lap reports four wheels on asphalt at 40 of 40, and never sits more than 27 mm below the road surface — which is suspension sag, not a hole.
+
+**Validation rejects a deliberately self-intersecting spline**, and the negative control is committed: `data/tracks/self_intersecting.track.json` closes, turns +360°, is 1,105 m long, has legal camber and its grid on a straight, and crosses itself. It is refused with **exactly one problem named**, and `circuit.sh` fails if it loads. An earlier version of that file was broken in nine ways at once, which proves that something is wrong and not that the self-intersection rule fires.
+
+Two corrections to this section's own wording, both earned:
+
+* "no radius the kart physically cannot take" against the stored **centerline** rejects every driveable circuit ever designed — Valdirone exceeds 1.86 g on its own centerline radius at all eight corners, 3.66 g at Il Ciglione. Nobody drives the centerline. The check is against the racing line's radius and the threshold is `min(grip, lock)`, because six of the eight corners are limited by steering lock rather than by the tire.
+* "no self-intersection" needs a *width-aware* rule and a vertical companion. Six meters of **clear ground** plus both half-widths, per Part I §7.5, and a slope cap between two sections that pass close — a flat 14 m constant is only correct at the 8 m width floor and four independent circuit designs published it.
+
+**The circuit is raced rather than driven (#180, closed).** `scenes/game/valdirone.tscn` builds a `SessionRunner` against the `KartTrack` itself, so the lap is split at the authored 524 m and 902 m — 473 m and 862 m reversed — and the fourteen checkpoints are owed in order. `circuit.sh --case=timing` walks both layouts at a constant 22 m/s, where every split is the authored station over the speed in closed form: forward **23.825 / 17.183 / 21.500** against a 62.508 s lap, reverse **21.508 / 17.675 / 23.325**. Even thirds would have been 20.836 each, so the gate cannot pass on a placeholder. Track limits now use the file's own width, 9.0 m to 14.0 m rather than the test track's flat 8.0 m. ADR-0051 has the design and the defect it exposed: a cut over the *first* mark of the lap used to swallow the lap entirely instead of striking it out, which nobody could reach while the first mark was 400 m past the line and anybody can reach at 98 m.
+
+Still open, each with a ticket rather than left in prose: scatter and the lightmap
+bake (#182), pit-lane asphalt for both layouts (#181), and the slipstream the T1
+pass leans on (#185). None of them blocks driving. Two housekeeping items came out
+of the same pass: the kart plumbing is extracted but two scenes still paste it
+(#183), and nothing has checked that `data/tracks/*.json` survives an export
+(#184).
 
 Effort: L
 
@@ -447,7 +483,7 @@ Effort: L
 
 ## M6 — Race loop and determinism
 
-- Checkpoint volumes, lap counting, lap and sector timing
+- Checkpoint volumes, lap counting, lap and sector timing. **Lap and sector timing landed at M5** — #180 wired `track.json`'s authored marks into the session runner and ADR-0051 is the design; what is left here is the *volumes*, since a checkpoint is a station in arc length today and a kart that leaves the road entirely still passes one
 - **Race sessions as configurations of M3c's session runner** — grid, countdown, racing, finished, results. This line read "race states" and was a state machine for one mode; `ARCHITECTURE.md` §17 has why that ordering was wrong
 - Track-limits detection, lap invalidation, respawn with rejoin cooldown. The off-track *definition* is the FIA's — all four wheels past the white line — and the penalty is **ours**, because the regulations attach none to it
 - Replay recording: seed + input stream + tick count

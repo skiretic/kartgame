@@ -2785,9 +2785,16 @@ the easiest place in a codebase for that to happen quietly.
 
 ## ADR-0046 — `track.json` owns the whole track, and furniture is placed by distance
 
-**Status.** Accepted, not yet implemented. Due before ROADMAP M5 writes the
-schema. Extends `ARCHITECTURE.md` §11's "one definition, two consumers" to a
-third consumer.
+**Status.** **Implemented**, ROADMAP M5. The schema it decided is written out in
+[`docs/TRACK_SCHEMA.md`](TRACK_SCHEMA.md), the executable copy is
+`src/core/track.h`, and `data/tracks/valdirone_nuova.track.json` is the first
+circuit authored into it. Three questions this entry did not settle turned up
+during the implementation and are their own decisions:
+[ADR-0048](#adr-0048--the-spline-stores-curvature-checks-position-and-interpolates-height-as-a-cubic),
+[ADR-0049](#adr-0049--one-piece-of-concrete-gets-one-geometry-and-the-gentler-case-wins)
+and [ADR-0050](#adr-0050--the-starting-grid-is-ours-and-it-is-namespaced-so-it-reads-that-way).
+Extends `ARCHITECTURE.md` §11's "one definition, two consumers" to a third
+consumer.
 
 **Context.** §11 already argues the principle: the spline is authored once and
 read by `gentrack.py` and by the C++ extension, so what you see and what you
@@ -2911,3 +2918,303 @@ and the AI consume plain structs, so `src/core/` stays engine-free per ADR-0017.
 - Adding a driver is a data commit. Adding a *difficulty tier* is not — the tiers
   scale the roster's parameters rather than replacing them, so a season at a
   higher tier is the same rivals driving better.
+
+---
+
+## ADR-0048 — The spline stores curvature, checks position, and interpolates height as a cubic
+
+**Status.** Accepted and implemented, ROADMAP M5.
+[ADR-0046](#adr-0046--trackjson-owns-the-whole-track-and-furniture-is-placed-by-distance)
+decided that `track.json` owns the whole track and said its spline carries
+"control points: position, width, banking, elevation". Writing the loader turned
+that one line into three questions it did not answer.
+
+**Context.** A circuit is authored from a design whose corners are exact — a 15 m
+hairpin is 15 m and a 110° corner is 110° — and it is consumed by a mesh
+generator, a collider and a validator that all have to agree with each other to a
+millimeter. Positions alone cannot express that: a corner sampled as a polyline
+has a *radius that depends on the sampling rate*, and the radius is what decides
+whether the corner is on the safe side of #137.
+
+**Decision, one.** **A span between two control points is a circular arc of
+constant curvature, and `distance_m` and `curvature_1pm` are normative.**
+`position` and `heading_deg` are stored too, and the loader **verifies** them
+against its own walk to 1 mm and 1e-4 rad and then never reads them again.
+
+Storing both looks redundant and buys two things that are not. The file stays
+readable and plottable without running an integrator — which is what makes a
+diff of a corner change reviewable. And a hand edit that moves a control point
+without fixing the curvature is a **load failure** rather than a road that
+quietly bends somewhere else three hundred meters later. That check has already
+paid for itself once: it is what caught a 0.0001 m span produced by a taper that
+ended exactly where a segment began.
+
+**Decision, two.** **Elevation interpolates as a cubic Hermite on
+`(elevation_m, grade_pct)`, not linearly.**
+
+This is not a smoothness preference, it is exactness. CIK-FIA Part I §7.2 fixes a
+vertical curve's radius, so a legal grade change is a **parabola**; a parabola is
+a cubic; and cubic Hermite through two endpoints with their two endpoint slopes
+is the unique cubic matching four constraints, so it reproduces that parabola
+*identically*. Valdirone's entire longitudinal profile — three vertical curves
+over 1,375 m — therefore needs six control points and is exact everywhere between
+them.
+
+Linear would have needed a control point every few meters and would still have
+been wrong in a way that is felt rather than seen: at 5 m spacing on the crest the
+grade steps 0.26% at every point, which is 0.10 m/s of vertical velocity arriving
+inside one tick at 140 km/h. That is a bump the road does not have, and it would
+have been indistinguishable from a suspension defect.
+
+The rule that replaced the obvious-but-vacuous check is worth recording. "Does the
+elevation profile close over a lap" is **structurally true** and cannot fail:
+elevation is stored per control point rather than integrated, so the spans'
+height changes telescope to zero. What *can* fail is consistency — Hermite will
+happily interpolate a 3 m climb across a span whose two ends both read flat, and
+draw a hump the design does not contain with the collider agreeing. The check is
+therefore that each span's mean grade lies between its two end grades, which is
+exact for both shapes the schema allows.
+
+**Decision, three.** **Validation is part of `load`, and `load` refuses.** Twenty
+rules, listed in `docs/TRACK_SCHEMA.md` and implemented in `src/core/track.h`,
+covering the geometry, the kart, the regulation's dimensions and the furniture. A
+track that fails any of them does not load. A track that loads and cannot be
+raced is worse than one that will not load: the failure otherwise surfaces three
+hundred meters into a session, at a corner nobody can take, as a physics bug.
+
+The rule the project had already got wrong twice is stated in the header where it
+is implemented, because it will be got wrong a third time otherwise. §11 and
+ADR-0046 both say "no radius the kart physically cannot take" and `track.json`
+stores the **centerline**; written from those words the check rejects every
+driveable circuit ever designed. Valdirone exceeds 1.86 g on its own centerline
+radius at all eight corners — 3.66 g at Il Ciglione. Nobody drives the centerline.
+The check is against the racing line's radius and the threshold is
+`min(grip, lock)`, because six of the eight corners are limited by steering lock
+and not by the tire.
+
+**Consequences.**
+
+- The two geometry consumers share no code — `src/core/track.h` is C++ inside the
+  engine, `tools/blender/tracklib/geometry.py` is Python inside Blender — so
+  §11's "what you see and what you collide with cannot drift apart" rests
+  entirely on the rules above being written in arithmetic. `gentrack.py` writes
+  the road's edges every 25 m into a committed manifest and
+  `tools/verify/circuit.sh` compares them against the collider's. **Measured at
+  0.034 mm worst disagreement over 56 stations.** Without that number the claim is
+  a comment.
+- The self-intersection gate needed two corrections nobody had written down. The
+  clear-ground requirement is `6 + h_a + h_b` and not a flat constant — a flat
+  14 m is only correct at the 8 m width floor and passes an illegal layout
+  anywhere wider, which four independent circuit designs published. And the
+  along-lap exclusion has to skip the **same continuous feature**, not just a
+  40 m window: their version reported a hairpin's own two tangents, and this one
+  reported the start/finish straight's own two ends at 90 m until same-feature
+  pairs were excluded outright.
+- The gate carries a negative control, `data/tracks/self_intersecting.track.json`
+  — a circuit that closes, turns +360°, is 1,105 m long, has legal camber and its
+  grid on a straight, and crosses itself. It breaks exactly one rule on purpose,
+  and `circuit.sh` fails if it loads. Same principle as
+  `input_push_probe.gd --break`.
+
+---
+
+## ADR-0049 — One piece of concrete gets one geometry, and the gentler case wins
+
+**Status.** Accepted and implemented, ROADMAP M5. Settles a contradiction
+[ADR-0046](#adr-0046--trackjson-owns-the-whole-track-and-furniture-is-placed-by-distance)
+created and did not notice.
+
+**Context.** ADR-0046 says the reverse layout is *authored* — "the geometry is
+shared; nothing else is assumed to be" — and that each layout names its own
+furniture. `docs/circuits/valdirone_nuova.json` takes that at its word and
+specifies T8a's inside kerb as **30 mm rippled** forward, where it is an apex
+kerb, and **25 mm flat** reversed, where the same edge is an exit kerb struck at
+111.9 km/h with the corner tightening.
+
+Both specifications are right about what that layout wants. One piece of concrete
+cannot be two heights.
+
+**Decision.** Where two layouts want different *geometry* in the same place, the
+**gentler case is built**, once, and the deviation is recorded rather than
+resolved silently.
+
+That is not a new rule so much as the one the design already applies to run-off
+and never generalized: every corner carries a forward approach speed and a
+reverse approach speed, and *the larger drives the build*. T8 Uscita is approached
+at 124.3 km/h forward and 142.2 km/h reversed — 1.31× the kinetic energy — so it
+is built with 14 m of asphalt and 26 m of grass instead of the 10 plus 16 the
+forward case alone needs. Nobody thought that was a contradiction. A kerb is the
+same question with the sign flipped: the *gentler* geometry is the one that is
+safe in both directions, exactly as the *larger* run-off is.
+
+So `data/tracks/valdirone_nuova.track.json` builds T8a at 25 mm flat. Forward, the
+apex kerb is 5 mm lower and smooth rather than rippled, which is a real loss of
+feel and is the price. The design's own T3 exit kerb shows the author already
+reasoning this way — it is specified flat *because* reversed it is an entry kerb
+taken at 52 km/h.
+
+**Decision, corollary.** The regulation's own cross-section ordering is the
+geometry, and it is **track, verge, run-off** — not track, run-off. Part I §7.5:
+1.80 m of compact verge along the whole length on both sides, then a run-off area
+that "must grade to the verge without a negative slope".
+
+Both consumers built the apron from the road edge first, so the apron and the
+verge occupied the same 1.80 m band. Two consequences, one cosmetic and one not:
+the verge vanished under the apron in every render, and the **collider had two
+coplanar faces there** — the exact condition that makes a suspension raycast's
+answer arbitrary along a whole boundary, which is the trap `ROAD_LIP` exists to
+prevent on the other side of the same edge. The verge is now a collider as well
+as a mesh, at `SURFACE_GRASS`, and the apron starts outboard of it.
+
+**Consequences.**
+
+- A layout may differ in *furniture* — sectors, checkpoints, grid, racing-line
+  seed, pit stations — and in *sizing*, but not in a dimension of a physical
+  object. `docs/TRACK_SCHEMA.md` says so where the `surfaces` array is described.
+- Running 1.80 m wide at a corner now crosses grass before it reaches the asphalt
+  apron. That is what the regulation describes and it makes running wide cost
+  something, which is the correct direction; it is stated here because it will
+  read as a bug the first time somebody feels it.
+- The reverse layout still gets its own kerb *specification* in the design
+  document. What it does not get is its own concrete.
+
+---
+
+## ADR-0050 — The starting grid is ours, and it is namespaced so it reads that way
+
+**Status.** Accepted and implemented, ROADMAP M5.
+
+**Context.** `docs/REFERENCES.md`'s circuit pass (#157) sourced nearly every
+dimension a circuit has to Appendix No. 13 and the 2026 Part I text. It left one
+gap and said so: **the starting grid**. CIK-FIA Part I §7.7 describes the starting
+procedure and refers to **Appendix No. 10** for the grid; Appendices 9, 10 and 15
+are referenced by the Part I text, are not published on fiakarting.com, and were
+not located. Part I's own appendix section reads, in full, *"Annexes — Voir
+fiakarting.com"*, which is the same trap that hid the track width in Appendix 13
+for a milestone.
+
+`ARCHITECTURE.md` §5 item 10, widened after ADR-0034: an externally-sourced
+constant invented in a planning session is indistinguishable from a measured one
+six months later, and this project has now paid for that twice — §6.4's lateral
+band and the engine's harmonic ladder. The grid was about to be the third.
+
+**Decision.** Pick the figures, say they are ours, and make the code say it at
+every call site. Four numbers, in `kart::core::circuit::ours::`, each with a
+`_SOURCED = false` beside it and each **derived from a clearance a reader can
+check** rather than chosen:
+
+| Figure | Value | What it is derived from |
+| --- | --- | --- |
+| Row pitch | 8.0 m | 4.37 kart lengths; 6.17 m of clear road behind the kart ahead in the same column |
+| Stagger | 4.0 m | Exactly half the pitch, so no kart sits directly behind another and every kart has **2.17 m of clear road ahead of it** — which is the number that matters, because a KZ leaves the line on a clutch and a launch that bogs needs room that is not somebody's bumper |
+| Column offset | ±3.0 m | On a 12 m start straight: 4.6 m of clear air between two 1.400 m karts abreast, 2.3 m from each outer edge to the white line |
+| Front-row setback | 4.0 m | One stagger. Everything behind the front row is spent out of the 120–200 m the starting straight is allowed to be |
+
+The separation matters more than the numbers. `circuit::` reads as "the FIA said
+so" and `circuit::ours::` reads as "we picked this", at the call site, without a
+comment. `src/core/circuit_reference.h` is the file, and it does for the circuit
+what `kz_audio_reference.h` does for the engine note: one owner for every external
+constant, with the unmeasured neighbours **named** rather than quietly filled in.
+
+Two more figures live in the same namespace under the same rule. The
+**superelevation runoff length** — the regulation says banking changes are "to be
+made over an appropriate distance" and gives no distance; 20 m is 0.52 s at
+140 km/h. And the **checkpoint spacing** — 100 m, which is not a regulation at all
+because the FIA has no opinion on how a game validates a lap; it is the anti-cut
+resolution, 7.3% of Valdirone's lap.
+
+**Consequences.**
+
+- Slot count is data and not a constant, so `KartTrack` *checks* rather than
+  assumes eight: every slot has to fit on the road at its own station,
+  `|lateral| + 0.700 + 0.120 ≤ width/2`, and has to be on a straight. A standing
+  start on camber is not a standing start.
+- Valdirone's grid of eight occupies 28.0 m of a 165 m start straight and leaves
+  45.0 m of straight behind the last row. The design's own note said 49.0 m,
+  counting only the pole column; the corrected figure is here.
+- If Appendix 10 turns up, four constants change in one file and the derivations
+  above say immediately what each change costs.
+
+## ADR-0051 — A checkpoint is a mark, not a sector, and the timer keeps them apart
+
+**Status.** Accepted, M5, issue #180.
+
+**Context.** ADR-0046 put two lists in `track.json` and they answer different
+questions. **Sector marks** are where the timing screen splits the lap: Valdirone
+authors two, at 524 m and 902 m forward and 473 m and 862 m reversed, chosen as a
+diagnostic partition of the circuit rather than as thirds. **Checkpoints** are the
+anti-cut resolution: fourteen of them, every 98.2 m, and ADR-0050 says why 100 m
+is ours rather than the FIA's.
+
+`src/core/lap_timing.h` predates both. It held one array of marks and defined
+`sector_count()` as `mark_count`, which is exactly correct while the two lists are
+the same list — which they were, because nothing had authored either yet and
+`SessionRunner` was cutting the lap into three equal thirds with a comment saying
+it was a placeholder.
+
+Handing a real circuit's marks to that timer reports Valdirone as a
+**sixteen-sector** track. `LapRecord::sector_s` is `LAP_MAX_SECTORS` long, which is
+eight, so the splits past the eighth were dropped by a bounds guard and the ones
+that survived did not add up to the lap. Nothing crashed and nothing said
+anything.
+
+**Decision.** A mark carries a flag, `checkpoint_only`, and the two lists merge
+into one ordered set through `LapMarks::from_stations`. **Every mark has to be
+crossed in order or the lap was cut; only a mark that is not `checkpoint_only` may
+put a split on the screen.**
+
+Three details are load-bearing:
+
+- **The flag is inverted.** `checkpoint_only` defaults to false, so zero
+  initialization means "every mark starts a sector" — which is what a hand-built
+  `LapMarks` and the existing authored-marks path already meant. Nothing that
+  predates the flag changes behavior by acquiring it.
+- **Coincident stations merge at a millimeter**, `LAP_MARK_MERGE_M`, and the
+  *sector mark's* station wins. A checkpoint half a millimeter short of 524.0 that
+  became the sector mark would put the split a hair off the number the design
+  document specifies, and the schema already merges control points on the same
+  rule for the same reason.
+- **`from_stations` refuses rather than clamps.** Over capacity, over
+  `LAP_MAX_SECTORS`, or a station off the lap all return an invalid `LapMarks` and
+  the session is refused by name. A clamped set is a cut detector with holes in it,
+  and the holes are exactly the checkpoints a driver could then skip for free.
+
+`LAP_MAX_MARKS` goes from 16 to 32. Valdirone's merged set is 1 + 13 + 2 = **16**,
+sitting precisely on the old ceiling, so a circuit with one more checkpoint than
+this one would have been refused with an arithmetic reason nobody expects.
+
+**A defect the new gate found, and it is the interesting one.** The lap arming
+condition read *"a mark has been consumed in order, or — if the layout has only a
+start line — half a circuit of travel"*. The marks a cut skips deliberately stay
+owed, so a cut over the **first** mark of the lap left `next_mark_` at 1 for the
+whole lap, and the lap never closed at all. `lap_timing.h` argues against exactly
+that outcome three functions higher: *"a cut has to still complete its lap so that
+the missed mark can invalidate it — swallowing the lap entirely would leave a
+driver who cut a corner with no lap on the screen at all and no explanation."*
+With three even sectors the first mark was 400 m past the line and nobody reached
+it; with fourteen checkpoints it is 98 m past the line and anyone can. The two
+witnesses are now an `||` rather than a fallback, and both are still required to
+fail before a lap is swallowed.
+
+**Consequences.**
+
+- `SessionRunner.configure()` takes a **duck-typed course** rather than a
+  `TrackLayout`. `TrackLayout` is a `Node3D` script and `KartTrack` is a
+  `RefCounted` in the GDExtension; they cannot share a base class, so the contract
+  is four required methods and three optional ones, checked by name at
+  `configure()` and refused by name. Half a partition is refused outright: a course
+  that publishes `sector_marks()` and not `checkpoints()` is a timing screen that
+  reads right over a cut detector with 380 m holes in it.
+- Track limits are measured against **the course's own width** where it has one.
+  `TrackRibbon.TRACK_WIDTH` is 8.0 m and it is the *test track's* width; Valdirone
+  runs 9.0 m to 14.0 m, so a constant would have struck out a lap for a wheel on
+  asphalt the design widened on purpose, and let one through where the road is
+  narrower — which is the silent direction.
+- The timing screen's sector strip is `sector_count()` wide, which is the track's
+  number. It was `best_sectors().size()`, so it drew one column until a valid lap
+  existed and then jumped.
+- `tools/verify/circuit.sh --case=timing` is the gate. It walks the timer round
+  both layouts at a constant 22 m/s, where every split is the authored station over
+  the speed in closed form, and carries its own negative control: a 40 m jump over
+  a checkpoint that clears no sector mark. A timer that owed only its splits passes
+  every other check in this file and fails that one.

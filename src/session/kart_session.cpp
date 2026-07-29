@@ -536,6 +536,9 @@ void KartLapTimer::_bind_methods() {
 			&KartLapTimer::begin_even);
 	ClassDB::bind_method(D_METHOD("begin_marks", "marks_m", "length_m", "step_s"),
 			&KartLapTimer::begin_marks);
+	ClassDB::bind_method(
+			D_METHOD("begin_track", "sector_marks_m", "checkpoints_m", "length_m", "step_s"),
+			&KartLapTimer::begin_track);
 	ClassDB::bind_method(D_METHOD("reset"), &KartLapTimer::reset);
 	ClassDB::bind_method(D_METHOD("advance", "distance_m", "off_track"), &KartLapTimer::advance);
 	ClassDB::bind_method(D_METHOD("respawn", "distance_m"), &KartLapTimer::respawn);
@@ -543,6 +546,9 @@ void KartLapTimer::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("lap_time"), &KartLapTimer::lap_time);
 	ClassDB::bind_method(D_METHOD("sector"), &KartLapTimer::sector);
+	ClassDB::bind_method(D_METHOD("sector_count"), &KartLapTimer::sector_count);
+	ClassDB::bind_method(D_METHOD("mark_count"), &KartLapTimer::mark_count);
+	ClassDB::bind_method(D_METHOD("marks"), &KartLapTimer::marks);
 	ClassDB::bind_method(D_METHOD("sector_time"), &KartLapTimer::sector_time);
 	ClassDB::bind_method(D_METHOD("laps_completed"), &KartLapTimer::laps_completed);
 	ClassDB::bind_method(D_METHOD("distance"), &KartLapTimer::distance);
@@ -620,6 +626,31 @@ bool KartLapTimer::begin_marks(const PackedFloat64Array &p_marks, double p_lengt
 	return true;
 }
 
+bool KartLapTimer::begin_track(const PackedFloat64Array &p_sector_marks,
+		const PackedFloat64Array &p_checkpoints, double p_length_m, double p_step_s) {
+	// `PackedFloat64Array` is contiguous doubles, so `ptr()` is exactly the argument
+	// `from_stations` takes and no copy is needed. `ptr()` on an empty array is null,
+	// which is the case the merge already handles: a layout may author checkpoints and
+	// no splits, and it times as one sector.
+	const LapMarks marks = LapMarks::from_stations(p_length_m, p_sector_marks.ptr(),
+			p_sector_marks.size(), p_checkpoints.ptr(), p_checkpoints.size());
+	if (!marks.is_valid() || !(p_step_s > 0.0)) {
+		// Named rather than generic, because the two lists fail in different ways and
+		// the counts are the first thing to look at: over `LAP_MAX_SECTORS` splits, over
+		// `LAP_MAX_MARKS` merged marks, or a station off the lap.
+		ERR_PRINT(vformat("KartLapTimer: %d sector marks and %d checkpoints on a %.3f m lap "
+						  "cannot be timed; they must lie on the lap, and the merged set must "
+						  "hold at most %d marks in at most %d sectors",
+				p_sector_marks.size(), p_checkpoints.size(), p_length_m, LAP_MAX_MARKS,
+				LAP_MAX_SECTORS));
+		return false;
+	}
+	marks_ = marks;
+	timer_.begin(marks_, p_step_s);
+	started_ = true;
+	return true;
+}
+
 void KartLapTimer::reset() {
 	timer_.reset();
 }
@@ -649,6 +680,22 @@ double KartLapTimer::lap_time() const {
 
 int KartLapTimer::sector() const {
 	return timer_.progress().sector;
+}
+
+int KartLapTimer::sector_count() const {
+	return marks_.sector_count();
+}
+
+int KartLapTimer::mark_count() const {
+	return marks_.mark_count;
+}
+
+PackedFloat64Array KartLapTimer::marks() const {
+	PackedFloat64Array out;
+	for (int i = 0; i < marks_.mark_count; ++i) {
+		out.push_back(marks_.mark_m[i]);
+	}
+	return out;
 }
 
 double KartLapTimer::sector_time() const {

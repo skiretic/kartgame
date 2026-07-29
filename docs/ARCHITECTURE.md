@@ -343,7 +343,10 @@ Contains control points with position, width, banking, and elevation, plus surfa
 start line, grid slots, sector marks and checkpoints, and the calendar in
 `docs/GAMEDESIGN.md` needs reverse layouts.
 [ADR-0046](DECISIONS.md#adr-0046--trackjson-owns-the-whole-track-and-furniture-is-placed-by-distance)
-extends the schema to own all of it, and settles two things this section did not:
+extends the schema to own all of it — **written out in
+[`docs/TRACK_SCHEMA.md`](TRACK_SCHEMA.md) and implemented at M5**, with
+`src/core/track.h` as the executable copy — and settles two things this section
+did not:
 furniture is placed by **arc length in meters from the start line** rather than by
 control-point index, so inserting one control point to smooth a corner does not
 silently renumber every checkpoint behind it; and **reverse is an authored layout

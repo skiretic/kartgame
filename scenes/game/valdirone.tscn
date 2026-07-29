@@ -1,0 +1,33 @@
+[gd_scene load_steps=2 format=3]
+
+; Almost empty on purpose, the same as the other two driveable scenes: everything
+; is built by scripts/game/circuit.gd from data/tracks/valdirone_nuova.track.json,
+; so a driving session or a still is described completely by the command that
+; started it rather than by editor state.
+;
+; The difference from scenes/game/test_track.tscn is where the geometry comes
+; from. That one builds a diagnostic loop in code, because a test track has to
+; exist on a fresh clone and its corners are sized from a measurement rather than
+; authored. This one reads a file -- ADR-0046's track.json, ROADMAP M5 -- and the
+; file is committed, so it also exists on a fresh clone.
+;
+; Two things it loads at run time rather than referencing here, both because they
+; are gitignored and regenerated:
+;
+;     assets/generated/kart.glb              tools/blender/genkart.sh
+;     assets/generated/valdirone_nuova.glb   tools/blender/gentrack.sh
+;
+; A hard ext_resource to either would make the scene fail to load before those
+; have ever run. The collision geometry does NOT come from the .glb -- it is built
+; in C++ by KartTrack from the same track.json, which is ARCHITECTURE.md section
+; 11's whole point -- so the circuit is driveable with no mesh at all, and
+; --mesh=false draws the colliders instead when the question is whether the two
+; agree.
+;
+;     godot --path . scenes/game/valdirone.tscn
+;     godot --path . scenes/game/valdirone.tscn -- --layout=reverse
+
+[ext_resource type="Script" path="res://scripts/game/circuit.gd" id="1_circuit"]
+
+[node name="Valdirone" type="Node3D"]
+script = ExtResource("1_circuit")
