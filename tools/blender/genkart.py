@@ -867,6 +867,27 @@ def export_gltf(context: build.BuildContext, path: str) -> None:
     )
 
 
+def build_totals(context: build.BuildContext) -> dict[str, int]:
+    """Object, mesh, vertex and triangle counts for the scene as it stands.
+
+    Split out of `write_manifest` so that a run which skipped the export stage can
+    still report what it built. It must not report a hash — see the reasoning at
+    its call site.
+    """
+    objects = exportable(context)
+    meshes = [obj for obj in objects if obj.type == "MESH"]
+    return {
+        "objects": len(objects),
+        "meshes": len(meshes),
+        "vertices": sum(len(obj.data.vertices) for obj in meshes),
+        "triangles": sum(
+            max(0, len(polygon.vertices) - 2)
+            for obj in meshes
+            for polygon in obj.data.polygons
+        ),
+    }
+
+
 def write_manifest(
     context: build.BuildContext,
     gltf_path: str,
@@ -1234,6 +1255,38 @@ def main() -> None:
         return
 
     elapsed = time.perf_counter() - started
+
+    # ...and the same is true of **any** run that skipped the export stage, which
+    # the check above missed for a milestone because `--watch` was the only way
+    # anybody had reached it. `--stages=geometry` builds a fresh scene, does not
+    # rewrite the .glb, and then hashed whatever .glb was already on disk: three
+    # different meshes of 37,768, 38,499 and 38,583 vertices all printed
+    # `ffc0094e…` while `totals` came from the fresh scene. A stale hash under
+    # fresh counts is worse than no hash, because `kartview.gd`'s STALE IMPORT
+    # check reads this file to decide whether the mesh it is showing is current —
+    # so the one guard against a stale kart was being fed a stale manifest.
+    #
+    # No export, no manifest. The counts still print, because they are the reason
+    # to run a geometry-only build in the first place.
+    if "export" not in stages:
+        totals = build_totals(context)
+        print(
+            "==> not exported (--stages=%s)\n"
+            "    %d objects, %d meshes, %s verts, %s tris in %.1f s\n"
+            "    no sha256 and no manifest: %s is left describing the last\n"
+            "    exported mesh rather than this one"
+            % (
+                arguments.get("stages", "?"),
+                totals["objects"],
+                totals["meshes"],
+                "{:,}".format(totals["vertices"]),
+                "{:,}".format(totals["triangles"]),
+                elapsed,
+                os.path.relpath(manifest_path, _project_root()),
+            )
+        )
+        return
+
     manifest = write_manifest(context, out, manifest_path, elapsed)
     totals = manifest["totals"]
 
