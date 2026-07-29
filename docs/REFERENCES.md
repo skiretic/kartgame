@@ -2305,3 +2305,122 @@ search is not repeated, are recorded in `refs/frontend/sweep_manifest.txt`.
    three unknown lighting conditions and white balances, bracketing rather
    than measuring — a real albedo needs a calibrated shot or the paint
    standard, so the value is provisional and recorded as such.
+
+## The kart's own look — visual redesign references
+
+The generated kart does not look like the karts this project models, and the
+existing sections cover single parts — an engine, a radiator, a steering
+geometry — not the whole machine. This section is the whole machine: what a
+current KZ kart actually looks like from the four angles a player sees it
+from, photographed by the three manufacturers whose chassis dominate the
+class, plus the homologation paperwork that constrains any redesign. Files
+in `refs/kart-visual/` (gitignored) with `sources.txt`; fetched by a browser
+session 2026-07-28, since a plain `curl` of the pages themselves is not
+always possible. All manufacturer photographs are copyrighted marketing
+material and are **reference only** — handled as F5–F8 are: nothing traced,
+nothing redistributed, nothing shipped. What is taken is shape, proportion,
+finish and layout.
+
+### Photographs
+
+| Ref | Subject | Source |
+| --- | --- | --- |
+| V1 | **Tony Kart Racer 401 T, full right-side view, KZ trim** — expansion chamber and silencer, radiator, green chassis, gold magnesium rims | tonykart.com, `img/chassis/racer401T/racer401T-p.png` |
+| V2 | Racer 401 T, rear-left three-quarter — pod tail, seat, rear bumper end | tonykart.com, `img/chassis/racer401T/01.png` |
+| V3 | **Racer 401 T, dead-rear** — rear wheel protection full width, its top level with the rear tires, logo blocks on each end face, radiator and engine between the seat and the right rear | tonykart.com, `img/headers/header_telai25.jpg` |
+| V4 | **Racer 401 T, top-down full kart** — the layout shot: pod plan shape, seat position, tank under the column, radiator angle, pedals, front hubs | tonykart.com, `p05.jpg` |
+| V5 | Racer 401 T front three-quarter (this one is OK single-speed trim, not KZ — note the airbox and no gear lever) | tonykart.com, `p02.jpg` |
+| V6 | Racer 401 T detail set: floor tray decal (`p01`), rear caliper casting (`p03`), pedal/master-cylinder linkage (`p04`), wrap texture closeup (`p06`) | tonykart.com |
+| V7 | **CRG Road Rebel, rear-right three-quarter, full kart, KZ trim** — black chassis, orange/black livery, nickel exhaust | kartcrg.com Road Rebel gallery, 900×600 |
+| V8 | CRG Road Rebel, dead-front — fairing over panel, pod mouths, radiator edge-on | kartcrg.com, same gallery |
+| V9 | CRG front fairing + front panel from above — the twin-lobe nose read as a shape | kartcrg.com, same gallery |
+| V10 | CRG detail pair: front corner (caliper, drilled disc, hub, nose underside) and left side (airbox, exhaust header, rear disc, pod top) | kartcrg.com, same gallery |
+| V11 | CRG cockpit: steering wheel, column, front-panel bracket, seat edge | kartcrg.com, same gallery |
+| V12 | Birel ART KZ, dead-front product shot — red livery, Freeline bodywork | birelart.com, `IMG_4222-kz-frontale.jpg` |
+| V13 | **Birel ART decal-kit flat layout, 1668×1608** — the actual die-cut sticker shapes for every panel, labeled by part: `PN509` nose and front panel, `SERB 9Lt` tank, `CL FL AERO` side pods, with yellow number zones printed into the kit | birelart.com, `assets/elfinder-2/files/S19/graphics.jpg` |
+| V14 | Birel ART renders: steering column (10 mm annotation), eccentric caster/camber pill kit | birelart.com, same directory |
+| V15 | **CIK-FIA Bodywork, Brakes, Chassis Homologation Technical List 2025–2027, Group 2** (02.09.2025) — every homologated chassis and bodywork part in the KZ classes, with numbers. Hash-pinned in `sources.txt`; Group 3 list fetched but not yet read | fiakarting.com, Homologated Equipment |
+
+### What the references settled
+
+1. **A kart is five homologated bodywork elements on a visible chassis, and
+   nothing else is dressed.** Front fairing, front fairing mounting kit,
+   front panel, two side pods, rear wheel protection (Art. 4.10.1). Engine,
+   radiator, seat, tank, column, floor tray all sit exposed. The kart's
+   color reads as *chassis-tube color plus wrapped plastics* — Tony Kart is
+   green tubes under white-based wrap, CRG is black tubes under
+   orange/black, Birel is red tubes under red. Painting the whole kart one
+   body color, the way the current generated kart reads, is exactly what a
+   real one never looks like (V1, V7, V12).
+2. **Livery is a printed die-cut wrap per panel, not paint.** V13 is the
+   proof and the template: one flat sheet, one shape per panel, logos
+   pre-oriented per panel, number zones printed in. V6's closeup shows the
+   wrap's glitter-print texture and how it ends at panel edges. A livery
+   redesign for the generated kart should be authored the same way — flat
+   per-panel art applied in UV space, not vertex color.
+3. **The front end is two parts, not one.** The fairing is a twin-lobed
+   cowl with a center dip, no higher than the front wheels (9.5.2); the
+   front panel is a separate near-flat shield standing behind and below it,
+   raked with the column, 250–300 mm wide, carrying the front number
+   (9.5.3). V9 shows the two as distinct shapes; conflating them into one
+   nose blob is the single most visible bodywork error a model can make.
+4. **The rear wheel protection is a full-width tray, level with the rear
+   tire tops, with contrast edges.** Mandatory in the KZ classes (4.11),
+   injection blow-molded, mounted to the two main chassis tubes, and its
+   outer edges must be "a colour appreciably different" from its body —
+   the regulation itself forces the two-tone rear (V3).
+5. **Hardware finish vocabulary** (V1, V3, V6, V10, V11): chrome/zinc
+   bright fittings and column supports; magnesium wheels — OTK gold, CRG
+   black; raw silver engine and clutch castings; nickel/raw steel exhaust
+   with spring-retained joints; drilled steel brake discs; raw aluminum
+   radiator; natural translucent-white fiberglass seat on the Tony Kart,
+   black on the CRG. Nothing on a real kart is body-colored metal.
+6. **Cockpit reads**: small three-spoke wheel, padded rim in an accent
+   color with visible stitching (V11), flat center plate; tank is a white
+   translucent jug under the column (V4); pedals sit at the very front of
+   the frame rails ahead of the fairing mounting kit (V4, V6).
+7. **The photographed karts tie directly to the homologation list** (V15):
+   CRG Road Rebel chassis `002-CH-20`; Tony Kart Racer `012-CH-30`; Birel
+   RY30 `007-CH-10`. Bodywork families: KG 507/508/509 (`003-BF-99`,
+   `003-BP-02`, `003-BP-78`, `003-BF-09`, `003-BP-11`, C3 rear wheel
+   protection `003-BR-55`, 507 side `003-BS-36`) — CRG's own page names its
+   trim "carenature 507/509"; OTK M10/M11 (`012-BF-10`, `012-BF-80`,
+   `012-BP-41`, `012-BP-70`, `012-BR-15`, `012-BS-05`); Freeline Aero side
+   bodywork `007-BS-20` on the Birel. A redesigned kart that wants to look
+   class-legal copies the *families*, not a mix of parts — though 8.5
+   explicitly allows combining homologated elements, the side pods must be
+   used as a set.
+8. **The regulation envelope any redesign must stay inside** — all read
+   from the 2026 Technical Regulations text (V.2.2), not recalled, per the
+   §7.2 lesson: KZ bodywork is Art. 8.5, which defers to 9.5. Front
+   fairing: width ≥1,000 mm and ≤ the overall width of the front
+   wheel/axle unit, gap from its back to the front wheels ≤180 mm, front
+   overhang ≤680 mm, one vent hole ≤12 mm on the rear face only. Front
+   panel: below the steering-wheel-top plane, ≥50 mm clear of the wheel,
+   not proud of the fairing, 250–300 mm wide. Side pods: never above the
+   tire-top plane, 0–40 mm inboard of the wheels' outer plane, ground
+   clearance 25–60 mm, ≤150 mm behind the front wheels, ≤60 mm ahead of
+   the rears, smooth with no holes but the fixings, number space near the
+   rear wheels. Bodywork corner radius ≥5 mm (4.10.2), any color allowed.
+   KZ minimum mass 170.0 kg including the driver (8.9). No bodywork
+   element may serve as a tank or carry ballast.
+
+### What could not be sourced
+
+1. **The homologation drawings themselves.** The technical list gives
+   numbers, not geometry; the dimensioned homologation forms for KG 509 or
+   OTK M11 are not public. Shape comes from the photographs; the envelope
+   comes from Art. 9.5. Direct-karting's KG 506 category exists but lists
+   zero products, so no clean per-panel product shots either.
+2. **Any calibrated color.** Same caveat as the panel yellow above: every
+   value in these photographs is lighting times reflectance. Brand
+   palettes are safe as *relationships* (green tubes + gold rims; black +
+   orange) but not as albedo values.
+3. **A KZ-trim shot of every angle from one manufacturer.** Tony Kart's
+   gallery mixes trims — V5 is OK trim and says so. The KZ-specific
+   dressing (expansion chamber right side low, silencer, gear lever,
+   front brake lines) is confirmed in V1, V7 and V10, and the M3b/M3c
+   powertrain sections already pin the engine itself.
+4. **CRG originals above 900×600.** The site serves resized thumbnails;
+   the originals are not reachable. Good enough for shape and finish, not
+   for texture work.
