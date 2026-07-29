@@ -258,15 +258,71 @@ literal reading.
 > protection.
 > The rear wheel protection must be placed no higher than the rear wheels.
 
-**Art. 9.4 / 9.4.1 Bumpers** (PDF pp. 22–23)
+**Art. 9.4 Bumpers** (PDF p. 22)
 > Front and side protections are compulsory. They must be made of magnetic steel
 > round tubing and be homologated with the bodywork.
+
+**Art. 9.4.1 Front bumper** (PDF p. 23). Two bars, at two different heights, and
+an earlier version of this section got both the height and the attachment spacing
+wrong — see the correction note below.
+> Height: 200.0 mm minimum and 250.0 mm maximum from the ground (measured to the
+> tubing top).  ← **upper** bar
+> [a] lower bar with a minimum diameter of 20.0 mm and two corner bends with one
+> constant radius. The straight length between the bends must be 295.0 mm minimum
+> and 315.0 mm maximum.
+> Height: 70.0 mm minimum and 110.0 mm maximum (measured to the tube top).
+> ← **lower** bar
+> The bar must be fixed to two welded chassis frame attachments, which must be
+> **450.0 mm apart** and centred on the kart's longitudinal axis. The attachments
+> must be horizontally and vertically parallel to the kart's axis and allow for a
+> 50.0 mm insertion of the bar.
 > Front overhang: 350.0 mm minimum.
-> […] 550.0 mm apart and centred on the kart's longitudinal axis.
+> Both bars must be connected by the front bumper support.
+> The front bumper must be independent from the pedal attachment and allow for the
+> mounting of the mandatory front fairing.
+
+**Art. 9.4.2 Side bumpers** (PDF p. 23)
+> The side bumper consists of two elements of magnetic steel round tubing that are
+> centred in relation to the longitudinal axis of the kart. Each element must be
+> composed of a lower and an upper bar. They must have a diameter of 20.0 mm.
+> Minimum straight length is 400.0 mm for the lower bar and 300.0 mm for the upper
+> bar.
+> Overall width: 480.0 mm minimum and 520.0 mm maximum for the lower bar, 480.0 mm
+> minimum and 600.0 mm maximum for the upper bar (measured to the tube midpoint)
+> in relation to the longitudinal axis of the kart.
+> Each bar must be fixed to two welded tube attachments that must be 500.0 ± 5 mm
+> apart (measured to the tube midpoint).
+> Height of the upper bar: 160.0 mm minimum from the ground (measured to the tube
+> top). See TD n°2.0.
 
 Front overhang carries **two** limits in two different articles and they are not
 the same kind of number: 9.4.1 sets a **minimum of 350** on the front bumper, and
 9.5.2 sets a **maximum of 680** on the front fairing. Both apply.
+
+**Correction, and it is the §7.2/§7.4 failure happening inside this document.**
+Two numbers above were wrong when first written here and were relayed to two
+section agents before being caught:
+
+1. The attachment spacing was quoted as **550.0 mm**. The text says **450.0 mm**
+   for the front bumper and **500.0 ± 5 mm** for the side bumpers. There is no 550
+   anywhere in Art. 9.4. §5b separately claims the OTK M4 form's 550 mm tube
+   spacing "matches Art. 9.4.1" — it does not; the form's **450** is the one that
+   matches, and the 550 is an unregulated second pair.
+2. The **160 mm minimum** was attributed to 9.4.1 and to the *front* bumper. It
+   belongs to **9.4.2**, and it governs the **side** bumper's upper bar. The front
+   bumper's own limits are 200–250 (upper) and 70–110 (lower), both to the tube
+   **top**.
+
+The practical consequence is the opposite of what was relayed: a front nose bar
+with its tube center at z 150 — top 160 — is not a legal minimum, it is **50 mm
+above the 110 mm ceiling** on the lower bar and 40 mm below the 200 mm floor on the
+upper. §Bodywork's "nose hoop demand" is specified against the withdrawn number and
+is superseded by §Chassis, which places the lower bar's top at 95 and the upper
+bar's top at 225. **The fairing picks up on the upper bar**, which is the only one
+in the right height band to carry it.
+
+Both errors were caught by a section agent reading the PDF rather than reading
+this file, which is the entire reason §1 forbids citing project text.
 
 **Do not cite Art. 9.5.4.1 for side bodywork — it does not exist.** The FIA's own
 text has a dangling cross-reference: Art. 8.5.4.1 (PDF p. 21) says "See Article

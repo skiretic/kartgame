@@ -46,13 +46,17 @@ Art. **4.11**, PDF pp. 11–12, on the rear protection specifically:
 **The two main tubes**, not the rear bumper. That is the fix for the 5.91 mm gap
 `joints.py` waives, and it is a different fix from the one the waiver proposes.
 
-Art. **9.4.1**, PDF p. 23, one line that §4 did not carry:
+**WITHDRAWN — this section attributed a side-bumper limit to the front bumper.**
+The line it quoted, *"Height of the upper bar: 160.0 mm minimum from the ground
+(measured to the tube top)"*, is **Art. 9.4.2 Side bumpers**, not 9.4.1, and it
+governs the side bar. It is not a floor under the nose bar and it is not half of
+any demand on the chassis.
 
-> Height of the upper bar: 160.0 mm minimum from the ground (measured to the tube
-> top). See TD n°2.0a.
-
-That is a floor under the upper nose bar, and it is half of the numeric demand
-this section puts on the chassis.
+The front bumper's own limits, Art. 9.4.1, PDF p. 23, are two bars at two heights,
+both measured to the tube **top**: the **upper** bar 200.0-250.0 mm and the
+**lower** bar 70.0-110.0 mm. See front matter §4, which now carries the article in
+full and records the correction. Demand 1 in §50.3 below is superseded on the same
+grounds.
 
 ## 50.1 Three corrections to §4's quoted envelope
 
@@ -164,11 +168,18 @@ second. As geometry:
 
 `frame.py:_bumpers` builds it at `z + 0.105` = 155 over |x| ≤ 255 — already
 compliant there — and then dives to `z + 0.020` = 70 at (±300, +545, 70), which is
-what makes the fairing impossible. The 150 floor is not a preference: Art. 9.4.1
-requires the upper bar's **top** at ≥160 above ground, and a 20 mm tube at z 150
-tops out at exactly 160. The hoop at 155 has 5 mm; the hoop at 70 is 70 mm
-illegal, and it has been for every milestone. The 130 floor over the run back to
-the frame is the fairing's cavity: the panel's inner lower skin is at z 43.8 and
+what makes the fairing impossible.
+
+**The 150 floor is withdrawn and this demand is superseded.** It rested on
+attributing Art. 9.4.2's 160 mm side-bumper minimum to the front bumper. The front
+bumper's real bands are 200-250 and 70-110 to the tube top, so a tube center at
+z 150 (top 160) is **50 mm above the lower bar's ceiling and 40 mm below the upper
+bar's floor** — it is the one height a front bar may not be. §Chassis places the
+lower bar's top at 95 and the upper bar's top at 225, and **the fairing picks up on
+the upper bar**, which is the only one in a height band that can carry it. The
+hoop's dive to z 70 (top 80) is therefore *legal* for a lower bar, not 70 mm
+illegal; what was missing was the second, upper bar. The 130 floor over the run
+back to the frame stands on its own reasoning — the fairing's cavity: the panel's inner lower skin is at z 43.8 and
 its inner upper skin at 263.2, so a tube anywhere in 130–250 is inside the
 cavity and clear of both.
 
@@ -342,14 +353,15 @@ determinism item only.
 **Status:** new.
 **Attaches to:** `bodywork_nose_fairing` (bolted, 1× M8),
 `chassis_nose_hoop_lower` (clamped).
-**Envelope:** Art. 9.5.2; the 550 mm spacing is also Art. 9.4.1's.
+**Envelope:** Art. 9.5.2. The 550 mm spacing is **not** in Art. 9.4.1 — see the
+row below.
 **Verification:** gate 2.
 
 | dimension | `params.py` field | value | prov | basis |
 | --- | --- | --- | --- | --- |
 | outside diameter | — | 16.0 | `sourced` | OTK M4 HF p. 2, `acciaio Ø16x1.5` |
 | wall thickness | — | 1.5 | `sourced` | same |
-| spacing | — | 550 | `sourced` | same drawing. Cross-checks Art. 9.4.1's *"550.0 mm apart and centred on the kart's longitudinal axis"* — a form and the text agreeing, which is why front matter §5b flags it |
+| spacing | — | 550 | `sourced` | same drawing — the form, and **only** the form. An earlier version of this row claimed it cross-checks Art. 9.4.1's *"550.0 mm apart"*; **the article says 450.0 mm** for the front bumper and 500.0 ± 5 mm for the side bumpers, and there is no 550 anywhere in Art. 9.4. The form's *other* pair, at 450, is the regulated one; this 550 pair is unregulated. Corrected in front matter §4 |
 | panel end | — | (±275, +830, 175) | `estimated` | outboard and above the U-frame's legs, matching the form's photo where the thin struts stand outside the thick ones |
 
 ### `bodywork_fairing_kit_tube_fwd`, `bodywork_fairing_kit_tube_aft`
