@@ -56,10 +56,17 @@ import fnmatch
 #:
 #: Not zero, and not a fudge: a joint that shares a surface exactly registers as
 #: an *intersection* once both sides are faceted, so several modules deliberately
-#: stand their parts off. `bodywork.MOUNT_STANDOFF` is 1.5 mm and says so; the
-#: engine mount table is 3 mm clear of the floor tray. 2 mm passes the first and
-#: fails the second, which is the correct outcome both times — the standoff is a
-#: faceting allowance, the 3 mm is a part attached to nothing.
+#: stand their parts off. The clearest case is now a **regulation** figure rather
+#: than a modeling allowance: Art. 9.5.2 states *"the 1 mm spacing between the hook
+#: clamps and the front fairing mounting kits"*, so
+#: `bodywork_fairing_kit_tube_*`/`bodywork_fairing_hook_?` passes at exactly 1.0 mm
+#: because the article says 1.0 mm. The engine mount table, by contrast, is 3 mm
+#: clear of the floor tray. 2 mm passes the first and fails the second, which is the
+#: correct outcome both times.
+#:
+#: `bodywork.MOUNT_STANDOFF` used to be cited here at 1.5 mm and is gone with the
+#: two molded fairing pins it existed for -- Art. 4.10.1 lists the mounting kit as
+#: its own homologated item, so the panel does not reach a frame tube at all.
 CONTACT_TOLERANCE: float = 0.002
 
 #: The closed vocabulary. Every one of these was drawn from a real joint on this
@@ -450,16 +457,103 @@ JOINTS: tuple[Joint, ...] = (
         a="axle_rear",
         b="wheel_r?_rim",
         kind="pierced",
-        why="the live axle runs right through both rear hubs and out to the "
-        "wheel nuts; on a kart the rear wheels are keyed to it, not to hubs",
+        why="**the second clause of this entry used to be wrong and it mattered.** "
+        "It read *\"on a kart the rear wheels are keyed to it, not to hubs\"*, and "
+        "Art. 4.2.1 and Art. 4.3 both say otherwise: the hub is a chassis main part "
+        "with a keyway of its own, so the axle is keyed to `hub_r?` and the hub is "
+        "bolted to the rim. Spec §20.9 item 8 asked for this joint to be deleted on "
+        "those grounds. It stays, because the geometry is still real: `axle_length` "
+        "= 2 x `rear_hub_x`, so the axle's end and the rim's mounting plane are the "
+        "same plane and the axle passes through the plate's Ø32 bore on its way to "
+        "the wheel nuts. What is deleted is the reasoning",
+    ),
+    Joint(
+        a="axle_rear",
+        b="hub_r?",
+        kind="pressed",
+        why="Art. 4.17: the hub's whole purpose is *\"to enable the transfer of "
+        "forces between the rim and the chassis\"*, and it does it by being bored "
+        "onto the axle over all 90 mm of its length -- 37.5 mm at the old "
+        "`axle_length` of 1.080",
+    ),
+    Joint(
+        a="hub_rl",
+        b="wheel_rl_rim",
+        kind="bolted",
+        why="3x M8 self-locking through the hub's outboard flange into the rim's "
+        "plate. Art. 4.13 names the M8; the count is kart practice",
+    ),
+    Joint(
+        a="hub_rr",
+        b="wheel_rr_rim",
+        kind="bolted",
+        why="the right-hand pair of the same joint",
+    ),
+    Joint(
+        a="axle_key_hub_l",
+        b="hub_rl",
+        kind="seated",
+        why="one of Art. 4.3's four keyways, and only one -- *\"one each for the "
+        "left and right hub, one for the brake disc and one for the rear axle "
+        "sprocket\"*. Written per side because the left key does not reach the right "
+        "hub",
+    ),
+    Joint(a="axle_key_hub_r", b="hub_rr", kind="seated", why="the right-hand pair"),
+    Joint(
+        a="axle_key_disc",
+        b="brake_disc_rear_hub",
+        kind="seated",
+        why="the disc's keyway. Its station moved with the bearing: spec §20.5 puts "
+        "it at x -260 against a hanger plate at -185, and wave 1's plate at -300 "
+        "carries the whole disc assembly out to -400",
+    ),
+    Joint(
+        a="axle_key_sprocket",
+        b="axle_sprocket",
+        kind="seated",
+        why="the fourth and last keyway. A fifth is not legal",
+    ),
+    Joint(
+        a="axle_key_*",
+        b="axle_rear",
+        kind="seated",
+        why="all four keys sit in the axle's own keyways, half in the shaft and "
+        "half in whatever they drive. Art. 4.3 exempts the keyways from the wall "
+        "table, which is why a 2.5 mm wall can carry an 8 x 4 key at all",
     ),
     Joint(
         a="axle_stub_fl",
-        b="wheel_fl_rim",
+        b="hub_fl",
         kind="pierced",
-        why="the stub axle passes through the front hub's bearings",
+        why="the spindle runs into the hub's bore. **This used to be declared "
+        "against `wheel_fl_rim`** and could not be after #190: the visible spindle "
+        "run is `stub_axle_length` = 90 mm from the knuckle's face at 345 to the "
+        "hub's inboard end at 435, and the rim's plate is 117.5 mm further out. The "
+        "old joint only held because the stub was built from "
+        "`front_hub_x - 0.090`, which put the kingpins 925 mm apart",
     ),
-    Joint(a="axle_stub_fr", b="wheel_fr_rim", kind="pierced", why="as front left"),
+    Joint(a="axle_stub_fr", b="hub_fr", kind="pierced", why="as front left"),
+    Joint(
+        a="axle_stub_fl",
+        b="knuckle_fl",
+        kind="pressed",
+        why="the spindle is a bolt through the knuckle's boss, and the boss is "
+        "machined at `KINGPIN_INCLINATION` off the kingpin's normal so the wheel "
+        "stands vertical -- which is what makes static camber 0 degrees",
+    ),
+    Joint(a="axle_stub_fr", b="knuckle_fr", kind="pressed", why="as front left"),
+    Joint(
+        a="hub_fl",
+        b="wheel_fl_rim",
+        kind="bolted",
+        why="3x M8 through the hub's outboard flange, as the rears",
+    ),
+    Joint(
+        a="hub_fr",
+        b="wheel_fr_rim",
+        kind="bolted",
+        why="the right-hand pair of the same joint",
+    ),
     Joint(
         a="axle_rear",
         b="chassis_bearing_hanger_?",
@@ -469,11 +563,568 @@ JOINTS: tuple[Joint, ...] = (
         "the one place those two modules meet",
     ),
     Joint(
+        a="axle_bearing_?",
+        b="axle_rear",
+        kind="pierced",
+        why="a 50 mm bore, forced by the axle. Three of them, because a KZ carries "
+        "a center bearing as well as the outer pair and `frame.py` builds three "
+        "hanger plates for it",
+    ),
+    Joint(
+        a="axle_bearing_l",
+        b="axle_cassette_l",
+        kind="pressed",
+        why="the bearing's 80 mm outside diameter is pressed into the cassette's "
+        "bore. Per station rather than as a glob: the left bearing is 300 mm from "
+        "the center cassette",
+    ),
+    Joint(a="axle_bearing_c", b="axle_cassette_c", kind="pressed", why="the center pair"),
+    Joint(a="axle_bearing_r", b="axle_cassette_r", kind="pressed", why="the right pair"),
+    Joint(
+        a="axle_bearing_l",
+        b="chassis_bearing_hanger_l",
+        kind="pierced",
+        why="the hanger plate is 12 mm thick and bored for the axle, and a 16 mm "
+        "bearing in a 40 mm cassette straddles that bore -- so the bearing is inside "
+        "the plate as well as inside its cassette. Per station, as above",
+    ),
+    Joint(
+        a="axle_bearing_c",
+        b="chassis_bearing_hanger_c",
+        kind="pierced",
+        why="the center station",
+    ),
+    Joint(
+        a="axle_bearing_r",
+        b="chassis_bearing_hanger_r",
+        kind="pierced",
+        why="the right station",
+    ),
+    Joint(
+        a="axle_cassette_l",
+        b="chassis_bearing_hanger_l",
+        kind="bolted",
+        why="4x M8 into the plate. The cassette is what Art. 9.1.2 calls a rear "
+        "axle bracket's bearing carrier, and its **outboard face at x -320 is what "
+        "fixes the rear disc's inboard limit** -- spec §20.6.5's *\"the constraint is "
+        "the bearing, not the wheel\"*, recomputed after wave 1 moved the plate from "
+        "-185 to -300",
+    ),
+    Joint(
+        a="axle_cassette_c",
+        b="chassis_bearing_hanger_c",
+        kind="bolted",
+        why="the center station",
+    ),
+    Joint(
+        a="axle_cassette_r",
+        b="chassis_bearing_hanger_r",
+        kind="bolted",
+        why="the right station",
+    ),
+    Joint(
+        a="axle_bearing_l",
+        b="chassis_seat_strut_rear_l",
+        kind="bolted",
+        why="Art. 9.1.2 starts the extra seat stays *\"between the rear axle "
+        "brackets and the seat\"*, so the stay's root and the bearing's carrier are "
+        "on the same plate at the same node -- measured, the stay's root at "
+        "(-300, -485, +167) is 44.7 mm from the axle centerline against a Ø80 "
+        "bearing. Not a joint anybody would draw, and it is the one the gate finds",
+    ),
+    Joint(
+        a="axle_bearing_r",
+        b="chassis_seat_strut_rear_r",
+        kind="bolted",
+        why="the right-hand pair of the same node",
+    ),
+    Joint(
+        a="axle_cassette_l",
+        b="chassis_seat_strut_rear_l",
+        kind="bolted",
+        why="the cassette half of the same node",
+    ),
+    Joint(
+        a="axle_cassette_r",
+        b="chassis_seat_strut_rear_r",
+        kind="bolted",
+        why="the right-hand pair",
+    ),
+    Joint(
         a="axle_rear",
         b="axle_sprocket",
         kind="clamped",
         why="the rear sprocket's carrier clamps around the axle tube, so its "
         "bore is inside the axle's surface",
+    ),
+    # --- wheels.py: the front uprights --------------------------------------
+    Joint(
+        a="chassis_kingpin_boss_l",
+        b="kingpin_fl",
+        kind="pierced",
+        why="Art. 4.2.2: *\"Articulated connections are only allowed for the "
+        "steering knuckle (through the king pin) and the steering.\"* This is that "
+        "one place, and the frame had nothing here before #190. The pin is tilted "
+        "18 degrees of caster and 11 of inclination about z 100 rather than about "
+        "the spindle, because the boss is a **vertical** Ø40 cylinder: pivoted at "
+        "the spindle the axis is 28.4 mm off the bore at the boss's mid-height and "
+        "the pin misses the frame by 3.4 mm",
+    ),
+    Joint(
+        a="chassis_kingpin_boss_r",
+        b="kingpin_fr",
+        kind="pierced",
+        why="the right-hand pair of the same joint",
+    ),
+    Joint(
+        a="chassis_kingpin_boss_l",
+        b="kingpin_pill_fl_lower",
+        kind="seated",
+        why="the lower eccentric pill sits in the yoke's bore. Only the lower one: "
+        "the boss is 60 mm tall and the upper pill is at its top, where the tilted "
+        "axis has already walked the pill's outside past the bore's lip -- which is "
+        "a fact about a vertical boss carrying an inclined pin and belongs in a "
+        "§Chassis ticket rather than in a fudge here",
+    ),
+    Joint(
+        a="chassis_kingpin_boss_r",
+        b="kingpin_pill_fr_lower",
+        kind="seated",
+        why="the right-hand pair of the same joint",
+    ),
+    Joint(
+        a="kingpin_fl",
+        b="kingpin_pill_fl_lower",
+        kind="pierced",
+        why="the pin passes through both pills' offset bores. That offset is the "
+        "whole mechanism: the CRG Caster/Camber Chart's III/III is maximum caster, "
+        "I/I minimum and II/II the factory neutral setting, and it publishes "
+        "positions and no degrees",
+    ),
+    Joint(
+        a="kingpin_fr",
+        b="kingpin_pill_fr_lower",
+        kind="pierced",
+        why="the right-hand pair of the same joint",
+    ),
+    Joint(
+        a="kingpin_fl",
+        b="kingpin_pill_fl_upper",
+        kind="pierced",
+        why="the upper pill of the same pair",
+    ),
+    Joint(
+        a="kingpin_fr",
+        b="kingpin_pill_fr_upper",
+        kind="pierced",
+        why="the right-hand pair of the same joint",
+    ),
+    Joint(
+        a="kingpin_fl",
+        b="knuckle_fl",
+        kind="pierced",
+        why="the knuckle swings on the pin between the yoke's two lugs. Art. 4.2.1 "
+        "makes both of them chassis main parts and this kart had neither",
+    ),
+    Joint(
+        a="kingpin_fr",
+        b="knuckle_fr",
+        kind="pierced",
+        why="the right-hand pair of the same joint",
+    ),
+    Joint(
+        a="knuckle_arm_fl",
+        b="knuckle_fl",
+        kind="welded",
+        why="one casting; separate meshes so the arm can carry its own section. Art. "
+        "4.5.3 wants it *\"made of aluminium or steel and securely attached with "
+        "self-locking nuts and bolts\"*",
+    ),
+    Joint(
+        a="knuckle_arm_fr",
+        b="knuckle_fr",
+        kind="welded",
+        why="the right-hand pair of the same joint",
+    ),
+    Joint(
+        a="kingpin_fl",
+        b="knuckle_arm_fl",
+        kind="pierced",
+        why="the arm's root straddles the pin, which is what makes it an arm about "
+        "the kingpin axis rather than a bracket beside it",
+    ),
+    Joint(
+        a="kingpin_fr",
+        b="knuckle_arm_fr",
+        kind="pierced",
+        why="the right-hand pair of the same joint",
+    ),
+    Joint(
+        a="knuckle_arm_fl",
+        b="tierod_end_l_outer",
+        kind="bolted",
+        why="Art. 4.5.3 permits *\"rose joints on each end of the arm\"* by name. The "
+        "outer eye shares the kingpin's lateral station, because the arm points "
+        "straight rearward -- measured on both sides of the CRG plan view to within "
+        "1 px, and it is what makes the sourced 270 mm tie rod fit",
+    ),
+    Joint(
+        a="knuckle_arm_fr",
+        b="tierod_end_r_outer",
+        kind="bolted",
+        why="the right-hand pair",
+    ),
+    Joint(
+        a="knuckle_arm_fl",
+        b="tierod_l",
+        kind="bolted",
+        why="the rod's threaded end reaches into the same eye",
+    ),
+    Joint(a="knuckle_arm_fr", b="tierod_r", kind="bolted", why="the right-hand pair"),
+    Joint(
+        a="tierod_l",
+        b="tierod_end_l_*",
+        kind="threaded",
+        why="both rose joints screw into the rod's own ends, which is what makes the "
+        "270 mm eye-to-eye adjustable at all. **The measured length is 271 mm** "
+        "against a sourced OTK *\"STEERING TIE-ROD 270 mm\"* -- a part length and a "
+        "geometry agreeing to 0.3%, and the third leg of spec §20.3.1's kingpin "
+        "derivation",
+    ),
+    Joint(a="tierod_r", b="tierod_end_r_*", kind="threaded", why="the right-hand rod"),
+    Joint(
+        a="steering_column",
+        b="tierod_end_?_inner",
+        kind="bolted",
+        why="**this joint is declared against the wrong part on purpose, and it is "
+        "waived.** The inner rod end belongs on `steering_pitman`, which §Cockpit "
+        "has not built; the pitman is clamped to the column, so the column is the "
+        "part it is attached *through*. The station is not a guess -- OTK's "
+        "\"38/50\" designation puts the outer hole 50 mm off the column axis and a "
+        "KZ runs the outer hole -- and it is 51.7 mm from the column's own surface, "
+        "which is exactly the pitman's reach. Spec §40 closes this",
+    ),
+    # --- wheels.py: the brake system ----------------------------------------
+    #
+    # Absent in its entirety before #190: no disc, no caliper, no master cylinder,
+    # no line. Art. 8.6 makes brakes **free** in Group 1, so four wheels is an
+    # `estimated` design choice and not a requirement (ADR-0054); what Art. 4.12 does
+    # make mandatory is the doubled pedal link and, on this kart, the disc pad.
+    Joint(
+        a="axle_rear",
+        b="brake_disc_rear_hub",
+        kind="clamped",
+        why="OTK's *\"MG DISK'S HUB D.50mm FOR BRAKE\"* clamps the 50 mm axle on the "
+        "kart's **left**, opposite the sprocket at +115. Art. 4.3's four-keyway "
+        "clause is the formal reason it has to be opposite: four stations on one "
+        "shaft, of which the disc and the sprocket are two, so they cannot be "
+        "coplanar. Measured separation 515 mm, on opposite sides of the center "
+        "bearing",
+    ),
+    Joint(
+        a="brake_disc_rear_carrier",
+        b="brake_disc_rear_hub",
+        kind="clamped",
+        why="the lobed star carrier's bore clamps the axle-mounted hub. Two pieces "
+        "rather than one because the friction ring floats",
+    ),
+    Joint(
+        a="brake_disc_rear_bobbin_*",
+        b="brake_disc_rear_carrier",
+        kind="pierced",
+        why="**6 bobbins on a bolt circle**, `sourced` as shape off `007-B4-69` "
+        "p. 2's exploded CAD at 170 dpi. One position carries the Art. 4.12.3 "
+        "homologation-number boss",
+    ),
+    Joint(
+        a="brake_disc_rear",
+        b="brake_disc_rear_bobbin_*",
+        kind="pierced",
+        why="the friction ring floats on them, which is the point of the "
+        "construction -- it expands and the carrier does not",
+    ),
+    Joint(
+        a="brake_disc_rear",
+        b="brake_pad_rear_?",
+        kind="seated",
+        why="2 pads at 58 mm overall against 2 pistons at 32 mm bore, `sourced` off "
+        "`82/FR/11`. Clamp area 1608 mm2 -- and note that Birel's 4-piston rear at "
+        "25 mm gives 1963 while its front gives 982, so the two makers put the "
+        "front-to-rear clamp ratio on opposite sides of 1.0",
+    ),
+    Joint(
+        a="brake_caliper_rear",
+        b="brake_pad_rear_?",
+        kind="seated",
+        why="each pad sits in its own half of the opposed body. The body is built as "
+        "a **C** rather than a solid block for this reason: solid, at the drawing's "
+        "74 mm thickness, it enclosed 9 mm of the disc's carrier",
+    ),
+    Joint(
+        a="brake_caliper_rear",
+        b="brake_caliper_rear_bracket",
+        kind="bolted",
+        why="2 lugs at the ends of the long axis plus a large central through-boss, "
+        "`sourced` off the drawing",
+    ),
+    Joint(
+        a="axle_cassette_l",
+        b="brake_caliper_rear_bracket",
+        kind="bolted",
+        why="Art. 4.12.5 confirms this end from the other side by attaching rain "
+        "covers *\"to the stub axle\"* -- the caliper hangs off the chassis's side of "
+        "the joint, not the wheel's. The bracket is an L: a radial plate on the "
+        "cassette's outboard face, then an axial arm out to the caliper at a radius "
+        "**above 70 mm**, which is what clears the disc's carrier entirely",
+    ),
+    Joint(
+        a="brake_disc_protector",
+        b="chassis_rail_l",
+        kind="bolted",
+        why="**Art. 4.12.4 makes this part mandatory and it did not exist.** "
+        "`derived`: `rail_z` 50 and `tube_main` 30 put the rails at z 35..65, and a "
+        "Ø195 disc concentric with the axle at z 147.5 has its bottom edge at "
+        "exactly **50.0** -- dead level with the rails' centerline. *\"Level with\"* is "
+        "satisfied, so the pad is not marginal. Its underside is at 35, level with "
+        "the rails' lowest point, so it grounds before the disc does",
+    ),
+    Joint(
+        a="brake_disc_fl",
+        b="hub_fl",
+        kind="bolted",
+        why="**3 integral drive tangs at 120 degrees** on the disc's inner bore, into "
+        "the hub's Ø48 inboard flange. `sourced` as shape off `007-B4-69` p. 2: the "
+        "front disc is one piece with no floating carrier, unlike the rear",
+    ),
+    Joint(
+        a="brake_disc_fr",
+        b="hub_fr",
+        kind="bolted",
+        why="the right-hand pair of the same joint",
+    ),
+    Joint(
+        a="brake_disc_fl",
+        b="brake_pad_fl_?",
+        kind="seated",
+        why="**4 pistons at 26 mm bore and 2 pads at 38 mm** per wheel, `sourced` off "
+        "`82/FR/11` and `007-BRKF-01`. Clamp area 2124 mm2. Per corner rather than "
+        "as a glob, because the left pads do not reach the right disc",
+    ),
+    Joint(a="brake_disc_fr", b="brake_pad_fr_?", kind="seated", why="the right corner"),
+    Joint(
+        a="brake_caliper_fl",
+        b="brake_pad_fl_?",
+        kind="seated",
+        why="a pad in each half of the opposed body",
+    ),
+    Joint(a="brake_caliper_fr", b="brake_pad_fr_?", kind="seated", why="the right corner"),
+    Joint(
+        a="brake_caliper_fl",
+        b="brake_caliper_fl_bracket",
+        kind="bolted",
+        why="4 bolt holes in a flange, 2 top 2 bottom, `sourced` off the drawing. "
+        "**And this is the pair spec §20.6.6 says to watch**: the caliper's outboard "
+        "face is 7.0 mm from the tire's inner face at x 485, which is the binding "
+        "clearance in the whole front assembly",
+    ),
+    Joint(
+        a="brake_caliper_fr",
+        b="brake_caliper_fr_bracket",
+        kind="bolted",
+        why="the right corner",
+    ),
+    Joint(
+        a="brake_caliper_fl_bracket",
+        b="knuckle_fl",
+        kind="bolted",
+        why="the bracket's other end. It reaches from the knuckle's outboard face at "
+        "345 out to 424 -- stopping 21 mm short of the disc's plane, because at the "
+        "plane itself its outer end is inside the friction ring's own radial band",
+    ),
+    Joint(
+        a="brake_caliper_fr_bracket",
+        b="knuckle_fr",
+        kind="bolted",
+        why="the right corner",
+    ),
+    Joint(
+        a="brake_master_bracket",
+        b="chassis_tray_edge_l",
+        kind="bolted",
+        why="**not `chassis_cross_front`, which spec §20.6.4 asks for and which "
+        "cannot carry it.** `frame.TRAY_HALF_WIDTH` is 131 mm at y +490, so the "
+        "floor pan's own edge is at x -131 and the loop's leg at this x is at y +706 "
+        "-- 216 mm forward of where Art. 4.4's ordering puts the cylinders. Art. "
+        "4.6's mandatory edging tube runs along the pan's edge with its top at z 81 "
+        "and is the only structure at the right station and height",
+    ),
+    Joint(
+        a="brake_master_rear",
+        b="brake_master_bracket",
+        kind="bolted",
+        why="the right-hand pair of the same joint -- written per cylinder because "
+        "the glob `brake_master_*` also matches `brake_master_bracket` itself",
+    ),
+    Joint(
+        a="brake_master_front",
+        b="brake_master_bracket",
+        kind="bolted",
+        why="both bodies bolt down onto the plate. **The front cylinder is the "
+        "inboard one**, which is not arbitrary: the front circuit's hose arrives at "
+        "the distributor on the bracket's outboard upstand and the rear circuit's "
+        "leaves rearward and inboard, and this is the ordering where neither hose has "
+        "to cross the other cylinder",
+    ),
+    Joint(
+        a="brake_distributor",
+        b="brake_master_bracket",
+        kind="bolted",
+        why="on the bracket's upstand. **Birel-only** -- `007-B4-69` item "
+        "`10.10659.00`, and the CRG form does not list one -- so this is a Birel "
+        "feature grafted onto a CRG layout and is the weakest-sourced part in the "
+        "section. Recorded rather than quietly dropped",
+    ),
+    Joint(
+        a="brake_balance_regulator",
+        b="chassis_rail_l",
+        kind="bolted",
+        why="on the left rail's straight run, where a seated driver can reach it. "
+        "Both homologation forms list a balance regulator and neither places one. "
+        "Inboard of the rail's centerline rather than on top of it, because Art. "
+        "9.4.2's side-bumper sockets own the rail's outboard side at y -100",
+    ),
+    Joint(
+        a="brake_pushrod",
+        b="pedal_brake",
+        kind="pierced",
+        why="the rod's clevis eye is on the pedal's plate. Aimed at the plate's own "
+        "plane -- `pedal_y + tan(PEDAL_FACE_TILT) x (z - pedal_z)` -- rather than at "
+        "the pad's center, which is 11 mm off it and would have left Art. 4.12.2's "
+        "mandatory link attached to nothing",
+    ),
+    Joint(
+        a="brake_pushrod_link",
+        b="pedal_brake",
+        kind="pierced",
+        why="**Art. 4.12.2, and this part exists because a rule says so:** *\"the "
+        "link between the pedal and the pump(s) must be doubled for safety\"*. A "
+        "mechanical redundancy rule, not a two-circuit rule. 2.0 mm of cable, one "
+        "step over the article's 1.8 mm floor -- and 1.8 is a floor and not a "
+        "practice, which is why this is not written as \"1.8 max\". The CRG chassis "
+        "form devotes a whole page to photographing it",
+    ),
+    Joint(
+        a="brake_master_front",
+        b="brake_pushrod",
+        kind="pierced",
+        why="one rod through **both** cylinders, which is what a balance bar is and "
+        "what makes a single Art. 4.4-compliant link serve a two-pump layout. "
+        "Measured 126 mm against spec §20.6.4's 135 estimate",
+    ),
+    Joint(
+        a="brake_master_rear",
+        b="brake_pushrod",
+        kind="pierced",
+        why="the rear cylinder of the same balance bar",
+    ),
+    Joint(
+        a="brake_master_front",
+        b="brake_pushrod_link",
+        kind="pierced",
+        why="the cable runs alongside it into the same two bodies",
+    ),
+    Joint(
+        a="brake_master_rear",
+        b="brake_pushrod_link",
+        kind="pierced",
+        why="the rear cylinder of the same balance bar",
+    ),
+    Joint(
+        a="brake_pushrod",
+        b="pedal_mount_l",
+        kind="pierced",
+        why="the rod passes through a slot in the left pedal bracket, which is what "
+        "a brake pushrod on a hanging pedal does. Declared against the left mount "
+        "alone: the right one is 250 mm away and a glob would demand the rod reach "
+        "it. There is no clear station -- the bracket spans z 85..168 at x 120..130 "
+        "and the cylinders' axis is at 116, so a rod that missed the bracket would "
+        "have to miss the pumps too",
+    ),
+    Joint(
+        a="brake_pushrod",
+        b="brake_pushrod_link",
+        kind="clamped",
+        why="the two halves of one doubled control, banded together. 6 mm apart in z, "
+        "which is inside both radii",
+    ),
+    Joint(
+        a="brake_line_front",
+        b="brake_caliper_f?",
+        kind="routed",
+        why="a **tee'd assembly** feeding both calipers from one pump: `007-B4-69` "
+        "item 9, *\"BRAKE FRONT TUBE ASSY.\"*, drawn as a tee with two equal "
+        "branches. Both banjos land on a caliper **half** at x +-470 rather than on "
+        "the disc's plane at 445, which with a C-shaped body is the gap between the "
+        "halves",
+    ),
+    Joint(
+        a="brake_line_front",
+        b="brake_master_front",
+        kind="routed",
+        why="the pump end of the front circuit",
+    ),
+    Joint(
+        a="brake_line_front",
+        b="brake_distributor",
+        kind="routed",
+        why="through the distributor on the way",
+    ),
+    Joint(
+        a="brake_line_front",
+        b="brake_master_bracket",
+        kind="routed",
+        why="cable-tied to the bracket's upstand where it turns down into the "
+        "distributor",
+    ),
+    Joint(
+        a="brake_line_front",
+        b="chassis_steering_hoop",
+        kind="routed",
+        why="cable-tied along the **upper** surface of the chassis tubes, which is "
+        "the route `col_crg_form_planview_1417.jpg` and "
+        "`crg_roadrebel_kz_detail7.webp` both show. This is the tie that keeps the "
+        "front pair off the floor tray -- Art. 4.12.6's rule of thumb, applied to the "
+        "hoses as well as to the cooling tube it names",
+    ),
+    Joint(
+        a="brake_line_rear",
+        b="brake_master_rear",
+        kind="routed",
+        why="a **single run**, unlike the front's tee",
+    ),
+    Joint(
+        a="brake_line_rear",
+        b="brake_balance_regulator",
+        kind="routed",
+        why="inline, which is why the regulator sits on the route rather than beside "
+        "it",
+    ),
+    Joint(
+        a="brake_line_rear",
+        b="brake_caliper_rear",
+        kind="routed",
+        why="the banjo end, at a radius inside the caliper's own 55..110 mm band -- "
+        "an end at the bracket's height is 47 mm out and touches nothing",
+    ),
+    Joint(
+        a="brake_line_rear",
+        b="chassis_tray_edge_l",
+        kind="routed",
+        why="cable-tied along the edging tube for most of its length. The run is "
+        "**inboard** of the rail's centerline throughout, and that is the fix for "
+        "four separate collisions: Art. 9.4.2 fixes the side-bumper sockets' 500 mm "
+        "pitch and all four of their sleeves project outboard from that rail, so its "
+        "outboard side is not available to a hose",
     ),
     # --- powertrain.py: driveline -------------------------------------------
     Joint(
@@ -1036,36 +1687,188 @@ JOINTS: tuple[Joint, ...] = (
         why="the lever pivots inside the base's fork",
     ),
     Joint(a="shifter_knob", b="shifter_lever", kind="pressed", why="the knob is on the lever"),
-    # --- bodywork.py --------------------------------------------------------
+    # --- bodywork.py: the front fairing and its mounting kit -----------------
+    #
+    # **`bodywork_nose_fairing`/`chassis_nose_hoop_lower` is deleted.** Art. 4.10.1
+    # lists *"one front fairing mounting kit"* as its own homologated item and Art.
+    # 9.5.2 dimensions its clamps, so the panel does not reach the frame at all: it
+    # reaches the kit and the kit reaches the frame. Panel-to-hoop is now a pair
+    # that must **not** overlap -- both bumper bars pass through the panel's open
+    # back with the cavity clear above and below them, which is what a real CIK nose
+    # looks like. Same shape as front matter §5a's radiator-and-seat rule.
     Joint(
         a="bodywork_nose_fairing",
-        b="chassis_nose_hoop_lower",
+        b="bodywork_fairing_support_u",
         kind="bolted",
-        why="the fairing's molded pins pick up on the lower nose tier. "
-        "bodywork.MOUNT_STANDOFF holds them 1.5 mm off the tube on purpose, "
-        "which is inside CONTACT_TOLERANCE and is the reason the tolerance is "
-        "not zero",
+        why="2x M8 through the panel's two molded bosses at x +-225, which is the "
+        "OTK M4 form's Ø20x1.5 leg spacing of 450 mm. The bosses are in the "
+        "panel's own mesh so a displaced fairing takes its mounts with it",
     ),
     Joint(
-        a="bodywork_rear_panel",
-        b="chassis_rear_bumper",
+        a="bodywork_nose_fairing",
+        b="bodywork_fairing_strut_?",
         kind="bolted",
-        why="the rear protector mounts on the bumper hoop -- and after #190 moved "
-        "the hoop 179 mm forward, to y -725 where Art. 9.5.5.1's 400 mm overhang "
-        "cap and the panel's own 187 mm depth put it, the two are **in contact for "
-        "the first time**: this pair was a waived 5.5 mm gap and the waiver is "
-        "deleted. The panel now meets the hoop's front face rather than wrapping "
-        "over it, which is a fact about the panel -- spec §50.11 respecifies it at "
-        "1390 x 187 x 177 and §Bodywork owns the change",
+        why="1x M8 each through the bosses at x +-275, the form's Ø16x1.5 pair at "
+        "550 mm. Outboard and above the U-frame's legs, matching the form's photo "
+        "where the thin struts stand outside the thick ones",
+    ),
+    Joint(
+        a="bodywork_nose_fairing",
+        b="bodywork_fairing_hook_?",
+        kind="bolted",
+        why="the two hook clamps bolt to the panel through the bosses at x +-115; "
+        "they are the release mechanism, and `nose_fairing_pivot` is their line",
+    ),
+    Joint(
+        a="bodywork_fairing_support_u",
+        b="chassis_cross_front",
+        kind="bolted",
+        why="the U-frame's two legs clamp the front loop's legs at x +-225, where "
+        "`_loop_leg_y` puts the leg centerline at y +606. Aimed at the station the "
+        "loop actually occupies rather than at spec §50.8's (+-225, +545), which is "
+        "61 mm of air on this chassis -- the same class of miss as the 104.65 mm "
+        "pedal-mount waiver below",
+    ),
+    Joint(
+        a="bodywork_fairing_support_u",
+        b="bodywork_fairing_kit_tube_*",
+        kind="welded",
+        why="Art. 9.5.2's *\"2 support tubes of the clamps\"* stand on two stubs off "
+        "the U-frame's front span at x +-45, in the U-frame's own mesh. Both tubes "
+        "cross both stubs",
+    ),
+    Joint(
+        a="bodywork_fairing_kit_tube_*",
+        b="bodywork_fairing_hook_?",
+        kind="clamped",
+        why="Art. 9.5.2: *\"the 1 mm spacing between the hook clamps and the front "
+        "fairing mounting kits\"*. Built at exactly 1.0 mm, which is inside "
+        "CONTACT_TOLERANCE by construction -- so this joint passes with a stated "
+        "regulation dimension rather than with a modeling standoff nobody chose",
+    ),
+    Joint(
+        a="bodywork_fairing_strut_?",
+        b="chassis_nose_hoop_upper",
+        kind="clamped",
+        why="**the upper bar, not the lower one.** Art. 9.4.1 puts the lower bar's "
+        "tube top in a 70..110 mm band and the upper bar's in 200..250, and a "
+        "1090 x 287 x 227 panel cannot be carried from a 110 mm ceiling. Each strut "
+        "is run 10 mm past the bar's nominal centerline so a bend fillet moving the "
+        "real centerline still leaves the clamp gripping tube",
+    ),
+    # --- bodywork.py: the front panel ---------------------------------------
+    Joint(
+        a="bodywork_front_panel",
+        b="bodywork_front_panel_stay_?",
+        kind="bolted",
+        why="Art. 9.5.3: *\"The panel's lower section must be securely attached to "
+        "the front part of the chassis frame, directly or indirectly.\"* These two "
+        "stays are the indirectly",
+    ),
+    Joint(
+        a="bodywork_front_panel",
+        b="bodywork_front_panel_bar",
+        kind="bolted",
+        why="and *\"Its upper part must be securely attached to the steering column "
+        "support with one or more independent bars\"*. One part, two legs at x +-60 "
+        "-- a single central bar passes 5.5 mm from the steering column's surface",
+    ),
+    Joint(
+        a="bodywork_front_panel_stay_?",
+        b="chassis_cross_front",
+        kind="clamped",
+        why="both stays land on the front loop's leg centerline at x +-250, y +572. "
+        "They splay outboard from the panel's own x +-110 because at that x the loop "
+        "is 175 mm further forward, at y +760",
+    ),
+    Joint(
+        a="bodywork_front_panel_bar",
+        b="chassis_steering_support_upper",
+        kind="bolted",
+        why="Art. 9.5.3's *\"steering column support\"* is this part, which wave 1 "
+        "built and #190 required. The landing is 0.90 of the way from the support's "
+        "own foot to its own apex rather than a point, so it tracks "
+        "`steering_support_foot_x` instead of restating it",
+    ),
+    # --- bodywork.py: the side pods -----------------------------------------
+    #
+    # **`bodywork_sidepod_?`/`chassis_side_bar_?` is deleted.** With the outer face
+    # out at Art. 9.5.4's tapered datum the pod's mouth is at x 505 and the lower
+    # bar's surface at 510, so the bar is *inside* the C and the pod's shell no
+    # longer reaches it -- a joint that cannot touch is a gate-2 failure by
+    # construction. The four brackets are what attach the pod, which is also what
+    # makes *"securely attached to the side bumpers"* a part rather than a claim.
+    Joint(
+        a="bodywork_sidepod_r",
+        b="bodywork_sidepod_bracket_r?",
+        kind="bolted",
+        why="two brackets per side is what a CIK pod carries, at y +180 and -200 -- "
+        "both on the lower bar's 420 mm straight run. Each arm starts 6 mm inside "
+        "the flank's skin, so contact is measured at the clamp",
     ),
     Joint(
         a="bodywork_sidepod_l",
-        b="chassis_side_bar_l",
+        b="bodywork_sidepod_bracket_l?",
         kind="bolted",
-        why="frame.py says it plainly: the side bars are 'what a sidepod bolts "
-        "to'. The pod wraps outboard of the bar and picks up on it",
+        why="the left-hand pair of the same joint",
     ),
-    Joint(a="bodywork_sidepod_r", b="chassis_side_bar_r", kind="bolted", why="the right-hand pod"),
+    Joint(
+        a="bodywork_sidepod_bracket_r?",
+        b="chassis_side_bar_r",
+        kind="clamped",
+        why="M10 through a rubber bush on the bar, 1.5 mm off its surface -- KG C2 "
+        "form p. 3's `RC.182.x`/`RC.228.x` bush pair, whose suffix is the tube "
+        "diameter. The arm reaches ~140 mm **inboard** from the flank rather than "
+        "50 mm outboard from the mouth, because the pod's mouth is now outboard of "
+        "the bar it bolts to. Spec §50.10's 50 mm reach is measured from a mouth at "
+        "505 to a bar at 455, and Art. 9.4.2 moved that bar to 500",
+    ),
+    Joint(
+        a="bodywork_sidepod_bracket_l?",
+        b="chassis_side_bar_l",
+        kind="clamped",
+        why="the left-hand pair of the same joint",
+    ),
+    # --- bodywork.py: the rear wheel protection -----------------------------
+    #
+    # **`bodywork_rear_panel`/`chassis_rear_bumper` is deleted.** Art. 4.11 puts the
+    # supports *"on the two main tubes of the chassis"* and not on the hoop, so the
+    # bumper is a pair the panel must not overlap: the panel's front wall is
+    # vertical to 0.78 of its height for that reason and clears the hoop's front
+    # surface by 6.2 mm.
+    Joint(
+        a="bodywork_rear_panel",
+        b="bodywork_rear_outer_?",
+        kind="bolted",
+        why="Art. 9.5.5.1's *\"two adjustable outer parts\"*, bolted through a 40 mm "
+        "adjustment slot at |x| 360..400. The split falls between the centerline "
+        "clearance window and the two wheel windows so it cuts neither",
+    ),
+    Joint(
+        a="bodywork_rear_panel",
+        b="bodywork_rear_support_?",
+        kind="bolted",
+        why="Art. 4.11: *\"fastened to the homologated chassis by at least two "
+        "points using supports homologated with the protection\"*. Both land 2 mm "
+        "inside the panel's front wall",
+    ),
+    Joint(
+        a="bodywork_rear_support_l",
+        b="chassis_rail_l",
+        kind="clamped",
+        why="*\"These supports must be mounted ... on the two main tubes of the "
+        "chassis (respecting the homologated dimension F)\"* -- so the rail, at its "
+        "own `frame_half_rear` = 310 rather than spec §50.11's stale +-215, which "
+        "was read off a rail path from before wave 1 moved it. M10 through a rubber "
+        "bush on a 30 mm tube: KG C2 form p. 3's `RC.182.30`/`RC.228.30`, and "
+        "`tube_main` is 30, which is the `.30` variant",
+    ),
+    Joint(
+        a="bodywork_rear_support_r",
+        b="chassis_rail_r",
+        kind="clamped",
+        why="the right-hand pair of the same joint",
+    ),
 )
 
 
@@ -1079,61 +1882,58 @@ JOINTS: tuple[Joint, ...] = (
 # "this is fixed, delete the waiver" -- so this list shrinks and cannot rot.
 
 OPEN_DEFECTS: tuple[Defect, ...] = (
+    # -- gate 1, #190: the rear protection's front edge has nowhere to be -----
+    #
+    # These two are one fact and it is arithmetic, not a modeling slip. Art. 9.5.5.1
+    # caps the rear overhang at 400 and the KG C2 form's sourced depth is 187, so
+    # the protection's front face lands at y -705 (`overhang_rear_protection` 367,
+    # the middle of the 349.5..384.5 band the tire gap allows). Art. 4.10.2 then
+    # requires a 5 mm minimum corner radius, which on a 3.8 mm wall can only be a
+    # returned lip -- and a returned lip needs **10 mm of material behind the free
+    # edge**, i.e. back to y -715.
+    #
+    # Both of §Chassis's rearmost tubes are inside that 10 mm:
+    #
+    #     chassis_cross_tail    y -713, Ø22 -> front surface -702, 3 mm forward
+    #                           of the panel's own front face
+    #     chassis_rear_bumper   legs at x +-310 from (y -715, z 50) to (-725, 140),
+    #                           front surface -715, exactly on the lip's end
+    #
+    # There is no z band that escapes either: the cross tail sits at z 39..61 and
+    # the panel's clearance windows put its bottom edge at 40, while the bumper's
+    # legs sweep z 50..140 and the panel's bottom edge between windows is 95.
+    #
+    # Three ways out and none of them belongs to this wave. `cross_tail_y` could go
+    # back 12 mm -- `params.py`'s own docstring records two readings for it "within a
+    # tube diameter" and the other one is -724. The bumper's leg roots could start at
+    # `rail_rear_y` rather than 20 mm forward of it. Or `overhang_rear_protection`
+    # could come down to 352, which clears both and costs 15 mm of the tire gap's
+    # 35 mm of margin. Recorded with the numbers so §Chassis can pick.
+    Defect(
+        a="bodywork_rear_panel",
+        b="chassis_cross_tail",
+        gate="overlap",
+        measured=126,
+        issue="#190",
+        why="the frame's rear strut's front surface is at y -702 and the "
+        "protection's front face at -705, so 3 mm of the tube is forward of the "
+        "panel and the returned lip's 10 mm band is inside the rest of it. See the "
+        "block comment above for the three fixes and who owns them",
+    ),
+    Defect(
+        a="bodywork_rear_panel",
+        b="chassis_rear_bumper",
+        gate="overlap",
+        measured=128,
+        issue="#190",
+        why="the bumper hoop's two legs stand at the same rail station the panel's "
+        "front wall crosses, and their front surface at y -715 is exactly where the "
+        "lip's fold ends. **The panel-to-bumper *joint* is deleted** either way -- "
+        "Art. 4.11 puts the supports on *\"the two main tubes of the chassis\"* and "
+        "`bodywork_rear_support_?` is what carries the panel now -- so this is a "
+        "collision to clear rather than a contact to keep",
+    ),
     # -- gate 1: parts built inside other parts ------------------------------
-    Defect(
-        a="bodywork_sidepod_l",
-        b="radiator_*",
-        gate="overlap",
-        measured=92,
-        issue="#192",
-        why="the radiator passes through the left sidepod, 13.7 mm deep at the "
-        "low tank. bodywork.SIDEPOD_TOP_X's comment reasons about a radiator "
-        "'at x = 0.330 with a 45 mm core, so its outer face is at 0.353' and "
-        "sets the pod's mouth to 0.360..0.372 to clear it. The comment was not "
-        "updated when the radiator moved sides. "
-        "NOTE, and this correction is the point: an earlier version of this "
-        "entry said the core's outboard face is at 0.385, being radiator_x "
-        "0.365 plus a 0.020 half thickness. That is the WRONG AXIS. Thickness "
-        "runs along the core's own face normal, which radiator_rake tips "
-        "forward, not outboard. The lateral half extent is half of "
-        "radiator_width -- 0.125 -- so the outboard face is at 0.490, and a "
-        "pod built to clear 0.385 is still 105 mm inside the radiator. "
-        "params.radiator_width's own docstring warns about exactly this "
-        "confusion, in these words: width is across the kart, height is up the "
-        "slant, thickness is through the core along the face's own normal. "
-        "docs/KART_SPEC.md section 30 settles the lateral extent as "
-        "-0.240..-0.490 so that neither the pod nor this waiver has to "
-        "re-derive it and pick the wrong axis again",
-    ),
-    Defect(
-        a="bodywork_sidepod_r",
-        b="engine_crankcase_upper",
-        gate="overlap",
-        measured=44,
-        issue="#192",
-        why="the crankcase is 26.7 mm inside the right pod, 274 of its "
-        "vertices enclosed. CRANKCASE_OUTBOARD_X is 0.398, chosen against "
-        "the side bar's inboard surface at 0.420 -- but the pod's top edge "
-        "is at 0.372 and its wall is inboard of the bar, and nothing checked "
-        "that",
-    ),
-    Defect(
-        a="bodywork_sidepod_r",
-        b="engine_ignition_cover",
-        gate="overlap",
-        measured=76,
-        issue="#192",
-        why="12.9 mm of the same intrusion, one casting further out",
-    ),
-    Defect(
-        a="bodywork_sidepod_r",
-        b="engine_ignition_bolt_4",
-        gate="overlap",
-        measured=8,
-        issue="#192",
-        why="1.4 mm of the same intrusion; the outermost cover bolt clips the "
-        "pod",
-    ),
     Defect(
         a="exhaust_chamber",
         b="engine_crankcase_upper",
@@ -1200,37 +2000,6 @@ OPEN_DEFECTS: tuple[Defect, ...] = (
     # rather than declarations because none of them is a joint -- a fairing is not
     # welded to a frame loop -- and they are recorded per pair, with the number,
     # so the wave that owns the other part can see exactly what it has to clear.
-    Defect(
-        a="bodywork_nose_fairing",
-        b="chassis_cross_front",
-        gate="overlap",
-        measured=236,
-        issue="#190",
-        why="the front of the frame is now a loop reaching y +760 (`G2` = 250 +-10 "
-        "on the CRG form) and the built fairing spans y +618..+902 with its lower "
-        "skin at z 46..51, so the loop passes through that skin. The fairing is "
-        "the part that is wrong: spec §50 puts its front face at y +1029 and its "
-        "rear at +742, i.e. entirely forward of the loop, and sizes it 1090 mm "
-        "wide against Art. 9.5.2's 1000 mm **minimum** -- the built panel is "
-        "512 mm wide. §Bodywork owns it",
-    ),
-    Defect(
-        a="bodywork_sidepod_?",
-        b="chassis_side_bar_upper_?",
-        gate="overlap",
-        measured=108,
-        issue="#190",
-        why="Art. 9.4.2 requires *two* bars per side and the kart had one, so the "
-        "upper bar is new -- and its legs have to come inboard to the frame "
-        "through the volume the built pod occupies (pod top edge z 232, outer face "
-        "480; the bar is at z 175 and x 560). There is no legal height for it that "
-        "clears: the article's floor is a 160 mm tube top and the pod spans "
-        "z 48..232. Spec §50.4 moves the pod's outer face to Art. 9.5.4's tapered "
-        "datum at x 618..664, outboard of both bars, which is where a pod that is "
-        "*"
-        "securely attached to the side bumpers"
-        "* has to be",
-    ),
     Defect(
         a="chassis_side_bar_upper_l",
         b="radiator_*",
@@ -1338,6 +2107,24 @@ OPEN_DEFECTS: tuple[Defect, ...] = (
         "because §30.6 moves the pipe and §40 keeps the lever where it is",
     ),
     # -- gate 2: declared joints that do not touch ---------------------------
+    Defect(
+        a="steering_column",
+        b="tierod_end_?_inner",
+        gate="gap",
+        measured=46.12,
+        issue="#190",
+        why="**the part these belong on does not exist.** Art. 4.5.3 permits the "
+        "rose joints and §Cockpit owns the pitman plate they bolt to; until it is "
+        "built the inner rod ends are declared against `steering_column`, which is "
+        "what a pitman is clamped to. The 46.12 mm is not slack -- it is the pitman's "
+        "reach: OTK's \"38/50\" designation puts the outer tie-rod hole 50 mm off the "
+        "column axis and a KZ runs the outer hole, which leaves 50 less the column's "
+        "9 mm radius less the rod end's 11 mm. The station is corroborated the other "
+        "way round: rod end here to the outer end at (320, 417, 140) measures "
+        "**271 mm** against a sourced OTK *\"STEERING TIE-ROD 270 mm\"*, and that "
+        "0.3% agreement is the third leg of spec §20.3.1's kingpin derivation. Closes "
+        "when §40 builds `steering_pitman`",
+    ),
     Defect(
         a="steering_bearing",
         b="chassis_steering_hoop",

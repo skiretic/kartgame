@@ -650,18 +650,40 @@ class KartParams:
 
     # --- wheels and tires --------------------------------------------------
 
-    rim_diameter: float = 0.127
-    """5 inch bead seat. `sourced` for the size, and **wrong for the flange**.
+    rim_bead_diameter: float = 0.1262
+    """Bead coupling diameter -- where the tire's bead sits. `sourced`, and a fit.
 
     Art. 8.7: *"In Group 1, only 5-inch rims are allowed with CIK-FIA homologated
     5-inch tyres."* So for a KZ, 5 inch is not merely typical -- it is the only
-    legal size, which is a stronger claim than this docstring used to make.
+    legal size.
 
-    Art. 4.14 then separates two diameters this field conflates: bead coupling
-    126.2 +0/-1 mm and flange external **136.2 mm minimum**. 127 is the bead. Any
-    module drawing the *visible flange* at 127 is 9 mm undersize -- §Running gear
-    owns that fix. Frozen here.
+    Art. 4.14, PDF p. 13: *"Coupling diameter of the tyre for the rim: 126.2 mm
+    with a +0/-1 mm tolerance for the diameter."* The tolerance direction makes
+    126.2 a **maximum**, so the single `rim_diameter = 0.127` this replaces was
+    0.8 mm over a fit rather than 9 mm under a flange. Spec §20.2.2 measured that
+    and corrected `notes_running.md` on it.
     """
+
+    rim_flange_diameter: float = 0.1362
+    """Flange external diameter -- the part of the rim anyone can see. `sourced`.
+
+    Art. 4.14: *"External diameter for 5-inch rims: 136.2 mm minimum."* Built to
+    the floor. `wheels.RIM_FLANGE_LIP` is now `(flange - bead) / 2` = 5.0 mm
+    rather than an authored 6.0, which is where the old build's accidentally-legal
+    Ø138.9 lip came from. Spec §20.2.2.
+    """
+
+    rim_front_width: float = 0.120
+    rim_rear_width: float = 0.198
+    """Rim width, flange to flange. `sourced`: CIK tire homologation forms
+    `047-TO-12` and `047-TO-14` p. 3, the dimensioned cross-section of the tire
+    fitted to its rim, +-5 mm.
+
+    They exist because the tire's three widths are not one number: the rear is
+    207 overall on 198 of rim carrying 179 of tread, so **the sidewall stands
+    4.5 mm proud of each flange and the tread band tucks 9.5 mm inboard of it**.
+    The built rim used to be sized off the tire's bead inset instead, which is a
+    shoulder-radius accident rather than a measurement."""
 
     tire_front_diameter: float = 0.280
     """`estimated`, and it is the Art. 4.13.1 **wheel** ceiling rather than a
@@ -692,19 +714,41 @@ class KartParams:
     the fronts is a large part of reading as a kart rather than as a small car,
     and that survives the relabel."""
 
-    tire_sidewall_bulge: float = 0.008
-    """How far the sidewall stands proud of the rim flange, radially.
-    `estimated`.
+    tire_front_tread_width: float = 0.110
+    tire_rear_tread_width: float = 0.179
+    """Width of the flat tread band. `sourced`: `047-TO-12` / `047-TO-14` p. 3.
+
+    Authored rather than left to fall out of the shoulder radius. Measured on the
+    old build, the flat band was `2 x (width/2 - TIRE_SIDEWALL_LEAN -
+    tire_shoulder_radius)` = **163 mm** at the rear against a sourced 179 and
+    **83 mm** at the front against a sourced 110 -- so a taste constant was eating
+    16 mm and 27 mm of the one surface that touches the road. Spec §20.9 item 6.
+    """
+
+    tire_sidewall_bulge: float = 0.038
+    """How far the sidewall stands proud of the **bead seat**, radially.
+    `derived`.
 
     Measured so that the tire's widest point sits at radius
-    `rim_diameter / 2 + tire_sidewall_bulge`, from which the profile turns back in
-    to meet the bead. Stated precisely because "the bulge" has two plausible
-    readings — radial and axial — and they produce different tires.
+    `rim_bead_diameter / 2 + tire_sidewall_bulge`, from which the profile turns
+    back in to meet the bead. Stated precisely because "the bulge" has two
+    plausible readings -- radial and axial -- and they produce different tires.
+
+    Was 0.008, i.e. a widest point at radius 71.5 mm. `047-TO-14` p. 3 puts it at
+    **101 mm** (`derived` in `refs/kart-visual/notes_running.md`: 63.1 + (950-632)
+    px / 8.34 px/mm), so the old figure was 29.5 mm too low radially and the tire
+    read as a cylinder with a chamfer. 101.0 - 63.1 = 37.9 -> 0.038. The front
+    agrees: mid-sidewall on a Ø260 tire over a Ø136 flange is (130 + 68)/2 = 99,
+    so one widest-point radius serves both ends. Spec §20.2.3; no physics reads
+    it.
     """
 
     tire_shoulder_radius: float = 0.022
     """Tread-to-sidewall corner radius. `estimated`. Kart slicks have a soft
-    shoulder and a square one reads as a toy."""
+    shoulder and a square one reads as a toy.
+
+    It no longer sets the tread band's width -- `tire_*_tread_width` does, and the
+    shoulder is fitted between that band and the sidewall."""
 
     tire_segments: int = 32
     tire_segments_high: int = 64
@@ -738,10 +782,27 @@ class KartParams:
     defining dynamic.
     """
 
-    axle_length: float = 1.080
-    """`estimated`. Spec §20 measures it 105 mm short of covering both hub
-    flanges and hands the change to §Running gear, because it is a §6.4 input and
-    needs `drive.sh` re-measured under it."""
+    axle_wall: float = 0.0025
+    """Rear axle wall thickness. `estimated` on a `sourced` floor.
+
+    Art. 4.3's table, PDF p. 9, sets **1.9 mm minimum** at 50.0 mm outside
+    diameter, and its own last row (*">28.0 -> full"*) shows solid construction is
+    for the small diameters only. KZ axles are sold soft/medium/hard by wall and
+    2.5 is mid-range; it also leaves 0.6 mm over the floor for the four keyways,
+    which the table exempts but which cannot be cut into 1.9 mm of wall without
+    going through. Spec §20.5.
+
+    A solid 50 mm steel axle 1.185 m long is 18.3 kg against 3.5 kg at this wall,
+    on a kart with a 170 kg minimum (Art. 8.9) -- so the old *"Solid, 50 mm"*
+    docstring was a real error and not a wording one."""
+
+    axle_length: float = 1.185
+    """`derived`: 2 x `rear_hub_x` = 2 x 592.5, so each end lands flush with its
+    rim's mounting plane.
+
+    Was 1.080, which stopped **52.5 mm short** of each wheel centerline: a 90 mm
+    rear hub was supported over 37.5 mm of its bore and Art. 4.3's hub keyway sat
+    20 mm from the axle's own chamfered end. Spec §20.9 item 3."""
 
     # --- seat --------------------------------------------------------------
 
@@ -918,30 +979,175 @@ class KartParams:
 
     # --- bodywork ----------------------------------------------------------
 
-    nose_width: float = 0.680
-    """Nose fairing overall width. `estimated`, and it describes nothing:
-    `bodywork.NOSE_HALF_WIDTH_LIMIT` clamps the built panel to a half-width of
-    0.256, so the parameter says 680 mm and the mesh is 512 mm wide -- 168 mm
-    apart, for two milestones, silently.
+    panel_thickness: float = 0.0038
+    """Wall thickness of every thermoformed panel. `derived`, spec §50.6.
 
-    The sourced figure is **1090 mm** (OTK M4 `100/CA/20`), against Art. 9.5.2's
-    *"Minimum width: 1.000 mm"* -- so the built fairing is 488 mm inside a
-    regulation **minimum**. §Bodywork owns the panel and the clamp; changing this
-    field alone would move nothing, which is exactly why it is still here.
-    """
+    Was `bodywork.PANEL_THICKNESS` = 3.0 mm, `estimated` from "CIK bodywork is
+    thermoformed about 3 mm of polyethylene". Three homologation forms publish a
+    mass, and mass over density times developed area is a thickness:
 
-    nose_height: float = 0.130
-    """`estimated`. The OTK M4 form publishes 227 mm; §Bodywork owns it."""
+        t = mass / (950 kg/m3 x developed area)
+        OTK M4 fairing   1500 g  1090 x ~380 arc = 0.414 m2  ->  3.81 mm
+        KG 505 fairing   1600 g  1029 x ~420 arc = 0.432 m2  ->  3.90 mm
+        KG C2 rear prot  1450 g  1360 x ~300 arc = 0.408 m2  ->  3.74 mm
 
-    sidepod_length: float = 0.560
+    Three independent masses landing inside 0.16 mm of each other. The arcs are
+    `estimated` off the forms' side elevations at about +-10%, which is +-0.4 mm,
+    and blow-moulded wall is not uniform -- so this is the mean wall and not a
+    caliper reading. It is not 3.0."""
+
+    nose_width: float = 1.090
+    """Nose fairing overall width. `sourced`: OTK M4 homologation form
+    `100/CA/20` p. 2, a dimensioned drawing read at 200 dpi.
+
+    Art. 9.5.2 sets *"Minimum width: 1.000 mm"* and caps the maximum at the
+    overall rear width of the front wheel/front axle unit, i.e. `track_front` =
+    1240 -- so 1090 clears the minimum by 90 and the maximum by 150.
+
+    It was 0.680 while `bodywork.NOSE_HALF_WIDTH_LIMIT` clamped the built panel to
+    a half-width of 0.256: the parameter said 680 mm, the mesh was 512 mm wide,
+    and the two disagreed by 168 mm for two milestones without a gate noticing.
+    The clamp is gone -- the fairing picks up on the front bumper's **upper** bar,
+    which is the one in a height band that can carry it, so the lower bar's dive
+    to rail height no longer bounds the panel."""
+
+    nose_height: float = 0.227
+    """Fairing overall height at the spine. `sourced`: same OTK M4 drawing, front
+    elevation. Was 0.130. `nose_bottom_z` + this is 267, which is 13 mm under the
+    front tire's top at 280 -- Art. 9.5.2's *"must be placed no higher than the
+    front wheels"*."""
+
+    nose_depth: float = 0.287
+    """Fairing fore-aft depth at the centerline. `sourced`: same drawing, plan
+    view. The KG 505 form gives 317 on the same field, and 287 is the shallower of
+    the two homologated panels -- which is what keeps the front overhang at 504
+    rather than 534."""
+
+    nose_bottom_z: float = 0.040
+    """Fairing bottom edge at the centerline. `estimated`: 5 mm above the rails'
+    underside at 35, which are the lowest thing on the kart
+    (`ground_clearance`). Was `bodywork.NOSE_BOTTOM_Z[0]` = 46; 40 buys the
+    fairing's top edge 6 mm against Art. 9.5.2's front-tire-top ceiling."""
+
+    front_panel_width: float = 0.275
+    """Front panel (nassau panel) width. `derived`: the midpoint of Art. 9.5.3's
+    *"Width: 250.0 mm minimum and 300.0 mm maximum"*, so +-25 mm either way.
+
+    **The part did not exist at all.** Art. 4.10.1 lists it as one of the six
+    homologated bodywork items and this kart had four panels."""
+
+    front_panel_top_z: float = 0.500
+    """Front panel top edge. `derived`, and the derivation is the regulation:
+    Art. 9.5.3 forbids the panel *"above the horizontal plane defined by the top
+    of the steering wheel"*. That top is z **552.5** -- `wheel_center_z` 480 plus
+    `wheel_diameter`/2 x cos(`wheel_angle`) = 160 x cos(0.470) = 72.5, because a
+    wheel raked 26.9° from vertical has its highest rim point leaning forward. 500
+    is 52.5 mm under it."""
+
+    front_panel_bottom_z: float = 0.190
+    """Front panel bottom edge. `estimated`: above the pedal pads at `pedal_z`
+    90, so Art. 9.5.3's *"must not impede the normal functioning of the pedals or
+    cover any part of the feet"* is satisfied by there being no panel at foot
+    height at all."""
+
+    sidepod_length: float = 0.595
+    """Fore-aft length of a side pod. `derived`: 265 - (-330).
+
+    **Was 0.560, and that was non-compliant** -- a rear edge at -295 leaves an
+    82.5 mm gap to the rear tire's forward face at -377.5, against Art. 9.5.4's
+    *"Gap between the back of the side bodywork and the rear wheels: 60.0 mm
+    maximum"*. Illegal by 22.5 mm, and it was a sixth undersize panel nobody had
+    listed. At 595 the gap is 47.5, 12.5 under the cap."""
+
     sidepod_height: float = 0.180
-    sidepod_x: float = 0.480
-    """Pod outer face, as a single constant -- which Art. 9.5.4 forbids: the
-    datum plane runs through the outer front edge of the front wheel *and* of the
-    rear wheel, so with tracks of 1240 and 1400 it tapers 4.36° in plan and the
-    pod must sit within 40 mm inboard of it. A constant makes the pods
-    parallel-sided and 118-160 mm inboard of where they belong. §Bodywork
-    replaces this with a datum, a slope and an inset."""
+    """Height of the pod's section at its deepest station. `estimated`, and it is
+    what sets kart bodywork height generally: Art. 3.7 makes a compliant
+    three-digit racing number 150 mm tall with a >=10 mm border, i.e. 170 mm, and
+    Art. 9.5.4 requires *"a space for racing numbers ... on the vertical surface
+    close to the rear wheels"*. 180 leaves 10 mm. The KG C2 rear protection is
+    177 on the same reasoning."""
+
+    sidepod_front_y: float = 0.265
+    """Forward edge of the pod. `sourced` in range: Art. 9.5.4 caps the gap to
+    the front wheels at 150 mm and the front tire's rear face is at y +385, so 265
+    leaves 120. Hoisted out of `bodywork.SIDEPOD_FRONT_Y`."""
+
+    sidepod_datum_x0: float = 0.660
+    sidepod_datum_slope: float = 0.0762
+    """Art. 9.5.4's datum plane, as `x_datum(y) = x0 - slope * y`. `derived`.
+
+    The article puts it through *"the outer front edge of the front wheel and the
+    outer front edge of the rear wheel (with the front wheels in the
+    straight-ahead position)"*, and the pod's outer face must lie between
+    `x_datum(y) - 40` and `x_datum(y)`. With `track_front` 1240 and `track_rear`
+    1400 the two datum points are x 620 at y +525 and x 700 at y -525:
+
+        x_datum(y) = 660 - (y / 1050) x 80,  plan angle atan(80/1050) = 4.36 deg
+
+    **`sidepod_x` = 0.480 was a single constant, which this article forbids**: one
+    number cannot be right at both ends of a tapering plane, and 482 was 136-182 mm
+    inboard of where the face belongs. Real pods splay outward toward the back for
+    this reason, which had been read as styling.
+
+    Read the article's words literally and the datum points are the tires'
+    forward-most faces at y +665 and -672.5, which gives `671.0 - 0.0767 y` --
+    the same plan angle to within 0.03° and uniformly **11 mm further outboard**.
+    So a face 40 mm inboard of this datum is 51 mm inboard of the literal one and
+    illegal under it: **the usable inset budget is 29 mm, not 40**, and
+    `sidepod_inset` plus `bodywork.SIDEPOD_TAPER` are specified against that
+    narrower band."""
+
+    sidepod_inset: float = 0.008
+    """Base inset of the pod's outer face inboard of `sidepod_datum_x0`.
+    `estimated` inside the 0-29 mm band above; the fore-aft taper adds up to
+    14 mm more in **millimeters**, never as a fraction of the face position.
+
+    That distinction is the trap `SIDEPOD_OUT_FRACTION` fell into: its taper was
+    0.960 at the front and 0.962 at the rear, read as a fraction, and 4% of 640 is
+    26 mm -- which plus any base inset walks the face out of a 40 mm band. As
+    millimeters the same visual taper is bounded by construction."""
+
+    sidepod_mouth_x: float = 0.505
+    """Lateral station of both of the pod's free edges -- the mouth of the C.
+    `estimated`, with a measured floor.
+
+    The radiator's outboard extremity is at x 489 (spec §00 §5a, measured off the
+    built mesh; photogrammetry on `crg_roadrebel_kz_front.webp` gives 479 and
+    `radiator_width`/2 about `radiator_x` gives 497.5). 505 clears the built figure
+    by 16 mm. Cross-checked photogrammetrically at 519 +-10 on the same image,
+    where the pod's top lip stands visibly outboard of the radiator's outer face.
+
+    Was `bodywork.SIDEPOD_TOP_X` = 0.372, set against a comment reasoning about a
+    radiator *"at x = 0.330 with a 45 mm core"* -- a radiator that has not been
+    there for two commits and was never on that side. That comment is why the
+    engine crankcase was built 26.7 mm inside the right pod."""
+
+    rear_prot_width: float = 1.390
+    """Rear wheel protection, overall width across all three parts. `derived`
+    from a `sourced` shape plus two `sourced` limits.
+
+    Art. 9.5.5.1: *"Width: minimum 1.340 mm, maximum that of the overall rear
+    width"*. The KG C2 form `003-BR-48` measures 1360, and 1360 on **this** kart
+    cannot present a 200 mm clearance window under a rear wheel: an edge at 680
+    against the tire's inner edge at 485 leaves 195, five short. 1390 gives 210
+    with 10 mm still under the 1400 ceiling, and it keeps the protection *"in line
+    with the outside of the rear wheels"* -- 5 mm inboard of the tire's outer plane
+    at 700.
+
+    Was `bodywork.REAR_HALF_WIDTH` x 2 = **572 mm**, i.e. 768 mm inside a
+    regulation minimum."""
+
+    rear_prot_depth: float = 0.187
+    rear_prot_height: float = 0.177
+    """Rear wheel protection depth and height. `sourced`: KG C2 homologation form
+    `003-BR-48` p. 2 drawing. The 187 is also the depth `overhang_rear_protection`
+    is derived from, so the two cannot drift."""
+
+    rear_prot_bottom_z: float = 0.040
+    """Bottom edge of the protection **inside its three clearance windows**.
+    `sourced` in range: Art. 9.5.5.1 wants 25-60 mm there, and 40 is the middle.
+    Between the windows the panel lifts to 95, which is what makes them
+    windows."""
 
     # --- driver ------------------------------------------------------------
     #
@@ -1079,15 +1285,12 @@ FIELD_COVERAGE_EXEMPT: dict[str, str] = {
         "skipped on every run and nothing consumes the ratios. Delete this "
         "entry when #20 lands."
     ),
-    "overhang_front_fairing": (
-        "read only by computed_figures() -- it is the fairing's depth chain and "
-        "spec §50 owns the panel that will consume it. Delete this entry when "
-        "bodywork.py places the fairing from it."
-    ),
-    "overhang_rear_protection": (
-        "read only by computed_figures(), as overhang_front_fairing. Spec §50 "
-        "owns the rear protection."
-    ),
+    # `overhang_front_fairing` and `overhang_rear_protection` were exempt here
+    # with the note "delete this entry when bodywork.py places the fairing from
+    # it". `bodywork.py` now does, through `nose_apex_y()` and
+    # `rear_prot_front_y()`, so both entries are gone -- an exemption that has
+    # stopped being needed is the same defect as a waiver that has stopped
+    # failing, and `check_field_coverage` is fatal on it.
     # The six below are the coverage gate's own findings: spec §10.7 named three
     # dead parameters and there were nine. Every one of these is *restated as a
     # literal* inside the module that should be reading it, which is worse than
@@ -1361,6 +1564,46 @@ def loop_front_y(p: KartParams) -> float:
     """Frontmost point of the front loop's centerline, by the same argument as
     `rail_rear_y` and against the sourced `G2`."""
     return front_axle_y(p) + p.overhang_front_frame - p.tube_main * 0.5
+
+
+def nose_apex_y(p: KartParams) -> float:
+    """Frontmost plane of the nose fairing, on the centerline. Spec §50.8.
+
+        front axle              +525
+        fairing overhang        +504   `overhang_front_fairing`, <= Art. 9.5.2's 680
+        apex                   +1029
+
+    Derived rather than authored so the fairing's front face and the number issue
+    #21 measures the kart against are one figure. `bodywork.FAIRING_CENTER_Y` used
+    to author +760 independently, which is where the built panel's 236-triangle
+    overlap with the front loop came from.
+    """
+    return front_axle_y(p) + p.overhang_front_fairing
+
+
+def nose_lip_y(p: KartParams) -> float:
+    """Rear lip of the nose fairing, constant across the span. `derived`:
+    apex - `nose_depth`. Constant so Art. 9.5.2's 180 mm wheel-to-fairing gap is
+    one number rather than a function of x."""
+    return nose_apex_y(p) - p.nose_depth
+
+
+def rear_prot_front_y(p: KartParams) -> float:
+    """Front face of the rear wheel protection. Spec §50.11.
+
+        rear axle               -525
+        protection overhang      367   `overhang_rear_protection`, <= 400 (9.5.5.1)
+        rear face               -892
+        depth                    187   `rear_prot_depth`, sourced KG C2
+        front face              -705
+
+    Derived from the overhang rather than from a half-length, because 1,920 mm of
+    overall length is **not symmetric about the origin** -- the two ends want 504
+    and 367 -- and placing either end from half of it is 35 mm over the rear cap.
+    The gap to the rear tire's rearmost surface at -672.5 is then 32.5 mm, the
+    middle of Art. 9.5.5.1's 15-50 band.
+    """
+    return rear_axle_y(p) - p.overhang_rear_protection + p.rear_prot_depth
 
 
 def tray_bottom_z(p: KartParams) -> float:
