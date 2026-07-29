@@ -456,6 +456,21 @@ records that and seven more decisions the storyboard could not make:
   "Surname, Forename" as the entry list does.
 - **Results list every lap**, best and optimal pinned, struck laps with their
   reason.
+- **The rest of the screen rules are in the ADR's second batch**: config hash
+  hidden one keypress away; standings keep both nationality columns and a
+  chassis/engine equipment string with the control tire as a footnote; Practice
+  cuts straight from loading to driving on an out lap; boot refuses on a
+  missing generated asset and prints the command; the session clock never stops
+  under pause in timed sessions; the loading tip line stays but only with a
+  corpus of measured-fact lines; Career creates the profile as its first step;
+  the first-run status panel is a one-line invitation in the world's voice; one
+  setup screen serves all session types, rendered read-only where a weekend's
+  round decides; audio is a settings section whose stored values the level
+  probe reads.
+
+Open, both deliberately: when the tuning overlay may be opened in a shipped
+build — decided by playing it — and naming, per §12, which is now only the
+series and the second circuit: the first is Valdirone Nuova.
 
 **The storyboard settles hierarchy and information design, and settles nothing
 about how any of it looks.** It is wireframes on purpose.
@@ -523,8 +538,9 @@ For `ROADMAP.md`:
 - [#170](https://github.com/skiretic/kartgame/issues/170) holds the questions for
   a former professional karter — the things a regulation cannot contain. It blocks
   nothing here; the structure does not move if a physics number does.
-- What the circuit and the series are called. Deferred deliberately; naming is
-  cheap and late.
+- What the series and the second circuit are called. Deferred deliberately;
+  naming is cheap and late. The first circuit is named: **Valdirone Nuova**,
+  built at M5.
 
 ---
 

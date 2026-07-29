@@ -2164,3 +2164,105 @@ else, which is what a derivation is for.
 
 [ADR-0053](DECISIONS.md#adr-0053) is the decision and
 `tools/verify/circuit.sh --case=pit` is the gate.
+
+## The front end and the paddock — issue #171, ADR-0052
+
+Everything the front end ships is original, generated work. What follows is
+what was *looked at* so the generated work is derived from the real thing
+rather than from expectation — the same rule §5 item 10 applies to parts, and
+the driving HUD section above is the worked example of why.
+
+*(This section was written once, destroyed by a concurrent agent merge
+overwriting the working file, and rebuilt from the session record — which is
+why references belong in a committed file and not in a conversation.)*
+
+### Photographs, screenshots and documents
+
+| Ref | Subject | Source |
+| --- | --- | --- |
+| F1 | **CRG factory racing tent interior** — the primary paddock reference. Two KZ-class karts nose-up on chrome wheeled stands, modular tile floor, branded mats, sponsor backdrop wall, strip lighting, tool tables | Wikimedia Commons, [`Klara Kowalczyk's karts under CRG Factory Karting Racing Team's tent.jpg`](https://commons.wikimedia.org/wiki/File:Klara_Kowalczyk%27s_karts_under_CRG_Factory_Karting_Racing_Team%27s_tent.jpg), CC BY-SA 4.0 |
+| F2 | **KZ pre-grid**, Le Mans Karting International — field formed up, official with red flag at the line, canopy tents flanking, tire-brand banners on the barriers | Wikimedia Commons, [`KZ PREGRID KSP 6 7810-edit-660x330.jpg`](https://commons.wikimedia.org/wiki/File:KZ_PREGRID_KSP_6_7810-edit-660x330.jpg), CC BY-SA 4.0 |
+| F3 | **KZ2 kart at speed, number panels in use** — black-on-yellow 110 on the front fairing and rear of the side pod, driver name and nationality flag small on the pod | Wikimedia Commons, [`Danny Buntschu en Karting KZ2 (2022).jpg`](https://commons.wikimedia.org/wiki/File:Danny_Buntschu_en_Karting_KZ2_(2022).jpg), CC BY-SA 4.0 |
+| F4 | Side number panel (334) set into white pod bodywork; behind it, white-painted tire-stack barriers, catch fencing, paddock vans — track-furniture texture. **The filename says 214 and the panel reads 334**; the image is the record | Wikimedia Commons, [`Tomás Granzella celebrating a karting victory with kart number 214.jpg`](https://commons.wikimedia.org/wiki/File:Tom%C3%A1s_Granzella_celebrating_a_karting_victory_with_kart_number_214.jpg), CC BY 4.0 |
+| F5 | **Apex Timing live-timing and results screens** (product screenshots) — Apex is FIA Karting's actual timing provider, so this is what the real timing screen family looks like | apex-timing.com marketing pages, © Apex Timing — **reference only** |
+| F6 | **FIA Karting's own live-timing page** — the deployed Apex instance, read as markup and stylesheet rather than as a picture | `apex-timing.com/live-timing/fiakarting/`, © Apex Timing / FIA Karting — **reference only** |
+| F7 | **The published FIA Karting result documents for a real 2026 event** — KZ2 entry list (83 drivers), Qualifying Practice classification (Document 13.2 OFFICIAL), Final classification, and the 199-page results booklet with per-driver Lap Time Analysis. Fetched by a browser session; files in `~/Downloads/kartgame-refs/` with `sources.txt` | `nocache.fiakarting.com/sites/default/files/xml_folder/2026/Karting%20Genk/` — `kz2_entry.pdf`, `kz2_resultsNN.pdf` (NN = session id), `Booklet_KZ2.pdf`. © FIA/RGMMC — **reference only** |
+| F8 | The live-timing page captured idle: black grid area, navy chrome, track map drawn as a green ribbon with white sector-boundary ticks, green CONNECTED pill, local-time footer | `~/Downloads/kartgame-refs/apex_fiakarting_live.png`, same source as F6 |
+
+**F5–F8 are copyrighted and are reference only**, handled exactly as the HUD
+section handles H1–H4: nothing traced, nothing redistributed, nothing shipped.
+What is taken is information architecture — what is largest, what is colored,
+what sits beside what — and the trade dress deliberately is not: no wordmark,
+no logo, no copy of the chrome, and not the FIA's exact navy/green pair.
+
+### What the references settled
+
+1. **A paddock floor is modular interlocking tile, not asphalt**, with a
+   branded mat under each kart (F1).
+2. **A parked kart is at chest height** — nose-up on a chrome wheeled stand
+   with a basket tray — not sitting on the ground. The stand is its own prop
+   and the paddock vignette is wrong without it (F1).
+3. **A team tent is a working garage, not a showroom**: white PVC walls, a
+   sponsor-print backdrop wall, LED strip lighting under the header rail, tool
+   tables, a paper-towel roll, cases and tires stacked at the walls (F1).
+4. **Number panels in use match Art. 3.7 and add one thing the regulation
+   text does not convey**: the driver's surname and nationality flag sit small
+   on the side pod beside the rear panel, and the front panel follows the
+   fairing's rake — a shaped part, not a flat decal (F3, F4).
+5. **The real timing screen family is dark ground with state-colored cells**
+   (F5): session clock top, position tile per driver, sector cells that go
+   green/red by state, the current split enormous in light-on-dark, a live
+   track map. The classification page is `Pos | No | Driver | flag | Gap |
+   Best lap` with a session tree down the left.
+6. **A pre-grid is furniture, not just a grid**: flanking canopy tents, an
+   official at the line with the flag, branded banners on every barrier face
+   (F2).
+7. **The paper documents are set in Arial** — not asserted from the panel
+   regulation but read out of the files: `pdffonts` on F7's entry list
+   reports embedded `Arial` and `Arial,Bold` and nothing else. The whole
+   document family shares the panel's typeface, so #187's Liberation Sans
+   substitution covers the sheets and the panels with one face.
+8. **The entry list's real columns (F7), correcting two guesses.** The order
+   is `No. | Competitor | Nat | Driver | Nat | Equipment` — **the competitor
+   (entrant) column comes before the driver**, not after. Nationality renders
+   as a **flag icon**, not a tricode. Equipment is three slash-joined parts,
+   `chassis / engine / tire`, and the tire is `LeCont` down all 83 rows.
+   Race numbers come in a 3xx block plus a 7xx block. Driver bold, competitor
+   regular.
+9. **The classification's page furniture (F7)**: full-width event/sponsor
+   banner; a boxed category code (`KZ2`) beside the document title; a
+   document number and status top-right (*Document 13.2 OFFICIAL*) over
+   *"Subject to scrutineering & sporting investigations"*; three steward
+   signature boxes and a **Posting Time** box (16:13, "1st posted: 16:00");
+   a `Not Classified` section (`No Time`, `DSQ`); a `Gap Between Series:
+   100.43%` summary line; footer with venue and date, "Timekeeping by Apex
+   Timing", `Page 1 / 2`, and a black sponsor strip.
+10. **The Lap Time Analysis register (F7)**: per-driver blocks laid three
+    columns to a page — `Laps | Sector 1 | Sector 2 | Sector 3 | Spd | Lap
+    Time`, speed as integer km/h; **personal bests bold, session bests as
+    inverted white-on-black cells**; header disclaimer *"For information
+    purposes. No official / regulatory value"*; signed by Timekeeper and
+    Clerk of the Course rather than stewards.
+11. **The FIA Karting timing screen's palette and vocabulary, from its own
+    CSS and markup (F6).** Title bar navy `rgb(0, 48, 98)` with the accent
+    and the progress-lap bar in green `rgb(0, 226, 147)` — a gradient bar
+    that fills along the row as the kart completes its lap. The column set
+    the timing grid actually carries: `class`, `club`, `entrant`,
+    `eq`(uipment), `lap_time`, `sector_1..3`; **Gap and Interval are two
+    separate columns** (gap to leader, gap to the kart ahead), not one
+    number. A kart's state is one of `On track / Pit in / Pit out / Stopped /
+    Out`. The page carries a track map pane, an onboard pane, three weather
+    cells and start/yellow flag signal states. Read off the deployed page,
+    not guessed.
+
+### What could not be sourced, yet
+
+1. **An outdoor paddock wide shot** — awning exteriors, trailers, the ground
+   between teams. F1 covers one tent's interior only. Openverse/Flickr CC is
+   the next pool to sweep, per the HUD section's finding that Commons is thin
+   on karting.
+2. **Race-control signage and the light-panel standard in use.** The standard
+   document is linked from the circuit-regulations pass; a photograph of the
+   panels lit at a kart race is not in hand.
+3. **The panel yellow's measured value** — to be sampled from F3/F4 rather
+   than picked.

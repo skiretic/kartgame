@@ -3297,12 +3297,59 @@ and is not decided here — these are structure and rules, not looks.
    from the person who drove them is the wrong kind of tidy. The optimal stays
    labeled for what it is — a sum of sector bests nobody drove.
 
-**Still open, and staying open through the mockup rounds:** the config hash on
-screen; the entrant-nationality column against the equipment string; a Practice
-countdown; boot behavior when `kart.glb` is missing; whether pause stops the
-clock in Practice; the loading tip line; whether F2's tuning overlay survives
-into a shipped build; whether Career creates the profile or requires one; and
-naming, deferred per §12 because it is cheap and late.
+**A second batch, settled in the same session, going through the remainder one
+at a time:**
+
+9. **The config hash is hidden, one keypress away.** Not on the default setup
+   or results screens — a debug-family toggle, plus a "copy session info"
+   action on results, puts it in a bug report when needed. A player never
+   parses hex; a bug report never loses its best line.
+10. **The standings table keeps both nationality columns *and* the equipment
+    string.** The full real column set. The equipment string compresses to
+    chassis / engine — the tire is a mandated control tire, uniform down the
+    field, and drops to a footnote, which is effectively what the real sheet's
+    uniformity already says.
+11. **Practice cuts straight from loading to driving.** No countdown, no grid
+    card. The kart is placed rolling at the pit exit, the first lap is an out
+    lap and can never be a best. The runner does not pretend Practice has a
+    race start.
+12. **Boot refuses on a missing generated asset and prints the exact
+    command.** No offer to run the generator — that bakes a Blender dependency
+    into the shipped game, and the missing-asset state is a dev-checkout
+    condition; a release build ships its assets.
+13. **Pause and the session clock: one rule.** Practice has no session clock,
+    so the question is moot there — the lap in progress is already covered by
+    the invalidation option. In timed sessions the session clock keeps running
+    under pause, as it does in the real thing: pausing costs track time.
+14. **The loading tip line stays, corpus-gated.** Lines are authored from
+    measured facts only — §6.4 figures, corner-specific behavior, class
+    differences. If the pool is thinner than about twenty real lines at ship,
+    the row is dropped rather than padded. The quality bar is part of the
+    design, not an aspiration.
+15. **Career creates the profile.** Picking Career with no profile runs the
+    four-question first-run sequence as the career's own first step — signing
+    an entry form is diegetic. No lock state, no detour.
+16. **The first-run "where you are" panel is an invitation.** One authored
+    line per empty slot, in the world's voice — "No entry filed — the OK season
+    starts when you do" — rather than blank dashes (reads unfinished) or a
+    hidden panel (the menu visibly restructures after one session).
+17. **One setup screen for all four session types; a weekend renders it
+    read-only where the round decides.** Circuit, layout and class show fixed;
+    what a real entrant chooses — assists, tuning preset, ghost — stays live.
+    One code path, and Qualifying still has the place you pick your preset.
+18. **Audio is a settings section, and the probe reads the stored values.**
+    Master, effects and engine sliders in the settings list like any player
+    option, in `settings.cfg`; `audio_level_probe` reports against what is
+    stored, so the audit still sees what the player moved. Player-facing and
+    measurable are not in conflict — ADR-0039's Master-trim argument already
+    depends on exactly this separation.
+
+**Still open, both deliberately:** when the player may open the tuning overlay
+in a shipped build — **decided by playing it**, the design's own precedent;
+Anthony has not yet driven with F2 open, and a feature is not scoped by someone
+who has never used it. And naming — deferred per §12 because it is cheap and
+late, and narrower than §12's wording: the first circuit is already **Valdirone
+Nuova** (M5), so what remains unnamed is the series and the second circuit.
 
 **Consequences.**
 
