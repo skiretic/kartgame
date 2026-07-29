@@ -8,6 +8,9 @@
 
 # Generated content — reproducible from tools/, never committed
 assets/generated/
+# Fetched fonts — reproduced by tools/assets/fetch_liberation_sans.sh from a
+# pinned SHA-256, same rule as doctest. ATTRIBUTION.md records the license.
+/assets/fonts/
 
 # GDExtension build artifacts
 .sconsign.dblite

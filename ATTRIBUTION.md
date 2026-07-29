@@ -83,6 +83,19 @@ Two consequences for the lighting rig:
 
 Both are consistent with §4's decision to drive the sky from `PhysicalSkyMaterial` with a real sun angle. These plates are for look development, IBL reference, and reflection content — not for being the sun.
 
+## Fonts
+
+| Asset | Source | License | Imported |
+|---|---|---|---|
+| `assets/fonts/liberation/` — Liberation Sans Regular + Bold 2.1.5 | [liberationfonts/liberation-fonts](https://github.com/liberationfonts/liberation-fonts), fetched by `tools/assets/fetch_liberation_sans.sh` (pinned SHA-256) | SIL OFL 1.1 | 2026-07-28 |
+
+Liberation Sans is the metric-compatible substitute for **Arial**, which is
+what both halves of the front end's typography actually call for and cannot
+ship: Technical Regulations Art. 3.7 names Arial for the number panels, and
+`pdffonts` reads embedded `Arial`/`Arial,Bold` out of the FIA's own published
+entry list (REFERENCES.md, front-end section, fact 7). Metric compatibility is
+the point — the regulation's proportions survive the substitution. Issue #187.
+
 ## Audio
 
 **No audio ships in this repository, and none of the files below is committed.**
