@@ -873,10 +873,21 @@ OPEN_DEFECTS: tuple[Defect, ...] = (
         why="the radiator passes through the left sidepod, 13.7 mm deep at the "
         "low tank. bodywork.SIDEPOD_TOP_X's comment reasons about a radiator "
         "'at x = 0.330 with a 45 mm core, so its outer face is at 0.353' and "
-        "sets the pod's mouth to 0.360..0.372 to clear it -- but "
-        "params.radiator_x is 0.365 with a half thickness of 0.020, so the "
-        "core's outboard face is at 0.385. The comment was not updated when "
-        "the radiator moved sides. Same family as the bug that move fixed",
+        "sets the pod's mouth to 0.360..0.372 to clear it. The comment was not "
+        "updated when the radiator moved sides. "
+        "NOTE, and this correction is the point: an earlier version of this "
+        "entry said the core's outboard face is at 0.385, being radiator_x "
+        "0.365 plus a 0.020 half thickness. That is the WRONG AXIS. Thickness "
+        "runs along the core's own face normal, which radiator_rake tips "
+        "forward, not outboard. The lateral half extent is half of "
+        "radiator_width -- 0.125 -- so the outboard face is at 0.490, and a "
+        "pod built to clear 0.385 is still 105 mm inside the radiator. "
+        "params.radiator_width's own docstring warns about exactly this "
+        "confusion, in these words: width is across the kart, height is up the "
+        "slant, thickness is through the core along the face's own normal. "
+        "docs/KART_SPEC.md section 30 settles the lateral extent as "
+        "-0.240..-0.490 so that neither the pod nor this waiver has to "
+        "re-derive it and pick the wrong axis again",
     ),
     Defect(
         a="bodywork_sidepod_r",
