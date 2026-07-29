@@ -50,6 +50,7 @@ import os
 import bpy
 
 from . import build
+from . import uv_stage
 
 #: Fixed so the bake is reproducible. Normals are a geometric quantity, so this
 #: needs far fewer samples than a lighting bake would — the ray either hits the
@@ -90,7 +91,11 @@ def run(context: build.BuildContext) -> None:
     scene = bpy.context.scene
     _configure_cycles(scene)
 
-    size = context.params.normal_map_size
+    # The same resolution the UV stage laid the islands out for, computed the same
+    # way from the same two owned numbers rather than read from a second constant.
+    # `params.normal_map_size` alone was 2048 while the unwrap needed 4096, so the
+    # bake wrote every part into an atlas region the UVs had already left.
+    size = uv_stage.atlas_resolution(context, meshes)
     image = bpy.data.images.new(
         "kart_normal", size, size, alpha=False, float_buffer=False
     )
@@ -105,9 +110,17 @@ def run(context: build.BuildContext) -> None:
     targets = _attach_normal_map(context, image)
 
     baked = 0
+    orphans: list[str] = []
     for index, obj in enumerate(meshes):
         source = context.high_poly.get(obj.name)
         if source is None:
+            # Counted and named rather than skipped in silence. An unpaired part
+            # bakes nothing into its own atlas region, so it ships with whatever the
+            # region held — at 295 parts that is one blurry or wrongly-shaded part
+            # among 294 correct ones, which is precisely the class of defect nobody
+            # finds by looking. Issue #19's pairing is the orchestrator's, so this
+            # stage can only report it.
+            orphans.append(obj.name)
             continue
         build.select_only([source, obj], active=obj)
         try:
@@ -137,7 +150,22 @@ def run(context: build.BuildContext) -> None:
         return
 
     path = _write(image, context)
-    print("    baked %d/%d objects into %s" % (baked, len(meshes), os.path.basename(path)))
+    print(
+        "    baked %d/%d objects into %s at %dx%d, %d orphan(s)"
+        % (
+            baked,
+            len(meshes),
+            os.path.basename(path),
+            size,
+            size,
+            len(orphans),
+        )
+    )
+    if orphans:
+        print(
+            "    WARNING: %d low-poly part(s) have no high-poly twin: %s"
+            % (len(orphans), ", ".join(orphans[:8]))
+        )
 
 
 def _bakeable(context: build.BuildContext) -> list[bpy.types.Object]:

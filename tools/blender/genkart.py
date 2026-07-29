@@ -79,7 +79,7 @@ MODULES: tuple[tuple[str, str], ...] = (
     ("driver", "#17 driver with IK-ready arms"),
 )
 
-STAGES: tuple[str, ...] = ("geometry", "uv", "bake", "lod", "export")
+STAGES: tuple[str, ...] = ("geometry", "finish", "uv", "bake", "lod", "export")
 
 BLENDER_REQUIRED: tuple[int, int] = (5, 2)
 

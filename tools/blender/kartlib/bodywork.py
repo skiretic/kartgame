@@ -535,7 +535,7 @@ it at worst."""
 def build_module(context: build.BuildContext) -> None:
     """Entry point. See `build.BuildContext` for the contract."""
     collection = context.collection("bodywork")
-    material = context.material("bodywork_plastic")
+    material = context.material("bodywork_wrap")
 
     root = build.empty("bodywork_root", (0.0, 0.0, 0.0), collection, size=0.10)
 
@@ -1456,11 +1456,13 @@ def _rear_protection(
     different from the main part"* and Art. 4.11 repeats it, so two colors need two
     materials, which need two meshes.
 
-    **The outer parts take `seat_fiberglass`, which is a near-black, and that is an
-    open item rather than a choice.** `build.MATERIALS` has no contrasting bodywork
-    slot and `build.py` is not this wave's file; a real KG C2 runs black ends on a
-    colored body, so the render is right and the material's *name* is wrong. What
-    the gate checks is that the slot differs from the main part's, which it does.
+    **The outer parts take `bodywork_contrast`.** They borrowed `seat_fiberglass`
+    for one wave, because `build.MATERIALS` had no contrasting bodywork slot and
+    `build.py` belonged to another agent — the render was right and the material's
+    *name* was wrong, which is the kind of thing that survives a milestone if it is
+    not written down. The slot exists now and the gate checks numerically that its
+    color differs from the main part's by at least 0.250; the three liveries measure
+    0.310, 0.270 and 0.380.
     """
     p = context.params
     detail = context.detail
@@ -1476,7 +1478,7 @@ def _rear_protection(
     )
     build.set_parent(main, root)
 
-    contrast = context.material("seat_fiberglass")
+    contrast = context.material("bodywork_contrast")
     inner = REAR_SPLIT_X - REAR_SLOT_OVERLAP
     for label, side in (("l", -1.0), ("r", 1.0)):
         outer = _panel(

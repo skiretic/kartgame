@@ -1267,7 +1267,7 @@ def _floor_tray(
         )
 
     obj = build.object_from_bmesh(
-        "chassis_floor_tray", bm, collection, material=context.material("tray_aluminium")
+        "chassis_floor_tray", bm, collection, material=context.material("tray_antislip")
     )
     build.bevel_object(obj, context.detail)
     build.set_parent(obj, root)

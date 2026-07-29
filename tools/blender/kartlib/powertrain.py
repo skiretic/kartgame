@@ -1278,7 +1278,7 @@ def _engine_mount(
     the 30 mm tube's surface.
     """
     p = context.params
-    material = context.material("engine_alloy")
+    material = context.material("engine_cast")
     front_y = -0.165
     rear_y = -0.305
     top = MOUNT_PLATE_TOP
@@ -1346,7 +1346,7 @@ def _engine(
     and `engine_x` should be about 0.320. See the report.
     """
     p = context.params
-    material = context.material("engine_alloy")
+    material = context.material("engine_cast")
 
     crank_bottom = MOUNT_PLATE_TOP
     crank_top = crank_bottom + CRANKCASE_HEIGHT
@@ -1888,7 +1888,7 @@ def _spark_plug(
     the cylinder moves.
     """
     axis_x, axis_y = CYLINDER_AXIS_X, CYLINDER_AXIS_Y
-    alloy = context.material("engine_alloy")
+    alloy = context.material("engine_cast")
     lean = _lean(context.params)
 
     boss_top = head_top + PLUG_BOSS_HEIGHT
@@ -2000,7 +2000,7 @@ def _intake(
     intake first and the exhaust after it is the order that keeps the two from
     being decided independently and ending up on the same side.
     """
-    material = context.material("engine_alloy")
+    material = context.material("engine_cast")
 
     # The reed cage: a raised bolting frame round a recessed face, which is the
     # cheapest pair of boxes that reads as a casting bolted to another casting.
@@ -2240,7 +2240,7 @@ def _driveline(
         context,
         collection,
         root,
-        context.material("engine_alloy"),
+        context.material("engine_cast"),
     )
 
     # Stepped: Ø18 where it lives inside the carrier, Ø16 where the chain wraps it.
@@ -2587,7 +2587,7 @@ def _exhaust(
     limits, and the system must discharge behind the driver. Art. **9.15.1** makes
     the HF's own pipe compulsory, which is what `EXHAUST_CONES` is.
     """
-    material = context.material("exhaust_steel")
+    material = context.material("exhaust_nickel")
     path, radii = _exhaust_centerline(context)
 
     bm = bmesh.new()
@@ -3037,7 +3037,7 @@ def _radiator(
     """
     p = context.params
     core_material = context.material("radiator_core")
-    alloy = context.material("engine_alloy")
+    alloy = context.material("engine_cast")
 
     basis, center = _radiator_frame(p)
 
@@ -3307,7 +3307,7 @@ def _cooling(
     position except the belt plane.
     """
     p = context.params
-    alloy = context.material("engine_alloy")
+    alloy = context.material("engine_cast")
     spindle = Vector(PUMP_SPINDLE)
     axle = Vector((P.rear_axle_y(p), P.rear_axle_z(p)))
 

@@ -1183,7 +1183,7 @@ def _wheel_spokes(
         )
 
     spokes = build.object_from_bmesh(
-        "steering_spokes", bm, collection, material=context.material("engine_alloy")
+        "steering_spokes", bm, collection, material=context.material("engine_cast")
     )
     build.bevel_object(spokes, context.detail)
     build.set_parent(spokes, pivot)
@@ -1226,7 +1226,7 @@ def _wheel_boss(
         "steering_boss",
         bm,
         collection,
-        material=context.material("engine_alloy"),
+        material=context.material("engine_cast"),
         shade_smooth=True,
     )
     build.set_parent(boss, pivot)
@@ -1253,7 +1253,7 @@ def _steering_hub(
     top = Vector(P.column_top(p))
     column_axis = Vector(P.column_axis(p))
     center, wheel_axis, right, up = _wheel_frame(p)
-    alloy = context.material("engine_alloy")
+    alloy = context.material("engine_cast")
 
     # The hub is square to the column: a short sleeve over the column's top end,
     # `hub_stack` less the wedge's mean thickness long.
@@ -1431,7 +1431,7 @@ def _steering_column(
         "steering_bearing",
         bm,
         collection,
-        material=context.material("engine_alloy"),
+        material=context.material("engine_cast"),
         shade_smooth=True,
     )
     build.set_parent(bearing, root)
@@ -1507,7 +1507,7 @@ def _steering_pitman(
         "steering_pitman",
         bm,
         collection,
-        material=context.material("engine_alloy"),
+        material=context.material("engine_cast"),
     )
     build.set_parent(pitman, root)
 
@@ -2020,7 +2020,7 @@ def _shift_linkage(
         6,
     )
     rod = build.object_from_bmesh(
-        "shift_rod", bm, collection, material=context.material("engine_alloy")
+        "shift_rod", bm, collection, material=context.material("engine_cast")
     )
     build.set_parent(rod, root)
 
@@ -2039,7 +2039,7 @@ def _shift_linkage(
             "shift_rod_end_%s" % label,
             bm,
             collection,
-            material=context.material("engine_alloy"),
+            material=context.material("engine_cast"),
             shade_smooth=True,
         )
         build.set_parent(end, root)

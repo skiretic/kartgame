@@ -1521,8 +1521,22 @@ class KartParams:
     prop's. See ADR-0024.
     """
 
-    normal_map_size: int = 2048
-    """Baked normal map resolution, issue #19."""
+    normal_map_size: int = 4096
+    """Baked normal map resolution, issue #19. A **floor**, not the answer.
+
+    `uv_stage.atlas_resolution()` derives the atlas the kart actually needs from
+    total surface area times `texel_density` squared, divided by what a packer can
+    reach, and rounds up to a power of two. This value only stops it choosing
+    something smaller. `bake_stage` calls the same function, so the density
+    arithmetic and the image can no longer disagree.
+
+    It was 2048, and its comment sized that when the kart was "roughly 10 m2". The
+    kart is **13.83 m2**, which at 512 px/m wants 86.4% of a 2048 atlas in island
+    area -- unpackable, and it did not pack: 276 of 295 objects sat outside the
+    0-1 square, the worst by 4,146 texels, while the bake reported `295/295`
+    because it never checked. 4096 lands the same set at 21.6% with 3.70x of
+    headroom.
+    """
 
     lod_ratios: tuple[float, ...] = (1.0, 0.55, 0.28, 0.12)
     """Decimation ratios for the LOD chain, issue #20. Index 0 is the mesh as

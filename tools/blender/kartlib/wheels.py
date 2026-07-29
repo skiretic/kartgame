@@ -1098,7 +1098,7 @@ def _rear_bearings(
     axle_z = P.rear_axle_z(p)
     bore = p.axle_diameter * 0.5
     steel = context.material("axle_steel")
-    alloy = context.material("engine_alloy")
+    alloy = context.material("engine_cast")
 
     for label, station in _bearing_stations(p):
         bm = bmesh.new()
@@ -1149,7 +1149,7 @@ def _rear_hubs(context: build.BuildContext, collection: bpy.types.Collection) ->
     p = context.params
     hub_x = P.rear_hub_x(p)
     bore = p.axle_diameter * 0.5
-    material = context.material("engine_alloy")
+    material = context.material("engine_cast")
 
     for label, side in (("rl", -1.0), ("rr", 1.0)):
         inboard = hub_x - HUB_REAR_LENGTH
@@ -1221,7 +1221,7 @@ def _front_uprights(
     axle_z = P.front_axle_z(p)
     hub_x = P.front_hub_x(p)
     steel = context.material("axle_steel")
-    alloy = context.material("engine_alloy")
+    alloy = context.material("engine_cast")
 
     for label, side in (("fl", -1.0), ("fr", 1.0)):
         bottom = _kingpin_point(p, side, KINGPIN_BOTTOM_Z)
@@ -1363,7 +1363,7 @@ def _front_hubs(context: build.BuildContext, collection: bpy.types.Collection) -
     p = context.params
     hub_x = P.front_hub_x(p)
     inboard = hub_x - _front_hub_length(p)
-    material = context.material("engine_alloy")
+    material = context.material("engine_cast")
 
     for label, side in (("fl", -1.0), ("fr", 1.0)):
         profile = [
@@ -1404,7 +1404,7 @@ def _steering_linkage(
     p = context.params
     axle_y = P.front_axle_y(p)
     axle_z = P.front_axle_z(p)
-    alloy = context.material("engine_alloy")
+    alloy = context.material("engine_cast")
 
     for label, side in (("l", -1.0), ("r", 1.0)):
         outer = Vector(
@@ -1521,7 +1521,7 @@ def _rear_brake(context: build.BuildContext, collection: bpy.types.Collection) -
     axle_y = P.rear_axle_y(p)
     axle_z = P.rear_axle_z(p)
     steel = context.material("axle_steel")
-    alloy = context.material("engine_alloy")
+    alloy = context.material("engine_cast")
     plastic = context.material("rubber_grip")
     detail = context.detail
 
@@ -1722,7 +1722,7 @@ def _front_brakes(context: build.BuildContext, collection: bpy.types.Collection)
     axle_y = P.front_axle_y(p)
     axle_z = P.front_axle_z(p)
     steel = context.material("axle_steel")
-    alloy = context.material("engine_alloy")
+    alloy = context.material("engine_cast")
     plastic = context.material("rubber_grip")
     detail = context.detail
 
@@ -1848,7 +1848,7 @@ def _brake_hydraulics(
     distributor and the two lines."""
     p = context.params
     detail = context.detail
-    alloy = context.material("engine_alloy")
+    alloy = context.material("engine_cast")
     steel = context.material("axle_steel")
 
     # **The bracket sits on `chassis_tray_edge_l`, not on the pan and not on the
