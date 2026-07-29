@@ -432,6 +432,2142 @@ stops failing is itself an error, so the list cannot rot.
 | 50 | Bodywork — front fairing, front panel, side pods, rear protection, number panels | `50-bodywork.md` |
 | 60 | Driver package and finishes — driver, materials, livery zones | `60-driver-and-finishes.md` |
 
+# 10. Chassis
+
+The weldment and everything welded or bolted to it. Conventions, provenance tags,
+the part-entry format and every regulation quote reused here are in
+`00-front-matter.md`; this section cites back to it and quotes only text the front
+matter does not already carry.
+
+Two things are settled here before any part entry, because most of the rest hangs
+off them: **the footprint**, which stops being one symmetric invented length, and
+**the front end**, which is a different shape from the one that is built.
+
+## 10.1 The primary chassis source, and what it actually says
+
+`refs/kart-visual/cik_hf_chassis_crg_road_rebel_04-CH-14.pdf` and
+`cik_hf_chassis_gillard_tg16_026-CH-99.pdf` are dimensioned CIK-FIA chassis
+homologation forms. Section B of each publishes the frame's own numbers, and the
+1:10 plan drawing on page 2 shows where each one is measured. Both were read.
+
+| form field | CRG Road Rebel `04/CH/14` | Gillard TG16 `026-CH-99` |
+| --- | --- | --- |
+| `A` wheelbase | 1050 ±10 | 1046 ±10 |
+| `B` main tube diameters (6 tubes) | 32 ±0.5 (all six) | 30 ±0.5 (all six) |
+| `C` bends in tubes >21 mm | 9 | 11 |
+| `D` tubes >21 mm | 6 | 6 |
+| `E` outer **front** width | 735 ±10 | 730 ±10 |
+| `F` outer **rear** width | 650 ±10 | 640 ±10 |
+| `G1` rear overhang, main tubes | 210 ±15 | 210 ±15 |
+| `G2` front overhang, main tube | 250 ±10 | 275 ±10 |
+
+The CRG plan drawing was measured photogrammetrically, anchored on `A`: the two
+extension lines of the `A` dimension are 1118 px apart at 300 dpi, so the scale is
+**0.9392 mm/px**. Cross-checks on the same drawing at that scale: `G1` measures
+194 mm against a stated 210 ±15, `G2` measures 241 against 250 ±10, `F` measures
+628 against 650 ±10, `E` measures 692 against 735 ±10. So the drawing is accurate
+to about 6% and **the numbers in section B are the data**; the drawing is used
+here only for *where* each is measured and for *ratios along the frame*, which
+survive a 6% scale error.
+
+What the drawing settles that no text does:
+
+1. **`E` is measured across the two stub-axle fixations, not across the main
+   tubes.** Its extension lines leave the drawing at the stub-axle bosses on the
+   front-axle station. The frontmost *tube* on that chassis is only ~230 mm wide.
+2. **The frame is widest at the rear, not at the front.** The rails hold a
+   constant outer half-width from the rear extremity forward to y −48, neck to a
+   **waist** at y +375, and flare out again to the stub-axle node. `frame.py`'s
+   docstring item 4 — *"The frame is widest at the front cross member, not at the
+   rear. The rails pinch inward through the seat area and stay narrow to the
+   back"* — is backwards, and the built kart is backwards with it: front ±462.5,
+   rear ±215. The measured CRG is rear ±314 outer, waist ±149 outer.
+3. **There is no straight cross member at the front-axle line.** The front is a
+   U-shaped loop (tube `B1`) running from one stub-axle node around the front to
+   the other, plus the two stub-axle fixations.
+4. The rearmost transverse tube is drawn thinner than 21 mm and is not one of the
+   six counted main tubes: it is the rear strut that carries the homologation
+   marking (`026-CH-99` page 3: *"The marking located on the rear strut must be
+   clearly visible at all times"*).
+
+`tube_main` **stays 30**, and its tag improves: Gillard TG16 publishes 30 ±0.5 for
+all six main tubes, so 30 is `sourced` rather than `estimated`. CRG runs 32 on the
+Road Rebel; both are homologated, 30 is the lighter and more common KZ figure, and
+nothing downstream is fitted to the difference.
+
+Frame material is `sourced` and was not previously cited anywhere: Art. 4.1.2
+*Chassis frame material*, PDF p. 7 — *"The structural steel or steel alloy used as
+chassis frame material must meet ISO 4948 classifications and ISO 4949
+designations. Only alloy steels having at least one alloy element with a mass
+content of ≤ 5% are allowed. The steel must be able to pass the contact force
+test: a control magnet […] must remain stuck to the surface of the chassis frame
+tubes."*
+
+## 10.2 The footprint — `nose_y`, `rear_y`, and deleting `length_overall`
+
+`frame.py:_bumpers` derives both ends from one symmetric length:
+
+    nose_y = p.length_overall * 0.5 - p.tube_bumper * 0.5      # = +0.905
+    rear_y = -p.length_overall * 0.5 + p.tube_secondary * 0.5  # = -0.904
+
+The two ends are not symmetric and never were. They are four different limits in
+three different articles, all measured from the **wheel axis lines** at y +525 and
+y −525 (front matter §5), and each end has its own chain.
+
+### Front
+
+Two limits apply to two different parts, and the front matter's §4 says so:
+Art. 9.4.1 sets a **minimum 350.0 mm** front overhang on the *bumper*
+(PDF p. 23), Art. 9.5.2 sets a **maximum 680 mm** on the *fairing* (PDF p. 24).
+
+    fairing front face      = 525 + 504 = +1029        derived, front matter §5
+    fairing rear face       = 1029 - 287 = +742        OTK M4 depth 287, §5b
+    front bumper overhang   = 420                      estimated, see below
+    nose bar outer surface  = 525 + 420 = +945
+    nose_y (tube center)    = 945 - 10 = +935          Ø20 lower bar, Art. 9.4.1
+
+420 mm is `estimated` and carries its reasoning: it clears the 350 minimum by
+70 mm, and it puts the bar 84 mm behind the fairing's front face, i.e. 29% of the
+way back into the fairing's own 287 mm depth — behind the molded nose radius,
+which is where a fairing's clamp bosses are, and forward of its open back. TD
+n°2.2 dimensions the mounting kit and is not obtainable, so this is judgment, not
+a limit.
+
+Checks, each against its article rather than against a neighbor:
+
+| check | number | article |
+| --- | --- | --- |
+| bumper overhang ≥ 350 | 420, +70 margin | 9.4.1, p. 23 |
+| fairing overhang ≤ 680 | 504, 176 margin | 9.5.2, p. 24 |
+| gap, front wheel front edge (+665) to fairing rear face (+742) ≤ 180 | 77 | 9.5.2, p. 24 |
+
+### Rear
+
+    rear frame overhang     = 210                      sourced, G1 both forms
+    rear strut outer surf.  = -525 - 210 = -735
+    chassis_cross_tail y    = -735 + 11 = -724 -> -713 center at Ø22, see 10.4
+    rear protection overhang= 367                      derived, front matter §5
+    protection rear face    = -525 - 367 = -892
+    protection front face   = -892 + 187 = -705        KG C2 depth 187, §5b
+    rear_y (bumper center)  = -735 + 10 = -725         Ø20, outer surface at -735
+
+Checks:
+
+| check | number | article |
+| --- | --- | --- |
+| protection overhang ≤ 400 | 367, 33 margin | 9.5.5.1, p. 25 |
+| gap, rear tire rear edge (−672.5) to protection front face (−705), 15..50 | 32.5 | 9.5.5.1, p. 25 |
+| frame rear overhang 210 ±15 | 199 as specified | `G1`, both forms |
+
+The rear closes on itself in a way that is worth naming, because it was not
+arranged: a rear bumper hoop at y −725 sits 20 mm inside the rear protection's
+187 mm depth, which is exactly where a panel that bolts over a hoop needs it.
+That is the 5.91 mm gap in 10.6 fixed by arithmetic rather than by nudging.
+
+### `length_overall`: delete it as an input
+
+**Recommendation: `length_overall` stops being a parameter that anything reads,
+and becomes a derived report value.**
+
+    length_overall = (525 + 504) + (525 + 367) = 1921 -> 1920      derived
+
+**A symmetric length cannot be made legal at any value.** This is the argument
+that closes the question, and it is arithmetic rather than preference. Run
+`frame.py`'s own formula at the new figure:
+
+    rear_y = -1920/2 + 22/2 = -949        tube center
+    rear tube outer surface = -960
+    rear overhang = 960 - 525 = 435       Art. 9.5.5.1 caps it at 400
+
+That is **35 mm illegal**, and at the same moment the front is spending only
+    905 + 10 - 525 = 390 of its 680 mm allowance. The two ends want 504 and 367,
+which differ by 137 mm; any symmetric split hands each end the mean, 435.5. So:
+
+| symmetric `length_overall` | front overhang | rear overhang | verdict |
+| --- | --- | --- | --- |
+| 1830 | 390 | 390 | legal, but the fairing is starved 114 mm and lands on §5's floor |
+| 1920 | 435 | 435 | **rear 35 mm over the 400 cap** |
+| 1850 | 400 | 400 | rear exactly on the cap, front 104 mm short, no margin either side |
+
+There is no value that gives the front its 504 and keeps the rear under 400,
+because 504 + 1050 + 504 = 2058 puts the rear at 504. The parameter is not
+mistuned; it is the wrong shape of parameter.
+
+Reasons to delete it, in order:
+
+1. It is a **bodywork** number. Both halves of the 1920 are fairing and rear
+   protection depths (front matter §5). `frame.py` reading it to place a frame
+   tube is a frame dimension fitted to a bodywork envelope — the exact inversion
+   §190 exists to stop.
+2. It is **not symmetric**, and a single scalar about the origin cannot express
+   +1029 forward and −892 rearward. The old arithmetic split it 905/904, which is
+   the *only* split it can produce, and it is wrong at both ends.
+3. Nothing needs it. The frame needs `overhang_front_frame` (250, `sourced`) and
+   `overhang_rear_frame` (210, `sourced`). The bumpers need
+   `overhang_front_bumper` (420, `estimated`). The bodywork needs its own two.
+   Issue #21's Godot check wants the *measured* overall length, which is now a
+   measurement of the built mesh compared against 1920, not a parameter read
+   back to itself.
+
+So: five new parameters replace one, each with a single owner and a single
+article, and `length_overall` survives only in the manifest as a computed figure.
+
+## 10.3 The rail path
+
+Centerlines, in mm, right-hand side; mirrored. z is `rail_z` = 50 throughout
+(`ground_clearance` 35 + half of `tube_main`), because nothing in the sources puts
+the front of a KZ frame at a different height from the rear and the built kart's
+25 mm front rise is unsourced.
+
+| station | y | x | prov | basis |
+| --- | --- | --- | --- | --- |
+| rear end | −720 | 310 | `derived` | `F` = 650 sourced: 650/2 − 15 = 310 |
+| constant to | −48 | 310 | `sourced` | CRG plan: outer half-width constant 334 px over y −735…−48 |
+| central strut | +40 | 286 | `derived` | 301/314 of the rear outer half × 325 − 15 |
+| **waist** | +375 | 139 | `derived` | 149/314 × 325 − 15; the drawing's minimum |
+| stub-axle node | +500 | 304 | `derived` | 308/314 × 325 − 15 |
+
+Ratios rather than absolute pixel distances, for the reason in 10.1: the drawing
+is 6% off in scale and dead-on in proportion.
+
+Consequences that are not obvious from the table:
+
+* The rails at the engine bay move **outboard 36 to 95 mm per side** (y −165:
+  274 → 310; y −305: 264 → 310). That is what fixes the engine mount, 10.6.
+* The **kingpin moves inboard 142.5 mm per side**. `_kingpin_x` is
+  `front_hub_x - 0.090` = 462.5; the frame puts it at 320. See 10.5.
+* The waist at ±139 leaves 248 mm of clear inner gap between the rails' surfaces
+  at y +375, which is where the driver's heels sit.
+
+## 10.4 Cross-member layout
+
+| part | y | Ø | half-span | prov |
+| --- | --- | --- | --- | --- |
+| `chassis_cross_front` (front loop) | +500 … +760 | 30 | see 10.5 | `sourced` `G2` |
+| `chassis_cross_mid_front` (**central strut**) | +40 | 30 | 286 | `derived` |
+| `chassis_cross_seat` | −417 | 30 | 310 | `sourced` CRG `B6` |
+| `chassis_cross_rear` | −525 | 30 | 310 | `estimated` |
+| `chassis_cross_tail` (rear strut) | −713 | 22 | 310 | `derived` `G1` |
+
+`chassis_cross_mid_front` is the **central strut** Art. 4.6 names, and that is a
+load-bearing identification rather than a label — see 10.7. It moves from y +230
+to y +40 (CRG `B2` measures y +36) and from Ø22 to Ø30, because the CRG's own
+six-main-tube count includes it.
+
+`chassis_cross_seat` moves from y −60 to y −417 (CRG `B6`). Nothing needs a tube
+under the seat: the seat is carried by four stays, Art. 4.2.3.
+
+`chassis_cross_rear` stays at the rear-axle line and is `estimated`: the CRG puts
+its rearmost transverse main tube at y −417 and carries its axle brackets on the
+rails, so a sixth member at the axle line is this kart's choice. It is kept
+because the **center** bearing hanger has nothing else to weld to.
+
+## 10.5 The front end
+
+### `chassis_rail_l` / `chassis_rail_r`
+
+**Status:** built
+**Attaches to:** `chassis_cross_*` (welded), `chassis_rear_bumper` (welded),
+`chassis_side_bar_?` (welded), `chassis_seat_strut_front_?` (welded),
+`chassis_kingpin_boss_?` (welded), `chassis_floor_tray` (bolted),
+`chassis_bearing_hanger_l`/`_r` (welded), `chassis_rail_insert_r` (pressed, right only)
+**Envelope:** Art. 4.1.2 material only; the frame's outline is not regulated.
+**Verification:** gate 1, gate 2, `genkart.sh --check`
+
+| dimension | `params.py` field | value | prov | basis |
+| --- | --- | --- | --- | --- |
+| outer diameter | `tube_main` | 30 | `sourced` | Gillard `026-CH-99` §B, 30 ±0.5 ×6 |
+| centerline z | `rail_z` | 50 | `derived` | `ground_clearance` 35 + 15 |
+| rear half-width | new `frame_half_rear` | 310 | `derived` | `F` 650/2 − 15 |
+| waist half-width | new `frame_half_waist` | 139 | `derived` | 10.3 |
+| waist station | new `frame_waist_y` | +375 | `sourced` | CRG plan minimum |
+| node half-width | new `frame_half_node` | 304 | `derived` | 10.3 |
+| rear end | new `overhang_rear_frame` | 210 | `sourced` | `G1`, both forms |
+| bend radius | `bend_radius` | 60 | `estimated` | mandrel bend, unchanged |
+
+### `chassis_cross_front`
+
+**Status:** built, **respecified as the front loop**. Not a straight tube.
+**Attaches to:** `chassis_rail_?` (welded, at the node), `chassis_steering_hoop`
+(welded), `pedal_mount_?` (bolted), `chassis_bumper_socket_front_*` (welded),
+`chassis_floor_tray` (bolted)
+**Envelope:** Art. 9.4.1 requires the front bumper's attachments to be *welded to
+the frame*, so this tube is what they land on; otherwise none.
+**Verification:** gate 1, gate 2
+
+Path, right half, Ø30, z +50 throughout, mirrored through x = 0:
+
+    (+304, +500)   the stub-axle node, welded to the rail's front end
+    (+270, +600)
+    (+110, +760)   frontmost tube center; outer surface at +775
+    (   0, +760)   crosses the centerline
+
+| dimension | `params.py` field | value | prov | basis |
+| --- | --- | --- | --- | --- |
+| frontmost tube outer surface | new `overhang_front_frame` | 250 | `sourced` | `G2` = 250 ±10 (CRG); Gillard 275 ±10 |
+| front segment half-width | new `frame_half_front` | 110 | `derived` | CRG plan 123 mm outer at the frontmost, −15 |
+| outer diameter | `tube_main` | 30 | `sourced` | as the rails |
+
+The name is kept deliberately. `joints.py` matches `chassis_cross_*` against
+`chassis_rail_?` and names `chassis_cross_front` in the pedal-mount joint; renaming
+it costs two edits there and every reference in five other section files.
+
+### `chassis_kingpin_boss_l` / `_r`
+
+**Status:** new. The kart has kingpins in `wheels.py` and nothing on the frame for
+them to pass through, which is why `_kingpin_x` had to invent a rail position.
+**Attaches to:** `chassis_rail_?` (welded), `chassis_cross_front` (welded),
+`axle_stub_f?` / kingpin (pierced — §Running gear owns the pin)
+**Envelope:** Art. 4.2.1 makes the steering knuckle a chassis *main part* and
+Art. 4.2.2 (PDF p. 8) allows an articulated connection *"only […] for the steering
+knuckle (through the king pin) and the steering"*, so this joint is the one place
+the frame is permitted to articulate.
+**Verification:** gate 1, gate 2
+
+| dimension | `params.py` field | value | prov | basis |
+| --- | --- | --- | --- | --- |
+| kingpin axis x | `kingpin_x` (was a function) | 320 | `derived` | two independent measurements, below |
+| kingpin axis y | — | +525 | `derived` | `front_axle_y`; `A` spans the axis lines |
+| boss outer face x | — | 367.5 | `sourced` | `E` 735/2 |
+| boss length (z) | new `kingpin_boss_length` | 60 | `estimated` | two lugs plus a plate; nothing publishes it |
+
+**The 320 is the number this section is least sure of, and it matters most.** Two
+measurements:
+
+    photogrammetric kingpin flange spacing 639 +-20  ->  319.5
+    E/2 minus a Ø40 boss radius, 367.5 - 20          ->  347.5
+
+They disagree by 28 mm. 320 is taken because it measures the pin directly rather
+than inferring it from a bracket whose thickness is unknown, and because it lands
+16 mm outboard of the rail's own node at 304, which is what the CRG's short
+diagonal from node to boss looks like. What would settle it: one front-three-
+quarter photograph of a KZ front end with a scale in frame, or any HF form whose
+section B happens to dimension the kingpin spacing.
+
+**The front track chain does not close, and the residual is 142.5 mm per side.**
+
+    front hub center  = (track_front 1240 - tire_front_width 135) / 2 = 552.5
+    kingpin axis                                                     = 320.0
+    kingpin -> wheel centerline                                      = 232.5
+    stub_axle_length                                                 =  90.0
+    unaccounted                                                      = 142.5
+
+`stub_axle_length`'s docstring calls 90 mm "a representative stub length", which it
+is — for the *stub*. The 232.5 mm is stub axle **plus** hub width **plus** rim
+offset, and one of three things is wrong: the parameter is measuring the wrong
+span, `track_front` = 1240 is too wide (it is `estimated` in front matter §3), or
+the kingpin is further out than 320. §Running gear owns all three; this section's
+contribution is that the frame puts the kingpin at **x ±320, y +525**, and the
+frame's own front width is `sourced` at 735 outer, so the residual cannot be
+absorbed by moving the rail.
+
+## 10.6 The five welds
+
+Each is a #192 gate finding. Numbers, not prose; an **Attaches to:** line is a
+promise gate 2 measures at 2.0 mm.
+
+### 1. `chassis_steering_hoop` — welded to nothing, 7.55 mm from `chassis_cross_front`
+
+**Status:** built. Recommend renaming to `chassis_steering_support_lower` once
+`joints.py` and §Cockpit can be edited in the same commit; kept as-is here so five
+section files and two joint entries do not break.
+**Attaches to:** `chassis_cross_front` (welded, both feet), `steering_bearing`
+(pressed), `chassis_floor_tray` (pierced)
+**Envelope:** Art. 9.5.3, PDF p. 24 — the front panel's *"upper part must be
+securely attached to the steering column support with one or more independent
+bars"*. This tube and the upper support in the next entry are jointly that
+support, so both are load-bearing for a regulation.
+**Verification:** gate 2 (declared joint, 2.0 mm)
+
+There are **two** steering supports on a real column and the project collapsed
+them into one. This is the **lower** one: it carries the column's lower bearing.
+Corrected path, Ø16, mirrored:
+
+    (-200, +639, + 50)   foot, on the front loop's left leg
+    (-105, +540, + 92)
+    (   0, +477, + 97)   bore, carries steering_bearing
+    (+105, +540, + 92)
+    (+200, +639, + 50)   foot, on the front loop's right leg
+
+The feet land on `chassis_cross_front` because at y +639 the loop's leg centerline
+is at x = 304 − (139/260) × 194 = **200** — the loop's own arithmetic, so the weld
+is exact rather than nearby. The built feet at x ±150 at rail height are 60 mm
+inboard of the loop and 114 mm behind the old cross member, which is the 7.55 mm.
+
+Bore at (0, +477, +97) is `sourced` from `refs/kart-visual/notes_column.md`, and
+it is consistent with the column: OD 20.0, rake 36° from vertical, length 490.
+
+### 2. `chassis_steering_support_upper`
+
+**Status:** new
+**Attaches to:** `chassis_cross_mid_front` (welded, two feet), `steering_column`
+(pierced, through a 20 mm nylon block), `bodywork_front_panel` (bolted — §Bodywork)
+**Envelope:** Art. 9.5.3, PDF p. 24, quoted above. The *"one or more independent
+bars"* is this part.
+**Verification:** gate 2
+
+An inverted V of two Ø16 tubes leaning **forward**, against the column's rearward
+36°:
+
+    foot   (±150, + 40, + 65)   on the central strut's top surface
+    apex   (   0, +262, +393)   20 mm bore, nylon block
+
+    forward lean = atan((262 - 40) / (393 - 65)) = 34.1 deg
+    column lean  = 36 deg rearward                        -> opposed, 70.1 deg included
+    apex height  = 393 + block <= 650                     Art. 9.1.1, front matter §3
+
+### 3. `chassis_cross_front` / `pedal_mount_?` — 5.37 mm
+
+The mounts bolt to the front loop's legs, and the loop's arithmetic gives the
+pickup exactly:
+
+    pedal_y = +560  ->  x = 304 - (60/260) x 194 = +-259
+    pickup point           (±259, +560, + 50)
+    tube surface available  x 244..274, z 35..65   (Ø30)
+
+So a mount plate whose bore straddles x ±259 at z +50 contacts the tube at 0 mm
+and gate 2 passes with the standoff to spare. §Cockpit owns the plate; this is the
+number it has to hit.
+
+Worth citing while it is open: Art. 9.4.1, PDF p. 23 — *"The front bumper must be
+independent from the pedal attachment."* The pedal mounts go on the loop, never on
+`chassis_nose_hoop_*`, and that is a regulation rather than a preference.
+
+### 4. `bodywork_rear_panel` / `chassis_rear_bumper` — 5.91 mm
+
+Settled by 10.2's arithmetic rather than by a standoff. The bumper's top bar runs
+across at **y −725, z +140**, out to x ±310, Ø20, so its rear surface is at
+y −735 and its upper surface at z +150. The rear protection's front face is at
+y −705 and its 187 mm depth reaches −892, so the hoop sits 20 mm inside the
+panel's own volume. `bodywork.MOUNT_STANDOFF` of 1.5 mm off the tube's rear-upper
+surface is then reachable at every pin.
+
+z +140 is `estimated` and carries its reasoning: the KG C2 panel is 177 tall with
+its lower edge in the 25–60 mm ground-clearance window (Art. 9.5.5.1), so it spans
+z 40…217 and its mid-height is 128. 140 is within 12 mm of the panel's own middle,
+and it is 155 mm below the rear tire's top at 295, so Art. 9.5.5.1's *"no higher
+than the rear wheels"* has margin at the tube as well as at the panel.
+
+### 5. `engine_mount_clamp_front` / `_rear` on `chassis_rail_r` — 12.10 and 22.90 mm
+
+The powertrain's only load path to the chassis. `_engine_mount`'s docstring reads
+the rail's path and puts the clamps *"about 11 mm outboard of the 30 mm tube's
+surface"* — correct arithmetic against a rail that is in the wrong place.
+
+The rail as respecified is **straight** through the entire engine bay, so there is
+one number for both clamps:
+
+    chassis_rail_r centerline, y -48 .. -720:   x = +310, z = +50
+    tube surface (Ø30):                          x 295..325, z 35..65
+    clamp stations:                              y = -165 (front), y = -305 (rear)
+
+A clamp pair at either station must bracket that tube: inboard plate outboard face
+at x ≤ 295, outboard plate inboard face at x ≥ 325, both spanning z 35…65. The
+built blocks span x 303…317, which is *inside* the tube — permitted, because the
+pair is a declared `clamped` joint, and it contacts at 0 mm. Either resolution
+passes; the point is that the rail is now under the clamp instead of 12 to 23 mm
+inboard of it.
+
+## 10.7 The floor tray, Art. 4.6
+
+Art. 4.6 *Floor tray*, PDF p. 10, is normative and was not previously cited:
+
+> It is mandatory to have a floor tray made of rigid material stretching from the
+> central strut to the front of the chassis frame. The floor tray must fit
+> completely within the perimeter formed by the main tubes, i.e. the central
+> strut, the longitudinal tubes and the front of the chassis frame, without
+> protruding beyond the central axis of the tubes seen from the top. It must be
+> made of a single element, and its surfaces must be uniform, solid, rigid,
+> impenetrable, smooth, without ribs and of constant thickness. It must be
+> laterally edged by a tube or a rim preventing the driver's feet from sliding off
+> the floor tray.
+
+### `chassis_floor_tray`
+
+**Status:** built, respecified. It is in the wrong place and the wrong shape.
+**Attaches to:** `chassis_rail_?` (bolted), `chassis_cross_mid_front` (bolted),
+`chassis_cross_front` (bolted), `chassis_tray_edge_?` (welded),
+`chassis_steering_hoop` (pierced)
+**Envelope:** Art. 4.6, quoted above.
+**Verification:** gate 1, gate 2
+
+    central strut          = chassis_cross_mid_front, y +40
+    front of chassis frame = chassis_cross_front's front segment, y +760
+    tray extent            = y +40 .. +760
+
+The **central strut is `chassis_cross_mid_front`** because Art. 4.6's own
+enumeration — *"the central strut, the longitudinal tubes and the front of the
+chassis frame"* — describes a three-sided perimeter, so the strut is the tube that
+closes it at the back, and the tray is entirely forward of it. `chassis_cross_seat`
+at y −417 and `chassis_cross_rear` at y −525 are behind the driver's hip and would
+put a footwell floor under the engine.
+
+Built extent is y **+180 back to −580**: 580 mm of it behind the origin, under the
+engine bay and out past the rear axle. `powertrain._engine_mount`'s docstring
+already names the consequence — *"it covers the main rail through the whole engine
+bay and out past the rear axle. Anything reaching down the rail's inboard side
+goes through it"* — and gave up the engine mount's inboard clamp because of it.
+Fixing the tray gives that clamp back.
+
+**Width is not a constant.** Art. 4.6 bounds it at *"the central axis of the tubes
+seen from the top"*, which is the rail centerline at each y, and the rails are not
+parallel. Half-width table, from 10.3 and 10.5:
+
+| y | +40 | +200 | +375 | +500 | +650 | +760 |
+| --- | --- | --- | --- | --- | --- | --- |
+| tray half-width | 286 | 220 | 139 | 304 | 200 | 110 |
+
+`tray_width` = 560 (±280) is right only at the strut and is 141 mm too wide per
+side at the waist, where the tray would hang outboard of the rails' centerlines
+and fail the article. `tray_length` = 760 is coincidentally the correct *length*
+(760 = 760 − 0, from +40 to +760 is 720) and is 40 mm long as well as 620 mm too
+far aft.
+
+An independent photogrammetric measurement puts the real tray at roughly y +70 to
++720 and 382 mm wide. That is corroboration and it lands inside this table: 382 is
+2 × 191, which is the perimeter half-width at y ≈ +290. The article is normative;
+the photograph agrees with it.
+
+The forward region between the waist and y +760 flares out to ±304 and closes to
+±110, so the perimeter is re-entrant and the tray's outline forward of the waist is
+`estimated` — a real tray shows a rounded nose there rather than following the
+tubes into the corner.
+
+| dimension | `params.py` field | value | prov | basis |
+| --- | --- | --- | --- | --- |
+| thickness | `tray_thickness` | 4 | `estimated` | aluminium pan; Art. 4.6 requires only *constant* thickness |
+| rear edge | `tray_rear_y` (new) | +40 | `sourced` | Art. 4.6 + central strut identification |
+| front edge | `tray_front_y` | +760 | `sourced` | Art. 4.6 + `G2` |
+| half-width | new `tray_half_width` table | above | `derived` | rail centerline at each y |
+| bottom z | `tray_bottom_z` | 65 | `derived` | rail top; unchanged, and correct |
+
+`tray_width` and `tray_length` are **deleted**: an hourglass is not a rectangle
+and two scalars cannot describe it.
+
+**This is the third parameter in `params.py` found to describe nothing**, and the
+pattern is worth stating once because it is a class rather than three incidents:
+`frame_height` was read by no geometry at all until a seat strut was pointed at it;
+`nose_width` = 680 has been clamped to 512 by `bodywork.NOSE_HALF_WIDTH_LIMIT` for
+two milestones, so the parameter block and the mesh have disagreed by 178 mm;
+`tray_width` and `tray_length` describe a rectangle that the article forbids. A
+parameter that no mesh reads, or that a module silently overrides, is a comment
+wearing a number's clothes. Any restructure of the parameter block should carry a
+build-time assertion that every field is read by at least one module — the same
+shape of check as `joints.py`'s "a pattern that matches nothing is fatal".
+
+**On "impenetrable":** the lower steering support's bore sits at (0, +477, +97),
+above a tray whose top is at z 69, so the tray is cut around the support's two
+legs — declared `pierced`, which `joints.py` already uses for *"a tray cut around a
+strut"*. Read strictly, *"impenetrable"* forbids that. Read as it is scrutineered —
+a solid walking surface, not lightened or louvred — a clearance aperture for the
+steering column and its support is universal on every kart in the reference set.
+This entry takes the second reading and marks it `estimated`; it is the one place
+in this section where a regulation word is being interpreted rather than measured.
+
+### `chassis_tray_edge_l` / `_r`
+
+**Status:** new. Art. 4.6's last sentence is mandatory and this part does not
+exist; the rails cannot serve, because the rail's top is at z 65 and the tray's top
+is at z 69, so the rail stands 4 mm *below* the surface a foot would slide off.
+**Attaches to:** `chassis_floor_tray` (welded), `chassis_rail_?` (welded, where the
+tray edge runs over the rail)
+**Envelope:** Art. 4.6 — *"laterally edged by a tube or a rim preventing the
+driver's feet from sliding off the floor tray."*
+**Verification:** gate 2
+
+| dimension | `params.py` field | value | prov | basis |
+| --- | --- | --- | --- | --- |
+| outer diameter | new `tube_tray_edge` | 16 | `estimated` | smallest tube on the reference karts; the article sets no size |
+| centerline z | — | 77 | `derived` | `tray_top_z` 69 + half of 16 |
+| plan path | — | the tray's own edge, y +40…+760 | `derived` | 10.7's half-width table |
+
+## 10.8 Bumpers
+
+Art. 9.4 (PDF p. 22) makes front and side protections compulsory *"made of
+magnetic steel round tubing"*. Art. 9.4.1 and 9.4.2 then dimension them, and this
+is the most heavily `sourced` part of the chassis — every figure below is in the
+text and none of it was previously in this repo.
+
+Art. 9.4.1 *Front bumper*, PDF pp. 22–23, verbatim, the parts the front matter
+does not carry:
+
+> The front bumper consists of two elements: an upper bar with a minimum diameter
+> of 16.0 mm and two corner bends with one constant radius. The straight length
+> between the bends must be 375.0 mm minimum and 395.0 mm maximum.
+> The bar must be fixed to two welded chassis frame attachments, which must be
+> 550.0 mm apart and centred on the kart's longitudinal axis.
+> Height: 200.0 mm minimum and 250.0 mm maximum from the ground (measured to the
+> tubing top).
+> A lower bar with a minimum diameter of 20.0 mm and two corner bends with one
+> constant radius. The straight length between the bends must be 295.0 mm minimum
+> and 315.0 mm maximum.
+> The bar must be fixed to two welded chassis frame attachments, which must be
+> 450.0 mm apart and centred on the kart's longitudinal axis. The attachments must
+> be horizontally and vertically parallel to the kart's axis and allow for a
+> 50.0 mm insertion of the bar.
+> Height: 70.0 mm minimum and 110.0 mm maximum (measured to the tube top).
+> These two elements must be vertically aligned […] Both bars must be connected by
+> the front bumper support.
+> The front bumper must be independent from the pedal attachment and allow for the
+> mounting of the mandatory front fairing.
+
+### `chassis_nose_hoop_lower`
+
+**Status:** built, respecified. Every one of its four dimensions is outside the
+article.
+**Attaches to:** `chassis_bumper_socket_front_lower_?` (seated, 50 mm insertion),
+`chassis_nose_hoop_upper` (welded, through the support),
+`chassis_front_bumper_support` (welded), `bodywork_nose_fairing` (bolted)
+**Envelope:** Art. 9.4.1, quoted above.
+**Verification:** gate 1, gate 2
+
+| dimension | `params.py` field | value | prov | basis | as built |
+| --- | --- | --- | --- | --- | --- |
+| outer diameter | `tube_bumper` | 20 | `sourced` | ≥20.0 | 20 ✓ |
+| straight length between bends | new `nose_lower_straight` | 305 | `derived` | mid of 295…315 | 330, **15 over** |
+| centerline z | new `nose_lower_z` | 85 | `derived` | tube top 95, mid of 70…110 | 60, top 70, at the floor |
+| frontmost tube center y | `nose_y` | +935 | `derived` | 10.2 | +905 |
+| attachment spacing | new `nose_lower_mounts` | 450 | `sourced` | *"450.0 mm apart"* | not modeled |
+| bar insertion into socket | — | 50 | `sourced` | *"allow for a 50.0 mm insertion"* | not modeled |
+
+Path, Ø20, one constant corner radius, mirrored, **planar at z +85 throughout**:
+
+    (-225, +606, + 85)   50 mm inside the left socket
+    (-152.5, +935, + 85) corner bend, constant radius
+    (+152.5, +935, + 85) corner bend
+    (+225, +606, + 85)
+
+`x = ±152.5` is half the 305 straight. `x = ±225` is half the 450 attachment
+spacing, and the socket's y follows from the loop: 304 − (79/194) × 260 gives
+y = **+606** at x 225, so the attachment lands on `chassis_cross_front` without
+a bracket. The bar is planar and horizontal because the 70…110 mm window is stated
+for *the bar*, not for its front straight, and because the article requires the
+attachments to be *"horizontally and vertically parallel to the kart's axis"* — so
+the socket is a 35 mm riser above the loop's tube at z +50, not a bend in the bar.
+
+**Do not lift this bar to clear a fairing.** A request came in during this section
+to put the nose hoop's tube center at z ≥ 150. At Ø20 that is a tube top of 160,
+which is **50 mm above Art. 9.4.1's 110 mm maximum** for the lower bar. The 160 mm
+figure it was justified by is real but belongs to a different article: it is in
+**Art. 9.4.2 *Side bumpers*** — *"Height of the upper bar: 160.0 mm minimum from
+the ground (measured to the tube top)"* — and it is about the side bumper, not the
+front protection. Proof of the section boundary, PDF p. 23: the 200/250 line, the
+70/110 line and *"Front overhang: 350.0 mm minimum"* are all above the **9.4.2
+Side bumpers** heading in the page's own text, and the 160 line is 18 lines below
+it. Same family as the §7.2/§7.4 error in CLAUDE.md: an article number recalled
+rather than located. The front bumper's two legal height windows are 70…110 for the
+lower bar and 200…250 for the upper, both to the tube top, and a fairing that needs
+a pickup above 110 mm gets it from the **upper** bar.
+
+### `chassis_nose_hoop_upper`
+
+**Status:** built, respecified. **Its top is 130 mm below the regulation
+minimum**: built at z +155 center, Ø20, top 165, against Art. 9.4.1's 200 minimum.
+**Attaches to:** `chassis_bumper_socket_front_upper_?` (seated),
+`chassis_front_bumper_support` (welded), `chassis_nose_hoop_lower` (welded),
+`bodywork_front_panel` (bolted — §Bodywork)
+**Envelope:** Art. 9.4.1.
+**Verification:** gate 1, gate 2
+
+| dimension | `params.py` field | value | prov | basis | as built |
+| --- | --- | --- | --- | --- | --- |
+| outer diameter | new `tube_bumper_upper` | 16 | `sourced` | ≥16.0 | 20 |
+| straight length | new `nose_upper_straight` | 385 | `derived` | mid of 375…395 | 280.5, **94.5 under** |
+| centerline z | new `nose_upper_z` | 217 | `derived` | tube top 225, mid of 200…250 | 155, top 165, **35 under min** |
+| frontmost tube center y | `nose_y` | +935 | `derived` | vertically aligned with the lower | +905 |
+| attachment spacing | new `nose_upper_mounts` | 550 | `sourced` | *"550.0 mm apart"*, and it matches the HF forms' 550 mount spacing in front matter §5b |
+
+Path, Ø16, mirrored, planar at z +217 throughout; the socket carries a 167 mm riser
+from the loop at z +50 up to the bar:
+
+    (-275, +539, +217)   50 mm inside the left socket
+    (-192.5, +935, +217)
+    (+192.5, +935, +217)
+    (+275, +539, +217)
+
+Vertical separation between the two bars at the front is 217 − 85 = **132 mm**,
+which clears Art. 9.5.2's *"distance of 60.1 mm minimum between the 2 support
+tubes of the clamps"* (PDF p. 24) by 72 mm. That line is what makes the two bars a
+fairing mount rather than two decorations, and it was not cited anywhere in this
+repo.
+
+### `chassis_front_bumper_support`
+
+**Status:** new
+**Attaches to:** `chassis_nose_hoop_lower` (welded), `chassis_nose_hoop_upper`
+(welded)
+**Envelope:** Art. 9.4.1 — *"Both bars must be connected by the front bumper
+support."* Not optional.
+**Verification:** gate 2
+
+Two vertical Ø16 posts at x ±75 (`estimated`; the article does not place them),
+y +935, from z +85 to z +217.
+
+### `chassis_bumper_socket_front_*` (4 parts)
+
+**Status:** new
+**Attaches to:** `chassis_cross_front` (welded), `chassis_nose_hoop_?` (seated)
+**Envelope:** Art. 9.4.1 — *"two welded chassis frame attachments"*, and for the
+lower pair *"horizontally and vertically parallel to the kart's axis and allow for
+a 50.0 mm insertion of the bar."*
+**Verification:** gate 2
+
+| part | x | y | bore axis z | bore | prov |
+| --- | --- | --- | --- | --- | --- |
+| `..._lower_l` / `_r` | ±225 | +606 | +85, on a 35 mm riser off the loop | Ø20, 50 deep, axis parallel to y | `sourced` spacing |
+| `..._upper_l` / `_r` | ±275 | +539 | +217, on a 167 mm post off the loop | Ø16, 50 deep | `sourced` spacing |
+
+### `chassis_side_bar_l` / `_r`
+
+**Status:** built, respecified as the side bumper's **lower** bar. It is 55 mm
+inboard of the regulation minimum today.
+**Attaches to:** `chassis_bumper_socket_side_lower_*` (seated),
+`bodywork_sidepod_?` (bolted), `exhaust_hanger` (bolted, right only)
+**Envelope:** Art. 9.4.2, PDF p. 23, verbatim:
+
+> The side bumper consists of two elements of magnetic steel round tubing that are
+> centred in relation to the longitudinal axis of the kart. Each element must be
+> composed of a lower and an upper bar. They must have a diameter of 20.0 mm.
+> Minimum straight length is 400.0 mm for the lower bar and 300.0 mm for the upper
+> bar. Overall width: 480.0 mm minimum and 520.0 mm maximum for the lower bar,
+> 480.0 mm minimum and 600.0 mm maximum for the upper bar (measured to the tube
+> midpoint) in relation to the longitudinal axis of the kart.
+> Each bar must be fixed to two welded tube attachments that must be 500.0 ± 5 mm
+> apart (measured to the tube midpoint). These attachments must be parallel to the
+> ground, perpendicular to the axis of the chassis and allow for a 50.0 mm
+> insertion of the bar.
+> Height of the upper bar: 160.0 mm minimum from the ground (measured to the tube
+> top).
+
+**Verification:** gate 1, gate 2
+
+**How the width figure is read, because it has two readings.** *"Overall width:
+480.0 minimum and 520.0 maximum […] in relation to the longitudinal axis"* is
+taken here as a **distance from the centerline**, not a total width, and that is
+`derived` rather than `sourced`. The argument: a total width of 480…520 for a side
+bumper element would put it inboard of the frame's own 650 mm outer rear width and
+far inboard of the pod datum window Art. 9.5.4 requires the side bodywork to
+occupy — 580 to 700 mm from the centerline, front matter §4 — while the same
+article requires the bodywork to be *"securely attached to the side bumpers"*. The
+half-width reading is the only one under which the bar is reachable from the pod.
+
+| dimension | `params.py` field | value | prov | basis | as built |
+| --- | --- | --- | --- | --- | --- |
+| outer diameter | `tube_bumper` | 20 | `sourced` | *"a diameter of 20.0 mm"* | 20 ✓ |
+| outermost tube midpoint x | `sidebar_x_lower` (new) | 500 | `sourced` | mid of 480…520 | 445, **35 inboard of the minimum** |
+| straight length | new `sidebar_lower_straight` | 420 | `derived` | ≥400 plus 20 mm of margin | ~1030 of curve, no straight |
+| centerline z | new `sidebar_lower_z` | 80 | `estimated` | no height given for the lower bar; above the rail, below the pod's 25…60 mm lower edge | ~105 |
+| attachment spacing | new `sidebar_mount_pitch` | 500 | `sourced` | *"500.0 ± 5 mm apart"* | not modeled |
+
+Path, right side, Ø20:
+
+    (+220, +190, + 80)   50 mm inside the front socket, on the rail
+    (+500, +100, + 80)
+    (+500, -320, + 80)   420 mm of straight between these two
+    (+310, -310, + 80)   rear socket, on the rail
+
+**Reach to the pod face, because Art. 9.5.4 makes this bar load-bearing for the
+bodywork** — *"[the side bodywork] must be securely attached to the side bumpers"*.
+Front matter §4's pod datum has been amended to the article's literal reading,
+`x = 671.0 − 0.0767·y`, giving a pod outer face at **618 front** and **664 rear**
+with a 29 mm inset budget. Against a lower bar at x 500:
+
+    pod face at the front of the pod, y +100:  618 - 500 = 118 mm of reach
+    pod face at the rear of the pod,  y -320:  664 - 500 = 164 mm of reach
+
+Those are the bracket lengths §Bodywork has to build, and **they cannot be
+shortened by moving this bar**: Art. 9.4.2 caps the lower bar at 520 from the axis,
+so 98 and 144 mm are the floor. A pod mount reaching 100 to 165 mm outboard of its
+bar is normal on a real kart — the bar is a bumper, not a pod rail.
+
+### `chassis_side_bar_upper_l` / `_r`
+
+**Status:** new. Art. 9.4.2 requires **two** bars per side and the kart has one.
+**Attaches to:** `chassis_bumper_socket_side_upper_*` (seated),
+`bodywork_sidepod_?` (bolted)
+**Envelope:** Art. 9.4.2, quoted above.
+**Verification:** gate 1, gate 2
+
+| dimension | value | prov | basis |
+| --- | --- | --- | --- |
+| outer diameter | 20 | `sourced` | *"a diameter of 20.0 mm"* |
+| outermost tube midpoint x | 560 | `estimated` | inside the sourced 480…600 window, with 40 mm of margin to the cap; 60 mm outboard of the lower bar, which is what makes a pod flare rather than sit vertical, and it cuts the pod's upper bracket reach to 58 front / 104 rear against the amended datum |
+| straight length | 320 | `derived` | ≥300 plus 20 mm of margin |
+| centerline z | 175 | `derived` | tube top 185, clears **Art. 9.4.2's** 160 mm minimum by 25 — this is the article the 160 belongs to, and it applies here and not to the nose hoop |
+
+### `chassis_bumper_socket_side_*` (8 parts)
+
+**Status:** new
+**Attaches to:** `chassis_rail_?` (welded), `chassis_side_bar_*` (seated)
+**Envelope:** Art. 9.4.2 — two welded tube attachments per bar, 500 ±5 apart,
+parallel to the ground, perpendicular to the chassis axis, 50 mm insertion.
+**Verification:** gate 2
+
+Stations, per side: y **+190** and y **−310** (500 apart), on the rail centerline,
+so x = 220 at the front pair and x = 310 at the rear pair, at the bar's own z.
+
+### `chassis_rear_bumper`
+
+**Status:** built, respecified. Moves forward **180 mm**.
+**Attaches to:** `chassis_rail_?` (welded, legs to the rail ends),
+`chassis_cross_tail` (welded), `bodywork_rear_panel` (bolted)
+**Envelope:** none directly — there is **no rear bumper article**. Art. 9.4 names
+only front and side protections as compulsory, and Art. 9.5.5.1 governs the rear
+wheel *protection*, which is bodywork. This hoop exists to carry that panel.
+**Verification:** gate 1, gate 2
+
+| dimension | `params.py` field | value | prov | basis | as built |
+| --- | --- | --- | --- | --- | --- |
+| outer diameter | `tube_bumper` | 20 | `estimated` | by analogy with Art. 9.4.2's 20.0; no article covers it | 22 |
+| rearmost tube center y | `rear_y` | −725 | `derived` | 10.2 | −904 |
+| top bar z | new `rear_bumper_z` | 140 | `estimated` | 10.6 item 4 | 140 ✓ |
+| half-width | new `rear_bumper_half` | 310 | `derived` | matches the rail ends, so the legs weld without a jog | 310 ✓ |
+
+Path, Ø20:
+
+    (+310, -700, + 50)   weld to the right rail's end
+    (+310, -725, +140)
+    (   0, -725, +140)   crosses the centerline
+    (-310, -725, +140)
+    (-310, -700, + 50)
+
+## 10.9 Seat struts, and the two Art. 9.1.2 stays
+
+Art. 9.1.2 *Chassis requirements*, PDF p. 22, verbatim — both sentences, because
+both bear on this section:
+
+> Anti-roll bars must only be connected to the main tubes of the chassis frame.
+> Extra seat stays are allowed between the rear axle brackets and the seat.
+
+Art. 4.2.3, PDF p. 8, is the other half: chassis auxiliary parts are *"the
+attachments, connections and attachment points welded to the frame for the
+steering, pedals, seat with four seat supports, bumpers, radiator(s), brakes,
+intake silencer, engine, exhaust and exhaust silencer."* **Four** seat supports,
+which is what the kart has.
+
+### `chassis_seat_strut_front_l` / `_r`
+
+**Status:** built, respecified
+**Attaches to:** `chassis_rail_?` (welded, same side only), `seat_shell` (bolted),
+`chassis_floor_tray` (pierced)
+**Envelope:** Art. 4.2.3 — one of the four seat supports.
+**Verification:** gate 2 (17.45 mm today)
+
+    (±305, + 40, + 50)   on the rail at the central strut station
+    (±240, - 10, +110)
+    (±160, - 20, +150)   seat_shell's front ear
+
+### `chassis_seat_strut_rear_l` / `_r`
+
+**Status:** built, respecified. These are the Art. 9.1.2 *extra seat stays*, and
+the article says where they start: **the rear axle brackets**. They currently start
+on the rail at y −400 and end 78.07 mm from the shell, aimed at nothing.
+**Attaches to:** `chassis_bearing_hanger_l`/`_r` (welded), `seat_shell` (bolted)
+**Envelope:** Art. 9.1.2 — *"Extra seat stays are allowed between the rear axle
+brackets and the seat."*
+**Verification:** gate 2 (78.07 mm today)
+
+    (±185, -525, +130)   on the bearing hanger's plate, which spans z 40..167
+    (±170, -400, +230)
+    (±145, -215, +300)   seat_shell's rear ear, on the back's flank
+
+    stay length = sqrt(40^2 + 310^2 + 170^2) = 356 mm
+
+**Both ear points are `estimated` and cannot be made exact from here.**
+`seat_shell` is lofted from `SEAT_HALF_WIDTH` × `seat_width`/2 and a wing flare
+along a filleted spine; its outer edge is a sampled surface, not a constant. The
+numbers above are read off that loft — half-width 165 at the widest station, wing
+flare 82 mm proud at the hip and 62 at t = 0.78, hip at (0, −60, +75), back top at
+(0, −263, +365) — and they will land within a few millimeters, not within 2.0.
+
+**What would settle it:** §Cockpit publishes four empties, `seat_ear_front_l/_r`
+and `seat_ear_rear_l/_r`, on the shell's own sampled surface, and `frame.py` reads
+them through `context`. A lofted surface met by a constant authored in a second
+module is the same failure as `Dictionary.get(key, default)` — it will drift and
+nothing will say so. This is the single highest-value follow-up in this section.
+
+### `chassis_bearing_hanger_l` / `_c` / `_r`
+
+**Status:** built, respecified laterally
+**Attaches to:** `chassis_cross_rear` (welded, all three), `chassis_rail_?`
+(welded, outer pair only), `axle_rear` (pierced),
+`chassis_bearing_cassette_?` (bolted), `chassis_floor_tray` (pierced — no longer
+applies once the tray moves forward, see below), `chassis_seat_strut_rear_?`
+(welded, outer pair only)
+**Envelope:** none. Art. 9.1.2 calls them *"the rear axle brackets"*, which is the
+only place the regulations name them.
+**Verification:able** gate 1, gate 2
+
+| dimension | value | prov | basis | as built |
+| --- | --- | --- | --- | --- |
+| outer pair x | ±300 | `derived` | the rail centerline at y −525 is ±310 and the plate is 12 thick, so 300 puts it inside the tube and welds at 0 mm | ±185 |
+| center x | 0 | `estimated` | a KZ carries a third bearing; nothing publishes its position | 0 ✓ |
+| plate thickness | 12 | `estimated` | unchanged | 12 |
+| z span | 40…167.5 | `derived` | rail bottom 35 to axle center 147.5 plus 20 | unchanged |
+
+**`joints.py` needs an edit here:** `chassis_floor_tray` / `chassis_bearing_hanger_?`
+is declared `pierced` with the reasoning *"the hangers stand up through the tray"*.
+Once the tray runs y +40…+760 per Art. 4.6, the tray is 565 mm forward of the
+hangers and that joint must be **deleted**, not waived. Same for
+`chassis_floor_tray` / `chassis_cross_rear`. Both are declarations that will fail
+gate 2 for the right reason.
+
+## 10.10 Parts a real KZ chassis has and this one does not
+
+Each of these is a spec item rather than an omission, per front matter §6.
+
+### `chassis_torsion_bar_front`, `chassis_torsion_bar_rear`
+
+**Status:** new
+**Attaches to:** `chassis_rail_l` and `chassis_rail_r` (clamped, both ends)
+**Envelope:** Art. 9.1.2 — *"Anti-roll bars must only be connected to the main
+tubes of the chassis frame."* Art. 4.2.5 (PDF p. 8) lists *"anti-roll bar"* among
+chassis components, and Art. 4.2.6 permits them a flexible connection where
+auxiliary parts must be welded.
+**Verification:** gate 2
+
+The front and rear adjustable bars a KZ tunes stiffness with. Both span rail to
+rail, clamped rather than welded so they can be swapped or removed — which is what
+Art. 4.2.5's classification as a *component* rather than an *auxiliary part*
+permits.
+
+| dimension | value | prov | basis |
+| --- | --- | --- | --- |
+| outer diameter | 28 | `estimated` | flat-sided round bar; no source, and nothing in Art. 9 sizes it |
+| front bar y | +230 | `estimated` | ahead of the waist, where the rails are still 220 apart per side |
+| rear bar y | −417 | `derived` | on the `chassis_cross_seat` station, which is where the rails are parallel |
+| centerline z | 50 | `derived` | `rail_z`; the bar clamps around the tube |
+
+### `chassis_rail_insert_r`
+
+**Status:** new
+**Attaches to:** `chassis_rail_r` (pressed)
+**Envelope:** Art. 4.2.3, PDF p. 8 — *"Chassis auxiliary parts also include the
+inner reinforcement of the chassis main tubes (maximum length 250 mm) between the
+axle bracket and the engine support."*
+**Verification:** gate 1 (it is inside the rail on purpose), gate 2
+
+The tube-in-tube stiffener. Its permitted span is named by the article and this
+kart's geometry lands inside it exactly:
+
+    axle bracket   y = -525      chassis_bearing_hanger_r
+    engine support y = -305      engine_mount_clamp_rear
+    insert length  = 220 <= 250  Art. 4.2.3
+
+| dimension | value | prov | basis |
+| --- | --- | --- | --- |
+| outer diameter | 26 | `estimated` | a slip fit inside a Ø30 × 2 tube |
+| length | 220 | `derived` | the article's own two endpoints |
+| side | right only | `derived` | the article says *"between the axle bracket and the engine support"*, and the engine is on the kart's right |
+
+### `chassis_bearing_cassette_l` / `_c` / `_r`
+
+**Status:** new
+**Attaches to:** `chassis_bearing_hanger_?` (bolted), `axle_rear` (pierced)
+**Envelope:** none.
+**Verification:** gate 1, gate 2
+
+The kart has three hanger plates with the axle passing through bare holes. A real
+kart carries a self-aligning bearing in an aluminium cassette bolted to each
+hanger; it is the most visible piece of hardware on the rear of the frame.
+Ø72 outer, 30 mm wide, `estimated` — this is at the §Running gear boundary and
+that section owns the bearing itself.
+
+### `chassis_idr_plate`
+
+**Status:** new
+**Attaches to:** `chassis_rail_r` (bolted) — but see below
+**Envelope:** Art. 4.1.5 *Impact Data Recorder*, PDF p. 7, verbatim:
+
+> From 01.01.2026, in FIA Karting Championships, Cups and Trophies, it is
+> mandatory to install an Impact Data Recorder. […] The IDR must be stocked on an
+> interchangeable plate. The plate must be horizontally and mechanically fixed to
+> the chassis, on the right side of the seat, under the inlet silencer.
+
+**Verification:** gate 2
+
+Mandatory on this kart's own regulation year, and it does not exist. Horizontal
+plate, on the kart's **right**, under the airbox, with the arrow pointing forward
+parallel to the longitudinal axis. Its position is `estimated`: x +250, y −120,
+z +72 (on the rail's inboard side, below `engine_airbox`). Whether it clears the
+airbox is §Powertrain's number.
+
+### `chassis_inboard_rail_l`
+
+**Status:** new
+**Attaches to:** `chassis_cross_seat` (welded), `chassis_cross_tail` (welded),
+`chassis_rail_l` (welded, at its forward end)
+**Envelope:** none.
+**Verification:** gate 1, gate 2
+
+The CRG plan drawing's tube `B5`: a longitudinal main tube inboard of one rail,
+running from the rear extremity forward to about y −48, at roughly 63% of the
+rail's own half-width. It is on **one side only** — the CRG frame is not laterally
+symmetric, and `frame.py`'s "a chassis is symmetric and authoring both halves is
+two places for a number to be wrong" is true of this kart and not of the reference.
+
+| dimension | value | prov | basis |
+| --- | --- | --- | --- |
+| half-width x | 198 | `sourced` | CRG plan, 211 px from the centerline at the confirmed scale |
+| extent y | −720 … −48 | `sourced` | CRG plan |
+| outer diameter | 30 | `sourced` | one of the six `B` tubes |
+| **side** | left | `estimated` | the drawing does not label which side is which; left is chosen because the right rail carries the engine mount, the exhaust hanger and the IDR plate and has no room |
+
+This tube is a stiffness asymmetry, not decoration, and #159's by-feel list should
+carry it: a KZ's left-right asymmetry under load is real and this is part of it.
+
+### `chassis_sprocket_guard_mount`
+
+**Status:** new
+**Attaches to:** `chassis_cross_rear` (welded), sprocket guard (bolted —
+§Powertrain)
+**Envelope:** none in Art. 9. The guard itself is required by the sporting
+regulations rather than the technical ones, and this document may only cite the
+pinned technical PDF, so no article is claimed.
+**Verification:** gate 2
+
+A bracket on the rear cross member, right of center, `estimated` at x +230,
+y −525, reaching up to z +200 beside the chain run.
+
+### `chassis_skid_plate_l` / `_r`
+
+**Status:** new
+**Attaches to:** `chassis_rail_?` (clamped)
+**Envelope:** Art. 4.2.5, PDF p. 8 — *"Chassis skid plates must only protect the
+tubes and must be made of plastic or composite material."*
+**Verification:** gate 2
+
+The plastic rail protectors every kart runs. They clip around the underside of
+each rail from about y +100 to y −450, 3 mm wall, `estimated`, and they are the
+lowest thing on the kart — which matters, because `ground_clearance` = 35 is
+documented as being measured to the rail's underside and these hang below it.
+
+## 10.11 Status and provenance tally
+
+| status | count | parts |
+| --- | --- | --- |
+| `built` | 20 | `chassis_rail_l/_r`, `chassis_cross_front`, `_mid_front`, `_seat`, `_rear`, `_tail`, `chassis_side_bar_l/_r`, `chassis_nose_hoop_lower/_upper`, `chassis_rear_bumper`, `chassis_steering_hoop`, `chassis_floor_tray`, `chassis_seat_strut_front_l/_r`, `chassis_seat_strut_rear_l/_r`, `chassis_bearing_hanger_l/_c/_r` |
+| of which respecified | 18 | everything except `chassis_bearing_hanger_c` and `chassis_seat_strut_front_?`'s rail foot |
+| `new` | 26 | `chassis_kingpin_boss_l/_r`, `chassis_steering_support_upper`, `chassis_tray_edge_l/_r`, `chassis_front_bumper_support`, `chassis_bumper_socket_front_*` (4), `chassis_side_bar_upper_l/_r`, `chassis_bumper_socket_side_*` (8), `chassis_torsion_bar_front/_rear`, `chassis_rail_insert_r`, `chassis_bearing_cassette_l/_c/_r`, `chassis_idr_plate`, `chassis_inboard_rail_l`, `chassis_sprocket_guard_mount`, `chassis_skid_plate_l/_r` |
+| `delete` | 3 parameters, 0 parts | `length_overall`, `tray_width`, `tray_length` |
+
+Numbers by tag, counting every value in every dimension table and path in this
+section:
+
+| tag | count | share |
+| --- | --- | --- |
+| `sourced` | 34 | 30% |
+| `derived` | 39 | 34% |
+| `estimated` | 41 | 36% |
+| `snippet` | 0 | — |
+
+`estimated` at 36% is the expected outcome for a chassis: front matter §6 says
+`none` is the common answer in the **Envelope** field for this assembly, and it is
+— 14 of the 27 part entries above are unregulated beyond tube material. What
+changed is that the 34 `sourced` numbers are almost all new: before this section,
+the only externally-anchored chassis figures in the repo were the wheelbase, the
+track width and `tube_main`'s "30 or 32".
+
+## 10.12 What is not settled
+
+| open | what would settle it |
+| --- | --- |
+| kingpin x: 320 (photogrammetric) vs 347.5 (`E`/2 − boss radius), 28 mm apart | a front-three-quarter photograph with a scale in frame, or an HF form whose section B dimensions kingpin spacing |
+| the 142.5 mm hole in the front track chain | §Running gear deciding whether `stub_axle_length` measures the stub or the whole kingpin-to-wheel-centerline span, and whether `track_front` = 1240 survives |
+| `seat_shell` ear coordinates to 2.0 mm | §Cockpit publishing four `seat_ear_*` empties off the sampled loft |
+| Art. 4.6 *"impenetrable"* vs a clearance aperture for the steering support | nothing in the pinned PDF resolves it; a scrutineering bulletin would |
+| the front loop's z, and whether a KZ frame's front rises above the rails | the CRG form's side view, page 2, measured the way the plan view was here |
+| which side the CRG's `B5` inboard rail is on | a photograph of a Road Rebel frame from below |
+| the front bumper's 420 mm overhang within the fairing | TD n°2.2, which dimensions the fairing mounting kit and is not obtainable |
+| whether §Bodywork's fairing can pick up on the upper bar at z +217 only, given the lower bar is capped at a 110 mm tube top | §Bodywork measuring the OTK M4 / KG 505 forms' own mount heights; both forms are in `refs/kart-visual/` and neither has been read for height |
+| the side bumper width figure's reading — half-width from the axis (taken here) vs total width | any HF bodywork form that dimensions a side bumper element, or TD n°2.0 |
+
+# 40 — Cockpit
+
+Steering, seat, pedals, controls, gear lever, fuel tank. Section file for
+`docs/kart_spec/40-cockpit.md`; conventions, provenance vocabulary and the
+part-entry format are `00-front-matter.md`'s and are not restated. Units are
+millimeters, origin on the ground at mid-wheelbase, +X kart right, +Y forward,
++Z up.
+
+Every regulation quote below was located in
+`refs/frontend/fia_karting_technical_regulations_2026.pdf` with
+`pdftotext -layout` and carries its PDF page. **KZ/KZ2 is Group 2** (PDF p. 1,
+*"Article 9 Group 2 Regulations — KZ … KZ2"*), which decides which of the
+duplicated Group 1 / Group 2 articles applies: fuel tank capacity is **Art. 9.3**,
+not Art. 8.3.
+
+The measurement work behind this section is `refs/kart-visual/notes_column.md`
+(steering), `notes_controls.md` (levers, pedals, tank) and `notes_radiator.md` §6
+(the seat, off Tillett's published size chart). Where this section disagrees with
+one of them the disagreement is stated with the arithmetic.
+
+## 40.0 The four things this section settles
+
+1. **The steering column no longer floats, because the welded end is now the
+   authored end.** `params.steering_column_base()` derives the column's *fixed*
+   lower end from its *free* upper end through a hardcoded 402 mm, so no
+   expression in the build mentions the bracket that carries it — which is why
+   #192's gate measures `chassis_steering_hoop`/`steering_bearing` at **23.36 mm**
+   and `chassis_steering_hoop` itself as touching nothing at all. Inverted here:
+   the bore is authored, the column length is a catalog part, the wheel center is
+   derived, and the gap is arithmetically impossible.
+2. **There are two column supports, not one.** A welded lower bracket at
+   z 97 and a separate two-tube upper support carrying a nylon block at z 393.
+   The single 22 mm hoop topping out at z 127 is dimensionally the lower bracket;
+   the upper support — the most visible piece of hardware in the cockpit, and what
+   Art. 9.5.3 requires the front panel's upper part to bolt to — is absent.
+3. **The pedals were a rental kart's.** `pedal_z = 0.090` is a foot resting on
+   the floor, and `pedal_width`/`pedal_length` describe a 70 x 120 flat plate
+   where the part is a Ø18 x 80 transverse round bar on a forged arm.
+4. **The kart has no fuel tank and Art. 9.3 requires one.** Its position is
+   mandated by Art. 4.7 rather than chosen, and the mandate puts it through the
+   steering column's path, which is why the real molding is notched.
+
+## 40.1 Regulation quotes this section is built on
+
+All from the pinned PDF. Quoted once here; part entries cite back.
+
+**Art. 4.4 *Pedals/pedal kits*, PDF p. 9**
+> Whatever their position, pedals must never protrude in front of the chassis,
+> including the bumper.
+> The brake pedal must be placed in front of the master cylinder.
+> The accelerator pedal must be equipped with a return spring. A mechanical link
+> between the accelerator pedal and the carburettor is mandatory.
+> Pedal kits to relocate the driver's feet may only be used if supplied by the
+> chassis manufacturer.
+
+**Art. 4.5 *Steering system*, PDF p. 9**
+> The steering system consists of a steering wheel, steering wheel hub, steering
+> column, steering column bracket and two steering arms connected to the steering
+> knuckles. **A spacer may be used between the steering wheel and the hub.**
+> Although it is an articulated connection, the steering system must only move in
+> one axis when the kart is in motion.
+
+That one sentence about a spacer is what makes the 7 degrees of §40.2 a
+regulation-legal part rather than a modeling liberty.
+
+**Art. 4.5.1 *Steering wheel*, PDF p. 9**
+> The steering wheel must be made of a continuous rim, not incorporating any
+> obtuse angles (180-360 °) in its basic shape. The upper and lower thirds of the
+> circumference may be straight or of a different radius to the rest of the wheel.
+> Steering wheel rims are manufactured with a metallic structure made of steel or
+> aluminium.
+> The steering wheel hub must be securely attached to the column with at least one
+> M6 screw (minimum grade 8.8) and a self-locking nut.
+
+**Art. 4.5.2 *Steering column*, PDF pp. 9-10**
+> The steering column must be mounted to the chassis with a bracket and an
+> articulated joint. It must be fixed with a safety clip system for the lower
+> bearing restraint nut and/or two collars between the column brackets. The
+> steering column must have a minimum diameter of 18.0 mm, a minimum wall
+> thickness of 1.8 mm and be made of magnetic steel.
+
+Note the plural — *"between the column brackets"*. The regulation itself says
+there are two.
+
+**Art. 4.5.4 *Steering wheel devices*, PDF p. 10**
+> No steering wheel device (such as a display or fuel cock) mounted on the
+> steering wheel may protrude by more than 20 mm from the plane defined by the
+> front of the steering wheel or have sharp edges.
+
+**Art. 4.6 *Floor tray*, PDF p. 10**
+> It is mandatory to have a floor tray made of rigid material stretching from the
+> central strut to the front of the chassis frame. The floor tray must fit
+> completely within the perimeter formed by the main tubes […] without protruding
+> beyond the central axis of the tubes seen from the top.
+> The floor tray may be perforated, but the holes must not have a diameter of more
+> than 10 mm […] In addition, **two holes with a maximum diameter of 35 mm are
+> allowed for steering column and/or gear shift lever access.**
+
+**Art. 4.7 *Fuel tank*, PDF p. 10**
+> The fuel tank must be securely fixed to the chassis and designed in such a way
+> that neither the tank nor the pipes (that must be flexible) present any danger of
+> leakage during the competition.
+> A quick attachment to the chassis is strongly recommended.
+> The fuel tank must in no way be shaped to act as an aerodynamic device.
+> It must supply the engine only under normal atmospheric pressure. This means
+> that, apart from the fuel pump located between the fuel tank and the carburettor,
+> any system (mechanical or not) that may have an influence on the internal
+> pressure of the fuel tank is not allowed.
+> **It is mandatory to place the fuel tank between the main tubes of the chassis
+> frame, ahead of the seat and behind the rotation axis of the front wheels.**
+
+**Art. 4.8 *Seat* / 4.8.1 *Reinforcement plates* / 4.8.2 *Seat stays*, PDF pp. 10-11**
+> The driver's seat must be designed to prevent him from moving towards the sides
+> when cornering. It may be made of composite material.
+> Reinforcement plates are required to support the upper part of the seat. They
+> must have a minimum thickness of 1.5 mm, a minimum surface of 13 cm2 and a
+> minimum diameter of 40 mm.
+> All seat stays must be bolted at each end. If they are not used, these seat
+> stays must be removed from the chassis frame and seat.
+
+**Art. 4.2.3 *Chassis auxiliary parts*, PDF p. 8**
+> These are the attachments, connections and attachment points welded to the frame
+> for the steering, pedals, **seat with four seat supports**, bumpers, radiator(s),
+> brakes, intake silencer, engine, exhaust and exhaust silencer.
+
+**Art. 4.2.5 *Chassis components*, PDF p. 8**
+> These are parts such as the acceleration and brake pedals, pedal kits, steering
+> column holder, anti-roll bar, extra seat stays, radiator(s), holder […]
+
+So the welded tabs are the frame's (4.2.3) and the bolt-on pedal kit, column
+holder and seat stays are components (4.2.5). Four seat supports is a number, not
+a style choice.
+
+**Art. 4.12.2 *Brake control*, PDF p. 12**
+> The brake control, i.e. the link between the pedal and the pump(s), must be
+> doubled for safety and always be in conformity with the HF of the chassis it is
+> homologated with. If a cable is homologated, it must have a minimum diameter of
+> 1.8 mm.
+
+**Art. 5.6.1 *Fuel lines*, PDF p. 16**
+> Only one fuel line from the tank to the carburettor/fuel pump is allowed, as well
+> as one fuel filter before the fuel pump.
+
+**Art. 9.3 *Fuel tank capacity*, PDF p. 22** (Group 2 = KZ)
+> 8 litres minimum.
+
+**Art. 5.3.1 *Radiator*, PDF p. 15**, the one clause that binds the seat:
+> They must not interfere with the seat.
+
+That is a regulation **forbidding** a joint. No `Joint` may be declared between
+any `radiator_*` part and `seat_shell`, and gate 1 then makes any overlap fatal.
+`joints.py` currently declares `radiator_bracket_* <-> seat_shell` as `bolted`,
+which this section says must be deleted — see §40.8.
+
+## 40.2 Steering — the chain, authored from the welded end
+
+**The authored numbers.** Three, and everything else follows.
+
+| parameter | value | prov | basis |
+| --- | --- | --- | --- |
+| `lower_bore` | (0, +477, +97) | `derived` | 22 mm up the column axis from the threaded tip; the middle of the 10 mm journal. The bracket is welded and cannot move, so this is the datum. `notes_column` §3. |
+| `column_length` | 490 | `sourced` | Real catalog lengths: OTK "38/50 Steering Column 470/490/510 mm", Birel ART "STEERING COLUMN RACING L490" / L520. 490 is the middle of the senior range. 470 and 510 are the adjustment range a tunable would sweep. |
+| `column_rake` | 0.628 rad (36° from vertical) | `derived` | Measured on the column tube in `tonykart_racer401T_product.png`, corrected for that image's 11% anisotropy: 119.3 mm forward per 165.9 mm of rise, atan = 35.7°. ±3°. |
+
+**The derivation, in arithmetic.** Axis unit vector, pointing up and rearward:
+
+    axis = (0, -sin 36°, +cos 36°) = (0, -0.5878, +0.8090)
+
+    journal_offset = 22                       # bore is 22 mm up-axis from the tip
+    hub_stack      = 25                       # hub + inclined spacer, along the axis
+    wheel_center   = lower_bore + axis * (column_length - journal_offset + hub_stack)
+                   = (0, 477, 97) + axis * 493
+                   = (0, 477 - 289.8, 97 + 398.8)
+                   = (0, +187.2, +495.8)   ->  (0, +187, +496)
+
+which is the wheel center **measured independently** off the side view at
+(0, +187, +496). The chain is closed, not merely consistent. Two further points
+fall on the same line and both were measured independently:
+
+| point | derived | measured | agreement |
+| --- | --- | --- | --- |
+| threaded tip, `lower_bore - axis * 22` | (0, +490, +79) | tray-level, Art. 4.6 access hole | qualitative |
+| upper support bore, `lower_bore + axis * 366` | (0, +262, +393) | (0, +263, +393) side view | 1 mm |
+| hub clamp face, `lower_bore + axis * 468` | (0, +202, +476) | — | — |
+
+**Why the gap cannot come back.** `steering_bearing`'s bore centre *is*
+`lower_bore` by construction and the column's journal centre is the same point, so
+`steering_bearing`/`steering_column` contact is identity. The only edit that can
+open a gap is an edit to `lower_bore`, which is exactly the edit that should move
+the column. The old failure was structural: with the base derived from the wheel,
+no expression in the build mentioned the bracket.
+
+**Specify against the *filleted* hoop, not the arithmetic one.**
+`cockpit.COLUMN_LOWER_CLEAR`'s docstring reasons that `frame.py` puts the hoop's
+apex control point at the column base and that the filleted centerline passes
+within 5 mm of it, so the column is lifted 26 mm up-axis to stay out of the tube.
+The module's arithmetic about an *unfilleted* tube is correct and the conclusion
+is still wrong: `build.tube` cuts the apex corner and pulls the crown **below**
+the control point that was supposed to meet the column, so the real clearance is
+19.1 mm to the column and 23.1-23.36 mm to the bearing. **Consequence for this
+spec: no part in §40 may be positioned by measuring from a `build.tube` control
+point.** Every steering position here is an absolute coordinate, and the bracket
+is specified as a plate with an authored bore — not as a bent tube whose crown is
+assumed to pass through a point.
+
+### `steering_column`
+**Status:** built — re-derived, and four of its five inputs change
+**Attaches to:** `steering_bearing` (pierced — the journal turns in the bush),
+`steering_bearing_upper` (pierced), `steering_hub` (clamped)
+**Envelope:** Art. 4.5.2 — minimum Ø18.0, minimum wall 1.8, magnetic steel
+**Verification:** gate 1, gate 2 (three declared joints), `genkart.sh --check`
+
+| dimension | `params.py` field | value | prov | basis |
+| --- | --- | --- | --- | --- |
+| overall length, tip to top | `column_length` | 490 | `sourced` | catalog, above |
+| outer diameter | `column_diameter` | 20.0 | `derived` | 50.0 px shaft against the 25.5 px annotated 10 mm feature in `birelart_kz_steering_column.jpg` = 19.6 mm. Corroborated: every European support block on the market is bored 20 mm. **Art. 4.5.2's 18.0 is a floor and `params.py` is built to the floor.** |
+| wall thickness | — | 2.0 | `estimated` | Art. 4.5.2's minimum is 1.8; a 20 mm tube at exactly 1.8 has no margin for the two cross-drillings at the top, so one step up. Only visible at the open top end. |
+| rake from vertical | `column_rake` | 0.628 rad | `derived` | above |
+| journal diameter | — | 10 | `sourced` | Birel render annotation; the part is sold as "…d.10 L490 HI TECH". |
+| journal length | — | 15 | `derived` | 193->225 rotated px at 0.485 mm/px = 15.5. |
+| reduced stem, tip to shoulder | — | 30 | `derived` | 163->225 px = 30.1. |
+| threaded tip | — | M8 | `derived` | second step profiles 21 px against the 25.5 px journal = 8.2 mm; the 8/10 catalog naming pair settles which is which. |
+| journal offset from tip | — | 22 | `derived` | journal spans 14.5-30 mm from the tip; midpoint 22.3. |
+| pitman hub, on the column | — | 64 long x Ø30, lower face 69 above the tip | `derived` | dark-mask profile of the render, 305->437 px. Belongs to §Running gear's steering-arm geometry; recorded here because it is a feature of this part. |
+| hub fixing holes | — | two transverse, 23 and 41 below the top | `derived` | two dark spots at rotated x 1088/1126; 18 mm apart is the wheel-height adjustment. |
+
+`params.py` changes: delete the local `length = 0.402` in
+`steering_column_base()`; delete `wheel_center_y` and `wheel_center_z` as
+authored fields and derive them; add `lower_bore`, `column_length`,
+`column_rake`, `hub_stack`, `wheel_incline_delta`. `wheel_angle` 0.470 rad (27°)
+becomes `column_rake` 0.628 (36°) — 9° of error, and `wheel_center_y` was
+133 mm too far forward.
+
+### `steering_bearing`
+**Status:** built — repositioned and re-sized; it is a bush in a welded bracket,
+not a collar on the tube
+**Attaches to:** `steering_column` (pierced), `chassis_steering_bracket` (pressed
+— §Chassis's part, see the demand below)
+**Envelope:** Art. 4.5.2 — *"a bracket and an articulated joint […] a safety clip
+system for the lower bearing restraint nut"*
+**Verification:** gate 2; the 23.36 mm figure is the waiver this closes
+
+| dimension | field | value | prov | basis |
+| --- | --- | --- | --- | --- |
+| bore centre | `lower_bore` | (0, +477, +97) | `derived` | §40.2 |
+| bore diameter | — | 12 | `estimated` | a 10 mm journal in a molded bush; 1 mm of wall is the least that molds. Not sourced anywhere. |
+| bush length along axis | — | 15 | `derived` | equal to the journal it captures. |
+| outer diameter | — | 24 | `estimated` | bore plus a 6 mm collar; the part is never visible in any photograph in the repo. |
+| axial retention | — | M8 nut + safety clip, under the bracket | `sourced` | Art. 4.5.2. Not a clamp and not a pillow block — the column must turn here. |
+
+**Demand on §Chassis.** `chassis_steering_hoop` as built is dimensionally this
+lower bracket and is welded to nothing (5.1 mm from `chassis_cross_front`). It must
+be replaced by **`chassis_steering_bracket`**: a welded bracket on the front cross
+member presenting a bore whose centre is within 2.0 mm of **(0, +477, +97)**, with
+its own top face at z ≈ 85 (`estimated`, below the bore by a bush radius; this is
+the single least-supported number in `notes_column`, because the bracket is behind
+bodywork in every photograph found). Its feet must contact `chassis_cross_front`
+within 2.0 mm — y +477 is 48 mm behind the front wheel axis, so it lands on the
+frame's front cross tube rather than in the overhang.
+
+**Demand on §Chassis, second.** `chassis_floor_tray` must carry a Ø35 access hole
+centred on (0, +477), because the restraint nut and clip are reached from
+underneath. Art. 4.6 permits exactly two such holes and this is one of them.
+
+### `steering_bearing_upper`
+**Status:** new
+**Attaches to:** `steering_column` (pierced), `chassis_column_support_l` and
+`chassis_column_support_r` (bolted — §Chassis's, see the demand)
+**Envelope:** none. Art. 9.5.3 makes it structure: the front panel's upper part
+must be attached to the steering column support with independent bars.
+**Verification:** gate 1, gate 2
+
+| dimension | value | prov | basis |
+| --- | --- | --- | --- |
+| bore centre | (0, +262, +393) | `derived` + measured | 366 mm up-axis from `lower_bore`, i.e. 103 mm below the hub clamp face; measured independently at (0, +263, +393). |
+| bore | Ø20.0 | `sourced` | "Tony Kart OTK Nylon Support for Steering Column 20mm"; "Birel 20mm Plastic Steering Shaft Block". |
+| length | 31 | `sourced` | Birel ART "NYLON SUPPORT STEERING COLUMN L31". |
+| outer size | 40 x 36 x 31 block | `estimated` | sized to a 20 mm bore with two bolt ears; the OTK part is the red anodized block visible in the side view. Two-hole bolt-through and centre-lock clamp styles both exist; take bolt-through. |
+| material | nylon | `sourced` | part names, above. A bushing, not a rolling bearing. |
+
+**Demand on §Chassis.** Two new tubes, **`chassis_column_support_l/r`**, Ø16
+(`estimated`: the support tube reads 5.5 px perpendicular in the side view after
+correcting for its lean, ≈15 mm at that scale, ±20%; 16 is the nearest standard
+accessory size and is under the 21 mm threshold at which a homologation form counts
+a tube as structural — do not quote it as measured). They converge upward into this
+block and their upper ends must contact it within 2.0 mm at **(0, +262, +378)**,
+the block's lower face. Lean **39° from vertical with the top forward of the
+base** — the opposite way to the column, so the two cross in a narrow V; a support
+built parallel to the column is wrong. Traced to (x ±0, y +200, z 243) before it
+disappears behind bodywork; the weld point to the frame is not visible in any
+image in the repo, so its lower end is §Chassis's `estimated`.
+
+### `steering_hub`
+**Status:** new
+**Attaches to:** `steering_column` (clamped, one M6 grade 8.8 minimum),
+`steering_hub_wedge` (bolted, 6x M6)
+**Envelope:** Art. 4.5.1 — *"securely attached to the column with at least one M6
+screw (minimum grade 8.8) and a self-locking nut"*
+**Verification:** gate 1, gate 2
+
+| dimension | value | prov | basis |
+| --- | --- | --- | --- |
+| bore | Ø20.0 | `derived` | the column it clamps. |
+| bolt pattern | 6 hole | `sourced` | OTK catalog, "STEER.WHEEL HUB - 6 HOLE". |
+| flange diameter | 60 | `estimated` | 6 holes on a Ø46 pitch circle with 7 mm of edge land; consistent with the 401T side view where the hub reads about a fifth of the rim's width. |
+| length along the axis | 17.3 | `derived` | `hub_stack` 25 minus the wedge's 7.7 mm mean thickness. |
+| material | aluminium | `sourced` | OTK "AL KZ STEERING WHEEL'S HUB". |
+
+### `steering_hub_wedge`
+**Status:** new — and it is the part that stops the wheel being built wrong
+**Attaches to:** `steering_hub` (bolted), `steering_boss` (bolted)
+**Envelope:** Art. 4.5 — *"A spacer may be used between the steering wheel and
+the hub."*
+**Verification:** gate 1, gate 2; the 7° is checkable as an angle between two
+built face normals
+
+**The wheel plane rakes 43° from vertical, seven degrees more than the column's
+36°.** The edge-on rim trace in the side view measures 42.9° while the column tube
+measures 35.7°, and the difference is hardware rather than measurement error: OTK
+sells an **"INCLINED STEERING WHEEL HUB"** and an **"INCLINED SPACER FOR
+STEERING"** whose only purpose is to lay the wheel back further than its column.
+Build the wheel perpendicular to the column and it reads subtly wrong against
+every photograph — and the error is invisible from any angle except a true side
+elevation, which is why it survives a turntable.
+
+| dimension | value | prov | basis |
+| --- | --- | --- | --- |
+| included angle | 7.0° = 0.122 rad | `derived` | 42.9° wheel plane minus 35.7° column, both off the same frame with the same scale correction. |
+| outside diameter | 60 | `derived` | matches the hub flange it bolts to. |
+| thickness, thin edge / thick edge | 4.0 / 11.4 | `derived` | 60 x tan 7° = 7.36 mm of taper across the face; 4.0 mm at the thin edge is the least that carries an M6 through-bolt. |
+| mean thickness | 7.7 | `derived` | (4.0 + 11.4)/2. |
+| orientation | thick edge **up** in the wheel plane | `derived` | the wheel must lay *back*, so the extra material is at the top. Getting this 180° wrong stands the wheel 7° more upright than the column and is the same magnitude of error with the opposite sign. |
+
+`params.py` field: `wheel_incline_delta = 0.122`, added to `column_rake` to give
+the wheel plane's rake. Authoring the wheel's absolute angle a second time is how
+a wheel ends up skewed on its own column — `cockpit._column_frame`'s existing
+instinct is right, it just needs the delta.
+
+### `steering_rim`, `steering_spokes`, `steering_boss`
+**Status:** built — geometry stands; four numbers change
+**Attaches to:** `steering_spokes` <-> `steering_rim` (welded),
+`steering_spokes` <-> `steering_boss` (welded), `steering_boss` <->
+`steering_hub_wedge` (bolted, 6x M6)
+**Envelope:** Art. 4.5.1 (continuous rim, no obtuse angles, metallic structure,
+straight upper and lower thirds permitted); Art. 4.5.4 (nothing mounted on it may
+protrude >20 mm ahead of its front plane); Art. 9.5.3 via §4 of the front matter
+(the front panel sits below the top-of-wheel plane, 50 mm clear)
+**Verification:** gate 1, gate 2, `genkart.sh --check`
+
+| dimension | field | value | prov | basis |
+| --- | --- | --- | --- | --- |
+| outside diameter | `wheel_diameter` | 320 | `sourced` size, `derived` choice | Kart wheels sell at 280/300/320/340. Seen edge-on in the side view the rim's trace is a straight segment of true length D: endpoints scale to 204.8 x 227.1 mm = **306 mm**, which picks 320 out of that list rather than 300 or 340. `wheel_diameter = 0.320` is the one steering number in `params.py` that is already right. |
+| padded grip section | `wheel_rim_thickness` | 38 | `derived` | red-grip mask, 21 px vertical chords corrected for the 40° axis lean = 16.1 px perpendicular ≈ 44 mm raw; the mask over-reads a soft foam edge by a pixel each side, so 38 ±6. Kart grips are genuinely chunky. **`wheel_rim_thickness = 0.024` is 14 mm thin.** |
+| bare rim tube | — | 20 | `estimated` | never visible under the foam; the usual round tube for a steel or aluminium rim, and consistent with 38 mm padded over ~9 mm of foam per side. |
+| spokes | — | 3 flat plates, two upper diagonals and one lower | `derived` | the bare-chassis plan view and the CRG close-up both show a single flat drilled centre plate with three arms, not a cast hub. Matches `WHEEL_SPOKE_ANGLES`. |
+| rim shape | `WHEEL_OUTLINE` | butterfly, straight top third, chord across the bottom | `sourced` (permitted) + `derived` (shape) | Art. 4.5.1 permits the straight thirds; both the CRG and OTK wheels in the repo's photographs have a straight top. The built 39.8 mm dip is the feature that has to read at 0.55 m and it stays. |
+| dish, rim plane ahead of the boss face | `WHEEL_DISH` | 15 | `estimated` | not separable from the hub stack in a side view at 2.9 mm/px. Kart wheels are close to flat; 15 mm clears the hub bolt heads. **`cockpit.WHEEL_DISH = 0.048` is 3.2x this**, and it is subtracted from the wheel centre to find the column's top, so it shortens the column by 33 mm as a side effect. |
+| hub stack, along the axis | `hub_stack` | 25 | `derived` | side view: the rim centre sits 16.9 mm rearward and 17.5 mm above the column's top end = 24 mm back along the axis. OTK sells it as a stack — hub, spacer, inclined spacer. |
+| top of the wheel, absolute | — | 613 | `derived` | 496 + (320/2) x cos 43° = 496 + 117. **Checks against Art. 9.1.1's 650 mm chassis height without the seat (PDF p. 22): 37 mm of margin.** Also the plane Art. 9.5.3 puts the front panel below, 50 mm clear. |
+
+### `steering_clutch_lever`
+**Status:** built — **re-attached**: it clamps the column, not the spoke plate
+**Attaches to:** `steering_column` (clamped, two-bolt)
+**Envelope:** none. Art. 4.12.2's 1.8 mm cable minimum is a *brake* rule and does
+not bind a clutch cable.
+**Verification:** gate 1, gate 2 — and the joint change is itself the fix:
+`joints.py`'s `steering_clutch_lever <-> steering_spokes (bolted)` must be deleted
+
+Two families are sold. This kart carries the first: **OTK 0113.A0KIT "Forged
+clutch lever Kit, KZ"** — a two-bolt clamp around a tube and a large closed D-loop
+grip, whose parts list is a support (0113.A1), an extension (0113.A2), a pin
+(0113.A3), two bushes (0113.A4 3x4x3 mm, 0113.A5 5x6x4 mm) and a D5 Seeger
+(`sourced`, kartshop OTK gear-lever-system category). The alternative is the plain
+0113.00 lever mounted by the shifter. Type 1 on the **left**: the right hand is
+busy with the gear lever, and OTK's forged kit exists because that is where KZ
+drivers put it.
+
+| dimension | value | prov | basis |
+| --- | --- | --- | --- |
+| clamp centre | (0, +234, +432) | `derived` | on the column axis, 55 mm below the hub clamp face: (0,202,476) - 55 x axis. Clears `steering_bearing_upper` (103 mm below the face) by 18.5 mm along the axis after both parts' half-lengths. |
+| clamp bore | Ø20.0 | `derived` | the column. |
+| D-loop centre | (-108, +228, +438) | `estimated` | the loop extends left into the left hand's fingers with that hand still on the rim. It sits ~70 mm behind the rim plane, which is not a choice: the clamp is 79 mm down the column from the hub face and the column is 7° off the wheel's normal, so any column-clamped lever is behind the rim by about that much. The loop's far end closes to ~55 mm. |
+| D-loop size | 95 x 55 outside, 14 section | `estimated` | 0113.A0KIT photo proportions against a clamp sized for a 20 mm column. |
+| stroke at the grip | 70 | `sourced(snippet)` | "The clutch lever stroke of the 2020 KZ World Champion is 7 cm, though the setup depends on the size of the driver's hand" — tkart.it via search summary; the page 403s from here and nobody in this project has read it. Treat as `estimated` on the recheck pass. |
+| angular travel | 35° | `derived` | 70 mm at the 108 mm grip radius about the clamp = 0.622 rad. |
+| cable | 1.5-2 mm inner in a 5 mm outer, down the column then rearward along the right rail with the shift rod | `estimated` | route and sizes both. |
+
+**Handoff to §Powertrain:** the clutch actuating arm is on the engine's
+**outboard** face at approximately **(+430, -200, +140)** (`estimated`: the TM
+KZ-R1 homologation form's two engine photos show the sprocket on one face and the
+clutch pack on the opposite, and the sprocket must face the kart's centerline).
+§Powertrain owns that part; this section owns the cable only as far as the
+engine's outboard face.
+
+## 40.3 The seat — one parameter was holding two angles, and both were wrong
+
+Sourced better than anything else in the cockpit, because kart seats are sold by
+numbered size with a published chart. **Tillett T11 ML** taken as the
+representative adult KZ size, from the Tillett/IKD dimension chart: A (internal
+width at the hips) 32.5, B (internal width across the top of the back) 36.0,
+C (external front-lip-to-back-top straight line) 46.0, D (front lip height above
+the base plane) 10.0, E (back top height above the base plane) 33.5 cm.
+
+### The derivation, and it closes on a number nobody fed it
+
+Authored: base plane 32, D 100, E 335, shell 4, rake 22°, and the sourced
+axle-to-back gap of 135.
+
+    rear axle centre y -525, axle OD 50 -> front face y -500
+    Tillett KZ "axle to driver's back" = 135 mm  ->  rearmost point y = -365
+    the rearmost point of a reclined shell is the TOP of the back, not its base
+    back rise above the base plane = E = 335, rake 22° from vertical
+      horizontal run = 335 x tan 22° = 135.3
+      hip (base of the back)  y = -365 + 135 = -230
+    front lip: z = 32 + D 100 = 132
+      pan length, hip to lip  = 260   (authored below as SEAT_PAN_LENGTH)
+      lip y = -230 + 260 = +30
+    check against Tillett C, which was NOT used above:
+      lip (0, +30, 132) to back top (0, -365, 367)
+      sqrt(395² + 235²) = 459.6  vs published C = 460      agreement 0.4 mm
+
+A published dimension the derivation never touched coming back to 0.4 mm is the
+reason to believe the rest of it.
+
+### `seat_shell`
+**Status:** built — re-dimensioned; five numbers change and one splits in two
+**Attaches to:** `seat_bracket_upper_l`, `seat_bracket_upper_r`,
+`seat_bracket_lower_l`, `seat_bracket_lower_r` (all bolted)
+**Envelope:** Art. 4.8 (composite permitted; must prevent the driver moving
+sideways), Art. 4.2.3 (four seat supports). Art. 9.1.1's 650 mm height limit
+explicitly excludes the seat.
+**Verification:** gate 1, gate 2 — the waiver this closes measures `seat_shell`
+at **78.07 mm** from its rear stays and **7.31 mm** from the floor tray, the
+latter being a part that should not be underneath it at all
+
+| dimension | field | value | prov | basis |
+| --- | --- | --- | --- | --- |
+| base plane above ground | `seat_z` | 32 | `sourced` -> `derived` | Tillett seat positioning: *"5 mm is usually the maximum dimension that you can set the base of the seat below the tubes with a modern chassis"*, and the lowest tube is at `ground_clearance` 35. So 30 (5 mm proud below the tubes) to 35 (flush); take 32. **`seat_z = 0.075` is 43 mm high.** |
+| back height above the base plane | `seat_height` | 335 | `sourced` | Tillett T11 ML, dimension E. Adult T11 range 280-335. **`seat_height = 0.290` is 45 mm short.** |
+| back top, absolute | — | 367 | `derived` | 32 + 335. `notes_radiator` §6 states 365 for this and its own arithmetic gives 367; 365 is the base-plane-30 case. 2 mm, recorded rather than silently adopted. |
+| rearmost point | — | y -365 | `derived from sourced` | 135 mm KZ axle-to-back gap ahead of the axle's front face at -500. |
+| hip point | `seat_y` | -230 | `derived` | above. `cockpit._seat_spine` reads `seat_y` as the hip point, which is the right reading. **`seat_y = -0.060` is 170 mm too far forward**, and that single error is most of why the built cockpit does not fit a driver. |
+| pan length, hip to front lip | `SEAT_PAN_LENGTH` | 260 | `derived` | 395 - 135.3. Was 300. |
+| front lip rise above the base plane | `SEAT_PAN_FRONT_RISE` | 100 | `sourced` | Tillett dimension D. Was 55. |
+| front lip, absolute | — | (0, +30, +132) | `derived` | 32 + 100. |
+| shell chord rake from vertical | `seat_shell_rake` | 0.384 rad (22° ±5) | `derived` | from C 460 and E 335: total horizontal run sqrt(460² - 335²) = 315; subtract 150-200 mm of flat pan and the back rises 335 over 115-165 of run, atan = 19-26°. |
+| width at the hips, internal / external | `seat_width` | 325 / **333** | `sourced` / `derived` | Tillett A; + 2 x 4 mm shell. `seat_width = 0.330` is right at the hips and should not move. |
+| width at the shoulders, internal / external | `seat_width_shoulders` | 360 / **368** | `sourced` / `derived` | Tillett B; + 2 x 4 mm shell. |
+| shell thickness | `seat_thickness` | 4 | `sourced` material, `estimated` thickness | Art. 4.8 permits composite; 4 mm is what a Tillett fiberglass shell measures. **`seat_thickness = 0.008` is twice it**, and the built shell's 8 mm rim is therefore twice as heavy an edge as the real one. |
+| pan top | — | 36 | `derived` | 32 + 4. It is essentially on the floor, which is the point of a kart. |
+
+**One `seat_width` cannot hold two widths.** A real shell is **35 mm wider at the
+shoulders than at the hips**, and `cockpit.SEAT_HALF_WIDTH`'s table does the
+opposite — it tapers to 0.812 of the hip width at the top, building a shell
+268 mm across the shoulders where the part is 368. Fix in two places: add
+`seat_width_shoulders`, and re-author the table's top entry from **0.812 to
+1.105** (368/333) with the intermediate stations made monotonic. A straight box
+reads wrong here and so does a tapered one.
+
+**Rake: one parameter, two angles, and a third module reading it.**
+
+| angle | value | belongs to | note |
+| --- | --- | --- | --- |
+| shell chord from vertical | 22° | this section, `seat_shell_rake` | the fiberglass's own line |
+| driver's torso recline | 40-45° | §Driver | `estimated`. Not the same thing — a kart shell wraps and the spine lies back further than the shell's own chord. |
+| radiator core rake | ~40° ±5 from vertical | §Powertrain | measured off photographs by `notes_radiator`, and **not** equal to the seat's chord |
+
+`seat_back_angle = 0.610` rad (35°) currently sits between the first two and does
+double duty for both. Worse, `radiator_rake_delta` **adds to it**, and its
+docstring asserts that the radiator core sits in the plane a second seat's back
+would occupy and that this *is* the number rather than an analogy. A measurement
+agent found that false: the core rakes 40° ±5 while the shell's chord is 19-26°.
+
+**So `seat_back_angle` -> `seat_shell_rake = 0.384` and
+`radiator_rake_delta` must be replaced by an authored `radiator_rake` in the same
+commit.** If the seat's number moves first and the coupling is left in place, the
+radiator's rake silently changes from 35° to 22° and nothing in any gate objects —
+a two-parameter drift of exactly the kind the coupling was introduced to prevent,
+running in the other direction.
+
+**No joint between the seat and any radiator part.** Art. 5.3.1: radiators
+*"must not interfere with the seat"* (PDF p. 15). The radiator therefore hangs
+off its own mount, not off the shell, and `joints.py`'s
+`radiator_bracket_* <-> seat_shell (bolted)` is not a joint this spec permits.
+Note that the front matter §5a says the radiator hangs off the seat **stays** while
+`notes_radiator` §4 measured every reference as showing a dedicated frame bracket
+and cites Art. 4.2.3 (welded radiator attachment points on the frame) and
+Art. 4.8.2 (stays are bolted at each end and removed if unused, so a stay is not a
+mounting rail). Whichever §Powertrain picks, it is not the shell. This section's
+only claim is the prohibition.
+
+### `seat_bracket_upper_l`, `seat_bracket_upper_r`
+**Status:** new
+**Attaches to:** `seat_shell` (bolted, M8 through a reinforcement plate),
+`chassis_seat_strut_rear_l` / `_r` (bolted)
+**Envelope:** Art. 4.8.1 — reinforcement plates minimum 1.5 mm thick, minimum
+13 cm2, minimum Ø40; Art. 4.8.2 — bolted at each end
+**Verification:** gate 2, both ends
+
+| dimension | value | prov | basis |
+| --- | --- | --- | --- |
+| pad centre, left / right | (±140, -338, +300) | `derived` | on the back's outer face: the back runs from (-230, 36) to (-365, 367), so z 300 is at y -337.7. x ±140 is inboard of the shoulder half-width 184 by 44 mm, which is where the visible discs sit in every photograph. |
+| reinforcement plate | Ø45 x 1.6 | `sourced` (minima) + `derived` | Art. 4.8.1's Ø40 and 13 cm2 minima: Ø45 gives 15.9 cm2. 1.6 mm is one gauge over the 1.5 minimum. |
+| bracket | 22 x 3 flat steel, ~60 long | `estimated` | a strap from the stay's end to the pad. Nothing publishes it. |
+
+### `seat_bracket_lower_l`, `seat_bracket_lower_r`
+**Status:** new
+**Attaches to:** `seat_shell` (bolted), `chassis_seat_strut_front_l` / `_r`
+(bolted)
+**Envelope:** Art. 4.2.3 — four seat supports
+**Verification:** gate 2, both ends
+
+| dimension | value | prov | basis |
+| --- | --- | --- | --- |
+| pad centre, left / right | (±150, -215, +70) | `estimated` | on the shell's outboard flank just above the pan at the hip station. Not stated in the regulations beyond "four seat supports"; universal in every photograph — the lower tabs come off the main tubes level with the seat's lower flank. |
+| bracket | 22 x 3 flat steel, ~50 long | `estimated` | as the upper pair. |
+
+**Demands on §Chassis, as numbers.** The seat publishes four pads. Each must
+receive a stay whose end contacts it within 2.0 mm:
+
+| pad | required point | `frame.py` today | move |
+| --- | --- | --- | --- |
+| upper l/r | (±140, -338, +300) | `chassis_seat_strut_rear_*` ends (±180, -250, +263) | 103.5 mm |
+| lower l/r | (±150, -215, +70) | `chassis_seat_strut_front_*` ends (±178, -120, +280) | 231.6 mm |
+
+Both of `frame.py`'s pairs currently terminate at upper-stay height (z 263-280),
+so the kart has two upper stays and no lower brackets — which is why the shell's
+nearest neighbor of any kind is the floor tray at 7.31 mm and its rear stays are
+78.07 mm away. **And the floor tray should not be under the seat at all:**
+Art. 4.6 stretches it *"from the central strut to the front of the chassis frame"*,
+and `notes_column` §9 measured the real tray at y **+70 to +720** against
+`params.py`'s `tray_front_y = 0.180` with `tray_length = 0.760`, which runs it from
+-580 to +180 — under the driver's backside instead of under his feet. With the tray
+corrected, the seat drops between the rails at z 32 with nothing beneath it, and
+its only contacts are its four brackets. That is the correct answer and it is why
+the 7.31 mm reading is a symptom of somebody else's bug.
+
+## 40.4 The gear lever — issue #117, which had never had a reference pulled
+
+### The three answers, one line each
+
+| # | #117 asked | answer | prov |
+| --- | --- | --- | --- |
+| 1 | outboard offset | pivot **x +320**, knob **x +200** — the lever leans 120 mm *inboard* as it rises | `estimated` |
+| 2 | knob height | **z +450** above ground, **414 mm above the seat pan** (pan top z 36) | `derived` |
+| 3 | fore-aft | pivot **y +330**, knob **y +300** — the pivot is beside the driver's right **knee**, and the knob sits 20 mm behind the steering wheel's centre plane | `estimated` |
+
+**The reasoning is the part worth keeping.** This is not a stubby thing beside the
+driver's hip. Its knob lives ~40 mm off the steering wheel rim
+(`sourced(snippet)`: *"Two fingers (approximately 4 cm) is the preferred distance
+between the gear lever and the steering wheel"*, tkart.it via two independent
+search summaries; the page 403s from here), so the lever is a ~450 mm bent shaft
+standing beside the knee. And the pivot is forced forward by a part nobody sells:
+**the only two shift rods on the market are 530 mm (OTK 0114.BA "Gear tie-rod,
+530 mm") and 495 mm (Righetti Ridolfi / IKP hexagonal), both `sourced`.** A rod of
+that length between two ball joints, reaching back to a selector at y ≈ -200, puts
+the lever's own pivot at y ≈ +330. A hip-mounted pivot at y ≈ +100 needs a ~300 mm
+rod and no catalog sells one. The rod length decides the fore-aft question against
+the intuitive answer.
+
+An independent check nobody arranged: the right main rail's centerline at y +330
+interpolates to **x 323** in `frame._rail_path`, and the estimated pivot x is
+**+320**. The bracket lands on the rail.
+
+### `shifter_base`
+**Status:** built — re-specified as a pivot bracket carrying two nylon bushes,
+not a plate with a shift gate
+**Attaches to:** `chassis_rail_r` (clamped), `shifter_lever` (pierced)
+**Envelope:** none
+**Verification:** gate 1, gate 2 — and the joint changes:
+`shifter_base <-> chassis_floor_tray (bolted)` becomes
+`shifter_base <-> chassis_rail_r (clamped)`, because the tray's edge is at the
+rail's centerline (Art. 4.6) and the bracket is outboard of it
+
+| dimension | value | prov | basis |
+| --- | --- | --- | --- |
+| bush axis | through (+330, +335, +75), direction (0.098, 0.026, 0.995) | `derived` | §40.4's closure, below. |
+| bush pair | 2 x Ø13 bore x 20 long, 50 apart along the axis | `estimated` | OTK 0111.002 "nylon bush for gear system" is sold with no dimensions. Two bushes is `sourced` as a shape from the part set. |
+| bracket | 40 x 6 steel plate, clamped to the Ø30 rail | `estimated` | the chassis bracket gives **three** discrete lever positions (`sourced(snippet)`), so it is slotted. |
+| standoff from the rail | rod axis 7 mm outboard of the rail's outer surface | `derived` | rail centre x 324 at that station, tube radius 15 -> surface 339; rod at 330 with the bracket carrying it clear above the tube's crown at z 63.3, so the rod passes 11.7 mm over it. |
+
+**The shift gate goes.** `cockpit._shifter` builds a slotted plate "which is what
+says sequential rather than a stick". A KZ has no gate: the lever rotates about
+its own rod's axis in two nylon bushes and the sequential detent is inside the
+gearbox. The plate is a car part and it is the one piece of this assembly that was
+invented rather than measured.
+
+### `shifter_lever`
+**Status:** built — re-specified as a Ø13 rod with a Ø20 hand tube kinked 55°
+**Attaches to:** `shifter_base` (pierced), `shifter_knob` (pressed),
+`shifter_connector_arm` (clamped, serrated collet)
+**Envelope:** none
+**Verification:** gate 1, gate 2, `genkart.sh --check`
+
+**Mechanism, from the part photos** (`sourced` as shapes; `sources_controls.txt`
+carries the images). OTK sells this as five pieces and their shapes say how it
+works: **0111.B0** is one long thin rod, a shoulder, then a thicker tube kinked
+away, with the rod's lower end **serrated**; **0111.002** is the nylon bush;
+**0111.B0A** is a flat forged arm with a **serrated collet clamp** at one end and
+a plain joint hole at the other; **0114.BA** is the 530 mm tie-rod. So the lever
+rotates about its own rod's axis, the kink carries the knob off that axis, and the
+connector arm below the bracket swings the rod fore-and-aft. The serrated collet
+is what lets the arm be set to the sourced 90° against the rod.
+
+**The closure, in arithmetic.** Authored: the rod's lower end R0 = (+330, +335,
++75), the knob N = (+200, +300, +450), the kink 55° ±3 (measured on
+`ctl_otk_0111.B0.webp`, atan(150/104) over four samples along the upper axis), and
+the photo's own length ratio rod:tube = 341:301 px = 53.12% : 46.88% of the bent
+path.
+
+    delta = N - R0 = (-130, -35, +375),  |delta| = 398.4
+    |delta|² = P² (0.5312² + 0.4688² + 2 x 0.5312 x 0.4688 x cos 55°)
+             = P² x 0.78758
+    P = sqrt(158750 / 0.78758) = 448.9        total bent path
+      rod  = 0.5312 P = 238.5
+      tube = 0.4688 P = 210.4
+    rod axis: cos(angle to delta) = (238.5 + 210.4 cos 55°)/398.4 = 0.9016 -> 25.6°
+      taking the in-plane branch nearer vertical:
+      a = (0.0984, 0.0265, 0.9947)            5.85° from vertical, leaning
+                                              outboard and forward
+    kink K = R0 + 238.5 a = (+354, +341, +312)
+    tube  T = N - K = (-153.5, -41.3, +137.8),  |T| = 210.4  ✓
+    angle(a, T) = 54.9°                                        ✓
+
+| dimension | value | prov | basis |
+| --- | --- | --- | --- |
+| rod length | 238 | `derived` | above. `notes_controls` gives 265 from the same photo ratio scaled by a 500 mm total that assumed a 395 mm exposed length measured from a bracket point 10 mm above the rail; re-anchoring on the rod's lower end gives 449 total and 238/210. Same photo, same ratio, different datum — and the 265/235 split does **not** close on the authored knob and pivot: it puts the knob 443.7 mm from the rod's end where the geometry needs 398.4. |
+| hand tube length | 210 | `derived` | above. |
+| kink angle | 55° ±3 | `derived` | photo, four samples. Out-of-plane rotation in the product shot biases it low; the ±3 covers it. |
+| rod diameter | 13 | `derived` | 16.5 px at the re-derived scale 449/586 px = 0.766 mm/px = 12.6. |
+| hand tube diameter | 20 | `derived` | 26.5 px x 0.766 = 20.3. |
+| rod axis, from vertical | 5.85° | `derived` | above. Leans outboard and forward, and the kink brings the tube back inboard over the driver's knee — which is why the lever bows out to x +354 at the kink and returns to +200 at the knob. |
+| knob radius about the rod axis | 172 | `derived` | 210.4 x sin 55°. |
+| throw at the knob, per shift | 88 (80-100) | `derived` | 28 mm of rod travel / 55 mm arm = 0.510 rad = 29.2°, x 172 mm = 88 mm. `notes_controls` says ~100 mm at a 192 mm radius; the radius follows from the tube length, so the 88 is the same estimate carried through the corrected split. |
+| rotation per shift | 29° | `derived` | above. A sequential box re-centres on its own detent, so the driver's motion is ~88 mm forward, release, ~88 mm back — total sweep ~176 mm and ~58°. |
+
+**The diameters are the cross-check, not an input.** The 449 mm total came from
+ergonomics (knob at the wheel, pivot where a real rod length puts it) with no
+reference to the part photo. Feeding that length back through the photo's pixel
+ratios yields a 13 mm rod, a 20 mm tube and a 28 x 47 knob — every one a sane real
+number for a hand lever, and none of them chosen. A badly wrong anchor would have
+produced 8 mm or 30 mm.
+
+### `shifter_knob`
+**Status:** built — dimensions confirmed, position moves
+**Attaches to:** `shifter_lever` (pressed)
+**Envelope:** none
+**Verification:** gate 1, gate 2
+
+| dimension | field | value | prov | basis |
+| --- | --- | --- | --- | --- |
+| centre | — | (+200, +300, +450) | `estimated` | one two-finger gap outboard of and below the rim's rightmost point (+160, +187, +496): \|Δ\| = 65 mm to that point, ~40 mm to the nearest grip surface. **`SHIFTER_KNOB = (0.262, 0.104, 0.392)` is 200 mm rearward of this** — the built knob is beside the seat's top edge, i.e. beside the hip, which is the placement §40.4 exists to correct. |
+| diameter | `SHIFTER_KNOB_RADIUS` | 28 | `derived` | OTK 0112.B0 photo, knob Ø / tube Ø = 1.35. Built radius 0.026 = Ø52, which is nearly twice the part. |
+| length | — | 47 | `derived` | same photo, 2.3 x tube Ø. |
+
+### `shifter_connector_arm`
+**Status:** new — **one part beyond the brief's authorized list**, recorded as
+such. OTK 0111.B0A is a real catalogued piece and the linkage cannot exist
+without it: without the arm there is nothing for the rod to push.
+**Attaches to:** `shifter_lever` (clamped, serrated collet),
+`shift_rod_end_front` (bolted, uniball)
+**Envelope:** none
+**Verification:** gate 1, gate 2
+
+| dimension | value | prov | basis |
+| --- | --- | --- | --- |
+| length, collet centre to joint | 55 | `estimated` | it has to swing 25-30 mm of rod for one gear, and it is set equal to the selector arm so the linkage is 1:1 and the sourced 90° rule is symmetric at both ends. |
+| joint centre | (+330, +276, +76) | `derived` | 55 mm rearward of the rod's lower end in the plane perpendicular to the rod axis, set to 90° against the rod by the collet. |
+| section | 20 x 6 forged flat | `estimated` | 0111.B0A photo proportions. |
+| angle to the rod | 90° | `sourced(snippet)` | tkart.it via two searches: 90° between the lever's connector arm and the return rod for a direct shift. The serrated collet is the hardware that makes an arbitrary angle settable, which is corroboration from the part rather than from the text. |
+
+### `shift_rod`, `shift_rod_end_front`, `shift_rod_end_rear`
+**Status:** new
+**Attaches to:** `shift_rod` <-> both rod ends (threaded, M8 opposing pitches),
+`shift_rod_end_front` <-> `shifter_connector_arm` (bolted),
+`shift_rod_end_rear` <-> `engine_selector_arm` (bolted — §Powertrain's part)
+**Envelope:** none
+**Verification:** gate 1, gate 2. The rod itself touches only its two ends, which
+is correct and is why both joints are declared.
+
+| dimension | value | prov | basis |
+| --- | --- | --- | --- |
+| length, eye to eye | **495** | `sourced` | Righetti Ridolfi / IKP hexagonal shift rod. The alternative is OTK 0114.BA at 530 mm, also `sourced`. |
+| section | 13 across the flats, hexagonal | `sourced` | 13 mm wrench flats, pointkarting. Adjustable with a wrench on the rod itself. |
+| ends | two uniball joints, M8, **opposing thread pitches** | `sourced` | the assembly is a turnbuckle and adjusts without disconnecting. The CRG lever is sold "complete with brackets and uniball joint". |
+| front joint | (+330, +276, +76) | `derived` | the connector arm's joint. |
+| rear joint | **(+215, -205, +95)** | `derived` | placed so the sourced 495 mm closes: sqrt(115² + 481² + 19²) = 494.9. |
+| route | rearward along the driver's right, outboard of `seat_shell`, crossing over `chassis_rail_r` at y +88 with 18.4 mm of clearance | `derived` | interpolating the straight run: at y +88 the rod is at x 285, z 83.4 and the rail's crown at that station is z 65. Minimum clearance to `seat_shell` is **31 mm** — the shell's widest external half-width is 184 at the shoulders and the rod never comes inboard of x 215 while at z 76-95, where the shell is narrower still. |
+
+**Handoff to §Powertrain, as a coordinate.** The engine end is not this section's.
+§Powertrain must place the gearbox selector arm's rod-end joint within **3.0 mm of
+(+215, -205, +95)**. With the selector shaft at (+215, -150, +95) — `estimated` by
+`notes_controls` as low and forward on the crankcase's inboard face, where the
+inboard face is at x 319 - 115 = 204 and a 55 mm arm clears by ~10 mm — that means
+a 55 mm arm pointing rearward. **If §Powertrain moves the shaft, the rod choice
+flips rather than the rod being stretched:** the 530 mm OTK part closes on a joint
+at y ≈ -240, and any joint that needs a length between 495 and 530 is reachable on
+the turnbuckle. A joint that needs less than 495 mm is not buildable from a part
+anybody sells, which is the constraint that placed the lever in the first place.
+
+## 40.5 Pedals — a Ø18 round bar on a forged arm, not a plate
+
+**Organ type, bottom pivot, transverse axis, and this is proven from the parts
+rather than judged.** OTK **0014.DC** (throttle) is a forged arm with a bushed
+pivot eye at the **bottom** and the foot bar at the top; **0014.D3** is the
+support plate; **0015.DC / 0015.DCA** ("Brake pedal, Adjustable, KZ, New type")
+is the same family, its "adjustable" being a slotted plate part-way up the arm
+carrying the pushrod clevis at one of three heights. All `sourced` as shapes.
+
+### `pedal_throttle`, `pedal_brake`
+**Status:** built — re-specified as forged arms; every dimension changes
+**Attaches to:** `pedal_cross_tube` (pierced), `pedal_throttle_pad` /
+`pedal_brake_pad` (welded)
+**Envelope:** Art. 4.4 — pedals must never protrude in front of the chassis,
+including the bumper. Art. 9.4.1's front overhang minimum of 350 puts the bumper
+at y ≥ +875; the foot bar reaches y ≈ +635 at full travel, so **240 mm clear**.
+**Verification:** gate 1, gate 2, and the `pedal_*_pivot` interface axes
+`cockpit.py` already publishes
+
+| dimension | field | value | prov | basis |
+| --- | --- | --- | --- | --- |
+| pivot, throttle / brake | `pedal_pivot` | (+85, +610, +50) / (-85, +610, +50), axis along X | `estimated` | throttle right, brake left (`sourced`, Art. 4.4 names only the two). y from the pedal-to-seat relationship below; z just under the frame's front tube, which is where 0014.D3's plate hangs its eye. |
+| separation | `pedal_separation` | 170 | `estimated` | ±85. Was 0.150; the difference is inside the estimate's own error and is not worth defending on its own. |
+| arm length, pivot to bar centre | `pedal_arm_length` | 180 | `estimated` | the part photo's proportions are self-consistent at this scale: the foot bar reads 0.44 of the arm's height, i.e. ~80 mm, which is one boot. At 145 mm the bar would be 64 mm — too narrow for a boot — and at 210 it would be 92. |
+| arm rake, rearward from vertical | `pedal_arm_rake` | 0.140 rad (8°) | `estimated` | puts the bar 25 mm behind the pivot so the sole meets it square with the leg raised. |
+| **foot bar centre** | derived | (±85, **+585**, **+228**) | `derived` | y = 610 - 180 sin 8° = 585.0; z = 50 + 180 cos 8° = **228.2**. `notes_controls` states 220 for this; 220 - 50 = 170 = 180 cos 19.2°, which contradicts its own 8° rake. 228 is what the note's own inputs give. |
+| **`pedal_z`, corrected** | `pedal_z` | 0.228 | `derived` | **was 0.090** — 21 mm above the floor tray, which is a foot resting on the floor and not a pedal. 138 mm of error. |
+| arm section | — | 22 x 8 at the pivot boss tapering to 16 x 6 | `estimated` | forged-arm proportions off 0014.DC. |
+| brake pushrod clevis, height above the pivot | — | 56 | `derived` | the slotted plate's centre reads 160 px above the pivot bush on a 510 px pivot-to-bar span: 160/510 x 180. Absolute (-85, +602, +105). |
+| **brake pedal ratio** | — | **3.2 : 1** | `derived` | 510/160 from the same photo, i.e. 180/56. Consistent with the ~3:1 that kart brake writing quotes. |
+| throttle travel at the foot | — | 50 (45-55) | `estimated` | 16° of arm rotation, ~25 mm at a cable eye 90 mm up the arm; a slide carburettor wants ~25 mm. |
+| brake travel at the foot | — | 32 | `estimated` | 10° of rotation. |
+
+### `pedal_throttle_pad`, `pedal_brake_pad`
+**Status:** built — re-specified. These are not rubber pads on plates; they are
+the transverse **foot bars**, and the name is now misleading.
+**Attaches to:** `pedal_throttle` / `pedal_brake` (welded)
+**Envelope:** none
+**Verification:** gate 1, gate 2. `joints.py` calls both pairs `bolted` ("the
+rubber pad on the plate"); on the real part the bar is welded to the arm, so the
+`kind` changes.
+
+| dimension | field | value | prov | basis |
+| --- | --- | --- | --- | --- |
+| foot bar | `pedal_bar_diameter`, `pedal_bar_length` | Ø18 x 80, transverse | `estimated` | 0014.DC/0015.DCA proportions at the 180 mm arm scale; 80 mm is one boot wide. **Replaces `pedal_width = 0.070` and `pedal_length = 0.120`, a flat 70 x 120 plate. A plate is a rental-kart pedal.** |
+| knurl / grip | — | cross-hatched over the middle 60 mm | `estimated` | visible as texture in the part photos; below the resolution that gives a dimension. |
+
+### `pedal_cross_tube`, `pedal_mount_l`, `pedal_mount_r`
+**Status:** built — re-positioned
+**Attaches to:** `pedal_cross_tube` <-> `pedal_mount_?` (pierced),
+`pedal_mount_?` <-> `chassis_cross_pedal` (clamped — a new §Chassis part, below)
+**Envelope:** Art. 4.2.3 (welded attachment points for the pedals are the frame's)
+and Art. 4.2.5 (the pedal kit itself is a component). Art. 4.4: a pedal kit that
+relocates the driver's feet may only be used if supplied by the chassis
+manufacturer — so the mounts are part of the chassis product, not a bolt-on.
+**Verification:** gate 2 — this closes the **5.2 mm** waiver on
+`pedal_mount_? <-> chassis_cross_front`
+
+| dimension | field | value | prov | basis |
+| --- | --- | --- | --- | --- |
+| cross tube | `PEDAL_TUBE_DIAMETER` | Ø16, x -140…+140 at (y +610, z +50) | `estimated` | the pivot shaft both pedals swing on. Diameter unpublished. |
+| mount plates | `PEDAL_MOUNT_X` | x ±125 | `derived` | outboard of both pedals (±85) and inboard of the tube's ends (±140), so the arms swing free. |
+| plate shape | — | bore for the frame tube at the top, pivot eye 25 mm below | `sourced` (shape) | 0014.D3. |
+
+**Demand on §Chassis, and one unresolved conflict.** The pedal mounts currently
+bolt to `chassis_cross_front` at y +525 and miss it by 5.2 mm, and they cannot
+reach a pivot at y +610 from there. §Chassis must provide
+**`chassis_cross_pedal`**: a transverse tube at **y +610, z +75**, Ø ≥ 22,
+spanning at least x ±160, as part of the frame's forward structure — the CRG Road
+Rebel homologation form publishes a 250 mm front overhang of the main tube ahead
+of the front axis, so there is frame out to y +775 for it to belong to. The mounts
+then clamp it with the eye 25 mm below at z +50.
+
+**The conflict, stated rather than hidden:** a pivot at z +50 is **19 to 44 mm
+below** the floor tray's top surface at that station (tray top z 69 where it bolts
+to rails at z 50, higher at the front where the rails rise 25 mm). Art. 4.6 wants
+the tray to be a single element stretching to the front of the frame and forbids
+ribs, so it cannot simply be notched around two supports without an argument.
+Either the tray's front edge stops at y ≤ +575 and the toe area is open frame, or
+the pivot rises to z ≈ +100 and the foot bar with it to z ≈ +278. This section
+authors z +50 because that is what the part photograph shows — the bore clamps the
+frame tube and the eye hangs below it — and flags the tray question as §Chassis's
+to settle. It is 25-50 mm and it moves the pedal face, so it is worth one
+measurement rather than one opinion.
+
+### Master cylinder — not this section's part, but this section's interface
+**Bore: 22 mm, `sourced`, deferred to §Running gear.** `notes_controls` §5 gives
+19 mm and marks it `estimated`, and says itself that it is the single number to
+re-check before anything depends on it: the only OTK figure found is a "D13 x 8 mm"
+BSM piston in a category that also contains a Mini Kid pump, so 13 is very likely
+the cadet part; kart master cylinders are published in 19 and 22 mm (Franklin
+Kart); OTK lists a pump named "22SRR". §Running gear is sourcing 22 mm from two
+homologation forms, and **a homologation form beats a catalog inference**, so this
+section adopts 22 and records 19 as superseded rather than carrying both.
+
+What changes with the bore and what does not:
+
+| quantity | 19 mm | 22 mm | note |
+| --- | --- | --- | --- |
+| pedal ratio | 3.2:1 | 3.2:1 | geometric, unaffected |
+| piston travel | 10 mm | 10 mm | 32 mm foot travel / 3.2, unaffected |
+| displacement per circuit | 2.84 cm3 | **3.80 cm3** | pi x 11² x 10 = 3801 mm3 |
+
+**Interface demands on §Running gear.** Art. 4.4 (PDF p. 9): *"The brake pedal
+must be placed in front of the master cylinder."* The brake pedal's pushrod clevis
+is at **(-85, +602, +105)** and the pushrod is **68 mm** (`sourced`, OTK 0119.01
+"Push rod, BSM, 68 mm"), so the cylinder's mouth is at **y ≈ +534** and its body
+runs rearward from there — entirely behind the pedal, which is the whole content of
+the article. The cylinder's axis must pass through the clevis. Art. 4.12.2 (PDF
+p. 12) requires the pedal-to-pump link to be **doubled for safety**, with a
+homologated cable at ≥1.8 mm; the second link is a pedal-side part that no section
+currently owns and it is **required, not optional** — recorded here as an open item
+rather than left in prose.
+
+### The pedal-to-seat relationship, which is what makes the cockpit fit
+
+| quantity | value | prov | basis |
+| --- | --- | --- | --- |
+| seat pan front lip | y +30 | `derived` | §40.3. `notes_controls` assumes y ≈ +90 for this from `seat_y = -0.060`; the corrected seat puts it 60 mm further back, which lengthens every reach below rather than shortening it. |
+| lip to foot bar | 555 | `derived` | 585 - 30. |
+| **hip point to foot bar** | **836** | `derived` | hip (0, -230, +36) to bar (±85, +585, +228): sqrt(815² + 192²). |
+| adjustment available on a real kart | 180 mm in ten holes | `sourced` | IPK/Praga "Driver position set-up": adjustable pedalboard, "18 cm" of foot movement over ten positions. So 836 sits in a band from about 660 to 1010 and is not at either end. |
+
+**This is the number `cockpit.py`'s own docstring says it cannot fix.** Criterion
+1 of issue #13 measured hip point to pad face at **618.5 mm**, folding the knee to
+89° where "nearly straight" is 850-870, and the module correctly refused to retune
+around it because the fault was in `seat_y`, `pedal_y` and `wheel_center_y`.
+Correcting the seat and the pedals independently, each to its own source, lands
+**836 mm** — 14 to 34 mm short of the target and inside the pedalboard's own
+adjustment range. Nobody fitted that. It is what two separately-sourced parts do
+when both are put where their sources say.
+
+The same arithmetic on the wheel: hip (0, -230, +36) to the rim's nearest grip
+point. Rim centre (0, +187, +496), the rim's lower edge at (0, +115, +429): 348 mm
+of reach in y and 393 in z, i.e. 525 mm from the hip, against
+`driver_upper_arm` + `driver_forearm` = 550. It fits with 25 mm to spare where the
+old geometry put the rim 4 mm past a fully extended arm. §Driver owns the check;
+this section owns the two endpoints.
+
+## 40.6 Fuel tank — mandated position, and it is why the molding is notched
+
+The kart has no tank. Art. 9.3 (PDF p. 22) requires **8 litres minimum** for
+Group 2, and Art. 4.7 (PDF p. 10) does not merely permit a position, it
+**mandates** one: *"It is mandatory to place the fuel tank between the main tubes
+of the chassis frame, ahead of the seat and behind the rotation axis of the front
+wheels."*
+
+### `fuel_tank`
+**Status:** new
+**Attaches to:** `chassis_floor_tray` (seated — it sits on the tray),
+`fuel_tank_strap_front` and `_rear` (clamped), `fuel_tank_filler` (threaded)
+**Envelope:** Art. 4.7 in full — securely fixed, flexible pipes, no
+pressurization other than the fuel pump, and **not shaped to act as an
+aerodynamic device**. Art. 9.3 — capacity.
+**Verification:** gate 1 (three neighbors it must clear: `steering_column`,
+`seat_shell`, both rails), gate 2 (four declared joints)
+
+| dimension | field | value | prov | basis |
+| --- | --- | --- | --- | --- |
+| capacity | `tank_capacity` | 8.5 L | `sourced` | OTK **0073.EA** "Fuel tank, KZ, 8.5 Litre"; KG SER.003 and CKR also sell 8.5. Art. 9.3's minimum is 8, so 8.5 is the catalog size that clears it. |
+| outer size | `tank_size` | 255 W x 250 D x 230 H | `estimated` | must fit between the rails, and 255 x 250 x 230 is 14.7 L of bounding box of which 8.5 L is 58% — the right fraction for a body radiused on every edge and waisted at the bottom front, which is what the 0073.EA photo shows. |
+| centre | `tank_center` | (0, +225, +184) | `derived` | Art. 4.7, three clauses at once: between the main tubes -> x 0; behind the front wheel axis (+525) -> front face +350, **175 mm clear**; ahead of the seat (lip +30) -> rear face +100, **70 mm clear**. z from the tray: bottom = tray top 69, so centre = 69 + 115 = 184 and top = 299. **Every one of the three coordinates is forced by the article, which is why this is `derived` and not `estimated`.** |
+| lateral clearance to the rails | — | 170 per side | `derived` | rail centerline interpolates to x 297 at y +225; half-width 127.5. |
+| **steering column relief** | — | notch above z 265, y +325…+350, 70 wide on the centerline | `derived` | the column's height along its axis is z(y) = 97 + 1.3763 (477 - y). At the tank's front face y 350 that is z **271.8**, and it crosses the tank's top plane z 299 at y **330.2**. So the mandated position drives the column through the tank's top-front corner over 20 mm of y and 27 mm of z. The real molding is *"waisted at the bottom front to clear the steering column and the shins"* (`sourced` as a shape, 0073.EA photo) — this is the same feature, and it has to be **real geometry, not a declared joint**, because a joint would permit the interpenetration gate 1 exists to catch. Ø20 column plus 25 mm of clearance per side = 70 mm wide. |
+| shape | — | waisted at the bottom front, widest at the top, molded strap channels | `sourced` (shape) | 0073.EA photo. It sits between the driver's legs; Art. 4.7 forces the position that causes the shape. |
+| fittings | — | **three** on the top rear: feed, return, vent, Ø8 nipples | `sourced` | *the KZ tank differs from the OK tank by an extra fitting for a return line* — that is the distinguishing feature of this part and it is the reason not to reuse an OK tank. The 0073.EA photo shows two red-collared fittings plus one bare nipple. Modeled as molded bosses on this mesh rather than as three separate parts, which is a mesh-count decision and not a claim about the real part. |
+
+### `fuel_tank_strap_front`, `fuel_tank_strap_rear`
+**Status:** new
+**Attaches to:** `fuel_tank` (clamped), `chassis_rail_l` and `chassis_rail_r`
+(clamped)
+**Envelope:** Art. 4.7 — securely fixed; *"A quick attachment to the chassis is
+strongly recommended."*
+**Verification:** gate 2, three declared contacts each
+
+| dimension | value | prov | basis |
+| --- | --- | --- | --- |
+| count | two, over the top | `estimated` | the 0073.EA photo shows two molded strap channels; the count follows the channels. |
+| positions | y +310 and y +140 | `derived` | over the channels, inboard of the tank's front and rear faces by 40 mm. |
+| section | 25 x 2 nylon-reinforced strap, cam buckle | `estimated` | a quick attachment per Art. 4.7's recommendation; a bolted steel band would satisfy the article and lose the recommendation. |
+
+### `fuel_tank_filler`
+**Status:** new
+**Attaches to:** `fuel_tank` (threaded)
+**Envelope:** none
+**Verification:** gate 1, gate 2
+
+| dimension | value | prov | basis |
+| --- | --- | --- | --- |
+| centre | (0, +140, +299) | `estimated` | top face, rearward third, on the centerline — reached between the legs past the steering wheel. The 401T side view shows the red cap at the tank's top-rear corner. |
+| size | Ø60 x 25 tall | `estimated` | 0073.EA photo proportions. |
+| top of the cap | z 324 | `derived` | 299 + 25. Well under Art. 9.1.1's 650. |
+
+### `fuel_line_feed`, `fuel_line_return`
+**Status:** new
+**Attaches to:** each `routed` into `fuel_tank`'s fittings at one end and handed
+off to §Powertrain at the other
+**Envelope:** Art. 5.6.1 (PDF p. 16) — *"Only one fuel line from the tank to the
+carburettor/fuel pump is allowed, as well as one fuel filter before the fuel
+pump."* Art. 4.7 — pipes must be flexible, and the fuel pump is the only
+permitted influence on the tank's internal pressure.
+**Verification:** gate 1, gate 2
+
+| dimension | value | prov | basis |
+| --- | --- | --- | --- |
+| feed lines | **one**, and one filter before the pump | `sourced` | Art. 5.6.1. Two feed lines is a scrutineering failure, so this is a hard count and not a styling choice. The return line is not a feed line and does not count against it. |
+| line size | 5 ID / 8 OD | `estimated` | standard translucent fuel hose; not published for this part. |
+| route | up out of the top-rear face, rearward and to the right along the right rail under the seat's edge, to the pulse pump and then the carburettor | `estimated` | path only; that the pipes must be flexible is `sourced` (Art. 4.7). |
+| handoff to §Powertrain | carburettor inlet ≈ **(+300, -160, +280)**, pulse pump between it and the tank | `estimated` | `notes_controls` §7.1. §Powertrain owns both fittings; these lines end at them. |
+
+## 40.7 The throttle link and the return spring — required by Art. 4.4, deferred
+
+Art. 4.4 is not permissive here: *"The accelerator pedal must be equipped with a
+return spring. A mechanical link between the accelerator pedal and the carburettor
+is mandatory."* Neither part exists and neither is in this section's authorized
+new-part set, so both are recorded with their numbers and left as open items
+rather than written into prose and forgotten:
+
+| part | numbers | prov |
+| --- | --- | --- |
+| throttle return spring | Ø8 coil, free length 72 / 97 / 124 (three offered); anchor boss on the arm ~40 mm above the pivot, spring running rearward to a frame tab | `sourced` (Righetti Ridolfi "Tension Spring for Brake/Throttle Pedal"; OTK 0016.DA accelerator and 0016.DB brake springs are separate parts). The boss is `sourced` from the 0014.DC photo; the tab is `estimated`. |
+| throttle cable | 1.5 mm inner in a 5 mm outer, rearward along the right rail, under the seat, up to the carburettor's throttle arm at ≈ (+300, -160, +280) | `sourced` that the link must be mechanical and must exist (Art. 4.4); route and sizes `estimated` |
+| second brake link | ≥1.8 mm cable, pedal arm to the cylinder bracket | `sourced` (Art. 4.12.2) |
+
+The mechanical-link clause also has a sim consequence worth writing down once:
+there is no fly-by-wire on this kart, so a stuck throttle is a mechanical
+possibility and the model may not assume the input can be cut electrically.
+
+## 40.8 `joints.py` — what this section adds, changes and deletes
+
+| pair | kind | action |
+| --- | --- | --- |
+| `steering_column` <-> `steering_bearing` | pierced | keep; the 23.36 mm waiver closes by construction |
+| `steering_bearing` <-> `chassis_steering_bracket` | pressed | replaces `steering_bearing <-> chassis_steering_hoop` |
+| `steering_column` <-> `steering_bearing_upper` | pierced | new |
+| `steering_bearing_upper` <-> `chassis_column_support_?` | bolted | new |
+| `steering_column` <-> `steering_hub` | clamped | replaces `steering_boss <-> steering_column` |
+| `steering_hub` <-> `steering_hub_wedge` | bolted | new |
+| `steering_hub_wedge` <-> `steering_boss` | bolted | new |
+| `steering_clutch_lever` <-> `steering_column` | clamped | **replaces** `steering_clutch_lever <-> steering_spokes` |
+| `seat_shell` <-> `seat_bracket_*` | bolted | new, four pairs |
+| `seat_bracket_upper_?` <-> `chassis_seat_strut_rear_?` | bolted | replaces `seat_shell <-> chassis_seat_strut_*` |
+| `seat_bracket_lower_?` <-> `chassis_seat_strut_front_?` | bolted | as above |
+| `radiator_bracket_*` <-> `seat_shell` | bolted | **delete** — Art. 5.3.1 forbids it |
+| `shifter_base` <-> `chassis_rail_r` | clamped | **replaces** `shifter_base <-> chassis_floor_tray` |
+| `shifter_lever` <-> `shifter_connector_arm` | clamped | new |
+| `shifter_connector_arm` <-> `shift_rod_end_front` | bolted | new |
+| `shift_rod` <-> `shift_rod_end_?` | threaded | new, two pairs |
+| `shift_rod_end_rear` <-> `engine_selector_arm` | bolted | new, and §Powertrain owns the far side |
+| `pedal_?_pad` <-> `pedal_?` | welded | was `bolted`; the foot bar is welded to the arm |
+| `pedal_mount_?` <-> `chassis_cross_pedal` | clamped | **replaces** `pedal_mount_? <-> chassis_cross_front`; closes the 5.2 mm waiver |
+| `fuel_tank` <-> `chassis_floor_tray` | seated | new |
+| `fuel_tank` <-> `fuel_tank_strap_?` | clamped | new |
+| `fuel_tank_strap_?` <-> `chassis_rail_?` | clamped | new |
+| `fuel_tank` <-> `fuel_tank_filler` | threaded | new |
+| `fuel_tank` <-> `fuel_line_?` | routed | new |
+
+Waivers this section's numbers close: `steering_bearing`/`chassis_steering_hoop`
+23.36 mm, `chassis_steering_hoop`/`chassis_cross_front` 5.1 mm,
+`seat_shell`/`chassis_seat_strut_*` 78.07 mm, `pedal_mount_?`/`chassis_cross_front`
+5.2 mm. Each of the four is closed by an authored coordinate plus a stated
+tolerance, not by a nudge.
+
+## 40.9 `params.py` — the change list
+
+    # steering: author the welded end and the part, derive the free end
+    lower_bore          = (0.0, 0.477, 0.097)   # was: not represented at all
+    column_length       = 0.490                 # was: local 0.402 in steering_column_base
+    column_rake         = 0.628                 # was: wheel_angle 0.470
+    column_diameter     = 0.020                 # was: 0.018, the Art. 4.5.2 floor
+    hub_stack           = 0.025                 # new
+    wheel_incline_delta = 0.122                 # new: the inclined hub is a real part
+    upper_bore          = (0.0, 0.262, 0.393)   # new, and derivable at 366 mm up-axis
+    # wheel_center_y / wheel_center_z: DELETE as authored; derive to (0, 0.187, 0.496)
+    wheel_rim_thickness = 0.038                 # was 0.024
+
+    # seat
+    seat_z              = 0.032                 # was 0.075
+    seat_y              = -0.230                # was -0.060
+    seat_height         = 0.335                 # was 0.290
+    seat_thickness      = 0.004                 # was 0.008
+    seat_width          = 0.333                 # hips, external; was 0.330
+    seat_width_shoulders= 0.368                 # new
+    seat_shell_rake     = 0.384                 # replaces seat_back_angle 0.610
+    # and radiator_rake_delta must become an authored radiator_rake IN THE SAME
+    # COMMIT, or the seat's change silently moves the radiator from 35 to 22 deg
+
+    # pedals
+    pedal_pivot         = (0.085, 0.610, 0.050) # replaces pedal_y 0.560
+    pedal_arm_length    = 0.180                 # new
+    pedal_arm_rake      = 0.140                 # new
+    pedal_z             = 0.228                 # was 0.090, derived not authored
+    pedal_separation    = 0.170                 # was 0.150
+    pedal_bar_diameter  = 0.018                 # replaces pedal_width 0.070
+    pedal_bar_length    = 0.080                 # replaces pedal_length 0.120
+
+    # gear lever
+    shift_rod_end_lower = (0.330, 0.335, 0.075) # new
+    shift_knob_center   = (0.200, 0.300, 0.450) # replaces SHIFTER_KNOB
+    shift_kink          = 0.960                 # 55 deg
+    shift_rod_length    = 0.495                 # new, sourced
+
+    # fuel tank
+    tank_capacity       = 0.0085                # m3, sourced OTK 0073.EA
+    tank_size           = (0.255, 0.250, 0.230) # new
+    tank_center         = (0.0, 0.225, 0.184)   # new, derived from Art. 4.7
+
+## 40.10 Provenance and part tally
+
+**Parts: 30.** 17 `built` (`steering_column`, `steering_bearing`,
+`steering_boss`, `steering_rim`, `steering_spokes`, `steering_clutch_lever`,
+`seat_shell`, `shifter_base`, `shifter_lever`, `shifter_knob`, `pedal_throttle`,
+`pedal_throttle_pad`, `pedal_brake`, `pedal_brake_pad`, `pedal_cross_tube`,
+`pedal_mount_l`, `pedal_mount_r`) and **13 `new`** (`steering_bearing_upper`,
+`steering_hub`, `steering_hub_wedge`, `seat_bracket_upper_l/r`,
+`seat_bracket_lower_l/r`, `shifter_connector_arm`, `shift_rod`,
+`shift_rod_end_front/rear`, `fuel_tank`, `fuel_tank_strap_front/rear`,
+`fuel_tank_filler`, `fuel_line_feed/return`). None marked `delete`; of the built
+17, **every one** changes at least one dimension and four change their attachment.
+
+**Numbers: 136 tagged rows carrying 138 tags** (a few rows carry two, where a
+`sourced` size was picked out of a catalog list by a `derived` measurement):
+`sourced` 32, `derived` 65, `estimated` 39, `sourced(snippet)` 2. Three further
+`snippet` figures are cited in §40.4's prose rather than in a table — the 40 mm
+knob-to-wheel gap, the reach rule and the bracket's three positions — so the
+snippet count is **5**. The `snippet` five are all tkart.it via search summary —
+the knob-to-wheel gap, the reach rule, the 90° lever-to-rod rule, the bracket's
+three positions and the clutch stroke — and the recheck pass treats them as
+`estimated`. `estimated` clusters in three places and each has a reason: the two
+steering brackets (no manufacturer publishes a support drawing and every
+photograph in the repo has the lower bracket behind bodywork), the gear lever's
+absolute position on the chassis (published nowhere at all) and the fuel tank's
+outer form (sold by capacity, never dimensioned).
+
+Four `estimated` figures become measurements from a single photograph if one turns
+up: a shot from the front or from underneath with the floor tray visible closes the
+lower bracket's top face, the bracket's own size, the upper support's weld point
+and the tray's front edge in one pass.
+
+## 40.11 Things this section believes are wrong in files it does not own
+
+Numeric, reported rather than acted on, and each one is verifiable before it is
+believed.
+
+1. **`radiator_rake_delta` is a live trap, not just a mislabel.** It is *added to*
+   `seat_back_angle`. Correcting the seat's rake from 0.610 to 0.384 moves the
+   radiator core 13° more upright with no gate objecting, because no gate measures
+   a rake. The two changes have to land together. `params.py` §radiator.
+2. **`cockpit.WHEEL_DISH = 0.048` shortens the steering column.**
+   `_steering_column` computes its upper end as `center - axis * WHEEL_DISH`, so a
+   dish that is 33 mm too large removes 33 mm of column. The dish estimate is
+   15 mm and the hub stack is a separate 25 mm; conflating the two is what makes
+   48 look reasonable.
+3. **`params.py`'s floor tray is about 650 mm too far back.**
+   `tray_front_y = 0.180` with `tray_length = 0.760` runs it from y -580 to +180 —
+   under the seat. `notes_column` measured the real tray at **+70 to +720** at
+   1.1236 mm/px, and Art. 4.6 agrees in words. `tray_width = 0.560` also
+   over-reads; the tray measures ~382 mm across and Art. 4.6 caps it at the main
+   tubes' centerline seen from above. This section depends on it twice: the seat's
+   7.31 mm "attachment" is to a tray that should not be underneath it, and the
+   column's lower nut passes through it.
+4. **`cockpit.py`'s shift gate is invented.** `_shifter` builds a slotted plate
+   "which is what says sequential rather than a stick". A KZ lever turns in two
+   nylon bushes and the detent is inside the gearbox; there is no gate on any of
+   the five OTK parts that make up the assembly.
+5. **`axle_diameter`'s docstring says "Solid, 50 mm"** and Art. 9.2 (PDF p. 22)
+   sets the maximum outside diameter with *"wall thickness according to Article
+   4.3"* — a wall thickness clause means a tube. §Running gear's, and the front
+   matter already flags it; repeated because `notes_column` used the 50 mm axle as
+   a photogrammetric scale reference and a solid-vs-tube error there would move
+   the seat's 135 mm axle-to-back gap.
+6. **`tube_main = 0.030` has a sourced alternative it is not using.** The CRG Road
+   Rebel homologation form publishes 32 mm ±0.5 in section B; `params.py`'s header
+   calls 30 mm "KZ typical" with no citation. §Chassis's call, but it moves the
+   rail crown that the shifter bracket clamps and the 18.4 mm the shift rod clears
+   it by.
+7. **`params.py`'s header still carries `Overall length 1830 mm max`** and the
+   "where a regulation states a maximum, the maximum is used" framing, which the
+   front matter §5 replaced with a derived 1920. It is the worked example of an
+   estimate wearing the vocabulary of a limit and it is still in the file.
+8. **`notes_controls` cites Art. 8.3 for the fuel tank minimum.** 8.3 is the
+   **Group 1** article (PDF p. 20); KZ/KZ2 is Group 2 (PDF p. 1) and the article is
+   **9.3** (PDF p. 22). Both say "8 litres minimum", so the number survives and
+   only the citation was wrong — which is exactly the failure mode the §7.4/§7.2
+   incident recorded, caught this time before it reached five files.
+
 # 50. Bodywork
 
 Front fairing and its mounting kit, front panel, two side pods, rear wheel
@@ -1065,3 +3201,938 @@ placed from their own overhang, not from half a length.
 23 parts, against Art. 4.10.1's six homologated *items* — the difference is
 mounting hardware, which the article rolls into "one front fairing mounting kit"
 and gate 2 needs individually.
+
+# 60 — Driver package, finishes and livery
+
+Issue #190, §60 of `KART_SPEC`. Conventions, provenance tags and the part-entry
+format are `00-front-matter.md`'s and are not restated. Millimeters throughout;
+`params.py` is in meters. Blender axes, origin on the ground at mid-wheelbase.
+
+Three sources are load-bearing here and each is named where it is used:
+
+    refs/frontend/fia_karting_technical_regulations_2026.pdf   the only regulation text
+    refs/kart-visual/notes_radiator.md  §6                     the seat, already sourced
+    the photographs in refs/kart-visual/                       what settles a finish
+
+**The seat is not re-derived.** §6 of `notes_radiator.md` sources it from Tillett's
+published size chart (T11 ML: A 32.5, B 36.0, C 46.0, D 10.0, E 33.5 cm) and every
+driver datum below hangs off that block. Where this section disagrees with a
+`params.py` field it says so in §60.6 and changes nothing.
+
+---
+
+## 60.1 The seated driver, as hard points
+
+There is **no driver mesh**: `assets/generated/kart.json` holds 146 parts and not
+one of them is a person. `build.py` already carries `suit_fabric`, `helmet_shell`
+and `rubber_grip` for a driver that was never built, so the materials predate the
+geometry by two milestones.
+
+The whole driver is built off two things and nothing else: the seat, which is
+sourced, and one anthropometric table, which is sourced.
+
+### 60.1.1 The seat datums this rests on
+
+All `derived from sourced`, all from `notes_radiator.md` §6, restated because every
+row below cites one of them:
+
+| datum | value | basis |
+| --- | --- | --- |
+| seat base plane above ground | 32 | Tillett positioning note + `ground_clearance` 35 |
+| seat pan (the surface the weight sits on) | **z = 36** | base 32 + 4 mm shell |
+| seat front lip | z = 132 | base 32 + D 100 |
+| seat back top | **z = 365, y = −365** | base 32 + E 335; Tillett KZ axle-to-back gap 135 with the axle face at −500 |
+| back shell rake from vertical | **22°** (19–26) | from C 460 and E 335, pan flat 150–200 subtracted |
+| seat front lip, fore-aft | **y = −50** | `derived`: −365 + √(460² − 335²) = −365 + 315 |
+| back surface at height z | `y = −365 + 0.404·(365 − z)` | `derived` from the 22° rake, tan 22° = 0.404 |
+| shell external width, hips / shoulders | 333 / 368 | A and B + 2 × 4 mm |
+
+### 60.1.2 The anthropometry, and its citation
+
+`sourced`. **NASA, *Anthropometric Source Book*, Volumes I–III, 1978** (Webb
+Associates, Anthropometry Research Project), read via the US DoD Ergonomics
+Working Group's *Anthropometric Guidelines* tabulation at
+`denix.osd.mil/ergo-wg/…/AnthropometricGuidelines.doc`, fetched and read
+2026-07-28. Published in inches; converted here, arithmetic shown.
+
+Anthropometry is publishable reference data — this is a `sourced` citation in the
+front matter's sense, not a `snippet`. Two ANSUR routes were tried first and
+neither served a percentile table that could actually be read (the NC State
+summary PDF 404s; the UMTRI ANSUR files are code books, not statistics), so this
+is the table that was read rather than the table that was wanted. It is a 1978
+US-military-male sample and the driver is therefore a **50th-percentile adult
+male of that population**, which is a modeling choice and is stated as one.
+
+| dimension (50th pct male) | inches | **mm** |
+| --- | --- | --- |
+| stature | 68.7 | 1745 |
+| sitting height, pan to vertex | 34.1 | 866 |
+| sitting eye height | 31.0 | 787 |
+| midshoulder height, sitting | 24.5 | 622 |
+| shoulder breadth (bideltoid) | 17.9 | 455 |
+| upper-arm length, shoulder to elbow | 14.5 | **368** |
+| **elbow-to-fist length** | 14.2 | **361** |
+| hand length | 7.5 | 191 |
+| buttock-popliteal length | 19.2 | 488 |
+| knee height, sitting | 21.3 | 541 |
+
+`elbow-to-fist length` is the dimension the reach check needs and the reason this
+table was worth chasing: it runs from the elbow to the **center of the closed
+fist**, which is exactly where a steering-wheel rim sits. `driver_forearm` is an
+elbow-to-wrist bone and stops 90-odd millimeters short of any grip.
+
+Segment lengths not in that table, `derived` from Drillis & Contini's
+stature fractions, which is standard biomechanics reference data:
+
+    thigh, hip joint to knee joint    0.245 x 1745 = 428
+    shank, knee joint to ankle joint  0.246 x 1745 = 429
+
+### 60.1.3 The two placement estimates, stated as estimates
+
+| quantity | value | prov | reasoning |
+| --- | --- | --- | --- |
+| hip joint above the pan | **95** | `estimated` | the H-point sits 90–100 mm above a firm seat surface in every seating-package convention. Nothing in this repo sources it. |
+| hip joint forward of the back contact | **100** | `estimated` | roughly half the pelvis depth. Checked below against a figure measured by somebody else, and it lands within 4 mm. |
+| torso recline from vertical | **25°** | `estimated` | bracketed by the shell chord's sourced 19–26°, taken 3° back of the middle because the spine continues above where the shell ends. `notes_radiator.md` §6 offers 40–45° for the torso; §60.6 shows that angle cannot be built. |
+
+So: **hip joint at (±85, −170, 130).**
+
+    z:  pan 36 + 95                                        = 131 -> 130
+    y:  back surface at z 130 is -365 + 0.404 x 235 = -270
+        hip 100 forward of it                              = -170
+
+**And it is corroborated.** The §40 Cockpit agent measured hip-to-pedal-face at
+**735 mm** from a completely different direction. This spec's hip and
+`params.py`'s pedal give
+
+    sqrt((560 + 170)^2 + (90 - 130)^2) = sqrt(730^2 + 40^2) = 731.1 mm
+
+which agrees to **4 mm, 0.5%**. Two chains, one answer; the hip is solid.
+
+### 60.1.4 The hard points
+
+Torso axis unit vector at 25° from vertical, leaning back:
+`(0, −sin 25°, cos 25°) = (0, −0.4226, 0.9063)`. Along-torso distances are the
+table's sitting heights minus the 95 mm hip rise.
+
+| point | x | y | z | prov | arithmetic |
+| --- | --- | --- | --- | --- | --- |
+| hip joint (H-point) | ±85 | **−170** | **130** | `derived` | §60.1.3 |
+| shoulder joint (acromion) | ±200 | **−393** | **608** | `derived` | 622−95 = 527 along torso: −170 − 527·0.4226; 130 + 527·0.9063 |
+| shoulder outer surface | ±227 | −393 | 608 | `derived` | bideltoid 455 / 2 |
+| eye | ±32 | **−462** | **757** | `derived` | 787−95 = 692 along torso |
+| vertex, bare head | 0 | −496 | 829 | `derived` | 866−95 = 771 along torso |
+| helmet center | 0 | **−454** | **738** | `derived` | 100 mm below the vertex along the head axis |
+| helmet crown, outer | 0 | −511 | **860** | `derived` | vertex + 35 mm of liner and shell |
+| knee joint | ±180 | **+123** | **442** | `derived` | two-link solve, below |
+| ankle joint | ±110 | +425 | 137 | `derived` | heel + 55 forward + 68 up |
+| heel contact | ±110 | +370 | **69** | `derived` | ball of foot 190 back; tray top is z 69 — **see §60.6, there is no tray there** |
+| ball of foot / pedal contact | ±75 | +560 | +90 | `sourced` (`pedal_y`, `pedal_z`) | throttle x +75, brake x −75 from `pedal_separation` 150 |
+
+Overall seated height, helmeted: **860 mm** above the asphalt. `derived`. That is
+210 mm above Art. 9.1.1's 650 mm chassis ceiling, which is what every photograph
+of a kart shows and is the sanity check on the whole chain.
+
+Shoulder span: `driver_shoulder_span = 400` is **biacromial breadth and is
+correct**; the 455 bideltoid is the flesh, 27 mm wider per side. Both are wanted —
+400 places the joints for the reach solve, 455 sizes the mesh.
+
+Knee, two-link solve. Hip (−170, 130) to ankle (425, 137), d = 595.0.
+
+    a = (428^2 + 595^2 - 429^2) / (2 x 595) = 353168 / 1190 = 296.8
+    h = sqrt(428^2 - 296.8^2) = sqrt(95094)              = 308.4
+    knee = hip + 296.8 * along + 308.4 * perpendicular   = (123.2, 441.9)
+
+Knee lateral **±180**, `estimated` from `exh_commons_buntschu_kz2.jpg`: the driver's
+knees are splayed clearly *outboard* of the steering wheel rim with the front panel
+between them. This is the one lateral figure here read off a photograph, and the
+photograph is a three-quarter front-left action shot, so it is a proportion read
+against the front track and not a measurement — hence `estimated` and hence ±180
+rather than a decimal.
+
+### 60.1.5 Helmet and equipment as geometry
+
+**Art. 7 is the article that makes equipment compulsory, not Art. 3.** The brief
+this section was written to said Art. 3; the text puts driver safety equipment in
+**ARTICLE 7: DRIVER SAFETY EQUIPMENT**, PDF pages 19–20. Art. 3.6 *Mass* mentions
+equipment only in passing — *"The driver must be fully equipped for the driving
+conditions (with helmet, gloves and boots)"*, PDF p. 5 — as a weighing condition.
+Same class of error as the §7.4-for-§7.2 case the front matter records: an article
+number recalled rather than located.
+
+Art. 7 preamble, verbatim, PDF p. 19:
+
+> The driver must at all times wear a homologated full-face helmet, overalls and a
+> karting body protection, as well as gloves, boots.
+> Wearing a scarf, muff, or any loose clothes around the neck, even inside the
+> overalls, is not allowed.
+> Long hair must be completely contained in the helmet, the balaclava or the
+> overalls.
+
+| item | article | page | what the text requires | geometry |
+| --- | --- | --- | --- | --- |
+| helmet | 7 preamble + **7.1** | 19 | *"homologated full-face helmet"*; Snell-FIA / FIA 8859-2024 / 8860-2018 families; for under-15s *"the weight of the helmet must not exceed 1,500g including paint, visor and all accessories"*. *"Helmets must have an efficient and unbreakable visor for the eye opening."* | full-face shell + visor aperture. Outer 250 wide × **340 long** × 300 tall; center (0, −454, 738). `driver_helmet_radius = 125` is right laterally and 90 mm short fore-aft — a helmet is an ellipsoid, not a sphere. Visor aperture centered on the eye point (±32, −462, 757), ~95 mm tall × 200 wide, `estimated`. |
+| overalls | **7.2** | 19–20 | *"Fabric overalls must have either: i) a «Level 2» CIK-FIA homologation … or ii) be Grade 1 or Grade 2 Karting Overalls complying with FIA Standard 8877-2022."* Karting overalls to 8877-2022 *"are mandatory from 01.01.2030"* | a single close-fitting layer over the whole body, collar to wrist to ankle. 6–8 mm of thickness over the torso, `estimated`. |
+| gloves | **7.3** | 20 | *"Gloves must completely cover the hands and wrists or must comply with FIA Standard 8877-2022."* 8877-2022 mandatory for FIA Championships and anything on the International Sporting Calendar. | hands + wrists covered; the cuff overlaps the sleeve. Grip axis at the wheel rim. |
+| boots | **7.4 Shoes** | 20 | *"Shoes must cover the feet and protect the ankles or must comply with FIA Standard 8877-2022."* | above-ankle boot; sole contacts the pedal at the ball of the foot, (±75, 560, 90). |
+| rib protector | **7.5 Karting body protection** | 20 | *"The use of karting body protection complying with FIA Standard 8870-2018, and of the correct size in relation to the driver's height - or up to one size lower - will be mandatory …"* | a rigid shell over the ribs, front and back, roughly z 250–450 in the torso frame. Adds 12–18 mm per side over the overalls and is the reason a driver fills a 325 mm hip / 360 mm shoulder seat. `estimated`. |
+| neck brace | **none** | — | **The 2026 TR does not require one.** No neck collar, brace or support appears anywhere in Art. 7, and the preamble's ban on *"a scarf, muff, or any loose clothes around the neck"* points the other way. Art. 7.1's note that *"the M6 anchorages cannot be used in karting for safety reasons"* explicitly rules out FHR/HANS. `exh_commons_buntschu_kz2.jpg` shows a KZ2 driver mid-corner with no collar. | not modeled. If one is wanted it is a styling choice and must not be labeled as a regulation. |
+
+That last row is the point of the table. The brief asked for the article that makes
+a neck brace compulsory; there isn't one, and inventing a citation for it would be
+exactly the failure the front matter's §1 exists to prevent.
+
+---
+
+## 60.2 The reach arithmetic — does the cockpit fit the driver?
+
+Issue #17 wants the hands to reach the wheel at full lock. It is arithmetic, and
+the arithmetic does not close.
+
+### 60.2.1 The wheel's rim, in world coordinates
+
+`sourced` from `params.py`: `wheel_diameter` 320 (radius 160), `wheel_angle` 0.470
+rad = 26.93° from vertical, center at `(0, 320, 480)`.
+
+The column axis runs forward and down from the center, `(0, sin θ, −cos θ) =
+(0, 0.4527, −0.8917)`. The disc lies in the plane normal to it, spanned by
+`e1 = (1, 0, 0)` and `u = (0, 0.8917, 0.4527)`. So `u` is the in-plane "up", and
+the top of the rim is **forward** of the center — the driver looks down at a wheel
+whose far edge is its top, which is what a laid-back kart column does.
+
+    rim(phi) = C + 160 * (sin phi * e1 + cos phi * u)
+
+| rim point | position | `derived` |
+| --- | --- | --- |
+| top / far edge | (0, 462.7, 552.4) | 320 + 160·0.8917 ; 480 + 160·0.4527 |
+| bottom / near edge | (0, 177.3, 407.6) | |
+| 3 and 9 o'clock — the hands | **(±160, 320, 480)** | |
+
+### 60.2.2 Straight-line reach required, and available
+
+Shoulder joint (200, −393, 608) to the right hand's grip at 3 o'clock
+(160, 320, 480):
+
+    dx = 40      dy = 713      dz = -128
+    d  = sqrt(1600 + 508369 + 16384) = sqrt(526353) = 725.5 mm     REQUIRED
+
+| available | value | verdict |
+| --- | --- | --- |
+| `params.py` as it stands: `driver_upper_arm` 290 + `driver_forearm` 260 | **550** | **short by 175.5 mm.** And these are bones — the forearm ends at the wrist, so there is no hand in the number at all. |
+| sourced 50th-pct male: upper arm 368 + elbow-to-fist 361 | **729** | closes by **3.5 mm**, with the elbow at 180°. A driver cannot steer with locked arms. |
+| comfortable, elbow at 110°: `sqrt(368² + 361² − 2·368·361·cos 110°)` | **597.2** | the wheel is **128.3 mm too far from the shoulder.** |
+
+**At full lock it is worse.** Kart steering is direct; a hand starting at 3 o'clock
+travels up the rim as the wheel turns.
+
+| wheel rotation | outside hand's rim point | shoulder distance | vs 729 available |
+| --- | --- | --- | --- |
+| 0° (straight) | (160, 320, 480) | 725.5 | 3.5 mm spare |
+| 60° | (80, 443.6, 542.7) | 847.7 | **short 118.7** |
+| 90° (top of rim) | (0, 462.7, 552.4) | 880.5 | **short 151.5** |
+
+So issue #17's requirement fails by 119–152 mm depending on how much lock is
+called full, using the *generous* sourced segment lengths. With the segment
+lengths actually in `params.py` it fails by 300 mm.
+
+### 60.2.3 What should move, and why it is not one number
+
+Solving for the `wheel_center_y` that puts the straight-ahead grip at a 110° elbow,
+with `wheel_center_z` unchanged at 480:
+
+    dy = sqrt(597.2^2 - 40^2 - 128^2) = sqrt(338664) = 581.9
+    wheel_center_y = -393 + 581.9 = 188.9   ->  190 mm      (from 320)
+
+That is a **130 mm move rearward** and it is the dominant error. But it cannot be
+made alone, and this is the interesting part:
+
+- **At the current 320 the knees are clear.** The rim's rearmost point is
+  y = 177.3 and the knee joint is at y = +123, so the wheel is entirely ahead of
+  the knees with 54 mm to spare. No conflict, and no reach either.
+- **At 190 the rim's lower arc runs through the knee sweep.** At the knee's y = 123
+  the rim passes `x = ±141, z = 446`; the knee joint is at `(±180, 123, 442)`, so
+  the rim's lower arc lies **39 mm inboard of the knee joint and 4 mm above it**.
+  It works only because the knees straddle the column — which is precisely what
+  `exh_commons_buntschu_kz2.jpg` shows, and precisely why that ±180 is the number
+  the geometry is most sensitive to and the least well sourced.
+- **Raising the wheel is nearly out of headroom.** Art. 9.1.1 caps chassis height
+  at 650 mm from the ground, seat excluded, and the front matter reads the steering
+  wheel as living under it. The rim's top is at `wheel_center_z + 160·cos 26.93° =
+  wheel_center_z + 142.7`, so `wheel_center_z ≤ 507.3`. There is **27 mm** of
+  vertical adjustment available, not 100.
+
+**Verdict: the cockpit does not fit the driver.** `wheel_center_y` should come back
+from 320 to about **195**, `wheel_center_z` may rise as far as **505** and no
+further, and the fit then depends on a knee splay of ±180 that is read off one
+action photograph. That is a two-parameter fit against a soft constraint and it
+belongs in a ticket with the knee splay measured properly, not in a one-line
+parameter edit. It is also the wrong reach *before* the arm segments are corrected:
+290 + 260 is a small adult's arm with no hand on the end of it.
+
+### 60.2.4 The pedals — these close, comfortably
+
+Hip (−170, 130) to the ankle at (425, 137): **595.0 mm** required.
+Available thigh + shank: 428 + 429 = **857 mm**.
+
+    slack             = 857 - 595 = 262 mm
+    leg extension     = 595 / 857 = 69%
+
+**The pedals reach with 262 mm to spare.** If anything they are *close*: 69% is a
+deeply folded leg, and a driving-position convention of 80–85% extension would put
+the pedal face nearer y = 660 than y = 560. That is a comfort observation, not a
+defect — a KZ driver's knees genuinely are up around the wheel.
+
+Cross-check against the two figures the §40 Cockpit agent measured:
+
+| their figure | this spec | agree? |
+| --- | --- | --- |
+| hip to pedal face **735** | **731.1** | yes, 4 mm / 0.5% |
+| seat pan front edge to pedal face **495** | **611** from the Tillett front lip at y = −50, `sqrt(610² + 42²)` | **no, 116 mm apart** |
+
+Both are right about different seats. 495 implies a front lip at y ≈ +65; the
+sourced T11 ML puts it at **y = −50**. So the *built* seat mesh's front lip stands
+about 115 mm forward of where a real T11 ML's does — consistent with
+`notes_radiator.md` §6's finding that `seat_height = 0.290` is 45 mm short of the
+sourced 335 and that the shell is built as a single-width box. The hip agreeing to
+4 mm while the lip disagrees by 116 says the *seat* is the part that is wrong, not
+the driver and not the pedals.
+
+---
+
+## 60.3 Finishes, per part group
+
+Twelve materials cover 146 parts. The grouping below is by *finish*, not by
+material name, because three of the twelve names are each doing two or three jobs.
+
+Every claim names the image it came from. **Read `refs/kart-visual/` with the
+seat trap in mind:** `notes_radiator.md` §7 records that the three Tony Kart
+frames and `crg_roadrebel_kz_side.webp` are all **seatless studio chassis shots**,
+and that the graphics-wrapped object in the middle of `tonykart_rear_header.jpg`
+is the **front panel 1.2 m away**, not a seat. One further frame is discussed in
+§60.3.7 and its identification is flagged rather than asserted.
+
+### 60.3.1 Powder-coated steel tube — 33 parts, `frame_powdercoat`
+
+`chassis_rail_*`, `chassis_cross_*`, `chassis_*_hoop_*`, `chassis_side_bar_*`,
+`chassis_seat_strut_*`, `chassis_bearing_hanger_*`, `chassis_rear_bumper`.
+
+Art. 9.4 requires the protections be *"made of magnetic steel round tubing"*, so
+the tube material is regulated; the coating is not.
+
+| property | spec |
+| --- | --- |
+| base color | **a livery variable, not a fixed value.** See §60.5. |
+| finish | **gloss** powder coat, not satin |
+| roughness | **0.30** — `frame_powdercoat`'s 0.42 is too rough. `crg_roadrebel_kz_detail7.webp` shows a hard specular streak running the length of every tube, and a 30 mm tube at 0.42 will not produce it. |
+| metalness | 0.0 |
+| wear | chips to bright steel on the rails' underside where the kart is dropped on a stand; a polished ring at every bolted clamp. `estimated` — **no photograph in this repo shows a used frame.** |
+
+Images: `crg_roadrebel_kz_detail7.webp` (gloss black rails),
+`tonykart_racer401T_p01.jpg` (gloss green tube, and the reason §60.5's Heritage
+palette is not invented).
+
+**Four sets of parts are in this group and should not be:**
+
+| part | current | should be | image |
+| --- | --- | --- | --- |
+| `chassis_rear_bumper`, `chassis_nose_hoop_*` | `frame_powdercoat` | `tube_chrome` — **new.** Bright chrome or polished stainless. In `crg_roadrebel_kz_detail7.webp` the front bumper tube crossing the top of the frame is unmistakably chrome against gloss-black rails. Roughness 0.08, metalness 1.0. | detail7 |
+| `pedal_brake`, `pedal_throttle`, `pedal_mount_*`, `pedal_cross_tube` | `frame_powdercoat` | `stainless_polished` — **new.** The pedal loop at the lower left of `crg_roadrebel_kz_detail7.webp` is raw polished stainless, brighter and cooler than any coating, with visible bend-forming marks. Roughness 0.18, metalness 1.0. | detail7 |
+| `engine_airbox`, `engine_airbox_lid`, `engine_battery` | `frame_powdercoat` | `plastic_matte_black` — **new.** Moulded, not painted. Reads flatter and browner than powder coat. Roughness 0.55, metalness 0.0. | `exh_commons_shifter_engine.jpg` (filter and airbox) |
+| `steering_column`, `steering_clutch_lever`, `shifter_lever`, `shifter_base` | `frame_powdercoat` | column and lever are plated steel (`tube_chrome`); the clutch lever and shifter base are anodized aluminum (`anodized_clear`). | `crg_roadrebel_steering.webp`, `birelart_kz_steering_column.jpg` |
+
+### 60.3.2 The floor tray — 1 part, `tray_aluminium`, and the committed finish is wrong
+
+`chassis_floor_tray`. Committed as "anodized aluminum". The photograph disagrees
+specifically and it is the largest single surface on the kart.
+
+`tonykart_racer401T_p01.jpg` is a close-up of the tray and shows a **granular
+anti-slip surface**, white-silver, coarse enough to resolve individual grains at
+that magnification, printed over with green and red pinstripes and a `RACER 401T`
+decal. Sampled across the frame the surface's dominant mode is **#c8c8d2** —
+brighter than any metal on the kart and reading as a *coating*, not as aluminum.
+
+| property | spec | prov |
+| --- | --- | --- |
+| base color | **brighter than everything else on the chassis**, roughly 4× the powder coat's value; a neutral white with a faint cool cast | `derived` from p01, mode #c8c8d2, studio white-sweep lighting so the cool cast is partly the photograph |
+| roughness | **0.85** | `estimated` from the granular texture; `tray_aluminium`'s 0.58 is a metal's number |
+| metalness | **0.0** | it is a coating over aluminum, and it does not read as metal |
+| decoration | a printed decal zone, chassis-brand and pinstripes; see §60.5 | `sourced`, p01 |
+| wear | heel scuffs wearing the grain smooth in two ovals, plus chain-oil fling along the right-hand edge | `estimated`, **and see §60.6 — on this kart the heels land 190 mm ahead of the tray's front edge, so this wear cannot happen where it should** |
+
+`tray_aluminium`'s comment argues the value down because a bright metal slab
+"swamps the frame it is bolted to". That instinct was right and the diagnosis was
+wrong: it is not a dark metal, it is a bright non-metal.
+
+### 60.3.3 Tires — 4 parts, `tire_rubber`
+
+| property | spec |
+| --- | --- |
+| base color | the darkest thing on the kart; a brown-black, warmer than the frame's blue-black gloss |
+| roughness | 0.72 sidewall (keep), **0.62 on the tread face** — a scrubbed slick is glossier than its sidewall |
+| metalness | 0.0 |
+| detail | fine circumferential mould lines across the tread, clearly visible in `crg_roadrebel_kz_detail7.webp`; moulded sidewall lettering |
+| wear | **marbles** — discrete rubber pellets picked up on the shoulders; a bluish sheen on the worked band; a dust film over everything after a session | `exh_commons_buntschu_kz2.jpg`, on track and in use, is the only in-repo image of a tire that has done any work |
+
+### 60.3.4 Rims — 4 parts, `rim_magnesium`
+
+Cast magnesium. Two finishes, both committed and both confirmed:
+
+| variant | relationship | roughness | metalness |
+| --- | --- | --- | --- |
+| **gold anodized** | warmer and considerably darker than the regulation number yellow; duller and greyer than brass; warmer than the aluminum radiator | 0.35 | 1.0 |
+| **black anodized** | flatter and slightly lighter than the frame's gloss powder coat — an anodize is never as glossy as a coating | 0.45 | 1.0 |
+
+Images: `exh_commons_buntschu_kz2.jpg` (gold, all four wheels, in use);
+`crg_roadrebel_kz_detail7.webp` (a gold-anodized flange collar on a **black**
+anodized hub — the two finishes appear on one assembly, which is the detail worth
+having).
+
+`rim_magnesium` at (0.380, 0.375, 0.360) roughness 0.30 is a plausible *bare*
+magnesium and is neither of the two finishes that are actually sold. Wear: brake
+dust darkening the rear rims' inner faces, and bead-flange scuffing from tire
+fitting. `estimated` — buntschu is too small to resolve either.
+
+### 60.3.5 Steel running gear — 10 parts, `axle_steel`, and it is four finishes
+
+| part | finish | image |
+| --- | --- | --- |
+| `axle_rear` | heat-treated steel, dark satin. Keep 0.42 / 1.0. Wear: **bright polished bands** where the bearings, hubs and sprocket carrier clamp — the only part of a 1,080 mm axle that ever gets touched. | `estimated` |
+| `drive_chain` | **`chain_oiled` — new.** Near-black with oil, and *not* the axle's value: the roller ends and the tooth-contact flanks polish to bright bare steel while everything between them holds black oil and dust. Base color darker than `axle_steel`, roughness 0.30 on the worked facets, 0.55 elsewhere. | `estimated` — **no in-repo photograph shows a used chain.** Both CRG frames are new karts with the chain guard fitted. |
+| `axle_sprocket`, `drive_output_sprocket` | bright machined steel or 7075; a **swept, polished flank** on the drive side of every tooth and a duller cast/blank face between. | `estimated` |
+| `axle_stub_fl/fr` | bright zinc-plated steel, cooler and brighter than the axle, with a faint yellow-passivate cast on the nuts. Clearly resolved. | `crg_roadrebel_kz_detail7.webp` |
+| `exhaust_spring_0/1` | bright spring steel, **heat-tinted straw at the header end and clean at the silencer end** | `derived` from the exhaust gradient, §60.3.9 |
+| `engine_plug_hex` | black oxide hex | `estimated` |
+
+### 60.3.6 Bodywork — 4 parts, `bodywork_plastic`, and it is two finishes on one part
+
+`bodywork_nose_fairing`, `bodywork_rear_panel`, `bodywork_sidepod_l/r`.
+
+The substrate is moulded polyethylene/polypropylene; the *read* is dominated by
+the **printed vinyl wrap over it**, which is much glossier than the raw plastic and
+carries a clear laminate.
+
+| surface | relationship | roughness | metalness |
+| --- | --- | --- | --- |
+| wrapped outer faces | color is a livery variable; a hard clear-coat highlight, glossier than the powder-coated frame | **0.16** | 0.0 |
+| unwrapped inner faces and mounting flanges | the substrate: satin, flat, no highlight, and normally the panel's own moulded color rather than the livery's | 0.55 | 0.0 |
+
+Images: `crg_roadrebel_kz_detail11.webp` (the pod's wrapped outer face carries a
+long unbroken specular streak); `tonykart_racer401T_p06.jpg` (wrap texture);
+`birelart_kz_graphics.jpg` (the wrap **artwork itself**, die-cut per panel — the
+single most useful livery reference in this repo).
+
+`bodywork_plastic`'s 0.28 splits the difference between the two and gets neither.
+Wear: stone chipping along the fairing's leading edge and scuffing on the pods'
+lower outboard corners where kart-to-kart contact lands. `estimated` — every
+bodywork image in this repo is a studio shot of a new panel.
+
+### 60.3.7 The seat — 1 part, `seat_fiberglass`, and this one is badly wrong
+
+`seat_shell`. Committed finish: "translucent fiberglass seat". Correct — and
+`seat_fiberglass` is set to `(0.055, 0.055, 0.058)`, i.e. **near-black**, which is
+the opposite of what a bare fiberglass kart seat looks like.
+
+| property | spec | prov |
+| --- | --- | --- |
+| base color | **one of the brightest objects on the kart** — a pale grey with a distinct green cast, roughly 4–5× `frame_powdercoat`'s value; greyer and greener than the tray, much duller than the spark-plug porcelain | `derived` from an image, with the caveat below |
+| finish | gel-coated fiberglass: glossy, with a slight orange-peel | `sourced` (Art. 4.8 *"It may be made of composite material"*; Tillett shells are gel-coated) |
+| roughness | **0.22** | `estimated` |
+| metalness | 0.0 | |
+| translucency | real, and visible at the thin flared lip and the flank where light passes through — 4 mm of glass laminate is not opaque | `estimated` |
+| wear | glass fiber print-through where the driver's shoulder blades and hips rub the gel coat away; four reinforcement discs (Art. 4.8.1, ≥1.5 mm, ≥13 cm², ≥40 mm dia.) at the upper stay bolts; a transponder on the back (Art. 3.11) | `sourced` for the discs and the transponder via `notes_radiator.md` §6 |
+
+**The image, flagged rather than asserted.** The large pale grey-green shell filling
+the upper right of `crg_roadrebel_kz_detail11.webp` is, on my reading, the **seat's
+outboard flank and rolled lower lip** — the rolled edge is characteristic and
+nothing else on a kart has that flare. But `notes_radiator.md` §7 states flatly that
+there is no photograph in this repo showing a KZ seat, and the alternative reading
+is the far sidepod's inner face seen across the kart. I could not settle it. So:
+the *relationship* (pale, glossy, green-grey, far brighter than the frame) is what
+this row asserts, and it is a general fact about bare fiberglass kart seats that any
+Tillett product page corroborates; the specific frame is offered as evidence with
+that doubt attached. **This does not license leaving the material at near-black** —
+whichever object it is, nothing in that frame supports 0.055.
+
+### 60.3.8 Engine and machined alloy — 75 parts under `engine_alloy`, which is three finishes
+
+75 of 146 parts share one material. It covers three surfaces that photograph
+nothing like each other, and `exh_commons_shifter_engine.jpg` has two of them in
+one frame, lit identically, which is what makes the split measurable rather than
+asserted:
+
+| finish | parts | relationship | rough | metal |
+| --- | --- | --- | --- | --- |
+| **raw sand casting** | `engine_crankcase_*`, `engine_cylinder*`, `engine_head`, `engine_clutch_cover`, `engine_ignition_cover`, `engine_reed_block`, `engine_starter`, `engine_water_*`, all nuts and bolts on them | warm grey with a tan-green cast, matte, no directional highlight. Measured in that frame at #605944 against the machined billet's #f6f4ca in the same light — the casting is **less than half the billet's value and warmer.** A magnesium casting is warmer and greyer still than an aluminum one. | 0.66 (keep) | 1.0 |
+| **machined billet / clear anodize** — new `anodized_clear` | `engine_mount_plate`, `engine_mount_clamp_*`, `radiator_bracket_*`, `steering_boss`, `steering_spokes`, `steering_bearing`, `drive_sprocket_carrier` | brighter, whiter and much smoother than any casting, with **directional machining marks**. Also the caliper bodies and master cylinders in `crg_roadrebel_kz_detail7.webp` and `detail11.webp`. | **0.35** | 1.0 |
+| **gold anodize** — new `anodized_gold` | wheel hub collars, disc carriers, and whichever fasteners the livery wants | warm and saturated, darker than the number yellow, lower roughness than a casting | 0.30 | 1.0 |
+| **brazed radiator aluminum** — new `radiator_alu` | `radiator_fin_*` (19), `radiator_tank_high/low`, `radiator_end_*`, `radiator_divider`, `radiator_cap` | brighter and **cooler** than any casting — an unpainted brazed core is the only cool-white metal on a KZ. Confirmed at distance in `exh_commons_buntschu_kz2.jpg`, where the radiator is the brightest object on the kart besides the driver's suit. | 0.45 | 1.0 |
+
+`radiator_core` already has its own material at 0.120. The 24 parts that *make up*
+the radiator are on `engine_alloy`, i.e. the core is one value and its own tanks and
+fins are a sand-casting's value. `anodized_gold` is confirmed twice, on the CRG
+front hub collar (`detail7`) and on the rear disc carrier (`detail11`, cropped).
+
+Wear: the exhaust-side of the cylinder and head discolor; oil film and track grime
+collect in every draft angle and casting radius on the crankcase; the clutch cover
+polishes bright along the edge the driver's right heel strikes. All `estimated` —
+`exh_commons_shifter_engine.jpg` is the only used engine in the repo and its header
+is heat-wrapped, which hides the gradient rather than showing it.
+
+### 60.3.9 Exhaust — 2 parts, `exhaust_steel`, and the gradient is the whole finish
+
+`exhaust_chamber`, `exhaust_silencer`, plus `exhaust_flange` and
+`exhaust_flange_nut_*` which are wrongly on `engine_alloy`.
+
+Committed finish: nickel-plated. Correct. But **a single base color cannot express
+this part**, because the interesting thing about a two-stroke pipe is a heat
+gradient along its own axis, from the flange outward:
+
+| position along the pipe | appearance |
+| --- | --- |
+| flange and header, hottest | matte grey-brown, plating burnt off, the darkest metal on the kart |
+| header into the diverging cone | blue-purple oxide band |
+| convergent cone | straw and gold |
+| stinger and silencer, coolest | bright nickel, near-chrome |
+
+`exhaust_steel` at 0.36 / (0.088, 0.085, 0.084) is roughly the *flange* end and is
+wrong for the silencer by an order of magnitude in value. This is a per-part
+gradient texture or a vertex-color ramp, not a material value, and it should be
+specified that way.
+
+Images: `exh_commons_shifter_engine.jpg` (a used, discolored, heat-wrapped header
+— the gradient's existence, not its detail); `exh_eurokart_*` and
+`exh_fastech_tmkz_pipe.png` (new plated pipes, the bright end of the ramp).
+The banding *sequence* is `estimated` from general steel-oxide temper colors; no
+photograph in this repo resolves it on a kart pipe.
+
+### 60.3.10 Brakes — `new` parts, and the committed finish is half wrong
+
+The committed finish is "drilled steel brake discs". Drilled: yes. Steel-bright:
+**no**, and this is the clearest disagreement between the committed list and the
+photographs.
+
+`crg_roadrebel_kz_detail7.webp` (front) and `crg_roadrebel_kz_detail11.webp` (rear)
+both show a disc that is **dark grey to near-black**, with a ring of small drilled
+holes and a scalloped or waved periphery — not a bright turned steel face. Sampled
+in the crop at #303330. Ventilated iron or a dark-coated steel.
+
+| property | spec | prov |
+| --- | --- | --- |
+| base color | dark, close to the frame's black but greyer and flatter; distinctly *not* a bright metal | `derived`, detail7 + detail11 |
+| roughness | 0.55 | `estimated` |
+| metalness | 1.0 | |
+| wear | a **bright swept annulus** inside the pad track, polished to near-mirror; dark and lightly rust-bloomed outside it; polished bright rings around each drilled hole's edge | `estimated`, **and this is the wear claim with the weakest evidence in this section — both reference discs are brand new and show no swept band at all.** |
+| caliper | clear-anodized machined aluminum, bright, with black-anodized detail parts | `sourced`, detail7 and detail11 both |
+| master cylinder | **anodized, and the color is a livery variable** — detail7 shows two *red* anodized cylinders, detail11 shows a black one | `sourced`, both |
+| brake line | **red** PVC or braided sleeve, saturated, the most chromatic non-livery item on the kart | `sourced`, red in both frames |
+
+### 60.3.11 Rubber, hose and small parts — 10 parts under `rubber_grip`
+
+| part | finish | image |
+| --- | --- | --- |
+| `radiator_hose_upper/lower` | **`hose_silicone` — new.** A saturated color, not black: `notes_radiator.md` §5 records the CRG runs as **orange** over a protective sleeve, at ~33 mm OD against 28 mm of bare hose. Roughness 0.42. Sleeved sections read as a woven braid, not as smooth rubber. | `crg_roadrebel_kz_side.webp` via notes_radiator §5 |
+| `steering_rim` | moulded rubber, suede or leather; **a livery variable** — red-and-black in `exh_commons_buntschu_kz2.jpg`. Wear: darkens and polishes where the hands sit, at 9–10 and 2–3 o'clock. | buntschu |
+| `engine_plug_lead`, `engine_plug_cap` | black rubber, glossier than the hose, roughness 0.40 | `exh_commons_shifter_engine.jpg` |
+| `engine_intake_boot` | black rubber, matte, roughness 0.70 | same |
+| `engine_throttle_cable` | black outer sheath with a bright steel nipple and adjuster | `tonykart_racer401T_p04.jpg` |
+| `pedal_brake_pad`, `pedal_throttle_pad` | black rubber with a moulded tread. Wear: a smooth flat worn where the ball of the foot lands. | `estimated` |
+| `shifter_knob` | black, or an anodized ball — a livery variable | `estimated` |
+
+Also `plug_ceramic`: glazed white porcelain, keep as the brightest object on the
+engine; wear is a light brown ring at the insulator's base from blow-by,
+`estimated`.
+
+### 60.3.12 New parts the other sections add
+
+| part | finish |
+| --- | --- |
+| fuel tank | translucent polyethylene, natural amber-white, under a **two-piece printed wrap**. `birelart_kz_graphics.jpg` carries a dedicated `SERB 9Lt` left/right decal pair, so the tank is a livery surface in its own right. 9 litres clears Art. 9.3's *"8 litres minimum"* (PDF p. 22). The wrapped tank in `crg_roadrebel_kz_detail11.webp` is glossy; the unwrapped upper surface is satin and translucent. |
+| front panel | wrapped plastic per §60.3.6, plus the number zone of §60.4 |
+| number panels | flexible opaque plastic. Art. 3.7: *"The number plates must be made of flexible opaque plastic and be visible at all times."* Matte, roughness 0.45 — a number plate does not carry the bodywork's clear laminate, and it must stay legible off-axis. |
+| tie rods | bright chrome or zinc-plated rod with **black-anodized** rod ends. Clearly resolved in `crg_roadrebel_kz_detail7.webp`. |
+| exhaust support | carbon fiber twill with a resin gloss — `exh_eurokart_3.jpg` is a New-Line carbon exhaust support, and the weave scale is readable. Stainless band clamp with a zinc worm drive. |
+| curtain / radiator blind | matte black composite, one piece, screwed to the core's side rails (Art. 5.3.1) |
+
+### 60.3.13 The honest state of the wear evidence
+
+| wear claim | photograph behind it |
+| --- | --- |
+| tires — marbles, blued band, dust | **yes**, `exh_commons_buntschu_kz2.jpg` |
+| engine castings — grime in the draft angles | **partly**, `exh_commons_shifter_engine.jpg` |
+| exhaust — a heat gradient exists | **partly**, same frame; the banding sequence is not resolved |
+| chain — oiled dark with bright facets | **no** |
+| disc — swept band and rust | **no**, both refs are new discs |
+| tray — heel scuffs | **no**, and §60.6 says the heels do not even land on it |
+| rims — brake dust, bead scuffs | **no** |
+| bodywork — chips and scuffs | **no** |
+| frame — chips at the rails | **no** |
+
+Six of nine have nothing behind them, for one reason: **every chassis and bodywork
+photograph in this repo is a studio shot of a brand-new kart.** Wear is what
+separates this from a CAD render, and this repo currently cannot source it. That is
+a fetch job — a used-kart set, ideally a post-session paddock shot — and it should
+be a ticket, not six `estimated` rows quietly carrying the whole claim.
+
+---
+
+## 60.4 Racing numbers and number panels — the regulation, verified
+
+### 60.4.1 The text, verbatim
+
+**Art. 3.7 *Racing numbers and number plates*, PDF pages 5–6** of
+`refs/frontend/fia_karting_technical_regulations_2026.pdf`. Located by reading the
+section boundaries — Art. 3.6 *Mass* precedes it and Art. 3.8 follows on p. 6 — not
+recalled.
+
+> Racing numbers must be black, in an Arial font on a yellow background.
+> For short circuits, they must be at least 15 cm high and have a 2 cm thick stroke.
+> For long circuits, they must be at least 20 cm high and have a 3 cm thick stroke.
+> Racing numbers must be bordered by a yellow background of at least 1 cm.
+> They must be fitted before scrutineering, on the front panel, rear wheel
+> protection or rear number plate, and on both sides towards the rear of the
+> bodywork.
+> The driver is responsible for ensuring that the required numbers are clearly
+> visible to Timekeepers and Officials.
+> The number plates must be made of flexible opaque plastic and be visible at all
+> times. They must be fixed without possibility of removal.
+> In Group 4, the number plate fitted at the back of the kart must be flat and have
+> rounded corners (diameter of rounded corners 15 to 25 mm) with 220 mm sides.
+> It may be made of polyester. The racing number may be printed on the rear
+> radiator.
+> For FIA Karting Championships, Cups and Trophies, the driver's name as well as
+> the flag of his nationality must be displayed at the front of the lateral
+> bodywork.
+> […] The flag and name letters must be at least 3 cm high.
+> For FIA Karting Championships, Trophies and Cups, the CIK-FIA may require
+> advertising on the front panel and front fairing. For all other competitions,
+> only the organiser's advertising is permitted; in that case, the organiser must
+> supply the stickers. This advertising must not be more than 5 cm high and may
+> only be affixed to the upper or lower part of the number plate.
+
+Two further sentences put the panel *locations* in the bodywork articles rather
+than in Art. 3.7:
+
+> A space for racing numbers must be provided on the front panel.
+> — Art. **9.5.3** *Front panel*, PDF p. 24
+
+> A space for racing numbers must be provided on the vertical surface close to the
+> rear wheels.
+> — Art. **9.5.4** *Side bodywork*, PDF p. 25
+
+### 60.4.2 Did the "≥150 mm tall, 20 mm stroke, ≥10 mm yellow border, Art. 3.7" note survive?
+
+**Mostly, and for the first time in this repo the recalled article number was
+right.** Art. 3.7 is correct. But three things in that note need correcting and one
+of them is a real trap:
+
+1. **The article number holds.** 3.7 is where the rule is. Worth recording,
+   because the front matter's §7.4/§7.2 case has made every article number in this
+   project suspect on sight.
+2. **150 / 20 / 10 are the *short-circuit* figures only.** The text carries a
+   second set the note dropped entirely: **200 mm high and a 30 mm stroke for long
+   circuits**. A spec that says "≥150 mm" without saying "short circuits" is an
+   estimate wearing the vocabulary of a limit in the other direction — it reads as
+   *the* rule and is half of it. Valdirone is a short circuit, so 150/20/10 is what
+   this project builds to; the number panel geometry must still be able to carry
+   200/30 or a long-circuit layout is a re-author rather than a re-skin.
+3. **The border is not a separate color.** The note said "≥10 mm yellow border",
+   which reads as a border *around* a differently-colored field. The text says the
+   background *is* yellow and that the numbers *"must be bordered by a yellow
+   background of at least 1 cm"* — one yellow field, with at least 10 mm of it
+   clear around the glyph on every side. There is no second color.
+4. **The font is specified and the note omitted it.** *"black, in an Arial
+   font"*. That is a hard constraint on the texture, not a suggestion.
+5. **The 220 mm rear plate is Group 4, not KZ.** KZ is Group 2. Anyone lifting
+   "220 mm sides" into this kart would be building a superkart's plate.
+
+### 60.4.3 What those figures mean geometrically
+
+`derived`, and the derivation matters because it constrains panels this section
+does not own.
+
+**150 mm cap height with a 20 mm stroke effectively mandates Arial Bold.** Arial
+Regular's digit stem is about 0.093 em; at a 150 mm cap height (0.716 em) the em is
+209.5 mm and the stem is ~19.5 mm — just barely 20. Arial Bold's stem is ~0.13 em
+= 27 mm, comfortably over. Arial Regular is the marginal case, so **Bold is the
+safe spec** and Regular must be checked rather than assumed.
+
+    em         = 150 / 0.716              = 209.5 mm
+    digit advance, Arial Bold, 0.556 em   = 116.5 mm
+
+| digits | glyph block | **+10 mm border all round** |
+| --- | --- | --- |
+| 1 | 116.5 × 150 | **137 × 170** |
+| 2 | 233 × 150 | **253 × 170** |
+| 3 | 350 × 150 | **370 × 170** |
+
+Three-digit numbers are normal in KZ2 — `exh_commons_buntschu_kz2.jpg` carries
+**110**, and `refs/frontend/genk2026_kz2_entry_list.pdf` is full of them. So the
+number zone the bodywork has to provide is **370 × 170 mm** for the general case.
+
+**Three consequences, all of which are findings rather than restatements:**
+
+- **A three-digit number does not fit on a front panel.** Art. 9.5.3 caps the panel
+  at *"250.0 mm minimum and 300.0 mm maximum"* wide. 370 > 300. Two digits at
+  253 mm fit a 300 mm panel with 47 mm to spare and **do not fit a 250 mm panel at
+  all**. This is not a defect in the regulations; it is why a three-digit kart
+  carries the full number on the pods and the rear and an abbreviated one on the
+  front, and it is a constraint the §Bodywork agent needs in writing.
+- **The 170 mm zone height is within 10 mm of every panel's full height.**
+  `sidepod_height` is 180. The KG C2 rear protection is 177 tall (`sourced`, front
+  matter §5b). Both leave 7–10 mm of margin. **The 150 mm regulation number height
+  is what sets the height of kart bodywork, not styling** — that falls straight out
+  of three independent numbers and is the most useful thing in this section for
+  whoever sizes a panel.
+- The zone must be **flat and vertical**. Art. 9.5.4 says *"on the vertical surface
+  close to the rear wheels"*, and a 370 mm zone wrapped around a pod's rear
+  curvature is not legible off-axis, which is what Art. 3.7's *"clearly visible to
+  Timekeepers and Officials"* is for.
+
+### 60.4.4 Number zones, per panel
+
+Read off `birelart_kz_graphics.jpg` (1668 × 1608), the Birel ART Freeline decal-kit
+**flat layout** — die-cut sticker shapes per panel with the yellow number fields
+drawn in. This is vector artwork exported to JPEG, not a photograph, which is why
+§60.5 can source a color off it.
+
+| panel | zones | evidence |
+| --- | --- | --- |
+| **front panel** (`new`) | **three** yellow fields in the Birel ART kit: one central rectangle on the vertical face carrying the number, plus two angled fields on the upper wings. Central field ≥253 × 170 (two digits), centered laterally, top edge under Art. 9.5.3's steering-wheel plane. | `birelart_kz_graphics.jpg`, the `PN509` element |
+| **side pods** ×2 (`built`) | one large field at the **rear-outboard end** of each pod, wrapping onto the vertical face — exactly where Art. 9.5.4 puts it. In the Birel ART `CL FL AERO` decals it is a trapezoid occupying the pod's full height for the rearmost ~35% of its length. ≥370 × 170. | `birelart_kz_graphics.jpg`; confirmed in use on the right pod of `exh_commons_buntschu_kz2.jpg`, which reads **110** |
+| **rear wheel protection** (`new`) | one field on the **main** (central) part, ≥370 × 170. Art. 3.7 offers *"rear wheel protection or rear number plate"*; KZ has no mandated plate, so the number goes on the panel. It must sit on the main part, because the two outer parts are committed to the contrast color of §60.4.5. | Art. 3.7 + Art. 9.5.5.1 |
+| **front fairing** (`built`) | **no number zone.** Art. 3.7 does not list it and the Birel ART fairing decal has no yellow anywhere. It is a sponsor and CIK-advertising surface only. | `birelart_kz_graphics.jpg`, the wide `PN509` element |
+| **front of the lateral bodywork** | driver **name + national flag**, letters ≥30 mm, mandatory for FIA Championships/Cups/Trophies. So the pods carry a number zone aft and a name zone forward, and the sponsor block lives between them. | Art. 3.7, PDF p. 6 |
+| **number plate, upper or lower strip** | organiser advertising, ≤50 mm high, and only there | Art. 3.7, PDF p. 6 |
+| **fuel tank** (`new`) | a two-piece sponsor wrap, left and right. No number. | `birelart_kz_graphics.jpg`, the `SERB 9Lt` pair |
+| **floor tray** | chassis-brand decal and pinstriping. No number. | `tonykart_racer401T_p01.jpg` |
+
+### 60.4.5 The rear protection's two outer parts
+
+Art. **9.5.5.1**, PDF p. 25, verbatim and complete — the front matter's quote of
+this stops one sentence early and the missing sentence is the one that says how:
+
+> The two adjustable outer parts of the homologated rear wheel protection must have
+> a color that is clearly different from the main part of the rear wheel protection.
+> This can be done by a dedicated sticker kit or by adding color to the parts during
+> production.
+
+So the contrast may be a **decal**, which makes it a UV zone rather than a
+geometry-and-material problem.
+
+| property | value | prov |
+| --- | --- | --- |
+| which parts | the two outboard adjustable sections, in the extension of the rear wheels | `sourced`, 9.5.5.1 |
+| zone width per side | **300 mm**, full panel height | `estimated`. 9.5.5.1's ground-clearance rule requires *"at least three spaces of a 200.0 mm minimum width, located in the extension of the rear wheels and the centreline"*, so an outer part is at least 200 mm wide; 300 of a 1,360 mm panel leaves a 760 mm main section, which comfortably carries the 370 mm number zone. |
+| contrast test | *"clearly different"* — no numeric threshold in the text. Spec it as **≥0.25 difference in linear luminance** from the main part, so it is checkable rather than judged. | `estimated`, and flagged as an invented threshold |
+| what it must not be | the number-field yellow, in any palette. A third color adjacent to a regulation yellow field reads as a printing error. | `derived` |
+
+---
+
+## 60.5 Livery palettes
+
+Geometry is not this section's. These are palettes: named relationships, with hex,
+and every hex tagged.
+
+### 60.5.1 The one color here that is genuinely sourced
+
+**Number-field yellow: `#ecd44c`.** `sourced`.
+
+Sampled at four independent number zones in `birelart_kz_graphics.jpg` — the front
+panel's central field, its left wing field, and both `CL FL AERO` pod fields — and
+all four returned **(236, 212, 76)** to the byte. It is a flat vector fill in a
+manufacturer's own decal-kit artwork, so there is **no photographic white balance
+to correct**, which is what separates this from every other color below.
+
+Number glyph: **`#000000`**, `sourced` — Art. 3.7, *"must be black"*.
+
+**This supersedes the provisional `#d7c354` for number fields.** `#d7c354` is 8%
+darker and less saturated; the two adjacent will read as a faded reprint of one
+another. Where palette C wants `#d7c354` as a circuit accent, keep it away from a
+number field, or separate them with a white keyline **outside** Art. 3.7's 10 mm of
+clear yellow — the article requires 10 mm of yellow around the glyph and says
+nothing about what sits beyond it, so a keyline is legal.
+
+Birel ART's own livery red measured the same way: **`#9e3b36`**, `sourced` as a
+vector fill. Recorded because it is the only other exactly-known color in this
+repo, not because any palette below uses it.
+
+### 60.5.2 A — Heritage
+
+Green tubes, gold magnesium rims, white wrap with green and red pinstripes.
+
+| element | relationship | hex | prov |
+| --- | --- | --- | --- |
+| frame tube | deep racing green, gloss powder coat; **one stop darker and bluer than the pinstripe green**, so the tube reads as structure and the stripe as decoration | `#1d5c33` | `estimated`. `tonykart_racer401T_p01.jpg`'s tube samples at `#1d3e2b` but that pixel is in shadow on a 30 mm cylinder; the frame's dominant green mode is `#285032`. Studio white-sweep lighting, cool, so the true hue is warmer than either. |
+| pinstripe green | printed vinyl, brighter and yellower than the tube | `#2d5839` | `estimated`, measured off p01's tray; printed vinyl on a flat surface, so closer to true than the tube |
+| pinstripe red | a warm signal red, not a crimson | `#c33533` | `estimated`, measured off p01's tray |
+| wrap white | a warm white, clearly warmer than the number field's neighbor | `#f2f0ec` | `estimated` |
+| rims | gold-anodized magnesium: warmer and much darker than the number yellow, duller than brass | `#9a7b34` | `estimated`; `exh_commons_buntschu_kz2.jpg` confirms the finish exists on a KZ2 and is too small and too shadowed to sample |
+| tray | §60.3.2's anti-slip white, with the green/red pinstripes | `#c8c8d2` | `estimated`, measured mode from p01 |
+| accents | chrome bumper tubes, clear-anodized machined parts, red brake lines | — | — |
+
+### 60.5.3 B — Factory
+
+Black tubes, black rims, orange and black wrap.
+
+| element | relationship | hex | prov |
+| --- | --- | --- | --- |
+| frame tube | gloss black powder coat, reading **blue-black against the tires' brown-black** — the two must not collapse into one value | `#14161a` | `estimated`; `crg_roadrebel_kz_detail7.webp` shows exactly this separation |
+| rims | satin black anodized magnesium, **flatter and slightly lighter than the tube's gloss** | `#1c1c1e` at roughness 0.45 | `estimated` |
+| wrap orange | a fluorescent orange, hotter than any process orange | `#f4491f` | `estimated`, **and the measurement failed, which is the honest part**: across `crg_roadrebel_kz_detail7.webp` **36.6%** of the orange pixels have the red channel clipped at ≥253, and in `detail11.webp` **54.1%**. A fluorescent ink under studio light saturates the sensor, so the hue is unrecoverable from these frames and the value is certainly wrong. Any orange sampled off a CRG photograph in this repo is a guess wearing a measurement's clothes. |
+| wrap black | the wrap's black, glossier than the tube's and slightly warmer | `#17171a` at roughness 0.16 | `estimated` |
+| accents | grey-silver graphic flashes (`crg_roadrebel_kz_detail11.webp` uses a mid grey as the third color, not white), gold-anodized hubs, red brake lines | `#9a9ea0` | `estimated` |
+
+### 60.5.4 C — Valdirone
+
+Deep blue tubes, silver rims, white wrap, accented on the circuit's provisional
+panel yellow.
+
+| element | relationship | hex | prov |
+| --- | --- | --- | --- |
+| frame tube | deep navy, gloss; dark enough to read as near-black at distance and clearly blue up close | `#14284b` | `estimated` |
+| rims | bright silver — clear-anodized or polished magnesium, **cooler and brighter than the radiator core** and the only near-white metal on the kart besides it | `#b9bcc0` | `estimated` |
+| wrap white | a cool white, a half-stop bluer than Heritage's | `#f4f5f7` | `estimated` |
+| circuit accent | the documented provisional Valdirone panel yellow | `#d7c354` | `estimated` — carried forward from the front-end work, not measured here |
+| accent, adjacency rule | **never adjacent to a number field.** `#d7c354` against `#ecd44c` is an 8% value step in the same hue and reads as a print defect. Separate with the wrap white or the navy. | — | `derived` from the two hexes |
+| accents | navy-anodized fasteners, silver graphic flashes, red brake lines | — | — |
+
+**Number zones stay `#ecd44c` with `#000000` Arial Bold glyphs in all three
+palettes.** They are regulated, not styled, and they are the one part of the
+livery that must be identical across every variant.
+
+---
+
+## 60.6 Things I believe are wrong in files I do not own
+
+Numbers, not opinions. Nothing here was edited.
+
+**1. `params.py`: the driver is 130 mm underground, and it is one bug in two fields.**
+
+    driver_shoulder_z = 0.470     spec 608     138 mm low
+    driver_eye_z      = 0.620     spec 757     137 mm low
+
+The identical error in both is the tell. The *relative* geometry is exactly right:
+params' eye−shoulder gap is 150 mm and the sourced gap is
+`(787 − 622) × cos 25° = 149.5 mm`. And placing the hip joint at **z = 0** instead
+of on the seat pan reproduces both fields to within 8 mm:
+
+    527 x cos 25 = 477.7    vs driver_shoulder_z 470
+    692 x cos 25 = 627.2    vs driver_eye_z      620
+
+So both were measured **from the asphalt with the driver's hip on it**, rather than
+from the seat pan 130 mm up. The correct values are 608 and 757. This is not
+cosmetic — see item 3.
+
+**2. `params.py`: `driver_upper_arm` and `driver_forearm` are a small adult's arm
+with no hand on it.**
+
+    driver_upper_arm  0.290    sourced 50th pct male 0.368    78 mm short
+    driver_forearm    0.260    elbow-to-fist 0.361           101 mm short
+
+`driver_forearm`'s docstring says the two are what issue #17's reach arithmetic
+runs on. They are elbow-to-**wrist**, so the arithmetic they support stops 90 mm
+before any grip. The reach required is 725.5 mm; 290 + 260 = 550 misses by 176 mm
+and 368 + 361 = 729 closes it with the elbow locked at 180°. Both fields should
+change, and even then §60.2.3 says the wheel has to move.
+
+**3. `src/core/chassis.h`: three of the four driver mass lumps are ~125 mm too low,
+which is a load-transfer term, not a cosmetic one.**
+
+Converting each lump's Godot position to spec coordinates (`(x, Y, Z)_godot`
+→ `(x, −Z, Y)_blender`) and comparing to §60.1.4's segment centroids:
+
+| lump | chassis.h (y, z) | this spec (y, z) | Δy | Δz |
+| --- | --- | --- | --- | --- |
+| `driver trunk` 39.0 kg | (−248, 330) | (−281, 369) | 33 | **−39** |
+| `driver arms` 7.8 kg | (+32, 420) | (−37, 544) | 69 | **−124** |
+| `driver legs` 25.0 kg | (+122, 170) | (+125, 288) | 3 | **−118** |
+| `driver head and helmet` 6.2 kg | (−128, 560) | (−454, 738) | **326** | **−178** |
+
+The fore-aft agreement on legs (3 mm) and trunk (33 mm) says the longitudinal model
+is sound; every z is low by the same 120–180 mm as item 1's driver, from the same
+cause. 78 kg of a ~170 kg kart sitting 125 mm lower than it should understates the
+CoM height, and CoM height is the numerator of the load-transfer term that every
+§6.4 figure and the 2.43 g rollover threshold depend on.
+
+`chassis.h` carries an explicit instruction not to correct these against
+`params.py`'s seat until **issue #107** closes, and I have not. But #107 is about
+the longitudinal calibration, and this is a vertical error of a different sign and a
+different cause. It should be its own ticket rather than sheltering under #107's.
+
+**4. `src/core/chassis.h`: the head lump is 326 mm too far forward, and it is where
+the cockpit camera and the audio listener both sit.**
+
+`KartBody::driver_head_position()` returns the *"driver head and helmet"* lump
+center, and `cockpit_camera.gd` and `engine_voice_rig.gd` both use it. That lump is
+at spec `(0, −128, 560)`; the helmet center derived from the sourced seat and the
+sourced anthropometry is `(0, −454, 738)`. So the cockpit camera sits **326 mm
+forward and 178 mm below** the driver's head — roughly over his sternum, at
+chest-top height, looking out from inside the driver.
+
+`cockpit_camera.gd`'s own header argues that an eye offset would be *"a number with
+no source"* and that `chassis.h` has *"a 260 mm helmet box and nothing inside it"*.
+That was the right instinct and this section removes its premise: the eye point is
+now `(±32, −462, 757)`, sourced, with its arithmetic shown. The camera has an eye
+point to use.
+
+**5. `params.py`: the floor tray stops 190 mm behind the driver's heels.**
+
+    tray_front_y = 0.180   tray_length = 0.760   ->  tray spans y -580 .. +180
+    heel contact        y = +370         190 mm ahead of the tray's front edge
+    pedal face          y = +560         380 mm ahead of the tray's front edge
+
+There is no floor under the driver's feet, which is why §60.3.2's heel-scuff wear
+cannot be placed on this kart and why the heel's `z = 69` is a hypothetical. A real
+kart's tray runs forward to the front cross member; `tray_front_y` wants to be
+around 0.500 with `tray_length` around 1.08. The tray's z is fine —
+`ground_clearance 0.035 + tube_main 0.030 + tray_thickness 0.004` puts the top at
+**0.069**, which is what `radiator_z`'s docstring asserts.
+
+**6. `params.py`: `driver_helmet_radius = 0.125` is a sphere where a helmet is an
+ellipsoid.** 250 mm is right for a helmet's *width*; a full-face karting helmet is
+about **340 mm** front-to-back. A spherical helmet is 90 mm short in length, and it
+is short in the direction the cockpit camera looks. `chassis.h`'s 0.26 m cube has
+the same problem for the same reason.
+
+**7. `notes_radiator.md` §6: the estimated 40–45° torso recline cannot be built.**
+That row is `estimated` and marked as such, so this is a correction and not a
+defect. At 43° from vertical, a hip at (−170, 130) puts the shoulder joint at
+`y = −170 − 527 × sin 43° = −529` — **4 mm behind the rear axle centerline**, with
+the acromion 164 mm behind the seat back's own rearmost point. The seat's total
+horizontal run, front lip to back top, is 315 mm; a 43° torso needs 359 mm of run
+for the torso alone. It does not fit. The shell chord's sourced 19–26° is the
+number that closes, which is what §60.1.3 uses. It is worth noting that the 43°
+figure and `driver_shoulder_z = 470` are *nearly* consistent with each other, which
+is probably how both survived: 43° recline off a ground-level hip gives 473.
+
+**8. `build.py`: `MATERIALS` has 15 entries for at least 22 distinct finishes, and
+one entry covers 75 of 146 parts.** The splits are §60.3's; the headline is that
+`engine_alloy` holds a raw sand casting, machined billet, gold anodize and a brazed
+radiator core simultaneously, and `seat_fiberglass` at `(0.055, 0.055, 0.058)` is
+near-black where a bare fiberglass kart seat is one of the brightest objects on the
+kart. The comments in that block are careful and well reasoned about *value
+separation between neighbors*, which is why several of them are wrong: they solved a
+composition problem by darkening a material, when the fix was a second material.
+
+**9. `refs/kart-visual/sources.txt`:** `notes_radiator.md` §8 already flags the
+`tonykart_racer401T_p05.jpg` caption for claiming a seat and a top-down view where
+there is neither. Still unfixed at this commit. Not my file and not that agent's
+either, so recording it a second time rather than a third.
+
+---
+
+## 60.7 Provenance count for this section
+
+| tag | numbers | notes |
+| --- | --- | --- |
+| `sourced` | **31** | 12 regulation quotes with verified article numbers and pages (Art. 3.6, 3.7, 3.11, 4.8, 4.8.1, 7 preamble, 7.1–7.5, 9.3, 9.5.3, 9.5.4, 9.5.5.1); the NASA 1978 anthropometric table's 10 dimensions; `#ecd44c` and `#9e3b36` from vector artwork; the Tillett chart via `notes_radiator.md`. |
+| `derived` | **34** | every hard point in §60.1.4, the whole reach and pedal arithmetic, the number-zone block sizes, the Arial Bold stroke check, the seat front lip at y −50, and the six defect figures in §60.6. |
+| `estimated` | **29** | the three placement estimates in §60.1.3, the knee splay, the equipment thicknesses, most roughness values, all wear placement, and every palette hex except `#ecd44c`. |
+| `snippet` | **0** | nothing here rests on a page that could not be opened. |
+
+`estimated` is a third of this section, which is what the front matter says a
+normal outcome looks like. The two that should worry a reader are named where they
+sit: the **knee splay of ±180**, because the whole steering-wheel fix depends on it
+and it is read off one action photograph; and the **six wear claims with no
+photograph at all** in §60.3.13, because wear is the thing this section exists to
+specify.
