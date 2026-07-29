@@ -53,12 +53,15 @@ import time
 import traceback
 
 import bpy
+from mathutils import Vector
+from mathutils.bvhtree import BVHTree
 
 # Blender runs this file as a script, not as part of a package, so the package
 # next to it is not importable until its parent is on the path.
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from kartlib import build  # noqa: E402
+from kartlib import joints  # noqa: E402
 from kartlib import params as P  # noqa: E402
 
 #: Geometry modules, in build order. Each exposes `build_module(context)` and
@@ -287,6 +290,430 @@ def check_face_winding(context: build.BuildContext) -> None:
             else "",
         )
     )
+
+
+#: How many points per part gate 2 samples, spread evenly by index.
+#:
+#: By index rather than by area, because index order is a property of the mesh and
+#: is therefore reproducible; picking points by area would need a tie-break that
+#: is not.
+GAP_SAMPLES: int = 160
+
+#: How many of those sample points are used as seeds for the refinement below, per
+#: direction. The first probe is a coarse net; the refinement is what makes the
+#: number mean anything.
+GAP_SEEDS: int = 4
+
+#: Alternating-projection steps per seed. Six is where the numbers stopped moving:
+#: measured on `bodywork_sidepod_r` against `chassis_side_bar_r`, which reads
+#: 14.08 mm from vertices alone and 1.27 mm after refinement.
+GAP_REFINE: int = 6
+
+
+@dataclasses.dataclass
+class Part:
+    """One exportable mesh, prepared in **world space** for both gates.
+
+    `BVHTree.FromObject` builds in the object's *local* space, so overlapping two
+    of them compares two parts as if both sat at the origin — which reports the
+    seat as intersecting all four tires. Already in CLAUDE.md as having cost real
+    time once, so the triangles are transformed by hand and handed to
+    `FromPolygons`.
+    """
+
+    name: str
+    tree: BVHTree
+    samples: list[Vector]
+    low: Vector
+    high: Vector
+
+    def bounds_gap(self, other: Part) -> float:
+        """Distance between the two axis-aligned boxes; 0.0 if they overlap.
+
+        A lower bound on the true surface gap, which is what makes it useful
+        twice: gate 1 rejects a pair outright when it is positive, and gate 2
+        stops walking candidates once it exceeds the best gap found so far.
+        """
+        squared = 0.0
+        for axis in range(3):
+            separation = max(
+                self.low[axis] - other.high[axis],
+                other.low[axis] - self.high[axis],
+                0.0,
+            )
+            squared += separation * separation
+        return squared**0.5
+
+
+def assembly_parts(context: build.BuildContext) -> list[Part]:
+    """Every exportable mesh as world-space triangles, a BVH and a sample set.
+
+    Built once and handed to both gates: the trees are the expensive half of gate
+    1 and all of gate 2's input, and building them twice would double the only
+    part of this that shows up in a `--watch` rebuild.
+
+    Sample points are vertices *and* triangle centroids. Vertices alone are a bad
+    net on a coarse part — a flat panel's nearest point to a tube is in the middle
+    of a triangle, nowhere near a corner — and that showed up as the same joint
+    measuring 14.08 mm at low detail and 1.72 mm at high, which would have failed
+    a gate at one density and passed at the other.
+    """
+    parts: list[Part] = []
+    for obj in exportable(context):
+        if obj.type != "MESH":
+            continue
+        matrix = obj.matrix_world
+        vertices = [matrix @ vertex.co for vertex in obj.data.vertices]
+        triangles: list[tuple[int, int, int]] = []
+        for polygon in obj.data.polygons:
+            loop = list(polygon.vertices)
+            for index in range(1, len(loop) - 1):
+                triangles.append((loop[0], loop[index], loop[index + 1]))
+        if not triangles:
+            continue
+
+        candidates = list(vertices)
+        for a, b, c in triangles:
+            candidates.append((vertices[a] + vertices[b] + vertices[c]) / 3.0)
+        stride = max(1, len(candidates) // GAP_SAMPLES)
+
+        corners = [matrix @ Vector(corner) for corner in obj.bound_box]
+        parts.append(
+            Part(
+                name=obj.name,
+                tree=BVHTree.FromPolygons(vertices, triangles, all_triangles=True),
+                samples=candidates[::stride][:GAP_SAMPLES],
+                low=Vector(
+                    (
+                        min(point.x for point in corners),
+                        min(point.y for point in corners),
+                        min(point.z for point in corners),
+                    )
+                ),
+                high=Vector(
+                    (
+                        max(point.x for point in corners),
+                        max(point.y for point in corners),
+                        max(point.z for point in corners),
+                    )
+                ),
+            )
+        )
+    # `exportable` already sorts, but gate output ordering is an acceptance
+    # concern rather than a convenience, so this does not depend on that.
+    parts.sort(key=lambda part: part.name)
+    return parts
+
+
+def check_interpenetration(parts: list[Part]) -> set[tuple[str, str]]:
+    """Fail the build if any part is built inside another it does not join.
+
+    The radiator was built through the gear lever, through the exhaust chamber and
+    through the right sidepod for several milestones — 593 intersecting triangle
+    pairs — and every render looked fine, because a part inside another part is
+    hidden by the thing it is inside. It was found by a human turning a viewport,
+    which is not a loop that survives an unattended run.
+
+    `kartlib/joints.py` is the allowlist and it is not a list of name pairs: a
+    declared `Joint` permits this overlap **and** obliges gate 2 to find the two
+    parts touching, so one entry cannot rot into permission for a collision. Very
+    roughly 200 of the ~218 overlapping pairs here are legitimate — a nut threaded
+    into a casting, a tube welded to a tube, a tire bead inside a rim flange, a
+    chain over a sprocket, a plug in a head, a hose entering a tank — and which
+    ones took reading the code that builds each part rather than reading names.
+
+    Returns the overlapping pairs, because gate 2 needs them: two parts that
+    intersect have a surface gap of exactly zero, and sampling for it would report
+    a bearing hanger 12 mm from an axle that runs straight through it.
+    """
+    started = time.perf_counter()
+    names = [part.name for part in parts]
+    declared = joints.declared(names)
+    waived = joints.waived("overlap", names)
+
+    considered = 0
+    rejected = 0
+    overlapping: set[tuple[str, str]] = set()
+    counts: dict[tuple[str, str], int] = {}
+    for index, part in enumerate(parts):
+        for other in parts[index + 1 :]:
+            considered += 1
+            # Bounds first: 146 meshes is 10,585 pairs and the tree overlap is
+            # two orders of magnitude dearer than six comparisons.
+            if part.bounds_gap(other) > 0.0:
+                rejected += 1
+                continue
+            hits = part.tree.overlap(other.tree)
+            if hits:
+                pair = (part.name, other.name)
+                overlapping.add(pair)
+                counts[pair] = len(hits)
+
+    fatal: list[tuple[tuple[str, str], int]] = []
+    excused: list[tuple[tuple[str, str], int, joints.Defect]] = []
+    # What "failing" means here is *undeclared* overlap, not overlap. A waiver on
+    # a pair that is also a declared joint would otherwise never be reported
+    # stale, because the joint keeps the pair overlapping forever -- and that is
+    # exactly the waiver that has stopped meaning anything.
+    failing: set[tuple[str, str]] = set()
+    for pair in sorted(overlapping):
+        if pair in declared:
+            continue
+        failing.add(pair)
+        defect = waived.get(pair)
+        if defect is None:
+            fatal.append((pair, counts[pair]))
+        else:
+            excused.append((pair, counts[pair], defect))
+
+    if fatal:
+        listing = "\n".join(
+            "      %-28s %-28s %4d triangle pair(s)" % (pair[0], pair[1], count)
+            for pair, count in fatal
+        )
+        raise SystemExit(
+            "error: %d pair(s) of parts are built inside each other:\n%s\n"
+            "       Either the two really do collide -- in which case move one, "
+            "and note that\n"
+            "       no render will show you the problem -- or they are joined, in "
+            "which case\n"
+            "       declare the joint in tools/blender/kartlib/joints.py with what "
+            "physically\n"
+            "       holds them together. A declared joint also has to *touch*, "
+            "which is\n"
+            "       deliberate: it is one fact about the kart, not two lists."
+            % (len(fatal), listing)
+        )
+
+    stale = joints.stale_waivers("overlap", names, failing)
+    if stale:
+        listing = "\n".join(
+            "      %-28s %-28s %s" % (defect.a, defect.b, defect.issue)
+            for defect in stale
+        )
+        raise SystemExit(
+            "error: %d overlap waiver(s) in joints.py no longer cover a failing "
+            "pair:\n%s\n"
+            "       This is fixed. Delete the waiver -- a waiver list that keeps "
+            "entries for\n"
+            "       faults that are gone stops being a list of what is broken."
+            % (len(stale), listing)
+        )
+
+    for pair, count, defect in excused:
+        print(
+            "    warning: %s and %s intersect, %d triangle pair(s) -- known, %s"
+            % (pair[0], pair[1], count, defect.issue)
+        )
+    print(
+        "    overlap  %d/%d pair(s) intersect: %d declared, %d known-open; "
+        "%d rejected on bounds, %.0f ms"
+        % (
+            len(overlapping),
+            considered,
+            len(overlapping) - len(excused),
+            len(excused),
+            rejected,
+            (time.perf_counter() - started) * 1000.0,
+        )
+    )
+    return overlapping
+
+
+def check_attachment(parts: list[Part], overlapping: set[tuple[str, str]]) -> None:
+    """Fail the build if a part touches nothing, or misses what it mounts to.
+
+    `steering_column`'s lower bearing bottoms out 13.2 mm above the crown of
+    `chassis_steering_hoop`, whose whole stated purpose in `frame.py` is *"so that
+    the column has something to be mounted to rather than floating"*. Nothing
+    objected, and nothing could: a 13 mm gap behind a steering wheel is invisible
+    from every camera angle this project has ever rendered.
+
+    Two forms, because the cheap one is not enough:
+
+    **weak** — a part whose nearest neighbor over the whole kart is further than
+    `joints.CONTACT_TOLERANCE` is floating. This catches a part nobody thought
+    about, including one that has no joint declared at all.
+
+    **strong** — every declared joint's two parts must be that close *to each
+    other*. A sidepod resting against the engine instead of against its side bar
+    passes the weak form and is still wrong, and that is not hypothetical: the
+    right pod is 26.7 mm inside the crankcase and 1.3 mm off the bar it bolts to.
+
+    The measurement is an upper bound on the true surface gap and says so: sample
+    points on A, nearest surface point on B, then alternate the projection a few
+    times from the best seeds. That converges on a local minimum fast and is what
+    makes the figure agree between detail levels — vertices alone put one joint at
+    14.08 mm low and 1.72 mm high. An upper bound is the safe direction for a
+    gate that fails on *large* gaps, and refinement is what stops it crying wolf.
+    """
+    started = time.perf_counter()
+    names = [part.name for part in parts]
+    by_name = {part.name: part for part in parts}
+    declared = joints.declared(names)
+    waived = joints.waived("gap", names)
+    tolerance = joints.CONTACT_TOLERANCE
+
+    def surface_gap(a: Part, b: Part) -> float:
+        if (a.name, b.name) in overlapping or (b.name, a.name) in overlapping:
+            return 0.0
+        seeds: list[tuple[float, Vector, bool]] = []
+        for source, target, forward in ((a, b, True), (b, a, False)):
+            hits = []
+            for point in source.samples:
+                location, _normal, _index, distance = target.tree.find_nearest(point)
+                if location is not None:
+                    hits.append((distance, point, forward))
+            hits.sort(key=lambda hit: hit[0])
+            seeds.extend(hits[:GAP_SEEDS])
+
+        best = float("inf")
+        for _distance, point, forward in seeds:
+            here, there = (a.tree, b.tree) if forward else (b.tree, a.tree)
+            current = point
+            for _step in range(GAP_REFINE):
+                location, _normal, _index, distance = there.find_nearest(current)
+                if location is None:
+                    break
+                best = min(best, distance)
+                current = location
+                here, there = there, here
+        return best
+
+    # --- weak: is anything floating? ---
+    floating: list[tuple[str, str, float]] = []
+    excused_weak: list[tuple[str, str, float, joints.Defect]] = []
+    for part in parts:
+        best_gap = float("inf")
+        best_name = ""
+        for candidate in sorted(parts, key=lambda other: part.bounds_gap(other)):
+            if candidate.name == part.name:
+                continue
+            # The bound is a lower bound on the gap, so once it exceeds the best
+            # surface gap found so far, nothing further out can win.
+            if part.bounds_gap(candidate) > best_gap:
+                break
+            gap = surface_gap(part, candidate)
+            if gap < best_gap:
+                best_gap, best_name = gap, candidate.name
+        if best_gap > tolerance:
+            defect = joints.waives_part(part.name)
+            if defect is None:
+                floating.append((part.name, best_name, best_gap))
+            else:
+                excused_weak.append((part.name, best_name, best_gap, defect))
+
+    if floating:
+        listing = "\n".join(
+            "      %-28s nearest %-24s %7.2f mm" % (name, other, gap * 1000.0)
+            for name, other, gap in floating
+        )
+        raise SystemExit(
+            "error: %d part(s) touch nothing on the kart:\n%s\n"
+            "       The tolerance is %.1f mm. A part that is not within that of "
+            "anything is\n"
+            "       floating in space, and no render will show it -- move it onto "
+            "whatever\n"
+            "       carries it, and declare that joint in joints.py so the next "
+            "edit cannot\n"
+            "       quietly move it off again."
+            % (len(floating), listing, tolerance * 1000.0)
+        )
+
+    # --- strong: does every declared joint actually touch? ---
+    broken: list[tuple[tuple[str, str], joints.Joint, float]] = []
+    excused_strong: list[tuple[tuple[str, str], float, joints.Defect]] = []
+    failing: set[tuple[str, str]] = set()
+    gaps: dict[tuple[str, str], float] = {}
+    for pair in sorted(declared):
+        gap = surface_gap(by_name[pair[0]], by_name[pair[1]])
+        gaps[pair] = gap
+        if gap <= tolerance:
+            continue
+        failing.add(pair)
+        defect = waived.get(pair)
+        if defect is None:
+            broken.append((pair, declared[pair], gap))
+        else:
+            excused_strong.append((pair, gap, defect))
+
+    if broken:
+        listing = "\n".join(
+            "      %-26s %-26s %7.2f mm  (%s)"
+            % (pair[0], pair[1], gap * 1000.0, joint.kind)
+            for pair, joint, gap in broken
+        )
+        raise SystemExit(
+            "error: %d declared joint(s) are not in contact:\n%s\n"
+            "       joints.py says these parts are joined and the mesh says they "
+            "are %.1f mm\n"
+            "       or more apart. One of the two is wrong. If the joint is real, "
+            "move the\n"
+            "       part; if it is not, delete the entry -- but read its `why` "
+            "first, because\n"
+            "       it says what physically holds the two together."
+            % (len(broken), listing, tolerance * 1000.0)
+        )
+
+    stale = joints.stale_waivers("gap", names, failing)
+    if stale:
+        listing = "\n".join(
+            "      %-26s %-26s %s" % (defect.a, defect.b, defect.issue)
+            for defect in stale
+        )
+        raise SystemExit(
+            "error: %d gap waiver(s) in joints.py no longer cover a failing "
+            "joint:\n%s\n"
+            "       This is fixed. Delete the waiver."
+            % (len(stale), listing)
+        )
+
+    for name, other, gap, defect in excused_weak:
+        print(
+            "    warning: %s touches nothing; nearest is %s at %.2f mm -- known, %s"
+            % (name, other, gap * 1000.0, defect.issue)
+        )
+    for pair, gap, defect in excused_strong:
+        print(
+            "    warning: joint %s/%s is %.2f mm apart -- known, %s"
+            % (pair[0], pair[1], gap * 1000.0, defect.issue)
+        )
+    widest = max(gaps.items(), key=lambda item: item[1]) if gaps else None
+    print(
+        "    attach   %d part(s) within %.1f mm of a neighbor (%d known-open); "
+        "%d declared joint(s) in contact (%d known-open), widest %s, %.0f ms"
+        % (
+            len(parts) - len(excused_weak),
+            tolerance * 1000.0,
+            len(excused_weak),
+            len(declared) - len(excused_strong),
+            len(excused_strong),
+            (
+                "%s/%s %.2f mm" % (widest[0][0], widest[0][1], widest[1] * 1000.0)
+                if widest
+                else "n/a"
+            ),
+            (time.perf_counter() - started) * 1000.0,
+        )
+    )
+
+
+def check_assembly(context: build.BuildContext) -> None:
+    """Both #192 gates, over one shared set of world-space trees.
+
+    Called where `check_face_winding` is called and for the same reason: these are
+    invariants a render cannot show you, so they are asserted on every build
+    rather than reviewed. Measured at 0.34 s for the two of them at high detail
+    against a 1.7 s rebuild, which is inside the budget `--watch` has to keep, so
+    neither half is skipped anywhere and there is no mode in which the kart is
+    built without being checked.
+    """
+    started = time.perf_counter()
+    parts = assembly_parts(context)
+    prepared = (time.perf_counter() - started) * 1000.0
+    overlapping = check_interpenetration(parts)
+    check_attachment(parts, overlapping)
+    print("    assembly %d part(s) prepared in %.0f ms" % (len(parts), prepared))
 
 
 def suffix_pass(context: build.BuildContext, suffix: str) -> None:
@@ -610,6 +1037,7 @@ def rebuild(arguments: dict[str, str], out_directory: str) -> tuple[int, int]:
     materials = build.make_materials()
     context = build_kart(parameters, detail, bpy.context.scene, materials, out_directory)
     check_face_winding(context)
+    check_assembly(context)
 
     meshes = [obj for obj in exportable(context) if obj.type == "MESH"]
     return len(meshes), sum(len(obj.data.vertices) for obj in meshes)
@@ -739,6 +1167,9 @@ def main() -> None:
     print("==> geometry (%s detail)" % detail.name)
     context = build_kart(parameters, detail, scene, materials, out_directory)
     check_face_winding(context)
+    # Before the high-poly pass is paired in, and before any stage renames or
+    # decimates anything: both gates measure the kart as it was built.
+    check_assembly(context)
     if high_context is not None:
         context.high_poly = pair_high_poly(context, high_context, high_suffix)
 
