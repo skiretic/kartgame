@@ -54,6 +54,11 @@ __pycache__/
 # nothing noticed. See issue #106.
 /shots/
 
+# Reference material — copyrighted photographs and FIA documents, looked at
+# and never shipped. REFERENCES.md records what each file is and where it
+# came from; the files themselves must not enter history.
+/refs/
+
 # LightmapGI bake products are NOT ignored, despite being generated output.
 #
 # The §16 rule says generated content stays out of version control, and the
