@@ -115,13 +115,45 @@ separately lets the rear protection reach *"the overall rear width"* — the two
 one number only in the maximum case, by coincidence. Same mislabeling class as
 `length_overall`, smaller consequence.
 
-**The tire figures are not sourced where the docstring implies.** `params.py`
-asserts "Rear tire width 215 mm max / Front tire width 135 mm max", and a grep of
-the 2026 technical regulations does not find either figure — tire dimensions live
-in the tire homologation list, not in Art. 9. Until one of them is tied to a
-primary source they are `estimated` wearing the word "max", which is the exact
-defect §1 names. They stay frozen either way, because every §6.4 driving figure is
-measured against them; what changes is the label. See §Running gear.
+**The tire figures are mislabeled, and the diameters are worse than the widths.**
+This paragraph replaces an earlier claim in this document that 215 and 135 appear
+nowhere in the regulations. They do: **Art. 4.13.1 *Wheel dimensions*, PDF p. 13.**
+But that article governs the **wheel** — Art. 2.3.2 defines a wheel as rim plus
+mounted tire — and its own footnote says *"maximum wheel dimensions […] at 0.5
+bar"*. So 215 and 135 are **inflated rim-plus-tire ceilings**, not tire widths, and
+`params.py` uses them as tire widths. Art. **4.15 *Tyres* is one sentence and
+contains no dimension at all**; real tire dimensions live in the tire homologation
+forms.
+
+Measured from CIK-FIA tire homologation forms **047-TO-12 / 047-TO-14** (Vega XH4,
+Groups 1 & 2), page 3, a dimensioned cross-section of the tire fitted to its rim,
+all ±5 mm and all `sourced`:
+
+| | diameter | overall width | tread width | rim width |
+| --- | --- | --- | --- | --- |
+| front | **260** | 130 | 110 | 120 |
+| rear | **274** | 207 | 179 | 198 |
+
+Against which `tire_front_diameter` 280 is the Art. 4.13.1 **maximum**, and
+`tire_rear_diameter` 295 is **neither the maximum (300) nor any real tire**.
+
+**These stay frozen, and this document flags rather than changes them.** Every
+§6.4 driving figure, every `drive.sh` scenario and the whole M3a/M3b tire model are
+measured against 280/295; a 20 mm diameter change moves the rolling radius, the
+axle heights, the gearing and the center of mass together, and re-deriving that is
+not a geometry task. So the spec records the truth beside the value:
+
+| field | built | sourced truth | disposition |
+| --- | --- | --- | --- |
+| `tire_front_diameter` | 280 | 260 | frozen, **relabel** `estimated` — it is the wheel-dimension ceiling, not a tire |
+| `tire_rear_diameter` | 295 | 274 | frozen, **relabel** `estimated` — invented; not even the ceiling |
+| `tire_front_width` | 135 | 130 | frozen; 135 is the *wheel* ceiling |
+| `tire_rear_width` | 215 | 207 | frozen; 215 is the *wheel* ceiling |
+| `rim_diameter` | 127 | 136.2 flange minimum (Art. 4.14) | **bead vs flange conflation** — a module drawing the visible flange at 127 is 9 mm undersize |
+
+Changing the diameters needs its own ticket and a re-measurement of §6.4, and it
+is a driving-model change wearing a geometry hat. What is free today is the
+**label**: these are `estimated`, and the word "max" comes off.
 
 Two further limits from the same article and its neighbors, which bound parts
 elsewhere in this document:
