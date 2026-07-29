@@ -1,0 +1,791 @@
+<title>kartgame — front end mockup, round 1</title>
+
+<style>
+  /* Round 1 of the visual pass: the timing / results / standings family.
+     Language per docs/FRONTEND.md, sourced F1–F6. The plates keep their own
+     grounds on purpose — a timing screen is dark and a classification sheet
+     is paper, whatever theme the page shell is in. */
+  :root {
+    color-scheme: light dark;
+
+    /* page shell */
+    --shell:      #eceae4;
+    --shell-ink:  #1a1b1d;
+    --shell-soft: #5d6166;
+    --shell-rule: #c9c6bd;
+
+    /* screen-document family */
+    --scr-ground: #101820;
+    --scr-chrome: #16263a;
+    --scr-ink:    #dce6f0;
+    --scr-soft:   #7f8ea0;
+    --scr-rule:   #23344a;
+    --accent:     #4aa8ff;
+
+    /* paper-document family */
+    --paper:      #f6f4ef;
+    --paper-ink:  #17181a;
+    --paper-soft: #62656a;
+    --paper-rule: #d4d1c8;
+    --paper-band: #ecebe3;
+
+    /* states — never decoration */
+    --st-improve: #2fbf5f;
+    --st-slower:  #e04545;
+    --st-best:    #b06de0;
+    --panel-yellow: #d7c354;   /* sampled from F3/F4, provisional */
+
+    --sans: "Helvetica Neue", Helvetica, Arial, ui-sans-serif, sans-serif;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --shell: #14161a; --shell-ink: #e3e4e6; --shell-soft: #9a9ea4;
+      --shell-rule: #2c2f35;
+    }
+  }
+  :root[data-theme="light"] {
+    --shell: #eceae4; --shell-ink: #1a1b1d; --shell-soft: #5d6166;
+    --shell-rule: #c9c6bd;
+  }
+  :root[data-theme="dark"] {
+    --shell: #14161a; --shell-ink: #e3e4e6; --shell-soft: #9a9ea4;
+    --shell-rule: #2c2f35;
+  }
+
+  body {
+    margin: 0;
+    background: var(--shell);
+    color: var(--shell-ink);
+    font-family: var(--sans);
+    font-size: 15px;
+    line-height: 1.5;
+    padding: 0 clamp(1rem, 4vw, 3rem) 5rem;
+  }
+  .wrap { max-width: 64rem; margin: 0 auto; }
+
+  header.top {
+    padding: 3rem 0 1.25rem;
+    border-bottom: 1px solid var(--shell-rule);
+    margin-bottom: 2.5rem;
+  }
+  .crumbs {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--shell-soft);
+    display: flex; flex-wrap: wrap; gap: 0 1.5rem;
+    margin-bottom: 0.9rem;
+  }
+  header.top h1 {
+    font-size: clamp(1.4rem, 4vw, 2.1rem);
+    font-weight: 700;
+    letter-spacing: -0.015em;
+    margin: 0 0 0.5rem;
+    text-wrap: balance;
+  }
+  header.top p { max-width: 40em; color: var(--shell-soft); margin: 0; text-wrap: pretty; }
+
+  .platehead {
+    display: flex; justify-content: space-between; align-items: baseline;
+    gap: 1rem; flex-wrap: wrap;
+    margin: 3rem 0 0.8rem;
+  }
+  .platehead h2 { font-size: 1rem; font-weight: 700; margin: 0; }
+  .platehead .src {
+    font-family: var(--mono); font-size: 0.7rem; color: var(--shell-soft);
+    letter-spacing: 0.08em; text-transform: uppercase;
+  }
+  .judge {
+    font-size: 0.82rem; color: var(--shell-soft); max-width: 46em;
+    margin: 0 0 1rem; text-wrap: pretty;
+  }
+
+  .plate {
+    border: 1px solid var(--shell-rule);
+    border-radius: 4px;
+    overflow: hidden;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.12);
+  }
+
+  /* ============ screen-document family ============ */
+  .scr {
+    background: var(--scr-ground);
+    color: var(--scr-ink);
+    font-variant-numeric: tabular-nums;
+  }
+  .scr .bar {
+    background: var(--scr-chrome);
+    display: flex; justify-content: space-between; align-items: center;
+    gap: 1rem; padding: 0.55rem 1rem;
+    border-bottom: 1px solid var(--scr-rule);
+  }
+  .scr .bar .sess { font-weight: 700; font-size: 0.85rem; letter-spacing: 0.04em; }
+  .scr .bar .sess span { color: var(--scr-soft); font-weight: 400; }
+  .scr .bar .clock {
+    font-family: var(--mono); font-size: 1.05rem; font-weight: 600;
+    color: var(--accent);
+  }
+  .scr .bar .flag {
+    font-size: 0.68rem; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--st-improve); font-weight: 700;
+  }
+
+  .tgrid { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+  .tgrid th {
+    text-align: left; font-size: 0.62rem; letter-spacing: 0.12em;
+    text-transform: uppercase; color: var(--scr-soft); font-weight: 600;
+    padding: 0.5rem 0.55rem; border-bottom: 1px solid var(--scr-rule);
+    white-space: nowrap;
+  }
+  .tgrid td {
+    padding: 0.42rem 0.55rem;
+    border-bottom: 1px solid rgba(35,52,74,0.55);
+    white-space: nowrap;
+    position: relative;
+  }
+  .tgrid td.n, .tgrid th.n { text-align: right; }
+  .tgrid .pos { font-weight: 700; width: 1.6rem; }
+  .tgrid .no { color: var(--scr-soft); }
+  .tgrid .drv { font-weight: 600; min-width: 11rem; }
+  .tgrid .drv small { color: var(--scr-soft); font-weight: 400; margin-left: 0.45rem; }
+  .tgrid tr.you td { background: rgba(74,168,255,0.10); }
+  .tgrid tr.you .drv { color: var(--accent); }
+  .cell-imp { color: var(--st-improve); }
+  .cell-slow { color: var(--st-slower); }
+  .cell-best { color: var(--st-best); font-weight: 700; }
+  .state { font-size: 0.66rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--scr-soft); }
+  .state.pit { color: var(--panel-yellow); }
+  .state.out { color: var(--st-slower); }
+
+  /* the progress-lap bar: accent filling along the row (F6 progress_lap) */
+  .prog {
+    position: absolute; left: 0; bottom: 0; height: 2px;
+    background: linear-gradient(to right, rgba(74,168,255,0) 0%, var(--accent) 86%);
+  }
+
+  .scr .followed {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 1rem; align-items: center;
+    padding: 0.9rem 1rem 1rem;
+    border-top: 1px solid var(--scr-rule);
+    background: var(--scr-chrome);
+  }
+  .followed .who { font-size: 0.8rem; color: var(--scr-soft); }
+  .followed .who b { color: var(--scr-ink); font-size: 0.95rem; display: block; }
+  .followed .split {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+  .followed .split .big {
+    font-size: clamp(2rem, 6vw, 3rem); font-weight: 800; letter-spacing: -0.02em;
+    color: var(--accent); line-height: 1;
+  }
+  .followed .split .sub {
+    font-family: var(--mono); font-size: 0.72rem; color: var(--scr-soft);
+    margin-top: 0.3rem;
+  }
+  .followed .split .sub em { font-style: normal; color: var(--st-improve); }
+
+  /* ============ paper-document family ============ */
+  .paper {
+    background: var(--paper);
+    color: var(--paper-ink);
+    font-variant-numeric: tabular-nums;
+  }
+  .paper .titleblock {
+    display: flex; justify-content: space-between; align-items: flex-start;
+    gap: 1rem; flex-wrap: wrap;
+    padding: 1.1rem 1.4rem 0.9rem;
+    border-bottom: 2px solid var(--paper-ink);
+  }
+  .paper .titleblock .doc {
+    font-size: 0.66rem; letter-spacing: 0.16em; text-transform: uppercase;
+    color: var(--paper-soft); margin-bottom: 0.25rem;
+  }
+  .paper .titleblock h3 { margin: 0; font-size: 1.05rem; font-weight: 700; letter-spacing: -0.01em; }
+  .paper .titleblock .meta {
+    text-align: right; font-size: 0.72rem; color: var(--paper-soft); line-height: 1.6;
+  }
+
+  .paper .body { display: grid; grid-template-columns: 11rem 1fr; }
+  @media (max-width: 46rem) { .paper .body { grid-template-columns: 1fr; } }
+
+  .stree {
+    border-right: 1px solid var(--paper-rule);
+    padding: 0.9rem 0;
+    font-size: 0.78rem;
+  }
+  @media (max-width: 46rem) { .stree { border-right: 0; border-bottom: 1px solid var(--paper-rule); } }
+  .stree .rnd {
+    font-size: 0.62rem; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--paper-soft); padding: 0 1.1rem 0.4rem;
+  }
+  .stree a {
+    display: block; padding: 0.32rem 1.1rem; color: var(--paper-ink);
+    text-decoration: none;
+  }
+  .stree a.on {
+    background: var(--paper-band);
+    border-left: 3px solid var(--accent);
+    padding-left: calc(1.1rem - 3px);
+    font-weight: 700;
+  }
+  .stree a.dim { color: var(--paper-soft); }
+
+  .sheet { padding: 1rem 1.4rem 1.3rem; overflow-x: auto; }
+
+  .pinned {
+    display: flex; gap: 2.2rem; flex-wrap: wrap; align-items: baseline;
+    padding-bottom: 0.9rem; margin-bottom: 0.9rem;
+    border-bottom: 1px solid var(--paper-rule);
+  }
+  .pinned .lbl {
+    font-size: 0.62rem; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--paper-soft); display: block; margin-bottom: 0.15rem;
+  }
+  .pinned .best { font-size: 1.9rem; font-weight: 800; letter-spacing: -0.02em; line-height: 1; }
+  .pinned .opt { font-size: 1.05rem; font-weight: 600; color: var(--paper-soft); }
+  .pinned .opt i { font-style: normal; font-size: 0.72rem; }
+  .pinned .splits { font-family: var(--mono); font-size: 0.78rem; color: var(--paper-soft); }
+
+  table.ptab { border-collapse: collapse; width: 100%; font-size: 0.8rem; }
+  .ptab th {
+    text-align: left; font-size: 0.62rem; letter-spacing: 0.12em;
+    text-transform: uppercase; color: var(--paper-soft); font-weight: 600;
+    padding: 0.4rem 0.6rem; border-bottom: 1px solid var(--paper-ink);
+    white-space: nowrap;
+  }
+  .ptab td { padding: 0.38rem 0.6rem; border-bottom: 1px solid var(--paper-rule); white-space: nowrap; }
+  .ptab td.n, .ptab th.n { text-align: right; }
+  .ptab tr.struck td { color: var(--paper-soft); }
+  .ptab tr.struck .time { text-decoration: line-through; text-decoration-color: var(--st-slower); }
+  .ptab .why { font-size: 0.7rem; color: var(--st-slower); }
+  .ptab td.pb { font-weight: 700; }                      /* personal best: bold (F7) */
+  .ptab td.sb {                                          /* session best: inverted (F7) */
+    background: var(--paper-ink); color: var(--paper);
+    font-weight: 700;
+  }
+  .ptab tr.bestrow td { font-weight: 700; }
+  .ptab tr.you td { background: rgba(74,168,255,0.09); }
+  .ptab .panelno {
+    display: inline-block; min-width: 2.1em; text-align: center;
+    background: var(--panel-yellow); color: #000;
+    font-weight: 700; font-family: Arial, "Liberation Sans", sans-serif;
+    border-radius: 2px; padding: 0.05rem 0.28rem;
+    border: 1px solid rgba(0,0,0,0.25);
+  }
+  .paper .foot {
+    display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap;
+    padding: 0.7rem 1.4rem;
+    border-top: 2px solid var(--paper-ink);
+    font-size: 0.68rem; color: var(--paper-soft);
+  }
+  .paper .foot .stamp { font-family: var(--mono); letter-spacing: 0.06em; }
+  .promo { font-size: 0.78rem; padding: 0.75rem 1.4rem 0; color: var(--paper-ink); }
+  .promo b { font-weight: 700; }
+
+  .notes {
+    margin-top: 1rem; font-size: 0.8rem; color: var(--shell-soft);
+    max-width: 46em; text-wrap: pretty;
+  }
+  .notes b { color: var(--shell-ink); font-weight: 600; }
+
+  footer.end {
+    margin-top: 3.5rem; padding-top: 1.2rem;
+    border-top: 1px solid var(--shell-rule);
+    font-family: var(--mono); font-size: 0.72rem; color: var(--shell-soft);
+  }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+
+  <header class="top">
+    <div class="crumbs">
+      <span>kartgame</span><span>issue #171 · round 1</span><span>docs/FRONTEND.md</span><span>sources F1–F6</span>
+    </div>
+    <h1>Front end mockup — the timing family</h1>
+    <p>
+      Three plates in the two document families FRONTEND.md derives: a live
+      timing screen (dark, glanceable), a session classification (paper), and
+      the championship standings (paper). Placeholder series colors — the
+      accent is deliberately not the FIA's green. <b>Round 2</b>, corrected
+      against the published 2026 Genk documents (REFERENCES.md F7): competitor
+      column before driver, nationality as flags, paper emphasis as bold /
+      inverted cells rather than color, official-document page furniture.
+    </p>
+  </header>
+
+  <!-- ============ PLATE 1: live timing ============ -->
+  <div class="platehead">
+    <h2>1 · Live timing — Qualifying Practice</h2>
+    <span class="src">family: screen · sources F5, F6</span>
+  </div>
+  <p class="judge">
+    Navy-family chrome, one accent, session clock top right. Gap and Interval
+    are two columns. Sector cells color by state only: green improved, red
+    slower, purple session best. The thin accent line under a row is the
+    progress-lap bar. Kart states use the real vocabulary.
+  </p>
+  <div class="plate scr">
+    <div class="bar">
+      <div class="sess">QUALIFYING PRACTICE <span>· Valdirone Nuova · KZ2</span></div>
+      <div class="flag">● Green flag</div>
+      <div class="clock">2:14</div>
+    </div>
+    <div style="overflow-x:auto">
+      <table class="tgrid">
+        <thead>
+          <tr>
+            <th class="pos">P</th><th>No</th><th>Driver</th>
+            <th class="n">Last</th><th class="n">Best</th>
+            <th class="n">Gap</th><th class="n">Int</th>
+            <th class="n">S1</th><th class="n">S2</th><th class="n">S3</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="pos">1</td><td class="no">104</td><td class="drv">Ferrand, Luca<small>FRA</small></td>
+            <td class="n">46.512</td><td class="n cell-best">46.402</td>
+            <td class="n">—</td><td class="n">—</td>
+            <td class="n cell-best">15.488</td><td class="n">15.402</td><td class="n">15.512</td>
+            <td class="state">On track<span class="prog" style="width:47%"></span></td>
+          </tr>
+          <tr class="you">
+            <td class="pos">2</td><td class="no">101</td><td class="drv">Skirving, Anthony<small>GBR</small></td>
+            <td class="n cell-imp">46.611</td><td class="n">46.611</td>
+            <td class="n">+0.209</td><td class="n">+0.209</td>
+            <td class="n cell-imp">15.531</td><td class="n cell-best">15.399</td><td class="n cell-slow">15.681</td>
+            <td class="state">On track<span class="prog" style="width:62%"></span></td>
+          </tr>
+          <tr>
+            <td class="pos">3</td><td class="no">107</td><td class="drv">Osei, Kwame<small>GHA</small></td>
+            <td class="n cell-slow">46.988</td><td class="n">46.740</td>
+            <td class="n">+0.338</td><td class="n">+0.129</td>
+            <td class="n">15.602</td><td class="n cell-imp">15.488</td><td class="n">15.650</td>
+            <td class="state">On track<span class="prog" style="width:31%"></span></td>
+          </tr>
+          <tr>
+            <td class="pos">4</td><td class="no">110</td><td class="drv">Bertola, Nadia<small>ITA</small></td>
+            <td class="n">46.902</td><td class="n">46.812</td>
+            <td class="n">+0.410</td><td class="n">+0.072</td>
+            <td class="n">15.633</td><td class="n">15.541</td><td class="n cell-imp">15.638</td>
+            <td class="state">On track<span class="prog" style="width:84%"></span></td>
+          </tr>
+          <tr>
+            <td class="pos">5</td><td class="no">115</td><td class="drv">Vasiliev, Andrei<small>BGR</small></td>
+            <td class="n">47.101</td><td class="n">46.899</td>
+            <td class="n">+0.497</td><td class="n">+0.087</td>
+            <td class="n">15.688</td><td class="n">15.577</td><td class="n">15.634</td>
+            <td class="state pit">Pit in</td>
+          </tr>
+          <tr>
+            <td class="pos">6</td><td class="no">109</td><td class="drv">Lindqvist, Måns<small>SWE</small></td>
+            <td class="n">47.230</td><td class="n">47.048</td>
+            <td class="n">+0.646</td><td class="n">+0.149</td>
+            <td class="n">15.702</td><td class="n cell-slow">15.741</td><td class="n">15.605</td>
+            <td class="state">On track<span class="prog" style="width:12%"></span></td>
+          </tr>
+          <tr>
+            <td class="pos">7</td><td class="no">118</td><td class="drv">Camara, Ibrahima<small>SEN</small></td>
+            <td class="n">47.582</td><td class="n">47.310</td>
+            <td class="n">+0.908</td><td class="n">+0.262</td>
+            <td class="n">15.822</td><td class="n">15.760</td><td class="n">15.728</td>
+            <td class="state pit">Pit out</td>
+          </tr>
+          <tr>
+            <td class="pos">8</td><td class="no">112</td><td class="drv">Roldán, Emilia<small>ESP</small></td>
+            <td class="n">—</td><td class="n">47.995</td>
+            <td class="n">+1.593</td><td class="n">+0.685</td>
+            <td class="n">—</td><td class="n">—</td><td class="n">—</td>
+            <td class="state out">Out</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="followed" style="grid-template-columns: 1fr auto auto">
+      <div class="who">
+        Following
+        <b>101 · Skirving, Anthony</b>
+        sector 2 of 3 · lap 4
+      </div>
+      <svg viewBox="220 30 560 660" style="height:5.2rem; width:auto; color:var(--scr-soft)" aria-label="track map">
+        <use href="#vmap-path"/>
+        <circle cx="352" cy="212" r="16" fill="var(--accent)" stroke="none"/>
+      </svg>
+      <div class="split">
+        <div class="big">−0.132</div>
+        <div class="sub">S2 15.399 <em>session best</em> · vs best lap</div>
+      </div>
+    </div>
+  </div>
+  <p class="notes">
+    <b>Deliberate:</b> the enormous figure is the live split, not the lap time —
+    F5's product does the same and it is the number a driver actually wants.
+    <b>Round-2 material:</b> the track-map pane and weather cells exist in F6
+    and are omitted here until the map can be drawn from the real
+    `track.json` spline.
+  </p>
+
+  <!-- ============ PLATE 2: results ============ -->
+  <div class="platehead">
+    <h2>2 · Results — session classification</h2>
+    <span class="src">family: paper · sources F5, race-format §</span>
+  </div>
+  <p class="judge">
+    A classification sheet, not a menu: title block, session tree down the
+    left, best and optimal pinned, then every lap with struck laps carrying
+    their reason. The optimal is never presented as a lap time.
+  </p>
+  <div class="plate paper">
+    <div class="titleblock">
+      <div>
+        <div class="doc">Session classification · Practice</div>
+        <h3>Valdirone Nuova · forward · KZ2</h3>
+      </div>
+      <div class="meta">
+        <b>For information purposes</b><br>
+        No official / regulatory value<br>
+        Round 2 · Day 1 · 12 laps · 9 valid
+      </div>
+    </div>
+    <div class="body">
+      <nav class="stree">
+        <div class="rnd">This round</div>
+        <a class="on" href="#">Practice</a>
+        <a class="dim" href="#">Qualifying Practice</a>
+        <a class="dim" href="#">Qualifying Heat</a>
+        <a class="dim" href="#">Super Heat</a>
+        <a class="dim" href="#">Final</a>
+      </nav>
+      <div class="sheet">
+        <div class="pinned">
+          <div>
+            <span class="lbl">Best lap — lap 9 · new personal best</span>
+            <span class="best">0:46.611</span>
+          </div>
+          <div>
+            <span class="lbl">Splits</span>
+            <span class="splits">15.531 · 15.399 · 15.681</span>
+          </div>
+          <div>
+            <span class="lbl">Optimal — sum of sector bests, nobody drove it</span>
+            <span class="opt">0:46.479 <i>(−0.132)</i></span>
+          </div>
+          <div>
+            <span class="lbl">Emphasis, per the real sheets</span>
+            <span class="splits"><b>bold</b> = personal best · <span style="background:var(--paper-ink);color:var(--paper);padding:0 0.3em">inverted</span> = session best</span>
+          </div>
+        </div>
+        <table class="ptab">
+          <thead>
+            <tr><th class="n">Lap</th><th class="n">Time</th><th class="n">S1</th><th class="n">S2</th><th class="n">S3</th><th class="n">Spd</th><th>Note</th></tr>
+          </thead>
+          <tbody>
+            <tr><td class="n">1</td><td class="n time">—</td><td class="n">—</td><td class="n">—</td><td class="n">—</td><td class="n">—</td><td class="why" style="color:var(--paper-soft)">out lap</td></tr>
+            <tr><td class="n">2</td><td class="n time">48.113</td><td class="n">16.102</td><td class="n">15.877</td><td class="n">16.134</td><td class="n">128</td><td></td></tr>
+            <tr><td class="n">3</td><td class="n time">47.021</td><td class="n">15.688</td><td class="n">15.599</td><td class="n">15.734</td><td class="n">131</td><td></td></tr>
+            <tr class="struck"><td class="n">4</td><td class="n time">47.930</td><td class="n">15.799</td><td class="n">16.320</td><td class="n">15.811</td><td class="n">130</td><td class="why">off track — T6, four wheels</td></tr>
+            <tr><td class="n">5</td><td class="n time">46.902</td><td class="n">15.641</td><td class="n">15.520</td><td class="n">15.741</td><td class="n">132</td><td></td></tr>
+            <tr><td class="n">6</td><td class="n time">46.850</td><td class="n">15.602</td><td class="n">15.488</td><td class="n">15.760</td><td class="n">132</td><td></td></tr>
+            <tr class="struck"><td class="n">7</td><td class="n time">49.877</td><td class="n">15.933</td><td class="n">17.502</td><td class="n">16.442</td><td class="n">126</td><td class="why">missed checkpoint — cut at T3</td></tr>
+            <tr><td class="n">8</td><td class="n time">46.799</td><td class="n">15.590</td><td class="n">15.475</td><td class="n">15.734</td><td class="n">133</td><td></td></tr>
+            <tr class="bestrow"><td class="n">9</td><td class="n sb time">46.611</td><td class="n pb">15.531</td><td class="n pb">15.399</td><td class="n">15.681</td><td class="n">133</td><td>best</td></tr>
+            <tr><td class="n">10</td><td class="n time">46.780</td><td class="n">15.560</td><td class="n">15.499</td><td class="n">15.721</td><td class="n">133</td><td></td></tr>
+            <tr><td class="n">11</td><td class="n time">46.869</td><td class="n">15.702</td><td class="n">15.618</td><td class="n pb">15.549</td><td class="n">132</td><td></td></tr>
+            <tr><td class="n">12</td><td class="n time">46.955</td><td class="n">15.633</td><td class="n">15.541</td><td class="n">15.781</td><td class="n">132</td><td></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="foot">
+      <span>New best — saved.</span>
+      <span class="stamp">session 0x2bfed011f85e5255 · tuning at defaults</span>
+    </div>
+  </div>
+  <p class="notes">
+    <b>Deliberate:</b> struck laps stay in the table with the strike on the
+    time only, so the sector data is still readable — a cut lap often holds
+    your best S1. The config hash lives in the footer stamp, which is the
+    "office use" corner of a real sheet — one glance for a bug report, invisible
+    as furniture otherwise.
+  </p>
+
+  <!-- ============ PLATE 3: standings ============ -->
+  <div class="platehead">
+    <h2>3 · Championship standings</h2>
+    <span class="src">family: paper · sources: entry list, race-format §, F3/F4 panels</span>
+  </div>
+  <p class="judge">
+    Columns in the real sheet's order — competitor before driver, driver bold,
+    nationality as flags, both of them. Equipment compresses to
+    chassis / engine per ADR-0052; the control tire is the footer's line, which
+    is what its uniformity means anyway. The kart number is drawn as its
+    regulation panel. The promotion line is the sheet's footnote, not a banner.
+  </p>
+  <div class="plate paper">
+    <div class="titleblock">
+      <div>
+        <div class="doc">Championship classification · after Round 2 of 4</div>
+        <h3>OK — season 1</h3>
+      </div>
+      <div class="meta">
+        Points from three classifications per round<br>
+        Nothing dropped · fastest lap of the Final +1
+      </div>
+    </div>
+    <div class="sheet" style="padding:1rem 1.4rem 0.4rem">
+      <table class="ptab">
+        <thead>
+          <tr>
+            <th class="n">Pos</th><th>No</th><th>Competitor</th><th>Nat</th>
+            <th>Driver</th><th>Nat</th><th>Equipment</th><th class="n">Points</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="n">1</td><td><span class="panelno">104</span></td><td>Scuderia Malvezzi</td><td>🇮🇹</td>
+            <td><b>Ferrand, Luca</b></td><td>🇫🇷</td><td>Malvezzi / Tessari</td><td class="n">188</td>
+          </tr>
+          <tr>
+            <td class="n">2</td><td><span class="panelno">110</span></td><td>Bertola Corse</td><td>🇮🇹</td>
+            <td><b>Bertola, Nadia</b></td><td>🇮🇹</td><td>Farina / Tessari</td><td class="n">176</td>
+          </tr>
+          <tr>
+            <td class="n">3</td><td><span class="panelno">107</span></td><td>Argent Racing</td><td>🇬🇧</td>
+            <td><b>Osei, Kwame</b></td><td>🇬🇭</td><td>Farina / Tessari</td><td class="n">151</td>
+          </tr>
+          <tr class="you">
+            <td class="n">4</td><td><span class="panelno">101</span></td><td>Argent Racing</td><td>🇬🇧</td>
+            <td><b>Skirving, Anthony</b></td><td>🇬🇧</td><td>Farina / Tessari</td><td class="n">134</td>
+          </tr>
+          <tr>
+            <td class="n">5</td><td><span class="panelno">115</span></td><td>Scuderia Malvezzi</td><td>🇮🇹</td>
+            <td><b>Vasiliev, Andrei</b></td><td>🇧🇬</td><td>Malvezzi / Tessari</td><td class="n">122</td>
+          </tr>
+          <tr>
+            <td class="n">6</td><td><span class="panelno">109</span></td><td>Nordkart</td><td>🇸🇪</td>
+            <td><b>Lindqvist, Måns</b></td><td>🇸🇪</td><td>Nordkart / Voss</td><td class="n">104</td>
+          </tr>
+          <tr>
+            <td class="n">7</td><td><span class="panelno">118</span></td><td>Argent Racing</td><td>🇬🇧</td>
+            <td><b>Camara, Ibrahima</b></td><td>🇸🇳</td><td>Farina / Voss</td><td class="n">87</td>
+          </tr>
+          <tr>
+            <td class="n">8</td><td><span class="panelno">112</span></td><td>Bertola Corse</td><td>🇮🇹</td>
+            <td><b>Roldán, Emilia</b></td><td>🇪🇸</td><td>Farina / Tessari</td><td class="n">79</td>
+          </tr>
+        </tbody>
+      </table>
+      <p class="promo"><b>Promotion to KZ2 at top 3.</b> You are 4th, 17 points off 3rd, with 150 available across the remaining two rounds.</p>
+    </div>
+    <div class="foot">
+      <span>Control tire: Corda, single supplier, all entrants.</span>
+      <span class="stamp">rounds 1–2 of 4 · OK · season 1</span>
+    </div>
+  </div>
+  <p class="notes">
+    <b>Deliberate:</b> every make is invented — no real chassis, engine or tire
+    marks anywhere in the fiction. The roster here is mockup placeholder; the
+    shipped one comes from ADR-0047's authored roster. The number panel chip is
+    the one place panel yellow appears, because it literally is a panel.
+  </p>
+
+  <!-- ============ THE REST OF THE FAMILY — first round for these seven ============ -->
+  <div class="platehead" style="margin-top:4rem; border-top:1px solid var(--shell-rule); padding-top:2.5rem">
+    <h2>The rest of the family — seven screens, their round 1</h2>
+    <span class="src">hierarchy: storyboard rev 3 · language: FRONTEND.md</span>
+  </div>
+  <p class="judge">
+    In the order a first-time player meets them. The paddock's 3D backdrop is a
+    labeled placeholder — the vignette is Blender-pipeline work that follows the
+    module plan, and only the overlay UI is being designed here.
+  </p>
+
+  <!-- 4 boot -->
+  <div class="platehead"><h2>4 · Boot</h2><span class="src">family: screen</span></div>
+  <div class="plate scr" style="display:grid; grid-template-rows:1fr auto; min-height:16rem">
+    <div style="display:grid; place-content:center; text-align:center; gap:0.5rem; padding:2rem">
+      <div style="font-size:clamp(1.8rem,5vw,2.6rem); font-weight:800; letter-spacing:0.28em; text-indent:0.28em">KARTGAME</div>
+      <div style="font-size:0.68rem; letter-spacing:0.18em; text-transform:uppercase; color:var(--scr-soft)">series name — open, naming is cheap and late</div>
+    </div>
+    <div class="bar" style="border-top:1px solid var(--scr-rule); border-bottom:none">
+      <span class="state">extension ✓ · kart.glb ✓ · audio device ✓</span>
+      <span class="state" style="color:var(--scr-ink)">press any key</span>
+    </div>
+  </div>
+  <p class="notes"><b>Refusal state:</b> a missing generated asset replaces the check line with the exact command to run, in words, and boot stops — per ADR-0052. No spinner, no silent black.</p>
+
+  <!-- 5 paddock -->
+  <div class="platehead"><h2>5 · Paddock — the main menu</h2><span class="src">backdrop placeholder · overlay: paper</span></div>
+  <div class="plate scr" style="padding:1rem; display:grid; grid-template-columns: 1.1fr 1fr; gap:1rem; align-items:stretch; position:relative; min-height:20rem">
+    <div style="position:absolute; inset:0.6rem; border:2px dashed var(--scr-rule); display:grid; place-content:end center; padding-bottom:0.5rem; pointer-events:none">
+      <span style="font-family:var(--mono); font-size:0.62rem; letter-spacing:0.12em; text-transform:uppercase; color:var(--scr-soft)">generated 3d paddock — stage 1 vignette: kart on stand, awning, parked camera · look_env lighting</span>
+    </div>
+    <div class="paper" style="align-self:center; margin:1.5rem 0 2.5rem 1rem; padding:1rem 1.2rem; max-width:17rem; box-shadow:0 8px 24px rgba(0,0,0,0.4)">
+      <div class="doc" style="font-size:0.62rem; letter-spacing:0.14em; text-transform:uppercase; color:var(--paper-soft); margin-bottom:0.5rem">where you go</div>
+      <div style="display:grid; gap:0.45rem; font-size:0.9rem">
+        <div style="font-weight:700; border-left:3px solid var(--accent); padding-left:0.5rem">Practice</div>
+        <div>Race weekend <span style="font-size:0.66rem; color:var(--paper-soft); text-transform:uppercase; letter-spacing:0.08em">needs a field — M7</span></div>
+        <div>Career <span style="font-size:0.66rem; color:var(--paper-soft); text-transform:uppercase; letter-spacing:0.08em">needs two circuits — M5</span></div>
+        <div style="color:var(--paper-soft); font-size:0.8rem; margin-top:0.3rem">Profile · Settings · Quit</div>
+      </div>
+    </div>
+    <div class="paper" style="align-self:center; margin:1.5rem 1rem 2.5rem 0; padding:1rem 1.2rem; max-width:19rem; box-shadow:0 8px 24px rgba(0,0,0,0.4)">
+      <div class="doc" style="font-size:0.62rem; letter-spacing:0.14em; text-transform:uppercase; color:var(--paper-soft); margin-bottom:0.5rem">where you are</div>
+      <div style="font-size:0.82rem; font-style:italic; color:var(--paper-ink); line-height:1.6">
+        No entry filed — the OK season starts when you do.<br>
+        <span style="color:var(--paper-soft)">No best set at Valdirone Nuova. The timing sheet is blank on purpose.</span>
+      </div>
+    </div>
+  </div>
+  <p class="notes"><b>First-run state shown deliberately</b> — the invitation lines are the fiction speaking, per ADR-0052, and italic is allowed here and nowhere a number lives. With a career underway the right card carries class, round, standing, best — the plate 02 wireframe's content.</p>
+
+  <!-- 6 setup -->
+  <div class="platehead"><h2>6 · Session setup</h2><span class="src">family: paper · an entry form</span></div>
+  <div class="plate paper">
+    <div class="titleblock">
+      <div><div class="doc">Entry form · Practice</div><h3>Valdirone Nuova · KZ2</h3></div>
+      <div class="meta">One screen for all four session types —<br>a weekend fixes circuit, layout and class</div>
+    </div>
+    <div style="display:grid; grid-template-columns: 1.2fr 1fr; gap:0; align-items:stretch">
+      <div class="sheet" style="border-right:1px solid var(--paper-rule)">
+        <table class="ptab" style="font-size:0.85rem">
+          <tbody>
+            <tr><td>Circuit</td><td class="n"><b>Valdirone Nuova</b></td></tr>
+            <tr><td>Layout</td><td class="n"><b>forward</b> · reverse</td></tr>
+            <tr><td>Class</td><td class="n"><b>KZ2</b></td></tr>
+            <tr><td>Length</td><td class="n">open — until you leave</td></tr>
+            <tr><td>Ghost</td><td class="n"><b>best</b> · off</td></tr>
+            <tr><td>Tuning preset</td><td class="n">defaults</td></tr>
+            <tr style="color:var(--paper-soft)"><td>Auto clutch</td><td class="n">on</td></tr>
+            <tr style="color:var(--paper-soft)"><td>Auto shift</td><td class="n">on</td></tr>
+          </tbody>
+        </table>
+        <p style="font-size:0.7rem; color:var(--paper-soft); margin:0.8rem 0 0">Session info for a bug report: one keypress, or copied from the results footer. Not printed here — ADR-0052.</p>
+      </div>
+      <div class="sheet" style="display:grid; align-content:center; justify-items:center; gap:0.4rem">
+        <svg viewBox="220 30 560 660" style="width:100%; max-width:15rem; height:auto; color:var(--paper-ink)" aria-label="Valdirone Nuova circuit map">
+          <path id="vmap-path" d="M 761.3 443.4 L 761.3 432.5 L 761.3 421.6 L 761.3 410.8 L 761.3 399.9 L 761.3 389.0 L 761.3 378.1 L 761.3 367.3 L 761.3 356.4 L 761.3 345.6 L 761.3 334.7 L 761.3 323.8 L 761.3 312.9 L 761.2 302.1 L 759.9 291.3 L 757.3 280.7 L 753.4 270.6 L 748.3 261.0 L 742.1 252.1 L 734.9 244.0 L 726.6 236.9 L 717.6 230.8 L 708.0 225.9 L 697.7 222.2 L 687.1 219.8 L 676.3 218.7 L 665.5 218.9 L 654.7 220.5 L 644.3 223.3 L 634.0 227.0 L 623.8 230.8 L 613.6 234.5 L 603.4 238.2 L 593.2 241.9 L 583.0 245.6 L 572.8 249.3 L 562.5 253.1 L 552.3 256.8 L 542.1 260.5 L 531.9 264.2 L 521.7 267.9 L 511.5 271.6 L 501.3 275.4 L 491.1 279.1 L 480.8 282.8 L 470.6 286.5 L 460.4 290.2 L 450.1 293.7 L 439.4 295.5 L 428.5 295.5 L 417.8 293.7 L 407.6 290.2 L 398.0 285.0 L 389.5 278.3 L 382.2 270.3 L 376.3 261.1 L 371.6 251.3 L 367.0 241.5 L 362.4 231.6 L 357.8 221.8 L 353.2 211.9 L 348.6 202.1 L 344.1 192.2 L 339.5 182.4 L 334.9 172.5 L 330.3 162.7 L 325.7 152.8 L 321.1 143.0 L 316.5 133.1 L 311.9 123.3 L 307.3 113.4 L 302.7 103.6 L 298.1 93.7 L 293.5 83.9 L 288.9 74.0 L 284.4 64.2 L 278.6 55.0 L 269.5 49.2 L 258.8 48.2 L 248.8 52.1 L 241.5 60.1 L 238.7 70.5 L 240.8 81.1 L 245.4 90.9 L 250.0 100.8 L 254.6 110.6 L 259.2 120.5 L 263.8 130.3 L 268.4 140.2 L 273.0 150.0 L 277.6 159.9 L 282.2 169.7 L 286.8 179.6 L 291.4 189.4 L 296.0 199.3 L 300.6 209.1 L 305.1 219.0 L 309.7 228.8 L 314.3 238.7 L 318.9 248.5 L 323.5 258.4 L 328.1 268.2 L 332.7 278.1 L 337.3 287.9 L 341.9 297.8 L 346.5 307.6 L 349.5 318.0 L 349.1 328.8 L 345.3 339.0 L 338.5 347.4 L 329.6 353.5 L 320.2 359.0 L 310.7 364.4 L 301.3 369.8 L 291.9 375.3 L 283.1 381.6 L 275.0 388.8 L 267.8 397.0 L 262.1 406.2 L 259.4 416.7 L 260.2 427.5 L 264.3 437.5 L 270.5 446.4 L 276.7 455.3 L 282.9 464.2 L 289.2 473.1 L 295.4 482.0 L 301.6 490.9 L 307.9 499.9 L 314.1 508.8 L 320.3 517.7 L 326.6 526.6 L 332.8 535.5 L 339.2 544.3 L 347.0 551.8 L 356.2 557.5 L 366.5 561.0 L 377.3 562.2 L 388.1 561.0 L 398.3 557.5 L 407.8 552.3 L 417.2 546.9 L 426.7 541.4 L 436.1 536.0 L 445.5 530.5 L 454.9 525.1 L 464.9 521.0 L 475.6 519.1 L 486.5 519.6 L 496.9 522.5 L 506.5 527.5 L 514.8 534.5 L 521.5 543.1 L 527.7 552.0 L 533.9 560.9 L 540.2 569.8 L 546.4 578.7 L 552.6 587.6 L 558.9 596.5 L 565.1 605.5 L 571.3 614.4 L 577.6 623.2 L 583.8 632.2 L 590.0 641.1 L 596.8 649.5 L 604.8 656.9 L 613.9 662.9 L 623.7 667.4 L 634.2 670.4 L 645.0 671.7 L 655.8 672.0 L 666.7 671.1 L 677.4 669.1 L 687.8 666.1 L 697.9 662.1 L 707.5 657.1 L 716.6 651.2 L 725.1 644.3 L 732.8 636.7 L 739.7 628.3 L 745.8 619.3 L 750.9 609.7 L 755.0 599.7 L 758.1 589.3 L 760.2 578.6 L 761.2 567.8 L 761.3 556.9 L 761.3 546.0 L 761.3 535.2 L 761.3 524.3 L 761.3 513.4 L 761.3 502.6 L 761.3 491.7 L 761.3 480.8 L 761.3 470.0 L 761.3 459.1 L 761.3 448.2 Z"
+                fill="none" stroke="currentColor" stroke-width="9" stroke-linejoin="round"/>
+          <line x1="748" y1="443.4" x2="774" y2="443.4" stroke="var(--accent)" stroke-width="6"/>
+        </svg>
+        <span class="lbl" style="font-size:0.62rem; letter-spacing:0.14em; text-transform:uppercase; color:var(--paper-soft)">1,375 m · 8 corners · 12.5 m elevation — drawn from track.json</span>
+      </div>
+    </div>
+    <div class="foot"><span><b>Go to track</b></span><span class="stamp">assists on · tuning at defaults</span></div>
+  </div>
+  <p class="notes"><b>The map is the real circuit</b> — decimated from <code>valdirone_nuova_svg.json</code>'s centerline, which author_track.py derives from the same segment list the loader checks. The accent tick is the start line.</p>
+
+  <!-- 7 loading -->
+  <div class="platehead"><h2>7 · Loading</h2><span class="src">family: screen</span></div>
+  <div class="plate scr" style="display:grid; grid-template-rows:1fr auto auto; min-height:13rem">
+    <div style="display:grid; place-content:center; text-align:center; gap:0.3rem; padding:1.5rem">
+      <div style="font-size:1.3rem; font-weight:800">Valdirone Nuova</div>
+      <div class="state">forward · KZ2</div>
+    </div>
+    <div class="bar" style="border-top:1px solid var(--scr-rule); border-bottom:none">
+      <span class="state" style="color:var(--scr-ink)">loading kart · <span style="color:var(--accent)">4 of 6</span></span>
+      <span class="state">track · collision · kart · ghost · audio · session</span>
+    </div>
+    <div class="bar" style="border-bottom:none">
+      <span class="state" style="text-transform:none; letter-spacing:0.02em; font-size:0.74rem">Il Ciglione would demand 3.66 g of the centerline. Nobody drives the centerline — the racing line is why the corner is possible.</span>
+    </div>
+  </div>
+  <p class="notes"><b>Tip line is corpus-gated</b> per ADR-0052: measured facts only, and the row is dropped if the pool is thin at ship. This one is ROADMAP M5's own figure.</p>
+
+  <!-- 8 pause -->
+  <div class="platehead"><h2>8 · Pause</h2><span class="src">family: screen · overlay, world visible behind</span></div>
+  <div class="plate scr" style="display:grid; grid-template-columns:1fr 1fr; min-height:13rem; background: linear-gradient(rgba(16,24,32,0.88), rgba(16,24,32,0.88)), var(--scr-chrome)">
+    <div style="padding:1.2rem 1.4rem; display:grid; align-content:center; gap:0.45rem">
+      <div class="state" style="margin-bottom:0.3rem">paused</div>
+      <div style="font-weight:700; border-left:3px solid var(--accent); padding-left:0.5rem">Resume</div>
+      <div>Restart session</div>
+      <div>Controls</div>
+      <div>Quit to paddock</div>
+    </div>
+    <div style="padding:1.2rem 1.4rem; display:grid; align-content:center; gap:0.35rem; color:var(--scr-soft); font-size:0.8rem; border-left:1px solid var(--scr-rule)">
+      <span class="state">the kart is not frozen</span>
+      <span>input gated at the driver</span>
+      <span class="num" style="color:var(--scr-ink)">lap 3 · 0:31.204 · <span style="color:var(--st-slower)">will be struck out</span></span>
+      <span style="font-size:0.7rem">pause invalidation: on · change with the assists</span>
+    </div>
+  </div>
+  <p class="notes"><b>The consequence line changes with the setting</b> — "will be struck out" or "lap continues · best will be flagged" — so the option is never silent. ADR-0052.</p>
+
+  <!-- 9 settings -->
+  <div class="platehead"><h2>9 · Settings</h2><span class="src">family: paper · one grouped list</span></div>
+  <div class="plate paper">
+    <div class="titleblock">
+      <div><div class="doc">Settings</div><h3>One list · saved to settings.cfg, not the profile</h3></div>
+      <div class="meta">Loads even when the career save does not</div>
+    </div>
+    <div class="sheet" style="max-width:34rem">
+      <table class="ptab" style="font-size:0.85rem">
+        <tbody>
+          <tr><td colspan="2" style="border-bottom:1px solid var(--paper-ink); font-size:0.62rem; letter-spacing:0.14em; text-transform:uppercase; color:var(--paper-soft); padding-top:0.7rem">Comfort</td></tr>
+          <tr><td>Field of view</td><td class="n">78°</td></tr>
+          <tr><td>Head motion</td><td class="n">60%</td></tr>
+          <tr><td>Shake</td><td class="n">40%</td></tr>
+          <tr><td>Horizon lock</td><td class="n">off</td></tr>
+          <tr><td>Motion blur</td><td class="n">on</td></tr>
+          <tr><td colspan="2" style="border-bottom:1px solid var(--paper-ink); font-size:0.62rem; letter-spacing:0.14em; text-transform:uppercase; color:var(--paper-soft); padding-top:0.7rem">Assists</td></tr>
+          <tr><td>Auto clutch</td><td class="n">on</td></tr>
+          <tr><td>Auto shift</td><td class="n">on</td></tr>
+          <tr style="background:rgba(74,168,255,0.09)"><td>Pause invalidates lap</td><td class="n"><b>on</b></td></tr>
+          <tr><td colspan="2" style="border-bottom:1px solid var(--paper-ink); font-size:0.62rem; letter-spacing:0.14em; text-transform:uppercase; color:var(--paper-soft); padding-top:0.7rem">Audio</td></tr>
+          <tr><td>Master</td><td class="n">−6 dB</td></tr>
+          <tr><td>Engine</td><td class="n">0 dB</td></tr>
+          <tr><td>Effects</td><td class="n">0 dB</td></tr>
+          <tr><td colspan="2" style="font-size:0.7rem; color:var(--paper-soft); border-bottom:none">Controls — the full binding list, reader-checked against the InputMap (#169)</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="foot"><span>d-pad up/down selects · left/right moves · backspace resets</span><span class="stamp">menu_* actions — the arrow keys drive the kart</span></div>
+  </div>
+
+  <!-- 10 profile -->
+  <div class="platehead"><h2>10 · Profile</h2><span class="src">family: paper · the panel is the hero</span></div>
+  <div class="plate paper">
+    <div class="titleblock">
+      <div><div class="doc">Profile</div><h3>Skirving, Anthony</h3></div>
+      <div class="meta">Everything that survives a quit</div>
+    </div>
+    <div style="display:grid; grid-template-columns: auto 1fr 1fr; gap:0; align-items:stretch">
+      <div class="sheet" style="display:grid; place-content:center; border-right:1px solid var(--paper-rule)">
+        <div style="background:var(--panel-yellow); padding:0.9rem 1.3rem; border-radius:3px; display:grid; justify-items:center; gap:0.15rem">
+          <span style="font-family:Arial, 'Liberation Sans', sans-serif; font-weight:700; font-size:3.4rem; line-height:1; color:#000">101</span>
+        </div>
+        <span class="lbl" style="text-align:center; margin-top:0.4rem; font-size:0.6rem; letter-spacing:0.12em; text-transform:uppercase; color:var(--paper-soft)">regulation proportion · Art. 3.7</span>
+      </div>
+      <div class="sheet" style="border-right:1px solid var(--paper-rule)">
+        <table class="ptab" style="font-size:0.85rem">
+          <tbody>
+            <tr><td>Surname</td><td class="n"><b>Skirving</b></td></tr>
+            <tr><td>Forename</td><td class="n">Anthony</td></tr>
+            <tr><td>Nationality</td><td class="n">🇬🇧</td></tr>
+            <tr><td>Number</td><td class="n">101 — lowest free in the OK block</td></tr>
+            <tr><td>Livery</td><td class="n">works blue</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="sheet" style="color:var(--paper-soft); font-size:0.8rem">
+        <span class="lbl" style="font-size:0.62rem; letter-spacing:0.14em; text-transform:uppercase; display:block; margin-bottom:0.4rem">Bests · per track, per layout, per class</span>
+        <div class="num">Valdirone fwd KZ2 &nbsp; 0:46.611</div>
+        <div class="num">Valdirone rev KZ2 &nbsp; —</div>
+        <span class="lbl" style="font-size:0.62rem; letter-spacing:0.14em; text-transform:uppercase; display:block; margin:0.7rem 0 0.2rem">Tuning presets</span>
+        <div>2 saved · user://tuning/</div>
+      </div>
+    </div>
+    <div class="foot"><span>Name renders "Surname, Forename" everywhere the entry list does.</span><span class="stamp">profile.save · atomic, fsync'd</span></div>
+  </div>
+  <p class="notes"><b>The panel is drawn, not decorated:</b> panel yellow #d7c354 sampled from the reference photographs, black figures in the Arial-metric face, proportions from Art. 3.7 pending the 2026 re-verify.</p>
+
+  <footer class="end">
+    Round 2 (plates 1–3) + round 1 of the remaining seven · docs/FRONTEND.md · REFERENCES.md F1–F8 · #171
+  </footer>
+</div>

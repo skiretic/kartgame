@@ -1,0 +1,822 @@
+<title>kartgame — front end storyboard</title>
+
+<style>
+  /* Drafting film, not a design.
+     Everything here is hairlines, mono interiors and margin annotations, on
+     purpose: GAMEDESIGN.md §9 says the storyboard settles hierarchy and
+     information design and settles nothing about how any of it looks. A
+     good-looking mockup becomes the design by accident, which is exactly what
+     issue #171 exists to stop. So the palette carries no UI colour at all —
+     the only two hues in the document are annotation inks, and they encode
+     whether a decision is settled or still open. */
+  :root {
+    color-scheme: light dark;
+
+    --film:        #eceeed;   /* drafting film, faint cyan bias */
+    --film-sunk:   #e2e5e5;
+    --frame:       #f7f8f8;   /* inside a wireframe */
+    --ink:         #12161a;
+    --ink-soft:    #4b545a;
+    --ink-faint:   #7d878c;
+    --rule:        #b6bdbe;
+    --rule-hair:   #cfd5d5;
+    --settled:     #0f6470;   /* decided, and where it was decided */
+    --open:        #a8501c;   /* open, and yours to call */
+    --fill:        #dfe3e3;   /* a region with content in it */
+
+    --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+    --sans: ui-sans-serif, -apple-system, "Helvetica Neue", Arial, sans-serif;
+
+    --step--1: 0.75rem;
+    --step-0:  0.9375rem;
+    --step-1:  1.125rem;
+    --step-2:  1.5rem;
+    --step-3:  2.125rem;
+    --step-4:  3rem;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --film:      #15191b;
+      --film-sunk: #101315;
+      --frame:     #1c2124;
+      --ink:       #dfe4e4;
+      --ink-soft:  #a3adb1;
+      --ink-faint: #6f7a7e;
+      --rule:      #394145;
+      --rule-hair: #2a3134;
+      --settled:   #56b8c4;
+      --open:      #e08a4f;
+      --fill:      #232a2d;
+    }
+  }
+
+  /* The viewer's own toggle wins in both directions. */
+  :root[data-theme="light"] {
+    --film: #eceeed; --film-sunk: #e2e5e5; --frame: #f7f8f8;
+    --ink: #12161a; --ink-soft: #4b545a; --ink-faint: #7d878c;
+    --rule: #b6bdbe; --rule-hair: #cfd5d5;
+    --settled: #0f6470; --open: #a8501c; --fill: #dfe3e3;
+  }
+  :root[data-theme="dark"] {
+    --film: #15191b; --film-sunk: #101315; --frame: #1c2124;
+    --ink: #dfe4e4; --ink-soft: #a3adb1; --ink-faint: #6f7a7e;
+    --rule: #394145; --rule-hair: #2a3134;
+    --settled: #56b8c4; --open: #e08a4f; --fill: #232a2d;
+  }
+
+  body {
+    background: var(--film);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: var(--step-0);
+    line-height: 1.55;
+    margin: 0;
+    padding: 0 clamp(1rem, 5vw, 4rem) 6rem;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .sheet { max-width: 62rem; margin: 0 auto; }
+
+  /* --- masthead ---------------------------------------------------------- */
+
+  header.masthead {
+    border-bottom: 1.5px solid var(--rule);
+    padding: 3.5rem 0 1.25rem;
+    display: grid;
+    gap: 1.25rem;
+  }
+  .stamp {
+    font-family: var(--mono);
+    font-size: var(--step--1);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 1.75rem;
+  }
+  h1 {
+    font-family: var(--mono);
+    font-size: clamp(var(--step-2), 5.5vw, var(--step-4));
+    font-weight: 500;
+    letter-spacing: -0.02em;
+    line-height: 1.05;
+    margin: 0;
+    text-wrap: balance;
+  }
+  h1 em { font-style: normal; color: var(--ink-faint); }
+  .standfirst {
+    max-width: 34em;
+    font-size: var(--step-1);
+    color: var(--ink-soft);
+    margin: 0;
+    text-wrap: pretty;
+  }
+
+  /* --- prose ------------------------------------------------------------- */
+
+  section { padding-top: 3.5rem; }
+  h2 {
+    font-family: var(--mono);
+    font-size: var(--step--1);
+    font-weight: 600;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--ink);
+    margin: 0 0 1.25rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--rule-hair);
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+  h2 span { color: var(--ink-faint); font-weight: 400; letter-spacing: 0.1em; }
+  p { max-width: 34em; text-wrap: pretty; }
+  p.note { color: var(--ink-soft); }
+  code, .m { font-family: var(--mono); font-size: 0.92em; }
+  strong { font-weight: 650; }
+
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem 1.5rem;
+    font-family: var(--mono);
+    font-size: var(--step--1);
+    color: var(--ink-soft);
+    margin-top: 1rem;
+  }
+  .legend b { font-weight: 500; }
+  .key-settled { color: var(--settled); }
+  .key-open { color: var(--open); }
+
+  /* --- the flow ---------------------------------------------------------- */
+
+  .flow {
+    overflow-x: auto;
+    border: 1px solid var(--rule-hair);
+    background: var(--film-sunk);
+    padding: 1.5rem;
+  }
+  .flow pre { margin: 0; }
+  pre.ascii {
+    font-family: var(--mono);
+    font-size: var(--step--1);
+    line-height: 1.5;
+    color: var(--ink-soft);
+    margin: 0;
+    white-space: pre;
+  }
+
+  /* --- screen plates ----------------------------------------------------- */
+
+  .plate {
+    display: grid;
+    grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+    gap: 1.75rem;
+    padding: 2.25rem 0;
+    border-bottom: 1px solid var(--rule-hair);
+    align-items: start;
+  }
+  @media (max-width: 46rem) { .plate { grid-template-columns: minmax(0, 1fr); } }
+
+  .plate > .annot { display: grid; gap: 0.9rem; }
+  .plate-no {
+    font-family: var(--mono);
+    font-size: var(--step--1);
+    letter-spacing: 0.12em;
+    color: var(--ink-faint);
+  }
+  .plate h3 {
+    font-family: var(--mono);
+    font-size: var(--step-1);
+    font-weight: 550;
+    margin: 0.15rem 0 0;
+    letter-spacing: -0.01em;
+  }
+  .plate .job {
+    font-size: var(--step-0);
+    color: var(--ink-soft);
+    margin: 0;
+    max-width: 30em;
+  }
+  ul.marks { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.55rem; }
+  ul.marks li {
+    font-size: var(--step--1);
+    font-family: var(--mono);
+    line-height: 1.5;
+    padding-left: 1.15rem;
+    position: relative;
+    color: var(--ink-soft);
+  }
+  ul.marks li::before {
+    position: absolute;
+    left: 0;
+    top: 0;
+  }
+  li.settled { color: var(--ink-soft); }
+  li.settled::before { content: "+"; color: var(--settled); }
+  li.open::before { content: "?"; color: var(--open); }
+  li.open { color: var(--ink); }
+  li.open b { color: var(--open); font-weight: 550; }
+
+  /* the wireframe itself: a 16:9 frame drawn in hairlines */
+  .wire {
+    aspect-ratio: 16 / 9;
+    background: var(--frame);
+    border: 1.5px solid var(--rule);
+    display: grid;
+    padding: 0.55rem;
+    gap: 0.4rem;
+    font-family: var(--mono);
+    font-size: 0.66rem;
+    line-height: 1.35;
+    color: var(--ink-soft);
+    container-type: inline-size;
+  }
+  .box {
+    border: 1px dashed var(--rule);
+    padding: 0.3rem 0.4rem;
+    display: grid;
+    align-content: start;
+    gap: 0.15rem;
+    min-width: 0;
+    overflow: hidden;
+  }
+  .box.filled { background: var(--fill); border-style: solid; }
+  .box.centre { align-content: center; justify-items: center; text-align: center; }
+  .box.focus { border: 1.5px solid var(--ink); }
+  .lbl {
+    font-size: 0.58rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+  }
+  .big { font-size: 1.05rem; color: var(--ink); letter-spacing: -0.01em; }
+  .row { display: flex; justify-content: space-between; gap: 0.5rem; }
+  .stack { display: grid; gap: 0.15rem; }
+  .tab { display: flex; gap: 0.6rem; }
+  .tab i { font-style: normal; color: var(--ink-faint); }
+  .tab i.on { color: var(--ink); border-bottom: 1.5px solid var(--ink); }
+  .num { font-variant-numeric: tabular-nums; }
+
+  /* --- tables ------------------------------------------------------------ */
+
+  .tablewrap { overflow-x: auto; border: 1px solid var(--rule-hair); }
+  table { border-collapse: collapse; width: 100%; font-size: var(--step--1); }
+  th, td {
+    text-align: left;
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid var(--rule-hair);
+    vertical-align: top;
+  }
+  th {
+    font-family: var(--mono);
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-size: 0.68rem;
+    color: var(--ink-faint);
+    white-space: nowrap;
+  }
+  td.m, td .m { font-variant-numeric: tabular-nums; }
+  tbody tr:last-child td { border-bottom: 0; }
+  td.ans { color: var(--settled); }
+
+  /* --- callout ----------------------------------------------------------- */
+
+  .callout {
+    border-left: 2px solid var(--open);
+    padding: 0.1rem 0 0.1rem 1.1rem;
+    margin: 1.5rem 0;
+  }
+  .callout.settled-note { border-left-color: var(--settled); }
+  .callout p { margin: 0.4rem 0; }
+  .callout .lbl { display: block; margin-bottom: 0.35rem; }
+
+  footer {
+    margin-top: 4rem;
+    padding-top: 1.25rem;
+    border-top: 1.5px solid var(--rule);
+    font-family: var(--mono);
+    font-size: var(--step--1);
+    color: var(--ink-faint);
+  }
+
+  a { color: var(--settled); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+  a:focus-visible { outline: 2px solid var(--open); outline-offset: 2px; }
+</style>
+
+<div class="sheet">
+
+  <header class="masthead">
+    <div class="stamp">
+      <span>kartgame</span>
+      <span>ROADMAP M3c</span>
+      <span>wireframe — hierarchy only</span>
+      <span>rev 3 · ADR-0052 recorded</span>
+    </div>
+    <h1>Front end storyboard<br /><em>eleven screens, and what each one is for</em></h1>
+    <p class="standfirst">
+      GAMEDESIGN §9 lists the screens and the order a first-time player meets
+      them. This sheet fixes what information lives on each one and what it is
+      called. It fixes nothing about how any of it looks.
+    </p>
+  </header>
+
+  <section>
+    <h2>Why this is drawn in hairlines <span>read before reacting</span></h2>
+    <p>
+      Every box below is a dashed rectangle with a monospaced label in it, and
+      that is a decision rather than laziness. A mockup that looked good would
+      become the design by accident — and the visual pass is
+      <strong>blocked on references, not on effort</strong>: paddocks, live timing
+      screens, classification sheets, number panels on a moving kart. The
+      telemetry HUD is the worked example of doing it properly. Its layout came
+      off a photograph and contradicted reasoning in five separate places,
+      starting with the fact that a real kart dash is a <em>positive</em> LCD
+      rather than glowing white on black.
+    </p>
+    <p class="note">
+      So react to the <em>hierarchy</em>: what is on each screen, what is missing,
+      what is one screen that should be two. Colour, type and texture come after
+      the reference photographs land.
+    </p>
+    <p class="note">
+      <strong>Revision 3.</strong> Eighteen decisions are settled and recorded
+      as ADR-0052; the settled ink below says which. The mode screen is deleted
+      — its plate is gone and the flow is one step shorter. Two things remain
+      open on purpose: tuning-overlay access, decided by playing it, and
+      naming.
+    </p>
+    <div class="legend">
+      <span class="key-settled"><b>+</b> settled, and where</span>
+      <span class="key-open"><b>?</b> open — your call</span>
+    </div>
+  </section>
+
+  <section>
+    <h2>The path through <span>GAMEDESIGN §9 · rev 2, no mode screen</span></h2>
+    <div class="flow">
+<pre class="ascii">  boot ──▶ paddock ──▶ session setup ──▶ loading ──▶ grid / countdown
+                ▲                                            │
+                │                                            ▼
+                └── standings ◀── results ◀────────────── driving
+                                                             │
+                     pause ─┬─ resume ───────────────────────┘
+                            ├─ restart session
+                            ├─ controls
+                            └─ quit to paddock
+
+  reachable from paddock at any time:   settings      profile
+</pre>
+    </div>
+    <p class="note" style="margin-top:1.25rem">
+      Practice is one session type reached through two doors — straight from the
+      paddock with a track picked, and as the first session of a weekend. There is
+      no second code path for it, and no screen below exists only for it. The
+      modes sit on the paddock itself; the mode screen this flow used to carry is
+      deleted per ADR-0052.
+    </p>
+  </section>
+
+  <section>
+    <h2>The eleven <span>numbered in the order a player meets them</span></h2>
+
+    <!-- 01 boot -->
+    <div class="plate">
+      <div class="wire" style="grid-template-rows: 1fr auto;">
+        <div class="box centre">
+          <div class="big">KARTGAME</div>
+          <div class="lbl">series name — deferred, §12</div>
+        </div>
+        <div class="box centre" style="border:none">
+          <div class="lbl">press any key · extension + assets checked</div>
+        </div>
+      </div>
+      <div class="annot">
+        <div class="plate-no">01</div>
+        <h3>Boot</h3>
+        <p class="job">
+          Proves the game launched: the extension loaded, the kart asset exists,
+          the audio device opened. Anything missing is said here in words, not as
+          a silent black screen.
+        </p>
+        <ul class="marks">
+          <li class="settled">The game is launched by double-clicking it. <code>project.godot</code> gains a main scene, which it has never had.</li>
+          <li class="settled">Any key or any pad button continues. No timed splash.</li>
+          <li class="settled">On a missing generated asset, boot refuses and prints the exact command. No offer to run the generator — that bakes a Blender dependency into the shipped game, and this state is a dev-checkout condition. ADR-0052.</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- 02 paddock -->
+    <div class="plate">
+      <div class="wire" style="grid-template-columns: 1.15fr 1fr; grid-template-rows: auto 1fr auto;">
+        <div class="box" style="grid-column: 1 / -1">
+          <div class="row"><span class="lbl">paddock — a 3d place, staged</span><span class="lbl num">A. SKIRVING · #101 · GBR</span></div>
+        </div>
+        <div class="box focus stack">
+          <div class="lbl">where you go</div>
+          <div style="color:var(--ink)">▸ Practice</div>
+          <div>Race weekend <span class="lbl">needs a field — M7</span></div>
+          <div>Career <span class="lbl">needs two circuits — M5</span></div>
+          <div style="color:var(--ink-faint)">Profile · Settings · Quit</div>
+        </div>
+        <div class="box stack">
+          <div class="lbl">where you are</div>
+          <div class="num">Career: OK, season 1, round 2 of 4</div>
+          <div class="num">Standings: 4th, 63 pts</div>
+          <div class="num">Best: Valdirone fwd · 46.825</div>
+        </div>
+        <div class="box" style="grid-column: 1 / -1">
+          <div class="lbl">pad detected: DualSense · ✕ select ○ back</div>
+        </div>
+      </div>
+      <div class="annot">
+        <div class="plate-no">02</div>
+        <h3>Paddock — the main menu</h3>
+        <p class="job">
+          Diegetic, per §7's fiction level — and now literally a place: a
+          generated 3D paddock behind document-styled UI, built in stages
+          starting from a vignette (kart on a stand, an awning, a parked
+          camera). Three modes on the left, your standing in the world on the
+          right.
+        </p>
+        <ul class="marks">
+          <li class="settled">The backdrop is a generated 3D environment through the kart's own Blender pipeline, staged — vignette first, environment growing outward in later rounds. ADR-0052.</li>
+          <li class="settled">There is no mode screen. The modes sit here, each saying what it is in one line. ADR-0052.</li>
+          <li class="settled">An unbuilt mode is visible and states its precondition — "needs a field — M7" — where a released build would put a difficulty hint. Neither absent nor a greyed row that does nothing. ADR-0052.</li>
+          <li class="settled">Exactly one focused thing per screen; hovering the pointer moves the focus ring rather than lighting a second state. ADR-0045.</li>
+          <li class="settled">The footer names the <em>detected</em> pad and its real bindings — <code>control_hints.gd</code> already does this in the driving scenes.</li>
+          <li class="settled">Career with no profile creates one — the four-question first-run sequence is the career's own first step. Signing an entry form is diegetic; no lock state. ADR-0052.</li>
+          <li class="settled">On a first run, "where you are" is an invitation: one authored line per empty slot, in the world's voice — "No entry filed — the OK season starts when you do." Not blank dashes, not a hidden panel. ADR-0052.</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- 03 setup -->
+    <div class="plate">
+      <div class="wire" style="grid-template-columns: 1fr 1fr; grid-template-rows: auto 1fr auto;">
+        <div class="box" style="grid-column: 1 / -1"><span class="lbl">practice — session setup</span></div>
+        <div class="box stack">
+          <div class="row"><span>Circuit</span><span class="num">Valdirone Nuova</span></div>
+          <div class="row"><span>Layout</span><span class="num">forward / reverse</span></div>
+          <div class="row"><span>Class</span><span class="num">KZ2</span></div>
+          <div class="row"><span>Length</span><span class="num">open</span></div>
+          <div class="row"><span>Ghost</span><span class="num">best · off</span></div>
+          <div class="row" style="color:var(--ink-faint)"><span>Auto clutch</span><span class="num">on</span></div>
+          <div class="row" style="color:var(--ink-faint)"><span>Auto shift</span><span class="num">on</span></div>
+        </div>
+        <div class="box stack">
+          <div class="lbl">this session, as recorded</div>
+          <div class="num" style="font-size:0.6rem">config 0x2bfed011f85e5255</div>
+          <div class="num" style="font-size:0.6rem">tuning at defaults</div>
+          <div class="lbl" style="margin-top:0.3rem">track map</div>
+          <div style="border:1px dashed var(--rule); height:2.1rem"></div>
+        </div>
+        <div class="box focus centre" style="grid-column: 1 / -1"><span>✕ Go to track</span></div>
+      </div>
+      <div class="annot">
+        <div class="plate-no">03</div>
+        <h3>Session setup</h3>
+        <p class="job">
+          Fills in a <code>SessionConfig</code> and nothing else. The right column
+          is the configuration read back as it will be recorded — the same fields,
+          the same hash a replay compares first.
+        </p>
+        <ul class="marks">
+          <li class="settled">Every row here is a real field of the committed type, and the screen cannot invent one. <code>KartSession.field_names()</code> is fourteen entries.</li>
+          <li class="settled">Assists default <strong>on</strong>, greyed but reachable. Issue #40.</li>
+          <li class="settled">The config hash is hidden, one keypress away — a debug-family toggle plus "copy session info" on results. A player never parses hex; a bug report never loses its best line. ADR-0052.</li>
+          <li class="settled">One setup screen for all four session types. A weekend renders circuit, layout and class read-only where the round decides; what a real entrant chooses — assists, preset, ghost — stays live. ADR-0052.</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- 04 loading -->
+    <div class="plate">
+      <div class="wire" style="grid-template-rows: 1fr auto auto;">
+        <div class="box centre" style="border-style:solid">
+          <div class="lbl">Valdirone Nuova · forward · KZ2</div>
+        </div>
+        <div class="box" style="border:none"><div class="lbl">baking lightmap · loading kart · 4 of 6</div></div>
+        <div class="box"><div class="lbl">T2 is an 11 m hairpin. Past a quarter lock this kart scrubs.</div></div>
+      </div>
+      <div class="annot">
+        <div class="plate-no">04</div>
+        <h3>Loading</h3>
+        <p class="job">
+          A real progress count over real steps, and one line about the circuit
+          you are about to drive.
+        </p>
+        <ul class="marks">
+          <li class="settled">Steps are named, not a spinner. The first headless import of a cold project takes long enough to look like a hang.</li>
+          <li class="settled">The tip line stays, corpus-gated: lines are authored from measured facts only — §6.4 figures, corner behavior, class differences — and if the pool is thinner than about twenty real lines at ship, the row is dropped rather than padded. ADR-0052.</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- 05 grid -->
+    <div class="plate">
+      <div class="wire" style="grid-template-rows: 1fr auto;">
+        <div class="box centre" style="border:none"><div class="big num">3</div><div class="lbl">countdown</div></div>
+        <div class="box"><div class="row"><span class="lbl">pit exit · practice starts rolling</span><span class="lbl">no grid, no field</span></div></div>
+      </div>
+      <div class="annot">
+        <div class="plate-no">05</div>
+        <h3>Grid and countdown</h3>
+        <p class="job">
+          A race state. Practice has no grid and no countdown, and the runner does
+          not pretend otherwise — it starts the kart on track and the first lap is
+          an out lap.
+        </p>
+        <ul class="marks">
+          <li class="settled">The first lap of a session can never become a best lap. A timer that trusts its own zero records a 24 s record nothing can beat.</li>
+          <li class="settled">Race states are configurations of the one runner, not a second mode. This is why the runner was written before the cameras.</li>
+          <li class="settled">Practice cuts straight from loading to driving — no countdown, no grid card. The kart is placed rolling at the pit exit; the first lap is an out lap and can never be a best. ADR-0052.</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- 06 driving -->
+    <div class="plate">
+      <div class="wire" style="grid-template-columns: 1fr 1.1fr 1fr; grid-template-rows: auto 1fr auto;">
+        <div class="box stack">
+          <div class="lbl">timing</div>
+          <div class="num">LAP 3 &nbsp; 0:31.204</div>
+          <div class="num">S2 &nbsp; −0.412</div>
+          <div class="num" style="color:var(--ink-faint)">BEST 0:46.825</div>
+        </div>
+        <div class="box centre" style="border-style:solid; color:var(--ink-faint)">
+          <div class="lbl">the kart · chase / cockpit / free</div>
+        </div>
+        <div class="box stack" style="justify-items:end; text-align:right">
+          <div class="lbl">vs ghost</div>
+          <div class="num">+0.31</div>
+        </div>
+        <div class="box" style="grid-column: 1 / -1; border:none">
+          <div class="row">
+            <span class="lbl">telemetry F3 · tuning F2 · look back C · respawn R</span>
+            <span class="num">GEAR 4 · 11 380 rpm · 118 km/h</span>
+          </div>
+        </div>
+      </div>
+      <div class="annot">
+        <div class="plate-no">06</div>
+        <h3>Driving</h3>
+        <p class="job">
+          The one screen that already half-exists. Timing on the left, the dash
+          bottom-right, the ghost delta opposite the timing so the two numbers a
+          driver reads are not in the same corner.
+        </p>
+        <ul class="marks">
+          <li class="settled">Lap times as <code class="num">m:ss.mmm</code>, deltas signed with negative ahead.</li>
+          <li class="settled">A struck-out lap says <em>why</em> — off track, missed a checkpoint, respawned — because "invalid" with no reason is a driver arguing with the game.</li>
+          <li class="settled">Nothing is printed here that the input map does not really bind. Four control failures in one day is why (#169).</li>
+          <li class="settled">The delta is against the <em>selected ghost</em> and labeled as such. Identical to "own best" in Practice today; the definitions diverge the moment a ghost can come from another session, and the HUD follows the ghost it draws. Sector deltas vs session best stay a separate channel. ADR-0052.</li>
+          <li class="open"><b>When may the tuning overlay be opened in a shipped build?</b> Deliberately undecided until it has been driven with — Anthony has not yet used F2, and the design's own precedent is "decide it by playing it".</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- 07 results -->
+    <div class="plate">
+      <div class="wire" style="grid-template-rows: auto auto 1fr auto;">
+        <div class="box"><div class="row"><span class="lbl">practice · Valdirone Nuova forward · KZ2</span><span class="lbl num">12 laps · 9 valid</span></div></div>
+        <div class="box stack" style="border-style:solid">
+          <div class="row num"><span>BEST</span><span>0:46.825</span><span>S1 15.608</span><span>S2 15.608</span><span>S3 15.609</span></div>
+          <div class="row num" style="color:var(--ink-faint)"><span>OPTIMAL</span><span>0:46.402</span><span>−0.423</span><span></span><span></span></div>
+        </div>
+        <div class="box stack" style="font-size:0.6rem">
+          <div class="lbl">every lap · scrolls</div>
+          <div class="row num"><span>1</span><span>out lap</span><span></span></div>
+          <div class="row num"><span>2</span><span>0:48.113</span><span></span></div>
+          <div class="row num"><span>3</span><span>0:47.021</span><span></span></div>
+          <div class="row num" style="color:var(--ink-faint)"><span>4</span><span>0:47.930</span><span>off track</span></div>
+          <div class="row num" style="color:var(--ink-faint)"><span>…</span><span></span><span></span></div>
+        </div>
+        <div class="box"><div class="row"><span class="lbl">new best — saved</span><span class="lbl">✕ paddock · △ again</span></div></div>
+      </div>
+      <div class="annot">
+        <div class="plate-no">07</div>
+        <h3>Results</h3>
+        <p class="job">
+          What the session produced. In Practice that is a best lap, its splits,
+          the theoretical optimal, and the whole session under it.
+        </p>
+        <ul class="marks">
+          <li class="settled">The optimal lap is shown next to the best and is never presented as a lap time — it is the sum of sector bests and nobody drove it.</li>
+          <li class="settled">"Saved" appears only after the write succeeded, and the write is atomic.</li>
+          <li class="settled">Every lap is listed, scrollable, best and optimal pinned above the scroll. Struck laps carry their reason. A real classification sheet is the whole session on one page. ADR-0052.</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- 08 standings -->
+    <div class="plate">
+      <div class="wire" style="grid-template-rows: auto 1fr auto;">
+        <div class="box"><div class="row"><span class="lbl">championship · OK · after round 2 of 4</span><span class="lbl">every result counts</span></div></div>
+        <div class="box stack" style="border-style:solid; font-size:0.6rem">
+          <div class="row num"><span>1 · 101</span><span>Turney, Joe</span><span>GBR</span><span>KR / IAME / Maxxis</span><span>188</span></div>
+          <div class="row num"><span>2 · 102</span><span>Toviggino, Maximo</span><span>ARG</span><span>CRG / IAME / Maxxis</span><span>176</span></div>
+          <div class="row num" style="color:var(--ink)"><span>4 · 101</span><span>Skirving, Anthony</span><span>GBR</span><span>KR / IAME / Maxxis</span><span>134</span></div>
+          <div class="row num" style="color:var(--ink-faint)"><span>…</span><span></span><span></span><span></span><span></span></div>
+        </div>
+        <div class="box"><div class="lbl">promotion to KZ2 at top 3 · you are 42 points off</div></div>
+      </div>
+      <div class="annot">
+        <div class="plate-no">08</div>
+        <h3>Standings</h3>
+        <p class="job">
+          The whole of the fiction, per §7: an entry list, real columns, and a
+          table that does the storytelling no text has to.
+        </p>
+        <ul class="marks">
+          <li class="settled">Columns off the real published entry list: <em>Surname, Forename</em>; <strong>two</strong> nationalities, driver and entrant, which routinely differ; chassis / engine / tire as one slash-joined string.</li>
+          <li class="settled">Points come from three classifications a round, not just the Final, so a bad Final does not erase a good day.</li>
+          <li class="settled">Promotion at top 3, and the gap to it is stated rather than left to arithmetic.</li>
+          <li class="settled">Both nationality columns <em>and</em> the equipment string stay — the full real column set. Equipment compresses to chassis / engine; the tire is a mandated control tire, uniform down the field, and drops to a footnote. ADR-0052.</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- 09 pause -->
+    <div class="plate">
+      <div class="wire" style="grid-template-columns: 1fr 1fr;">
+        <div class="box focus stack">
+          <div class="lbl">paused</div>
+          <div style="color:var(--ink)">▸ Resume</div>
+          <div>Restart session</div>
+          <div>Controls</div>
+          <div>Quit to paddock</div>
+        </div>
+        <div class="box stack" style="color:var(--ink-faint)">
+          <div class="lbl">the kart is not frozen</div>
+          <div>input gated at the driver</div>
+          <div class="num">lap 3 · 0:31.204 · will be struck out</div>
+        </div>
+      </div>
+      <div class="annot">
+        <div class="plate-no">09</div>
+        <h3>Pause</h3>
+        <p class="job">
+          Four items. The right half exists because a paused kart that is still
+          simulating needs to say so, and because the lap you were on is about to
+          be worthless.
+        </p>
+        <ul class="marks">
+          <li class="settled">Pause gates input at <code>PlayerDriver</code>, not by freezing the body. ADR-0040 is what made that a one-line call.</li>
+          <li class="settled">Invalidation is a <em>player option</em>, default on, living with the assists — and a best lap set with forgiveness enabled is flagged on the saved record, or every best silently absorbs an advantage the screen never mentions. The timing line here states the consequence either way. ADR-0052.</li>
+          <li class="settled">One clock rule: Practice has no session clock, so the question is moot there; in timed sessions the session clock keeps running under pause, as in the real thing — pausing costs track time. ADR-0052.</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- 10 settings -->
+    <div class="plate">
+      <div class="wire" style="grid-template-rows: auto 1fr;">
+        <div class="box"><span class="lbl">settings · one list · saved to settings.cfg, not the profile</span></div>
+        <div class="box stack">
+          <div class="lbl">comfort</div>
+          <div class="row"><span>Field of view</span><span class="num">78°</span></div>
+          <div class="row"><span>Head motion</span><span class="num">60%</span></div>
+          <div class="row"><span>Motion blur</span><span class="num">on</span></div>
+          <div class="lbl" style="margin-top:0.25rem">assists</div>
+          <div class="row"><span>Auto clutch</span><span class="num">on</span></div>
+          <div class="row"><span>Pause invalidates lap</span><span class="num">on</span></div>
+          <div class="lbl" style="margin-top:0.25rem">controls · audio · …</div>
+        </div>
+      </div>
+      <div class="annot">
+        <div class="plate-no">10</div>
+        <h3>Settings</h3>
+        <p class="job">
+          The §18 comfort options, the bindings, the assists. All of them exist as
+          values in the code already and none of them can be reached by a player
+          today.
+        </p>
+        <ul class="marks">
+          <li class="settled">One grouped list under section headers, single scroll — no tab strip, no second navigation axis on a pad. The interaction is the one the tuning overlay already taught. ADR-0052.</li>
+          <li class="settled">The pause-invalidation option lives here with the assists. ADR-0052.</li>
+          <li class="settled">Its own file. A career save that will not parse must still leave a menu you can read and a pad you can use — which means settings load when the career does not.</li>
+          <li class="settled">Menus declare their own <code>menu_*</code> actions. The engine's <code>ui_*</code> defaults are bound to the arrow keys, and the arrow keys are already throttle, brake and steer.</li>
+          <li class="settled">Audio is a section here — master, effects, engine — stored in <code>settings.cfg</code>, and the level probe reads the stored values, so the audit still sees what the player moved. Player-facing and measurable are not in conflict. ADR-0052.</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- 11 profile -->
+    <div class="plate">
+      <div class="wire" style="grid-template-columns: 1fr 1fr; grid-template-rows: auto 1fr auto;">
+        <div class="box" style="grid-column: 1 / -1"><span class="lbl">profile</span></div>
+        <div class="box stack">
+          <div class="row"><span>Surname</span><span class="num">Skirving</span></div>
+          <div class="row"><span>Forename</span><span class="num">Anthony</span></div>
+          <div class="row"><span>Number</span><span class="num">101</span></div>
+          <div class="row"><span>Nationality</span><span class="num">GBR</span></div>
+          <div class="row"><span>Livery</span><span class="num">works blue</span></div>
+        </div>
+        <div class="box stack" style="color:var(--ink-faint)">
+          <div class="lbl">bests · per track, per layout, per class</div>
+          <div class="num">Valdirone fwd KZ2 &nbsp; 0:46.825</div>
+          <div class="num">Valdirone rev KZ2 &nbsp; 0:49.877</div>
+          <div class="lbl" style="margin-top:0.3rem">presets in user://tuning/ · 2 saved</div>
+        </div>
+        <div class="box" style="grid-column: 1 / -1"><span class="lbl">number picked from the free 1xx block for OK</span></div>
+      </div>
+      <div class="annot">
+        <div class="plate-no">11</div>
+        <h3>Profile</h3>
+        <p class="job">
+          Who you are, and everything that survives a quit. Name in the sport's
+          own format, a number from the class's real block.
+        </p>
+        <ul class="marks">
+          <li class="settled">Numbers come in per-category blocks — 1xx for OK — and are fixed for the season, so the entry list reads as one document rather than the player plus some AI.</li>
+          <li class="settled">A best lap is stored per track <em>per layout per class</em>, or a shifter time silently beats a single-speed one.</li>
+          <li class="settled">The name is typed: surname and forename as two fields, rendered "Surname, Forename" everywhere the entry list does it, empty refused. A name picker defending the fiction against its one human participant defends it from the wrong direction. ADR-0052.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>What a first-time player is asked, and in what order <span>the only sequence on this sheet</span></h2>
+    <div class="tablewrap">
+      <table>
+        <thead>
+          <tr><th>Step</th><th>Asked for</th><th>Default if they say nothing</th><th>Where it lands</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="m">1</td><td>surname, forename</td><td>refuses to be empty</td><td class="m">profile.save</td></tr>
+          <tr><td class="m">2</td><td>nationality</td><td class="m">GBR</td><td class="m">profile.save</td></tr>
+          <tr><td class="m">3</td><td>a number</td><td>lowest free in the class block</td><td class="m">profile.save</td></tr>
+          <tr><td class="m">4</td><td>nothing else</td><td>assists on, comfort at defaults</td><td class="m">settings.cfg</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="note" style="margin-top:1.25rem">
+      Four questions, then a moving kart. §13's bar for this phase is that
+      somebody who has never seen the repository reaches one without being told
+      how, sets a lap time, sees it recorded, quits, and finds it still there.
+    </p>
+  </section>
+
+  <section>
+    <h2>The decisions <span>eighteen settled · ADR-0052 — two open on purpose</span></h2>
+    <div class="tablewrap">
+      <table>
+        <thead>
+          <tr><th>#</th><th>Question</th><th>Answer</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="m">1</td><td>How is the paddock rendered?</td><td class="ans">A generated 3D environment, staged — vignette first, grown outward. The kart pipeline builds it.</td></tr>
+          <tr><td class="m">2</td><td>Is there a mode screen?</td><td class="ans">No. Modes sit on the paddock; the plate is deleted.</td></tr>
+          <tr><td class="m">3</td><td>Does an unbuilt mode appear?</td><td class="ans">Visible, with an honest statement of what it needs.</td></tr>
+          <tr><td class="m">4</td><td>Does pausing invalidate the lap?</td><td class="ans">Player option, default on, with the assists — a best set with forgiveness on is flagged on the record.</td></tr>
+          <tr><td class="m">5</td><td>Ghost delta against what?</td><td class="ans">The selected ghost, labeled. Sector deltas vs session best stay separate.</td></tr>
+          <tr><td class="m">6</td><td>Settings: tabs or a list?</td><td class="ans">One grouped list, single scroll.</td></tr>
+          <tr><td class="m">7</td><td>Driver name typed, or picked?</td><td class="ans">Typed — surname and forename, sport format, empty refused.</td></tr>
+          <tr><td class="m">8</td><td>Results: every lap, or notable?</td><td class="ans">Every lap, scrollable, best and optimal pinned, struck laps say why.</td></tr>
+          <tr><td class="m">9</td><td>Is the config hash ever on screen?</td><td class="ans">Hidden, one keypress away — debug toggle plus "copy session info" on results.</td></tr>
+          <tr><td class="m">10</td><td>Entrant nationality vs equipment string?</td><td class="ans">Both stay. Equipment compresses to chassis / engine; the control tire is a footnote.</td></tr>
+          <tr><td class="m">11</td><td>Does Practice show a countdown?</td><td class="ans">No — straight from loading to driving, rolling at the pit exit, first lap an out lap.</td></tr>
+          <tr><td class="m">12</td><td>Does boot ever block on a missing asset?</td><td class="ans">Refuses and prints the exact generator command. Never runs Blender itself.</td></tr>
+          <tr><td class="m">13</td><td>Does pause stop the clock?</td><td class="ans">Practice has no session clock; in timed sessions it keeps running — pausing costs track time.</td></tr>
+          <tr><td class="m">14</td><td>Does the loading tip line stay?</td><td class="ans">Yes, corpus-gated: measured-fact lines only, and the row is dropped if the pool is thin.</td></tr>
+          <tr><td class="m">15</td><td>Career before a profile exists?</td><td class="ans">Career creates it — the first-run questions are its own first step.</td></tr>
+          <tr><td class="m">16</td><td>First-run "where you are": empty?</td><td class="ans">An invitation — one authored line per empty slot, in the world's voice.</td></tr>
+          <tr><td class="m">17</td><td>One setup screen for all session types?</td><td class="ans">Yes; a weekend renders the round-decided rows read-only, player choices stay live.</td></tr>
+          <tr><td class="m">18</td><td>Audio in settings, or probe-only?</td><td class="ans">A settings section; the level probe reads the stored values, so both.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="tablewrap" style="margin-top:1.5rem">
+      <table>
+        <thead>
+          <tr><th>#</th><th>Still open, on purpose</th><th>Why</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="m">19</td><td>When may the tuning overlay be opened in a shipped build?</td><td>Decided by playing it — it has not been driven with yet.</td></tr>
+          <tr><td class="m">20</td><td>What the series and the second circuit are called. The first is named: Valdirone Nuova, M5.</td><td>Naming is cheap and late — GAMEDESIGN §12.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="callout">
+      <span class="lbl">and one that is not a design question</span>
+      <p>
+        Every screen above needs reference photographs before it gets a colour or
+        a typeface: paddocks, live timing boards, printed classification sheets,
+        number panels on a moving kart — and now the paddock's own geometry:
+        awnings, kart stands, tire stacks, trailers, the ground between them.
+        That is issue #171 and it is the gate between this sheet and a front end
+        anyone should look at.
+      </p>
+    </div>
+  </section>
+
+  <footer>
+    Wireframes only — no colour, type or texture decided. Rev 3: mode screen deleted, eighteen decisions settled, two open on purpose. GAMEDESIGN §9 · ADR-0052 · ROADMAP M3c · issue #171
+  </footer>
+</div>
