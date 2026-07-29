@@ -149,3 +149,53 @@ and separately sourced).
 Open before round 2, and recorded in REFERENCES.md: the printed FIA sheet's
 typography (browser route), the outdoor paddock wide shot, the panel yellow's
 measured value.
+
+## 8. Approval, and the build blueprint (M5f)
+
+2026-07-28: the full family — all ten screens of
+`docs/mockups/frontend_family.html` — is **approved**. Section 7's open items
+closed on the way (typography verified off the real PDFs, paddock swept, panel
+yellow sampled at #d7c354 provisional). This section is how the mockups become
+Godot, per ADR-0053; the milestone is ROADMAP M5f and nothing builds until the
+design phase ends.
+
+### Scene shape
+
+    ShellRoot (Node3D)                  the main scene in project.godot
+    ├─ Paddock (Node3D)                 generated modules, #188 staged
+    ├─ ShellCamera (Camera3D)           parked framings per screen, not a free cam
+    └─ UI (CanvasLayer)
+       └─ ScreenStack (Control)         push/pop; owns focus and the back rule
+          ├─ BootScreen … ProfileScreen one Control scene per approved plate
+
+    Starting a session swaps to the track scene; everything else stays inside
+    ShellRoot. Screens never talk to each other — they push, pop, and read/write
+    the same data the probes already exercise (profile, settings, standings).
+
+### Input
+
+Menus are their own input context with their own actions (`ui_confirm` family,
+not reuse of driving actions): Cross confirm, Circle back, d-pad + left stick
+navigate, Enter/Esc on keyboard. `control_hints.gd` grows the menu context.
+Focus is always visible and always lands somewhere on screen entry —
+`shell_probe.gd` checks it rather than trusting the scene.
+
+### Theme
+
+One Theme resource carries §2's tokens; screens use the tokens and never a raw
+hex. Liberation Sans regular/bold from the fetch script; tabular figures on
+anything that lines digits up. The accent stays the azure placeholder until the
+livery round picks the final hue — one token to move.
+
+### The calendar
+
+`data/seasons/` joins the data directory: a season names its rounds, a round
+names a circuit + layout. Schema doc plus executable copy, load refuses, same
+family as TRACK_SCHEMA. Rounds without a built circuit are declared, drawn with
+the honest label, and refuse to start (ADR-0053 §4).
+
+### Flags
+
+Generated SVGs from recorded construction data (ADR-0053 §5), one script under
+`tools/assets/`, deterministic, roster-driven — it reads `data/drivers.json`
+and refuses a nationality it has no construction for.

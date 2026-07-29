@@ -3344,12 +3344,14 @@ at a time:**
     measurable are not in conflict — ADR-0039's Master-trim argument already
     depends on exactly this separation.
 
-**Still open, both deliberately:** when the player may open the tuning overlay
-in a shipped build — **decided by playing it**, the design's own precedent;
-Anthony has not yet driven with F2 open, and a feature is not scoped by someone
-who has never used it. And naming — deferred per §12 because it is cheap and
-late, and narrower than §12's wording: the first circuit is already **Valdirone
-Nuova** (M5), so what remains unnamed is the series and the second circuit.
+**Still open, both deliberately** — and one of the two has since moved: the
+tuning overlay **stays in the shipped build as an option, provisionally**
+(2026-07-28). The final call on where it surfaces — settings row, assist-family
+toggle, or always-on-F2 — is still decided by driving, which has not happened;
+what is settled is that it does not get cut while that evidence is missing. And
+naming — deferred per §12 because it is cheap and late, and narrower than §12's
+wording: the first circuit is already **Valdirone Nuova** (M5), so what remains
+unnamed is the series and the second circuit.
 
 **Consequences.**
 
@@ -3362,3 +3364,81 @@ Nuova** (M5), so what remains unnamed is the series and the second circuit.
   written from reference photographs before any module is coded. #171's
   reference gate applies to the paddock's geometry exactly as it does to the
   screens' typography.
+
+## ADR-0053 — The shell is one scene, and the six decisions that make the front end buildable
+
+2026-07-28. The mockups are approved — all ten screens of
+`docs/mockups/frontend_family.html`, timing/results/standings at round 2 against
+the real 2026 Genk documents, the other seven at round 1 — which ends the
+question of what the front end looks like and opens the question of how it is
+built. Six structural decisions, settled with Anthony one at a time, so the
+build has a design instead of improvising one screen at a time.
+
+**1. One shell scene, screens as a stack.** One root scene owns the 3D paddock
+and a UI layer; every menu screen — setup, settings, standings, profile,
+pause-adjacent paper screens — is a `Control` panel pushed and popped on a
+stack. Only starting a session swaps to a track scene. The alternative, a scene
+per screen, either reloads the paddock on every transition or duplicates it
+behind each screen, and threads all state through an autoload. ADR-0052 already
+decided modes have no screen of their own — modes *are* the paddock — so the
+paddock persisting behind every menu is the design, not an optimization. The
+demo definition's first line ("the game boots into itself") lands here:
+`project.godot` finally sets a main scene, and it is the shell.
+
+**2. Cross confirms, Circle backs, and menus are their own input context.**
+PlayStation-standard on the DualSense Anthony holds. Driving already binds Cross
+to shift-down; menus and driving are disjoint input contexts, so the overlap
+never fires — and that separation is itself the decision: menu actions get their
+own `[input]` entries, not reuse of driving actions. D-pad and left stick both
+navigate, Enter/Esc are the keyboard pair. The advertised-controls-drift family
+(four cases in one day) applies in full: `control_hints.gd` grows the menu
+context, and the shell gate below checks pad-only reachability rather than
+trusting the bindings list.
+
+**3. The gate is a probe plus reviewed stills, never a hash.** A headless
+`shell_probe.gd` walks the screen stack structurally: every screen reachable,
+back always returns to where it came from, focus lands somewhere visible on
+entry, and every control is reachable pad-only — the ADR-0040 reader-check
+family, applied to menus. What the screens *look* like is judged by eye against
+the mockups from `shoot.sh` stills, because ADR-0023 stands: stills are not
+byte-stable, and a layout-engine diff against an HTML mockup would need a
+tolerance so wide it gates nothing. Numbers gate structure; Anthony's eye gates
+looks.
+
+**4. The season calendar is data, and it is honest about what does not exist.**
+A season file names its rounds and each round names a circuit and layout.
+Rounds 1 and 2 are Valdirone Nuova forward and reverse; rounds 3 and 4 point at
+the unbuilt second circuit and say so — shown in the calendar with the honest
+"needs a circuit" label, refusing to start, exactly the ADR-0052 rule for
+unbuilt modes. The all-Valdirone placeholder was rejected because a placeholder
+that works tends to ship, and deferring the career screens was rejected because
+standings is an approved mockup with real data structures
+(`standings.h`, `ProfileCareer`) already behind it. The schema joins the
+TRACK_SCHEMA family when authored: normative doc plus executable copy, load
+refuses.
+
+**5. Flags are generated, like everything else.** A national flag is a
+published geometric construction — stripes, crosses, proportions — so a
+deterministic generator under `tools/assets/` builds the roster's ~12 flags as
+SVGs from recorded construction data, and complex emblems get a simplified mark
+the way real timing screens simplify them. No third-party asset set, no license
+column for one art file that everything else in the project generates. §5
+item 10 applies: each flag's construction is sourced, not remembered.
+
+**6. The build is a milestone, and it goes before M6.** M5f in ROADMAP.md:
+shell scene, screen stack, theme tokens from FRONTEND.md, Liberation Sans
+import, calendar schema, flag generator, paddock stage 1 (#188), and the
+shell probe. It runs on data that already exists — profile, standings, roster —
+and M6's race loop then lands into a finished shell instead of retrofitting
+one, which is the same argument that put M3c before M4. Folding it into M6 was
+rejected because visual iteration and a determinism harness are the two worst
+things to interleave in one gate.
+
+**Consequences.**
+
+- ROADMAP.md gains the M5f section with the accept criteria; #171 closes on the
+  approved mockups and the recorded references; the flag generator is a work
+  item under #187; the pause-flag field (#186) is scheduled into M5f.
+- Nothing here starts building. The design phase ends when Anthony says it
+  does; this ADR exists so that when he does, the first commit has a plan to
+  disagree with instead of a blank page.

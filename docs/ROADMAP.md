@@ -481,6 +481,52 @@ Effort: L
 
 ---
 
+## M5f — Front-end shell and paddock
+
+**Inserted before M6 for the M3c reason:** the race loop should land into a
+finished shell, not retrofit one. The visual design is done and approved —
+`docs/FRONTEND.md` is the art direction, `docs/mockups/frontend_family.html`
+(committed, also published as a live artifact) is the approved look for all ten
+screens, [ADR-0052](DECISIONS.md#adr-0052--the-paddock-is-a-place-and-the-eight-decisions-that-shape-the-shell)
+holds the shell's behavioral decisions and
+[ADR-0053](DECISIONS.md#adr-0053--the-shell-is-one-scene-and-the-six-decisions-that-make-the-front-end-buildable)
+the structural ones. This milestone is the build. **Blocked until Anthony ends
+the design phase.**
+
+- [ ] **The shell scene** — one root scene owning the 3D paddock and the UI
+  layer; screens are `Control` panels on a push/pop stack (ADR-0053 §1).
+  `project.godot` sets it as the main scene: the demo definition's "the game
+  boots into itself" line closes here
+- [ ] **Theme** — palette tokens from FRONTEND.md as a Godot Theme resource,
+  Liberation Sans imported (`tools/assets/fetch_liberation_sans.sh` already
+  fetches it), tabular figures wherever digits align
+- [ ] **The ten screens** rebuilt from the approved mockups: boot, paddock
+  overlay, session setup, loading, pause, results, standings, settings,
+  profile, driving HUD refinements. Screen family dark, paper family light,
+  per FRONTEND.md
+- [ ] **Menu input context** — Cross confirm / Circle back, its own `[input]`
+  actions, `control_hints.gd` grows the menu context (ADR-0053 §2)
+- [ ] **Season calendar schema + data** — rounds 1–2 Valdirone forward/reverse,
+  rounds 3–4 honestly unbuilt (ADR-0053 §4); schema doc + executable copy,
+  load refuses
+- [ ] **Flag generator** — deterministic SVGs from recorded construction data
+  for the roster's nationalities (#187, ADR-0053 §5)
+- [ ] **Paddock stage 1** — the vignette module set per #188: kart on stand,
+  awning, `look_env.gd` lighting; later stages grow outward
+- [ ] **Pause-flag field on saved bests** (#186) — the ADR-0052 §4 consequence
+- [ ] **`tools/verify/shell_probe.gd`** — the gate: every screen reachable,
+  back always returns, focus lands on entry, pad-only coverage (ADR-0053 §3)
+
+**Accept:** launching the game with no arguments boots into the paddock. Every
+screen is reachable and leavable pad-only, proven by `shell_probe.gd`. The
+calendar loads, shows two real rounds and two honest gaps, and refuses to start
+an unbuilt round. Stills of each screen (`shoot.sh`) judged against the mockups
+by eye — never hash-gated (ADR-0023).
+
+Effort: M
+
+---
+
 ## M6 — Race loop and determinism
 
 - Checkpoint volumes, lap counting, lap and sector timing. **Lap and sector timing landed at M5** — #180 wired `track.json`'s authored marks into the session runner and ADR-0051 is the design; what is left here is the *volumes*, since a checkpoint is a station in arc length today and a kart that leaves the road entirely still passes one
