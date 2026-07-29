@@ -385,8 +385,10 @@ high with a 2 cm stroke and a 1 cm yellow border, fitted on the **front panel, t
 rear, and both sides towards the rear of the bodywork** — four positions. Plus the
 driver's name and nationality flag at 3 cm on the front of the side pods. The kart
 currently has none of this, and it is a real content job against a real spec.
-*(Those centimeters are quoted from the 2023 edition; the 2026 technical
-regulations could not be reached. Re-verify before baking them into geometry.)*
+*(Verified against the 2026 Technical Regulations, V.2.2, Art. 3.7 — the
+figures hold, "rear" is the rear wheel protection or a rear number plate, and
+the plates are flexible opaque plastic by regulation. REFERENCES.md, front-end
+section, fact 12.)*
 
 There is no written narrative, no dialogue, no cutscene and no rival grudge text.
 A rival is a name, a number, a livery and a frozen set of M7's difficulty
@@ -531,8 +533,9 @@ For `ROADMAP.md`:
 - Voice culling or a far-field voice, prerequisite to any field at all.
 - The single-speed vehicle configuration, sourced. §5's **SOURCING** block.
 - Three races per round or two — §4's open question, decided by playing it.
-- Number-plate dimensions are quoted from the 2023 technical regulations because
-  the 2026 edition could not be reached. Re-verify before geometry.
+- ~~Number-plate dimensions are quoted from the 2023 technical regulations.~~
+  Re-verified against the fetched 2026 edition; the figures hold. Closed —
+  `REFERENCES.md`, front-end section, fact 12.
 - In-race track-limits enforcement is unsourced at the regulation level and our
   rule is therefore ours. Recorded in `REFERENCES.md`.
 - [#170](https://github.com/skiretic/kartgame/issues/170) holds the questions for

@@ -2255,6 +2255,22 @@ no logo, no copy of the chrome, and not the FIA's exact navy/green pair.
     cells and start/yellow flag signal states. Read off the deployed page,
     not guessed.
 
+12. **Art. 3.7 re-verified against the 2026 Technical Regulations themselves**
+    — the owed check from `GAMEDESIGN.md` §12, closed. CIK-FIA Karting
+    Technical Regulations 2026 V.2.2, fetched from the FIA backend
+    (`refs/frontend/fia_karting_technical_regulations_2026.pdf`, SHA-256 in
+    `sources.txt`). Verbatim: racing numbers **black, Arial, on yellow**;
+    short circuits **≥15 cm high, 2 cm stroke** (long circuits 20 cm/3 cm —
+    the long-circuit discipline, not ours); **≥1 cm yellow border**; fitted
+    before scrutineering on the **front panel, rear wheel protection *or*
+    rear number plate, and both sides towards the rear of the bodywork**;
+    plates **flexible opaque plastic, non-removable**. Driver name and
+    national flag **≥3 cm at the front of the lateral bodywork**. The 2024
+    edition's article is word-for-word identical, so the figures this project
+    has carried since the 2023 quote are confirmed, and the short/long split
+    was present by 2024 at the latest. The 2023 text itself remains
+    unreachable, which no longer matters.
+
 ### What could not be sourced, yet
 
 1. **An outdoor paddock wide shot** — awning exteriors, trailers, the ground
