@@ -1492,23 +1492,139 @@ class KartParams:
 
     # --- driver ------------------------------------------------------------
     #
-    # No Blender module reads any of these yet -- issue #17's driver is not
-    # written -- so all six are on `FIELD_COVERAGE_EXEMPT`. Two of them are read
-    # in Godot, off the manifest, by scripts/look/kartview.gd's cockpit camera.
+    # Spec §60.1.4's hard points, and §60.1.6 is the contract that fixes them:
+    # issue #17's driver module, issue #200's gate 3 and issue #194's mass lumps
+    # all read this block and none of them may rename a field. ADR-0055.
+    #
+    # **The driver was built sitting on the asphalt.** `driver_shoulder_z` was
+    # 0.470 and `driver_eye_z` 0.620, 137 and 138 mm low, and their *relative*
+    # gap of 150 matched the sourced 149.5 exactly -- which is what identified the
+    # cause: the hip joint had been placed at z = 0 instead of on the seat pan.
+    # Issue #194. Both are corrected here rather than in #194's own wave, because
+    # §60.1.4 already publishes the right figures as `derived` and two conflicting
+    # seated heights in one file is the drift this document exists to stop.
+    # scripts/look/kartview.gd reads both off the manifest for its cockpit camera,
+    # so that camera moves up 137 mm; no §6.4 figure reads either one.
+    #
+    # Every position is `derived` in §60.1.4 from a `sourced` chain: the Tillett
+    # T11 ML seat chart via notes_radiator.md §6, and the NASA *Anthropometric
+    # Source Book* 50th-percentile male segment table. The arithmetic is shown
+    # there, not repeated here. Signs: x is a half-offset, so a limb is at +-x.
 
-    driver_eye_z: float = 0.620
-    """Seated eye height. scripts/look/lookdev.gd uses the same figure for its
-    look-dev camera, which is why the two must agree."""
+    driver_hip_x: float = 0.085
+    driver_hip_y: float = -0.170
+    driver_hip_z: float = 0.130
+    """The H-point, `derived`: 95 mm above the pan at z 36, 100 mm forward of the
+    back contact. §60.1.3 marks both offsets `estimated` and §60.1.4 corroborates
+    the result -- hip-to-pedal-face comes out 731.1 mm against §40's independently
+    measured 735, agreeing to 0.5% with no shared method."""
 
-    driver_shoulder_z: float = 0.470
+    driver_torso_recline_deg: float = 25.0
+    """Torso axis from vertical, leaning back, so the axis is
+    `(0, -sin 25, cos 25)` = `(0, -0.4226, 0.9063)`. `estimated`, bracketed by the
+    seat shell chord's `sourced` 19-26 deg and taken 3 deg back of the middle
+    because the spine continues above where the shell ends. `notes_radiator.md` §6
+    offers 40-45 deg for the torso; §60.6 shows that angle cannot be built."""
+
+    driver_shoulder_x: float = 0.200
+    driver_shoulder_y: float = -0.393
+    driver_shoulder_z: float = 0.608
+    """Acromion. `derived`: sitting midshoulder height 622 less the 95 mm hip
+    rise is 527 along the torso axis. Was 0.470 -- see the note above."""
+
+    driver_eye_x: float = 0.032
+    driver_eye_y: float = -0.462
+    driver_eye_z: float = 0.757
+    """Seated eye point. `derived`: sitting eye height 787 less 95 is 692 along the
+    torso axis. Was 0.620. scripts/look/kartview.gd and scripts/look/lookdev.gd
+    both read this for a camera and must not drift from it."""
+
+    driver_helmet_y: float = -0.454
+    driver_helmet_z: float = 0.738
+    driver_helmet_width: float = 0.250
+    driver_helmet_length: float = 0.340
+    driver_helmet_height: float = 0.300
+    """A helmet is an **ellipsoid, not a sphere**, which is what the old
+    `driver_helmet_radius` = 0.125 got wrong: 125 is right laterally and 90 mm
+    short fore-aft. Center is `derived` at 100 mm below the bare vertex along the
+    head axis; the three outer dimensions are `estimated` in §60.1.5 against
+    Art. 7.1's full-face requirement. The crown lands at z 860, which is 210 mm
+    above Art. 9.1.1's 650 mm chassis ceiling -- as every photograph of a kart
+    shows, and it is the sanity check on the whole chain."""
+
+    driver_knee_x: float = 0.180
+    driver_knee_y: float = 0.123
+    driver_knee_z: float = 0.442
+    """Knee joint. y and z are `derived` by §60.1.4's two-link solve from the hip,
+    the ankle and the two sourced segment lengths, and close on the ankle exactly.
+
+    **`driver_knee_x` = 0.180 is `estimated` and it is load-bearing.** It is the
+    one lateral figure in the driver read off a photograph --
+    `exh_commons_buntschu_kz2.jpg`, a three-quarter front-left action shot where
+    the knees are splayed clearly outboard of the wheel rim -- so it is a
+    proportion against the front track, not a measurement, which is why it is
+    +-180 and not a decimal. Six of gate 3's first findings hang off it, and
+    §60.1.6's rule is that a finding which cannot be adjudicated against a sourced
+    figure gets a waiver and a ticket rather than a geometry change."""
+
+    driver_ankle_x: float = 0.110
+    driver_ankle_y: float = 0.425
+    driver_ankle_z: float = 0.137
+    driver_heel_y: float = 0.370
+    driver_heel_z: float = 0.069
+    """Ankle joint and heel contact, `derived` in §60.1.4 from the pedal face:
+    heel 55 mm forward and 68 mm up to the ankle, ball of foot 190 mm ahead of the
+    heel. **§60.6 records that there is no floor tray under the heel** -- the tray
+    top is z 69 and the tray does not reach that station -- so the heel rests on
+    nothing and that is a real finding, not a rounding."""
+
+    driver_ball_x: float = 0.075
+    driver_ball_y: float = 0.560
+    driver_ball_z: float = 0.090
+    """Ball of the foot on the pedal pad. `sourced` from `pedal_y` / `pedal_z`,
+    and the lateral is `pedal_separation` 150 halved: throttle x +75 is the right
+    foot, brake x -75 the left."""
+
+    driver_upper_arm: float = 0.368
+    driver_elbow_to_fist: float = 0.361
+    """Arm links, `sourced` from the NASA table. Not bone lengths and not mesh
+    sizes: **`elbow-to-fist length` runs from the elbow to the center of the
+    closed fist**, which is exactly where a wheel rim sits, and it is why §60.1.2
+    chased this figure rather than a forearm.
+
+    These replace `driver_upper_arm` = 0.290 and `driver_forearm` = 0.260, which
+    summed to 550 mm -- **175.5 mm short**, and a forearm ends at the wrist so
+    there was no hand in the number at all. The sourced pair sums to 729 with the
+    elbow locked straight and 597.2 at a comfortable 110 deg. §60.2 measures the
+    reach against the built rim and reports the residual; §60.1.6's rule is that
+    the arms are built at whatever angle actually closes, because a driver with
+    locked straight arms is the honest render of a cockpit that does not fit."""
+
     driver_shoulder_span: float = 0.400
-    driver_helmet_radius: float = 0.125
-    driver_upper_arm: float = 0.290
-    driver_forearm: float = 0.260
-    """Bone lengths, not mesh sizes. Issue #17 wants the hands to reach the
-    wheel at full lock, and that is arithmetic on these two plus the wheel
-    radius, not something to discover in the viewport. Spec §60 measures them
-    175 mm short of the wheel and owns the fix."""
+    driver_bideltoid: float = 0.455
+    driver_hip_breadth: float = 0.325
+    driver_seated_shoulder_breadth: float = 0.360
+    """The four breadths, and they are four numbers rather than two because they
+    measure different things at different heights. `driver_shoulder_span` is
+    **biacromial** -- bone to bone -- and places the joints for the reach solve;
+    `driver_bideltoid` is the flesh, 27.5 mm wider per side, and sizes the mesh at
+    the acromion. Both are `sourced`.
+
+    The lower pair are `derived` from the Tillett T11 ML chart via §60.1.1: the
+    shell's external widths of 333 and 368 are A and B plus 2 x 4 mm of shell, so
+    the driver filling it is 325 at the hip and 360 across the shell's shoulder
+    line. That the seated shoulder breadth (360) is *narrower* than the bideltoid
+    (455) is not a contradiction -- the deltoids sit above where the shell ends.
+    So the torso tapers 325 at the hip to 360 at the shell top to 455 at the
+    acromion, and all three stations are sourced or derived rather than styled."""
+
+    driver_overalls_thickness: float = 0.007
+    driver_protector_thickness: float = 0.015
+    """Art. 7.2's overalls and Art. 7.5's karting body protection as thickness.
+    Both `estimated` in §60.1.5: 6-8 mm for a single close-fitting fabric layer,
+    12-18 mm per side for the rigid rib shell. Between them they are the reason a
+    driver fills a 325 mm hip and a 360 mm shoulder seat rather than measuring
+    smaller, so they are not decoration -- they are what makes the seat fit."""
 
     # --- output and quality ------------------------------------------------
 
@@ -1671,18 +1787,66 @@ FIELD_COVERAGE_EXEMPT: dict[str, str] = {
         "geometry module cannot read a volume. Delete this entry if a module ever "
         "solves the shell to hit it."
     ),
-    "driver_eye_z": (
-        "issue #17: no driver module exists. Read in Godot off the manifest by "
-        "scripts/look/kartview.gd's cockpit camera and by lookdev.gd."
-    ),
+    # --- the driver -------------------------------------------------------
+    #
+    # `tools/blender/kartlib/driver.py` does not exist yet: issue #17 builds it
+    # against spec §60.1.6's part set, which is the contract this block's fields
+    # were written to serve. Until it lands, no module reads any of them, so every
+    # field is exempt with the same reason.
+    #
+    # **The driver module owns these entries and deletes each one as it reads the
+    # field.** That is the only part of this file it may touch -- `params.py` is
+    # single-owner and the driver block above was written by the main thread for
+    # exactly that reason. An exemption that outlives the module reading it is a
+    # field nobody reads wearing a note that says otherwise, so the list has to
+    # shrink to nothing.
+    #
+    # Two of them are read *in Godot*, off the manifest, and stay exempt from the
+    # Python-side check regardless: scripts/look/kartview.gd's cockpit camera and
+    # scripts/look/lookdev.gd both take `driver_eye_z`, and kartview.gd derives the
+    # camera's recline from `driver_shoulder_z`.
+    "driver_hip_x": "issue #17: driver.py is not written yet.",
+    "driver_hip_y": "issue #17: driver.py is not written yet.",
+    "driver_hip_z": "issue #17: driver.py is not written yet.",
+    "driver_torso_recline_deg": "issue #17: driver.py is not written yet.",
+    "driver_shoulder_x": "issue #17: driver.py is not written yet.",
+    "driver_shoulder_y": "issue #17: driver.py is not written yet.",
     "driver_shoulder_z": (
-        "issue #17, as driver_eye_z; kartview.gd derives the cockpit camera's "
-        "recline from it."
+        "issue #17: driver.py is not written yet. Read in Godot off the manifest "
+        "by scripts/look/kartview.gd, which derives the cockpit camera's recline "
+        "from it, so this entry stays after the module lands."
     ),
-    "driver_shoulder_span": "issue #17: no driver module exists.",
-    "driver_helmet_radius": "issue #17: no driver module exists.",
-    "driver_upper_arm": "issue #17: no driver module exists.",
-    "driver_forearm": "issue #17: no driver module exists.",
+    "driver_eye_x": "issue #17: driver.py is not written yet.",
+    "driver_eye_y": "issue #17: driver.py is not written yet.",
+    "driver_eye_z": (
+        "issue #17: driver.py is not written yet. Read in Godot off the manifest "
+        "by kartview.gd's cockpit camera and by lookdev.gd, so this entry stays "
+        "after the module lands."
+    ),
+    "driver_helmet_y": "issue #17: driver.py is not written yet.",
+    "driver_helmet_z": "issue #17: driver.py is not written yet.",
+    "driver_helmet_width": "issue #17: driver.py is not written yet.",
+    "driver_helmet_length": "issue #17: driver.py is not written yet.",
+    "driver_helmet_height": "issue #17: driver.py is not written yet.",
+    "driver_knee_x": "issue #17: driver.py is not written yet.",
+    "driver_knee_y": "issue #17: driver.py is not written yet.",
+    "driver_knee_z": "issue #17: driver.py is not written yet.",
+    "driver_ankle_x": "issue #17: driver.py is not written yet.",
+    "driver_ankle_y": "issue #17: driver.py is not written yet.",
+    "driver_ankle_z": "issue #17: driver.py is not written yet.",
+    "driver_heel_y": "issue #17: driver.py is not written yet.",
+    "driver_heel_z": "issue #17: driver.py is not written yet.",
+    "driver_ball_x": "issue #17: driver.py is not written yet.",
+    "driver_ball_y": "issue #17: driver.py is not written yet.",
+    "driver_ball_z": "issue #17: driver.py is not written yet.",
+    "driver_upper_arm": "issue #17: driver.py is not written yet.",
+    "driver_elbow_to_fist": "issue #17: driver.py is not written yet.",
+    "driver_shoulder_span": "issue #17: driver.py is not written yet.",
+    "driver_bideltoid": "issue #17: driver.py is not written yet.",
+    "driver_hip_breadth": "issue #17: driver.py is not written yet.",
+    "driver_seated_shoulder_breadth": "issue #17: driver.py is not written yet.",
+    "driver_overalls_thickness": "issue #17: driver.py is not written yet.",
+    "driver_protector_thickness": "issue #17: driver.py is not written yet.",
 }
 
 #: How a module reads a parameter. `p.foo`, `params.foo`, `context.params.foo`,

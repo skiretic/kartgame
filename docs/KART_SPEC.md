@@ -139,15 +139,33 @@ using unsourced all along:
 
 That is `sourced`, and it is the 170 kg the solver already uses.
 
-**Open item, and it is a decision rather than a measurement.** Group 1's rear
-protection delegates only to the *wheel-cover* variant. Either this kart runs the
-wheel-cover bodywork — which adds mandatory geometry: two M8 bolts per cover at
-≥75 mm horizontal spacing, ≥20 mm radial clearance to the tire, covers extending
-20–30 mm beyond the rear wheels' outer plane and 20–40 mm above their highest
-point — or it runs the plain protection §50 specified, which is a **KZ2** part. The
-spec currently describes the plain one. Flagged rather than silently resolved,
-because it changes five parts and the answer is a design choice about what the kart
-*is*.
+**Resolved: this kart runs the plain rear protection, and that is a deliberate
+deviation.** Issue #197, ADR-0056. Group 1's rear protection delegates only to the
+*wheel-cover* variant, 8.5.5.2 → 9.5.5.2, and Group 1 has no plain 8.5.5.1 at all,
+so the part §50 specifies — 1,340 mm minimum width, three 200 mm ground-clearance
+windows — is Art. 9.5.5.1, a **Group 2 / KZ2** part. It stays, for three reasons:
+
+1. **The reference corpus is KZ2 throughout.** The project's own race data is the
+   Genk KZ2 entry list, qualifying and final classification, and every reference
+   photograph in `refs/kart-visual/` shows plain protection. No accessible
+   photograph shows a KZ with wheel covers.
+2. **The plain part is the one with a homologation form behind it.** The 1,340 is
+   sourced through KG C2, `003-BR-48`, which is a plain rear protection. Switching
+   to covers would trade `sourced` dimensions for `estimated` ones, which is the
+   wrong direction for a document whose whole purpose is §1.
+3. **It is a different part, not an addition.** 9.5.5.2 has covers extending
+   20–30 mm *beyond* the rear wheels' outer plane and 20–40 mm *above* their
+   highest point, both of which contradict rules the plain part obeys — 9.5.5.1's
+   *"no higher than the rear wheels"* and *"in line with the outside of the rear
+   wheels"*. So the choice changes the silhouette of the widest, rearmost thing on
+   the kart, and it is a decision about what the kart *is* rather than a
+   measurement.
+
+Recorded rather than papered over: §50's Envelope field cites
+`Art. 9.5.5.1 (KZ2 part; Group 1 delegates only to 9.5.5.2 — deliberate
+deviation, see #197)`, and the deviation is `estimated` in front matter §1's sense
+— no source makes it correct for a KZ, and it carries its reasoning. Five parts and
+the two adjustable outer parts' contrast rule are unchanged.
 
 ## 3. Frozen, and verified rather than assumed
 
@@ -5622,6 +5640,17 @@ inside `CONTACT_TOLERANCE`.
 
 ## 50.11 Rear wheel protection
 
+**This assembly is the KZ2 part, deliberately.** Issue #197, ADR-0056, and front
+matter §2b carries the reasoning. KZ is Group 1 and Art. 8 delegates rear
+protection *only* to the wheel-cover variant 8.5.5.2 → 9.5.5.2; there is no plain
+8.5.5.1 for Group 1. Everything below is specified against **9.5.5.1**, which is a
+Group 2 part, because the reference corpus is KZ2 throughout, because the 1,340
+minimum is sourced through a plain-protection homologation form (KG C2,
+`003-BR-48`), and because 9.5.5.2's covers reach *beyond* and *above* the rear
+wheels where the plain part must not — a different silhouette, not an addition. The
+deviation is `estimated` in front matter §1's sense and every Envelope field in
+this subsection says so.
+
 Three parts, not one, and that is a **geometry** requirement before it is a livery
 one: Art. 9.5.5.1 requires the two adjustable outer parts to be *"a color that is
 clearly different from the main part"*, and Art. 4.11 repeats it. Two colors need
@@ -5637,7 +5666,8 @@ bumper.
 `chassis_rear_bumper` — the existing joint is deleted and so is its 5.91 mm gap
 waiver, because Art. 4.11 puts the supports on the two main tubes and the bumper
 is a pair the panel must **not** overlap.
-**Envelope:** Art. 9.5.5.1, Art. 4.11, Art. 4.10.2.
+**Envelope:** Art. 9.5.5.1 (KZ2 part; Group 1 delegates only to 9.5.5.2 --
+deliberate deviation, see #197), Art. 4.11, Art. 4.10.2.
 **Verification:** gate 1 (must not overlap `chassis_rear_bumper`,
 `wheel_r?_tire`, `exhaust_silencer`), gate 2, and the nine 9.5.5.1 rows.
 
@@ -5674,7 +5704,8 @@ which is most of them.
 **Status:** new — Art. 9.5.5.1's *"two adjustable outer parts"*, absent because the
 panel was built as one 572 mm piece.
 **Attaches to:** `bodywork_rear_panel` (bolted, through the adjustment slot).
-**Envelope:** Art. 9.5.5.1, Art. 4.11.
+**Envelope:** Art. 9.5.5.1 (KZ2 part; Group 1 delegates only to 9.5.5.2 --
+deliberate deviation, see #197), Art. 4.11.
 **Verification:** gate 1 (declared overlap with the main part over the slot),
 gate 2, and a **material assertion**: the outer parts' material must not be the
 main part's. That is the one regulation in this document satisfied by a material
@@ -5917,6 +5948,144 @@ Art. 7 preamble, verbatim, PDF p. 19:
 That last row is the point of the table. The brief asked for the article that makes
 a neck brace compulsory; there isn't one, and inventing a citation for it would be
 exactly the failure the front matter's §1 exists to prevent.
+
+### 60.1.6 The driver as built parts — the part set, its contacts, and gate 3
+
+**This subsection is a contract.** Issue #17's driver, issue #200's gate 3 and
+issue #194's mass lumps are three separate pieces of work that all read the part
+names and hard points below, so the names are fixed here before any of them starts
+and none of them may rename one. ADR-0055.
+
+**Why the driver is built geometry and not a hidden collision proxy.** Gate 1
+asserts no part is inside another and gate 2 asserts every part touches something.
+Neither has any opinion about the volume a seated human occupies, because that
+volume does not exist in the build — so a radiator hose crossed the driver's lumbar
+spine 79.4 mm deep while both gates stayed green, and the only thing that caught it
+was Anthony looking at a viewport. Two clauses of the regulation this document is
+written against are *about the driver* and are unverifiable without him:
+
+> **Art. 9.5.3** It must not impede the normal functioning of the pedals or cover
+> any part of the feet in the normal driving position.
+>
+> **Art. 9.5.4** No part of the side bodywork may cover any part of the driver
+> seated in the normal driving position.
+
+A proxy would satisfy the gate and leave the cockpit rendering empty, which is
+half of what #199 says is wrong with it — the seat, pedal and wheel relationship
+cannot be judged against nobody. So the driver is a real, exported, materialed
+part set.
+
+#### The parts
+
+Nineteen parts, all prefixed `driver_`, built by `tools/blender/kartlib/driver.py`
+into the `driver` collection group — which `build.GROUPS` already carries, as
+`genkart.MODULES` already carries `("driver", "#17 driver with IK-ready arms")`.
+
+Endpoints are §60.1.4's hard points and are **not** to be re-derived. Where a row
+says *segment*, the part spans those two points. Cross-sections are **not
+specified here on purpose**: they are flesh, §60.1.4 has no flesh dimension in it
+beyond the three breadths below, and a number invented in this table would be an
+estimate wearing the authority of a contract — front matter §1's second defect
+exactly. The building module owns them, derives what it can from the breadths, and
+carries reasoning on every one it has to estimate.
+
+| part | segment or center | from §60.1.4 | material |
+| --- | --- | --- | --- |
+| `driver_pelvis` | hip block about the H-point | (±85, −170, 130) | `overalls_fabric` |
+| `driver_torso` | hip → shoulder, along the 25° torso axis | (0, −170, 130) → (0, −393, 608) | `overalls_fabric` |
+| `driver_rib_protector` | over the torso, z 250–450 in the torso frame | Art. 7.5, §60.1.5 | `protector_shell` |
+| `driver_neck` | shoulder line → helmet underside | (0, −400, 615) → (0, −437, 694) | `overalls_fabric` |
+| `driver_helmet` | ellipsoid, 250 wide × 340 long × 300 tall | center (0, −454, 738) | `helmet_shell` |
+| `driver_helmet_visor` | aperture on the eye point, ~200 × 95 | (±32, −462, 757) | `visor_tint` |
+| `driver_upper_arm_l` / `_r` | shoulder → elbow | (±200, −393, 608) → elbow, arm 368 | `overalls_fabric` |
+| `driver_forearm_l` / `_r` | elbow → fist center | elbow → grip, elbow-to-fist 361 | `overalls_fabric` |
+| `driver_glove_l` / `_r` | fist at the rim, cuff overlapping the sleeve | on the rim, §60.2.1 | `glove_leather` |
+| `driver_thigh_l` / `_r` | hip → knee | (±85, −170, 130) → (±180, +123, 442) | `overalls_fabric` |
+| `driver_shank_l` / `_r` | knee → ankle | (±180, +123, 442) → (±110, +425, 137) | `overalls_fabric` |
+| `driver_boot_l` / `_r` | ankle → ball of foot, above-ankle | (±110, +425, 137) → (±75, +560, 90) | `boot_leather` |
+
+The elbow is **not** a hard point in §60.1.4 and must not be invented as one. It
+is the solution of the two-link reach with the upper arm 368 and elbow-to-fist
+361 against the shoulder-to-grip distance §60.2 measures, and §60.2.2 shows that
+distance does not close at a comfortable elbow angle. **So the elbow is where the
+reach arithmetic puts it, the residual is reported as a number, and the arms are
+built at whatever angle actually closes** — a driver built with locked straight
+arms is a legitimate output of a cockpit that does not fit, and it is a far more
+useful render than one with the arms quietly shortened to suit.
+
+Five new materials, following §60.3's four-tuple form
+`(hex, luminance, roughness, metallic)`. Values are `estimated` and owned by the
+building module; the *names* are fixed here so nothing downstream drifts:
+`overalls_fabric`, `protector_shell`, `helmet_shell`, `visor_tint`,
+`glove_leather`, `boot_leather`. **Nothing about the driver takes a livery role** —
+a suit is not bodywork and must not pick up `bodywork_wrap`.
+
+#### The contacts, and why they are not `Joint`s
+
+`joints.KINDS` is closed on purpose and every one of its nine kinds was drawn from
+a real joint on a kart: welded, bolted, threaded, pressed, seated, clamped,
+meshed, routed, pierced. **A driver is none of those.** He is not fastened to the
+kart, he carries no load into it through a fastener, and a hand on a rim is not a
+clamp. Widening `KINDS` to fit him would break the rule that makes that vocabulary
+worth having, so the driver gets its own table, `joints.DRIVER_CONTACTS`, with its
+own three-word vocabulary:
+
+    sits_on   weight passes through this surface into the kart
+    grips     a hand closes around it
+    presses   a foot bears on it
+
+| a | b | kind | why |
+| --- | --- | --- | --- |
+| `driver_pelvis` | `seat_shell` | `sits_on` | the H-point is 95 mm above the pan; this pair is where 78 kg enters the chassis |
+| `driver_torso` | `seat_shell` | `sits_on` | the back bears on the shell at the 22° rake §60.1.1 sources |
+| `driver_thigh_l` / `_r` | `seat_shell` | `sits_on` | the pan's front lip at y −50 carries the thighs |
+| `driver_glove_l` / `_r` | `steering_rim` | `grips` | §60.2.1's rim, straight-ahead |
+| `driver_boot_l` | `pedal_brake_pad` | `presses` | brake is the left foot, x −75 per `pedal_separation` |
+| `driver_boot_r` | `pedal_throttle_pad` | `presses` | throttle is the right foot, x +75 |
+
+**The gear lever is deliberately absent from that table.** A KZ is shifted with the
+right hand off the wheel, so `shifter_lever` is a *momentary* contact and a
+permanent declared one would assert a hand in two places. It is not modeled and
+the omission is the record of that decision, not an oversight.
+
+#### Gate 3 — driver clearance
+
+Issue #200, and it runs in the geometry stage beside gates 1 and 2, so `--watch`
+reports it on every save.
+
+- **Gates 1 and 2 skip every `driver_*` part.** The driver is not a kart part: he
+  is not mounted to anything, so gate 2's "every part touches a neighbor" is
+  meaningless for him, and gate 1's overlap rule would fire on the seat contacts
+  above. Every pair involving a `driver_*` part belongs to gate 3 alone.
+- **Intra-driver pairs are skipped entirely.** One articulated body authored as
+  nineteen segments interpenetrates at every anatomical joint by construction, and
+  declaring nineteen of those would be bookkeeping that asserts nothing.
+- **Every other part must not intersect any `driver_*` part.** A `DRIVER_CONTACTS`
+  row does what a `Joint` does — permits the overlap *and* requires contact within
+  `CONTACT_TOLERANCE`, so a glove 40 mm off the rim fails just as loudly as a hose
+  through the spine.
+- The two regulation clauses become assertions rather than prose: no `bodywork_*`
+  part may occlude a `driver_*` part (9.5.4), and no `bodywork_front_panel`
+  triangle may sit above a boot or inside the pedal sweep (9.5.3).
+- Waivers are itemized exactly like `OPEN_DEFECTS`, each carrying its **measured
+  depth in millimeters** and an issue number, and an entry that no longer fails is
+  fatal. The waiver list is seeded so the gate is green on its first run and every
+  later fix is a waiver deleted.
+
+**A finding that cannot be adjudicated against a sourced figure gets a waiver and
+a ticket, not a geometry change.** The knee splay of ±180 is `estimated` off one
+three-quarter action photograph and the whole leg path hangs off it; spending a
+regulated clearance to fix a leg whose position is a guess is how a real
+constraint gets consumed by a modeling error. Six of the first measured findings
+are in exactly that category.
+
+#### The switch, and why it is not optional
+
+`driver.py` is wired into `MODULES` behind `--set=driver=false`, which builds the
+bare kart. Every §6.4 driving figure, every `drive.sh` scenario and every
+published still predates the driver, and each one has to stay reproducible from
+the command that made it — the rule `shots/` is held to. A turntable of the kart
+*with* a driver is a new still, not a redefinition of an old one.
 
 ---
 

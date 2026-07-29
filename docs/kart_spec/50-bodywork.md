@@ -528,6 +528,17 @@ inside `CONTACT_TOLERANCE`.
 
 ## 50.11 Rear wheel protection
 
+**This assembly is the KZ2 part, deliberately.** Issue #197, ADR-0056, and front
+matter §2b carries the reasoning. KZ is Group 1 and Art. 8 delegates rear
+protection *only* to the wheel-cover variant 8.5.5.2 → 9.5.5.2; there is no plain
+8.5.5.1 for Group 1. Everything below is specified against **9.5.5.1**, which is a
+Group 2 part, because the reference corpus is KZ2 throughout, because the 1,340
+minimum is sourced through a plain-protection homologation form (KG C2,
+`003-BR-48`), and because 9.5.5.2's covers reach *beyond* and *above* the rear
+wheels where the plain part must not — a different silhouette, not an addition. The
+deviation is `estimated` in front matter §1's sense and every Envelope field in
+this subsection says so.
+
 Three parts, not one, and that is a **geometry** requirement before it is a livery
 one: Art. 9.5.5.1 requires the two adjustable outer parts to be *"a color that is
 clearly different from the main part"*, and Art. 4.11 repeats it. Two colors need
@@ -543,7 +554,8 @@ bumper.
 `chassis_rear_bumper` — the existing joint is deleted and so is its 5.91 mm gap
 waiver, because Art. 4.11 puts the supports on the two main tubes and the bumper
 is a pair the panel must **not** overlap.
-**Envelope:** Art. 9.5.5.1, Art. 4.11, Art. 4.10.2.
+**Envelope:** Art. 9.5.5.1 (KZ2 part; Group 1 delegates only to 9.5.5.2 --
+deliberate deviation, see #197), Art. 4.11, Art. 4.10.2.
 **Verification:** gate 1 (must not overlap `chassis_rear_bumper`,
 `wheel_r?_tire`, `exhaust_silencer`), gate 2, and the nine 9.5.5.1 rows.
 
@@ -580,7 +592,8 @@ which is most of them.
 **Status:** new — Art. 9.5.5.1's *"two adjustable outer parts"*, absent because the
 panel was built as one 572 mm piece.
 **Attaches to:** `bodywork_rear_panel` (bolted, through the adjustment slot).
-**Envelope:** Art. 9.5.5.1, Art. 4.11.
+**Envelope:** Art. 9.5.5.1 (KZ2 part; Group 1 delegates only to 9.5.5.2 --
+deliberate deviation, see #197), Art. 4.11.
 **Verification:** gate 1 (declared overlap with the main part over the slot),
 gate 2, and a **material assertion**: the outer parts' material must not be the
 main part's. That is the one regulation in this document satisfied by a material

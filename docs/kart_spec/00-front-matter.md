@@ -136,15 +136,33 @@ using unsourced all along:
 
 That is `sourced`, and it is the 170 kg the solver already uses.
 
-**Open item, and it is a decision rather than a measurement.** Group 1's rear
-protection delegates only to the *wheel-cover* variant. Either this kart runs the
-wheel-cover bodywork — which adds mandatory geometry: two M8 bolts per cover at
-≥75 mm horizontal spacing, ≥20 mm radial clearance to the tire, covers extending
-20–30 mm beyond the rear wheels' outer plane and 20–40 mm above their highest
-point — or it runs the plain protection §50 specified, which is a **KZ2** part. The
-spec currently describes the plain one. Flagged rather than silently resolved,
-because it changes five parts and the answer is a design choice about what the kart
-*is*.
+**Resolved: this kart runs the plain rear protection, and that is a deliberate
+deviation.** Issue #197, ADR-0056. Group 1's rear protection delegates only to the
+*wheel-cover* variant, 8.5.5.2 → 9.5.5.2, and Group 1 has no plain 8.5.5.1 at all,
+so the part §50 specifies — 1,340 mm minimum width, three 200 mm ground-clearance
+windows — is Art. 9.5.5.1, a **Group 2 / KZ2** part. It stays, for three reasons:
+
+1. **The reference corpus is KZ2 throughout.** The project's own race data is the
+   Genk KZ2 entry list, qualifying and final classification, and every reference
+   photograph in `refs/kart-visual/` shows plain protection. No accessible
+   photograph shows a KZ with wheel covers.
+2. **The plain part is the one with a homologation form behind it.** The 1,340 is
+   sourced through KG C2, `003-BR-48`, which is a plain rear protection. Switching
+   to covers would trade `sourced` dimensions for `estimated` ones, which is the
+   wrong direction for a document whose whole purpose is §1.
+3. **It is a different part, not an addition.** 9.5.5.2 has covers extending
+   20–30 mm *beyond* the rear wheels' outer plane and 20–40 mm *above* their
+   highest point, both of which contradict rules the plain part obeys — 9.5.5.1's
+   *"no higher than the rear wheels"* and *"in line with the outside of the rear
+   wheels"*. So the choice changes the silhouette of the widest, rearmost thing on
+   the kart, and it is a decision about what the kart *is* rather than a
+   measurement.
+
+Recorded rather than papered over: §50's Envelope field cites
+`Art. 9.5.5.1 (KZ2 part; Group 1 delegates only to 9.5.5.2 — deliberate
+deviation, see #197)`, and the deviation is `estimated` in front matter §1's sense
+— no source makes it correct for a KZ, and it carries its reasoning. Five parts and
+the two adjustable outer parts' contrast rule are unchanged.
 
 ## 3. Frozen, and verified rather than assumed
 

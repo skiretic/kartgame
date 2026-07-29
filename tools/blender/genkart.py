@@ -731,13 +731,31 @@ def check_assembly(context: build.BuildContext) -> None:
     against a 1.7 s rebuild, which is inside the budget `--watch` has to keep, so
     neither half is skipped anywhere and there is no mode in which the kart is
     built without being checked.
+
+    **`driver_*` parts are excluded from both, by contract.** Spec §60.1.6 and
+    ADR-0055: the driver is not a kart part. Gate 2's "every part is within 2 mm of
+    a neighbor" is meaningless for a body that is not mounted to anything, and gate
+    1's overlap rule would fire on the six `joints.DRIVER_CONTACTS` rows — a driver
+    who is *not* overlapping the seat he sits in is the defect, not the pass. Every
+    pair involving a driver part belongs to gate 3 (#200), which owns both
+    directions of that question. The filter is here rather than inside each gate so
+    there is exactly one place that decides what these two gates are about.
     """
     started = time.perf_counter()
-    parts = assembly_parts(context)
+    everything = assembly_parts(context)
+    parts = [part for part in everything if not part.name.startswith("driver_")]
     prepared = (time.perf_counter() - started) * 1000.0
     overlapping = check_interpenetration(parts)
     check_attachment(parts, overlapping)
-    print("    assembly %d part(s) prepared in %.0f ms" % (len(parts), prepared))
+    skipped = len(everything) - len(parts)
+    print(
+        "    assembly %d part(s) prepared in %.0f ms%s"
+        % (
+            len(parts),
+            prepared,
+            "" if skipped == 0 else "; %d driver part(s) deferred to gate 3" % skipped,
+        )
+    )
 
 
 def suffix_pass(context: build.BuildContext, suffix: str) -> None:

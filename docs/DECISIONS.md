@@ -3501,3 +3501,143 @@ cannot be checked, and this one survived from M0 to M5 because it was never a
 sentence anybody could disagree with. The spec's own §1 rule — an article number is
 an externally-sourced constant — turns out to apply one level up: so is the
 *article set*.
+
+---
+
+## ADR-0055 — The driver is a built part set, and gate 3 defends the volume he occupies
+
+**Status:** accepted, 2026-07-29. Extends ADR-0044's gate contract (#192) with a
+third gate. Supersedes nothing.
+
+**Context.** #190 took the kart from 146 to 295 parts, all specified in
+`docs/KART_SPEC.md`, and both #192 gates went green. Ten minutes of looking at the
+result in Blender produced a list the gates cannot produce: a radiator hose across
+the driver's back, a front panel raked 13.4° that reads as a wall, sidepods that
+read as sealed pontoons, a steering wheel rim shaped like a clover. The summary that
+mattered was *"I don't even see how a driver could actually sit in that."*
+
+The cause is structural rather than a series of slips. **Gate 1 asserts no part is
+inside another; gate 2 asserts every part touches something. Neither has any opinion
+about the volume a seated human occupies, because that volume does not exist in the
+build.** Measured against a capsule union built from §60.1.4's hard points, 29 parts
+reach inside it — `radiator_hose_upper` 79.4 mm deep into the chest at
+(8, −379, 394), and a cluster of chain parts at x 100–112 that ought to be outboard
+of a seat shell that is only ±184 wide.
+
+Two clauses of the regulation the spec is written against are *about the driver* and
+are therefore unverifiable today:
+
+> **Art. 9.5.3** It must not impede the normal functioning of the pedals or cover
+> any part of the feet in the normal driving position.
+>
+> **Art. 9.5.4** No part of the side bodywork may cover any part of the driver
+> seated in the normal driving position.
+
+**Decision.** Three parts, and the third is the one that makes the other two worth
+doing.
+
+1. **The driver is built geometry** — nineteen `driver_*` parts, exported, with
+   their own materials, from §60.1.4's hard points. Not a hidden collision proxy: a
+   proxy satisfies a gate and leaves the cockpit rendering empty, and #199 says
+   plainly that the seat, pedal and wheel relationship cannot be judged against
+   nobody. It closes #17.
+2. **The driver gets his own contact table**, `joints.DRIVER_CONTACTS`, with its own
+   three-word vocabulary — `sits_on`, `grips`, `presses`. `joints.KINDS` stays
+   closed: all nine of its kinds were drawn from a real joint on a kart, and a
+   driver is none of them. He is not fastened to the chassis, carries no load
+   through a fastener, and a hand around a rim is not a clamp. Widening `KINDS` to
+   fit him would destroy the property that makes it worth having.
+3. **Gate 3 owns every pair involving a `driver_*` part.** Gates 1 and 2 skip them
+   entirely — gate 2's "every part touches a neighbor" is meaningless for a body
+   that is not mounted to anything, and gate 1's overlap rule would fire on the six
+   declared contacts. Intra-driver pairs are skipped outright, because one
+   articulated body authored as nineteen segments interpenetrates at every
+   anatomical joint by construction. A `Contact` does what a `Joint` does: it
+   permits the overlap **and** requires contact within `CONTACT_TOLERANCE`, so a
+   glove 40 mm off the rim fails as loudly as a hose through the spine.
+
+`docs/kart_spec/60-driver-and-finishes.md` §60.1.6 is the contract — the part names,
+the segments, the contacts and the gate's rules — written and committed *before* any
+of the three pieces of work started, because #17's module, #200's gate and #194's
+mass lumps all read it and none of them may rename a field.
+
+**The rule that keeps this honest, and it is the important half.** *A finding that
+cannot be adjudicated against a sourced figure gets a waiver and a ticket, not a
+geometry change.* The knee splay of ±180 is `estimated` off one three-quarter action
+photograph and the entire leg path hangs off it; six of the first 29 findings are in
+that category. Spending a regulated clearance to fix a leg whose position is a guess
+is how a real constraint gets consumed by a modeling error — the same failure shape
+as `length_overall` = 1.830, where five panels were clamped to an unsourced estimate
+because it was phrased as a limit.
+
+**Consequences.**
+
+- Two `params.py` figures are corrected here rather than in #194's own wave:
+  `driver_shoulder_z` 0.470 → 0.608 and `driver_eye_z` 0.620 → 0.757. §60.1.4
+  already publishes both as `derived`, and two conflicting seated heights in one
+  file is exactly the drift the spec exists to stop. `scripts/look/kartview.gd`
+  reads both off the manifest, so **the cockpit camera moves up 137 mm**; no §6.4
+  figure reads either one. The cause was a single error — the hip joint placed at
+  z = 0 instead of on the seat pan — which is why the two were 137 and 138 mm low
+  while their *relative* gap of 150 matched the sourced 149.5 exactly.
+- `driver_upper_arm` 0.290 and `driver_forearm` 0.260 are replaced by the sourced
+  `driver_upper_arm` 0.368 and `driver_elbow_to_fist` 0.361. The old pair summed
+  175.5 mm short *and* contained no hand at all, a forearm ending at the wrist.
+- `driver_helmet_radius` is deleted. A helmet is an ellipsoid; 125 was right
+  laterally and 90 mm short fore-aft.
+- The driver builds behind `--set=driver=false`, so every §6.4 figure, every
+  `drive.sh` scenario and every published still stays reproducible from the command
+  that made it.
+- **The arms are built at whatever angle actually closes.** §60.2.2 shows the reach
+  does not close at a comfortable elbow, and a driver rendered with locked straight
+  arms is the honest output of a cockpit that does not fit — far more useful than one
+  whose arms were quietly lengthened to suit. The residual is reported as a number.
+
+---
+
+## ADR-0056 — This kart runs the plain rear wheel protection, which is the KZ2 part
+
+**Status:** accepted, 2026-07-29. Closes the open item ADR-0054 item 2 left, and
+issue #197.
+
+**Context.** ADR-0054 established that KZ is Group 1 and Art. 8 governs it. Art. 8's
+bodywork clauses delegate to Art. 9 one at a time, and for rear wheel protection
+there is exactly one entry:
+
+    8.5.5.2 Rear wheel protection with wheel covers   ->  See Article 9.5.5.2.
+
+**Group 1 has no plain 8.5.5.1.** The unadorned protection `docs/KART_SPEC.md` §50
+specifies — 1,340 mm minimum width, three 200 mm ground-clearance windows — is
+Art. 9.5.5.1, a Group 2 / KZ2 part.
+
+**Decision.** Keep the plain protection. Record it as a deliberate deviation with
+its reasoning attached, `estimated` in front matter §1's sense, rather than papering
+over it or switching parts.
+
+**Why.**
+
+1. **The reference corpus is KZ2 throughout.** The project's own race data is the
+   Genk **KZ2** entry list, qualifying and final classification, and every reference
+   photograph in `refs/kart-visual/` shows plain protection. No accessible
+   photograph shows a KZ with wheel covers.
+2. **The plain part is the one with a form behind it.** The 1,340 minimum is sourced
+   through KG C2, `003-BR-48`, which is a plain rear protection. Switching to covers
+   would trade `sourced` dimensions for `estimated` ones — the wrong direction for a
+   document whose entire purpose is §1.
+3. **It is a different part, not an addition.** Art. 9.5.5.2 has the covers
+   extending 20–30 mm *beyond* the rear wheels' outer plane and 20–40 mm *above*
+   their highest point. Both contradict rules the plain part obeys — 9.5.5.1's *"no
+   higher than the rear wheels"* and *"in line with the outside of the rear wheels"*.
+   So this is not geometry added to the current spec; it is a different silhouette on
+   the widest and rearmost thing on the kart.
+
+**Consequences.** No part moves and no dimension changes. Front matter §2b carries
+the reasoning; §50.11 carries it again at the assembly, and both Envelope fields
+read `Art. 9.5.5.1 (KZ2 part; Group 1 delegates only to 9.5.5.2 — deliberate
+deviation, see #197)`. The two adjustable outer parts' contrast rule stays checked
+against 9.5.5.1 and 4.11, which is where it already was.
+
+**What would reopen this.** A photograph or a homologation form showing a Group 1
+KZ running 9.5.5.2 covers. That is a `sourced` fact this project does not have, and
+the deviation is recorded precisely so that finding one is a one-line change rather
+than an archaeology exercise.

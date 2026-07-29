@@ -2536,6 +2536,125 @@ JOINTS: tuple[Joint, ...] = (
 )
 
 
+# --- the driver, and why he is not in the table above ----------------------
+#
+# Spec §60.1.6 is the contract; ADR-0055 is the decision. Issue #200 is the gate
+# that reads this, issue #17 is the module that builds the parts.
+#
+# `KINDS` is closed on purpose and every one of its nine kinds was drawn from a
+# real joint on a kart. **A driver is none of them.** He is not fastened to the
+# chassis, he carries no load through a fastener, and a hand closed around a rim
+# is not a clamp -- widening `KINDS` to fit him would destroy the property that
+# makes that vocabulary worth having, which is that a tenth kind means finding a
+# tenth kind of joint on a real kart first. So the driver gets his own table and
+# his own three words.
+#
+# What the table is *for*: gates 1 and 2 have never had an opinion about the
+# volume a seated human occupies, because that volume did not exist in the build.
+# `radiator_hose_upper` crossed the driver's lumbar spine 79.4 mm deep, measured,
+# while both gates stayed green -- and the only thing that caught it was a human
+# turning a viewport, which is the loop #192 exists to replace. Two clauses of the
+# regulation are *about the driver* and are unverifiable without him: Art. 9.5.3's
+# *"must not impede the normal functioning of the pedals or cover any part of the
+# feet"* and Art. 9.5.4's *"No part of the side bodywork may cover any part of the
+# driver seated in the normal driving position."*
+
+#: The driver's contact vocabulary. Three words, and the same closed-set rule
+#: applies: a fourth means finding a fourth way a driver touches a kart.
+CONTACT_KINDS: frozenset[str] = frozenset(
+    {
+        # Weight passes through this surface into the chassis.
+        "sits_on",
+        # A hand closes around it.
+        "grips",
+        # A foot bears on it.
+        "presses",
+    }
+)
+
+
+@dataclasses.dataclass(frozen=True)
+class Contact:
+    """One declared driver contact. Same two-way contract as a `Joint`.
+
+    It **permits** the pair to interpenetrate and it **requires** the pair to be
+    in contact within `CONTACT_TOLERANCE`, so a glove 40 mm off the rim fails as
+    loudly as a hose through the spine. `a` is always the `driver_*` side.
+    """
+
+    a: str
+    b: str
+    kind: str
+    why: str
+
+
+DRIVER_CONTACTS: tuple[Contact, ...] = (
+    Contact(
+        a="driver_pelvis",
+        b="seat_shell",
+        kind="sits_on",
+        why="the H-point sits 95 mm above the pan at z 36; this pair is where 78 kg "
+        "of the kart's 170 enters the chassis, and it is the pair issue #194's "
+        "mass lumps are placed against",
+    ),
+    Contact(
+        a="driver_torso",
+        b="seat_shell",
+        kind="sits_on",
+        why="the back bears on the shell at the 22 deg rake spec §60.1.1 sources "
+        "from the Tillett T11 ML chart. The driver's torso is at 25 deg and the "
+        "shell at 22, which is deliberate -- the spine continues above where the "
+        "shell ends -- so the two touch at the shell's top edge",
+    ),
+    Contact(
+        a="driver_thigh_?",
+        b="seat_shell",
+        kind="sits_on",
+        why="the pan's front lip at y -50 carries the thighs. §60.2.4 records that "
+        "the *built* lip stands about 115 mm forward of a real T11 ML's, so this "
+        "pair is also where that error will surface",
+    ),
+    Contact(
+        a="driver_glove_?",
+        b="steering_rim",
+        kind="grips",
+        why="§60.2.1's rim, hands at the 3 and 9 o'clock positions with the wheel "
+        "straight ahead. §60.2.2 measures the reach and it does not close at a "
+        "comfortable elbow angle, so this contact is the assertion that catches an "
+        "arm quietly lengthened to reach",
+    ),
+    Contact(
+        a="driver_boot_l",
+        b="pedal_brake_pad",
+        kind="presses",
+        why="the brake is the left foot at x -75, which is `pedal_separation` 150 "
+        "halved. Named per side rather than globbed because a mirrored pedal "
+        "assignment is exactly the bug a glob would hide",
+    ),
+    Contact(
+        a="driver_boot_r",
+        b="pedal_throttle_pad",
+        kind="presses",
+        why="the throttle is the right foot at x +75, the other half of the same "
+        "pair",
+    ),
+)
+
+# **`shifter_lever` is deliberately absent.** A KZ is shifted with the right hand
+# off the wheel, so that contact is *momentary*: declaring it permanently would
+# assert one hand in two places at once, and gate 3 would then require it -- a
+# driver whose right hand is on the rim would fail for not also being on the
+# lever. The omission is the record of that decision rather than an oversight.
+#
+# Nothing about the driver is in `JOINTS`, and gates 1 and 2 skip every
+# `driver_*` part: he is not mounted to anything, so gate 2's "every part touches
+# a neighbor" is meaningless for him, and gate 1's overlap rule would fire on the
+# six contacts above. Intra-driver pairs are skipped outright -- one articulated
+# body authored as nineteen segments interpenetrates at every anatomical joint by
+# construction, and declaring nineteen of those would be bookkeeping that asserts
+# nothing.
+
+
 # --- known-outstanding defects ---------------------------------------------
 #
 # Everything here fails a gate today, is a real fault in the mesh, and is
@@ -2940,6 +3059,32 @@ def _check_vocabulary() -> None:
                 % (defect.a, defect.b, defect.issue)
             )
 
+    for contact in DRIVER_CONTACTS:
+        if contact.kind not in CONTACT_KINDS:
+            raise SystemExit(
+                "joints.py: %s/%s declares contact kind %r, which is not one of "
+                "%s.\n           That vocabulary is closed for the same reason "
+                "KINDS is: a fourth\n           word means finding a fourth way a "
+                "driver touches a kart."
+                % (contact.a, contact.b, contact.kind, ", ".join(sorted(CONTACT_KINDS)))
+            )
+        if not contact.a.startswith("driver_"):
+            raise SystemExit(
+                "joints.py: contact %s/%s puts the non-driver part first; `a` is "
+                "always\n           the driver side, because gate 3 reads it that "
+                "way." % (contact.a, contact.b)
+            )
+        if contact.b.startswith("driver_"):
+            raise SystemExit(
+                "joints.py: contact %s/%s is driver-to-driver. Intra-driver pairs "
+                "are\n           skipped outright -- spec §60.1.6 -- so declaring "
+                "one asserts nothing." % (contact.a, contact.b)
+            )
+        if not contact.why.strip():
+            raise SystemExit(
+                "joints.py: contact %s/%s has no why" % (contact.a, contact.b)
+            )
+
     seen: dict[tuple[str, str], Joint] = {}
     for joint in JOINTS:
         key = tuple(sorted((joint.a, joint.b)))
@@ -2950,6 +3095,16 @@ def _check_vocabulary() -> None:
                 "wrong." % key
             )
         seen[key] = joint
+
+    contacts_seen: dict[tuple[str, str], Contact] = {}
+    for contact in DRIVER_CONTACTS:
+        contact_key = (contact.a, contact.b)
+        if contact_key in contacts_seen:
+            raise SystemExit(
+                "joints.py: contact %s/%s is declared twice. One contact, one "
+                "entry." % contact_key
+            )
+        contacts_seen[contact_key] = contact
 
 
 _check_vocabulary()

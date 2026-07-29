@@ -178,6 +178,144 @@ That last row is the point of the table. The brief asked for the article that ma
 a neck brace compulsory; there isn't one, and inventing a citation for it would be
 exactly the failure the front matter's §1 exists to prevent.
 
+### 60.1.6 The driver as built parts — the part set, its contacts, and gate 3
+
+**This subsection is a contract.** Issue #17's driver, issue #200's gate 3 and
+issue #194's mass lumps are three separate pieces of work that all read the part
+names and hard points below, so the names are fixed here before any of them starts
+and none of them may rename one. ADR-0055.
+
+**Why the driver is built geometry and not a hidden collision proxy.** Gate 1
+asserts no part is inside another and gate 2 asserts every part touches something.
+Neither has any opinion about the volume a seated human occupies, because that
+volume does not exist in the build — so a radiator hose crossed the driver's lumbar
+spine 79.4 mm deep while both gates stayed green, and the only thing that caught it
+was Anthony looking at a viewport. Two clauses of the regulation this document is
+written against are *about the driver* and are unverifiable without him:
+
+> **Art. 9.5.3** It must not impede the normal functioning of the pedals or cover
+> any part of the feet in the normal driving position.
+>
+> **Art. 9.5.4** No part of the side bodywork may cover any part of the driver
+> seated in the normal driving position.
+
+A proxy would satisfy the gate and leave the cockpit rendering empty, which is
+half of what #199 says is wrong with it — the seat, pedal and wheel relationship
+cannot be judged against nobody. So the driver is a real, exported, materialed
+part set.
+
+#### The parts
+
+Nineteen parts, all prefixed `driver_`, built by `tools/blender/kartlib/driver.py`
+into the `driver` collection group — which `build.GROUPS` already carries, as
+`genkart.MODULES` already carries `("driver", "#17 driver with IK-ready arms")`.
+
+Endpoints are §60.1.4's hard points and are **not** to be re-derived. Where a row
+says *segment*, the part spans those two points. Cross-sections are **not
+specified here on purpose**: they are flesh, §60.1.4 has no flesh dimension in it
+beyond the three breadths below, and a number invented in this table would be an
+estimate wearing the authority of a contract — front matter §1's second defect
+exactly. The building module owns them, derives what it can from the breadths, and
+carries reasoning on every one it has to estimate.
+
+| part | segment or center | from §60.1.4 | material |
+| --- | --- | --- | --- |
+| `driver_pelvis` | hip block about the H-point | (±85, −170, 130) | `overalls_fabric` |
+| `driver_torso` | hip → shoulder, along the 25° torso axis | (0, −170, 130) → (0, −393, 608) | `overalls_fabric` |
+| `driver_rib_protector` | over the torso, z 250–450 in the torso frame | Art. 7.5, §60.1.5 | `protector_shell` |
+| `driver_neck` | shoulder line → helmet underside | (0, −400, 615) → (0, −437, 694) | `overalls_fabric` |
+| `driver_helmet` | ellipsoid, 250 wide × 340 long × 300 tall | center (0, −454, 738) | `helmet_shell` |
+| `driver_helmet_visor` | aperture on the eye point, ~200 × 95 | (±32, −462, 757) | `visor_tint` |
+| `driver_upper_arm_l` / `_r` | shoulder → elbow | (±200, −393, 608) → elbow, arm 368 | `overalls_fabric` |
+| `driver_forearm_l` / `_r` | elbow → fist center | elbow → grip, elbow-to-fist 361 | `overalls_fabric` |
+| `driver_glove_l` / `_r` | fist at the rim, cuff overlapping the sleeve | on the rim, §60.2.1 | `glove_leather` |
+| `driver_thigh_l` / `_r` | hip → knee | (±85, −170, 130) → (±180, +123, 442) | `overalls_fabric` |
+| `driver_shank_l` / `_r` | knee → ankle | (±180, +123, 442) → (±110, +425, 137) | `overalls_fabric` |
+| `driver_boot_l` / `_r` | ankle → ball of foot, above-ankle | (±110, +425, 137) → (±75, +560, 90) | `boot_leather` |
+
+The elbow is **not** a hard point in §60.1.4 and must not be invented as one. It
+is the solution of the two-link reach with the upper arm 368 and elbow-to-fist
+361 against the shoulder-to-grip distance §60.2 measures, and §60.2.2 shows that
+distance does not close at a comfortable elbow angle. **So the elbow is where the
+reach arithmetic puts it, the residual is reported as a number, and the arms are
+built at whatever angle actually closes** — a driver built with locked straight
+arms is a legitimate output of a cockpit that does not fit, and it is a far more
+useful render than one with the arms quietly shortened to suit.
+
+Five new materials, following §60.3's four-tuple form
+`(hex, luminance, roughness, metallic)`. Values are `estimated` and owned by the
+building module; the *names* are fixed here so nothing downstream drifts:
+`overalls_fabric`, `protector_shell`, `helmet_shell`, `visor_tint`,
+`glove_leather`, `boot_leather`. **Nothing about the driver takes a livery role** —
+a suit is not bodywork and must not pick up `bodywork_wrap`.
+
+#### The contacts, and why they are not `Joint`s
+
+`joints.KINDS` is closed on purpose and every one of its nine kinds was drawn from
+a real joint on a kart: welded, bolted, threaded, pressed, seated, clamped,
+meshed, routed, pierced. **A driver is none of those.** He is not fastened to the
+kart, he carries no load into it through a fastener, and a hand on a rim is not a
+clamp. Widening `KINDS` to fit him would break the rule that makes that vocabulary
+worth having, so the driver gets its own table, `joints.DRIVER_CONTACTS`, with its
+own three-word vocabulary:
+
+    sits_on   weight passes through this surface into the kart
+    grips     a hand closes around it
+    presses   a foot bears on it
+
+| a | b | kind | why |
+| --- | --- | --- | --- |
+| `driver_pelvis` | `seat_shell` | `sits_on` | the H-point is 95 mm above the pan; this pair is where 78 kg enters the chassis |
+| `driver_torso` | `seat_shell` | `sits_on` | the back bears on the shell at the 22° rake §60.1.1 sources |
+| `driver_thigh_l` / `_r` | `seat_shell` | `sits_on` | the pan's front lip at y −50 carries the thighs |
+| `driver_glove_l` / `_r` | `steering_rim` | `grips` | §60.2.1's rim, straight-ahead |
+| `driver_boot_l` | `pedal_brake_pad` | `presses` | brake is the left foot, x −75 per `pedal_separation` |
+| `driver_boot_r` | `pedal_throttle_pad` | `presses` | throttle is the right foot, x +75 |
+
+**The gear lever is deliberately absent from that table.** A KZ is shifted with the
+right hand off the wheel, so `shifter_lever` is a *momentary* contact and a
+permanent declared one would assert a hand in two places. It is not modeled and
+the omission is the record of that decision, not an oversight.
+
+#### Gate 3 — driver clearance
+
+Issue #200, and it runs in the geometry stage beside gates 1 and 2, so `--watch`
+reports it on every save.
+
+- **Gates 1 and 2 skip every `driver_*` part.** The driver is not a kart part: he
+  is not mounted to anything, so gate 2's "every part touches a neighbor" is
+  meaningless for him, and gate 1's overlap rule would fire on the seat contacts
+  above. Every pair involving a `driver_*` part belongs to gate 3 alone.
+- **Intra-driver pairs are skipped entirely.** One articulated body authored as
+  nineteen segments interpenetrates at every anatomical joint by construction, and
+  declaring nineteen of those would be bookkeeping that asserts nothing.
+- **Every other part must not intersect any `driver_*` part.** A `DRIVER_CONTACTS`
+  row does what a `Joint` does — permits the overlap *and* requires contact within
+  `CONTACT_TOLERANCE`, so a glove 40 mm off the rim fails just as loudly as a hose
+  through the spine.
+- The two regulation clauses become assertions rather than prose: no `bodywork_*`
+  part may occlude a `driver_*` part (9.5.4), and no `bodywork_front_panel`
+  triangle may sit above a boot or inside the pedal sweep (9.5.3).
+- Waivers are itemized exactly like `OPEN_DEFECTS`, each carrying its **measured
+  depth in millimeters** and an issue number, and an entry that no longer fails is
+  fatal. The waiver list is seeded so the gate is green on its first run and every
+  later fix is a waiver deleted.
+
+**A finding that cannot be adjudicated against a sourced figure gets a waiver and
+a ticket, not a geometry change.** The knee splay of ±180 is `estimated` off one
+three-quarter action photograph and the whole leg path hangs off it; spending a
+regulated clearance to fix a leg whose position is a guess is how a real
+constraint gets consumed by a modeling error. Six of the first measured findings
+are in exactly that category.
+
+#### The switch, and why it is not optional
+
+`driver.py` is wired into `MODULES` behind `--set=driver=false`, which builds the
+bare kart. Every §6.4 driving figure, every `drive.sh` scenario and every
+published still predates the driver, and each one has to stay reproducible from
+the command that made it — the rule `shots/` is held to. A turntable of the kart
+*with* a driver is a new still, not a redefinition of an old one.
+
 ---
 
 ## 60.2 The reach arithmetic — does the cockpit fit the driver?
