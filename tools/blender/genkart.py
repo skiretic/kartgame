@@ -34,16 +34,23 @@ Stages, in order, each skippable so a geometry change does not pay for a bake:
     bake       normals from the high-poly source             (issue #19)
     lod        decimated chain                               (issue #20)
     export     glTF, Y-up, -Z forward                        (issue #21)
+
+`--watch` is the one mode that is not headless: it keeps a windowed Blender open
+and rebuilds the kart in place whenever a file under `kartlib/` is saved, so
+shape work is an edit-save-look loop instead of a quit-rerun-reframe one. It
+exports nothing and is refused under `--background`, so no gate can reach it.
 """
 
 from __future__ import annotations
 
 import dataclasses
 import hashlib
+import importlib
 import json
 import os
 import sys
 import time
+import traceback
 
 import bpy
 
@@ -485,6 +492,179 @@ def _project_root() -> str:
 # --- entry point -----------------------------------------------------------
 
 
+# --- live rebuild ----------------------------------------------------------
+#
+# Everything below serves `--watch` and nothing else. It is deliberately walled
+# off from the build path the gates run: a determinism failure that traced back
+# to a convenience loop would be a bad trade.
+
+
+#: Seconds between mtime polls. Short enough that a save feels immediate, long
+#: enough that the timer is not a measurable cost while nothing is changing.
+WATCH_INTERVAL: float = 0.4
+
+
+def watch_sources() -> list[str]:
+    """Every file whose edit should trigger a rebuild.
+
+    The geometry modules and the two files all of them import. `genkart.py`
+    itself is deliberately absent: it is `__main__` here, so reloading it would
+    re-enter `main()` and start a second watcher on top of the first. Editing
+    this file means restarting the session, which is the honest cost of it being
+    the entry point.
+    """
+    package = os.path.join(os.path.dirname(os.path.abspath(__file__)), "kartlib")
+    return sorted(
+        os.path.join(package, name)
+        for name in os.listdir(package)
+        if name.endswith(".py")
+    )
+
+
+def source_stamp(paths: list[str]) -> dict[str, int | None]:
+    """Modification times, with a missing file recorded rather than skipped.
+
+    An editor that writes by rename makes the file briefly absent, and treating
+    that as "no change" would drop the save that follows it.
+    """
+    stamp: dict[str, int | None] = {}
+    for path in paths:
+        try:
+            stamp[path] = os.stat(path).st_mtime_ns
+        except OSError:
+            stamp[path] = None
+    return stamp
+
+
+def reload_modules() -> None:
+    """Reload `kartlib` in dependency order.
+
+    `importlib.reload` mutates the module object in place, so every
+    `from . import build` binding inside the geometry modules keeps pointing at
+    the same object and sees the new code without being reloaded itself. That
+    only holds because this package imports *modules* and never names out of
+    them — one `from .params import KartParams` anywhere would go stale here and
+    silently keep building the old shape, which is the kind of bug that gets
+    blamed on the mesh.
+
+    `params` before `build` because `build` imports it; the geometry modules
+    last because they import both.
+    """
+    for name in ("params", "build"):
+        module = sys.modules.get("kartlib." + name)
+        if module is not None:
+            importlib.reload(module)
+    for module_name, _ in MODULES:
+        module = sys.modules.get("kartlib." + module_name)
+        if module is not None:
+            importlib.reload(module)
+
+
+def wipe_kart() -> None:
+    """Delete the built kart without touching the rest of the file.
+
+    A normal run calls `build.reset_scene()`, which calls
+    `read_factory_settings` — that discards the window layout and the viewport's
+    own view matrix along with the scene. In a live loop it would snap the view
+    back to the default on every save, which is exactly what the loop exists to
+    avoid. So the group collections are emptied by hand instead.
+
+    Orphans are purged because every mesh and material is created *by name*:
+    leave one behind and the next build gets `chassis_rail_r.001`, the outliner
+    is unreadable after four saves, and `make_materials` starts handing out
+    duplicates that look like the shading changed.
+    """
+    for name in build.GROUPS:
+        collection = bpy.data.collections.get(name)
+        if collection is None:
+            continue
+        for obj in list(collection.all_objects):
+            bpy.data.objects.remove(obj, do_unlink=True)
+        for child in list(collection.children):
+            bpy.data.collections.remove(child)
+        bpy.data.collections.remove(collection)
+    bpy.data.orphans_purge(do_local_ids=True, do_linked_ids=True, do_recursive=True)
+
+
+def rebuild(arguments: dict[str, str], out_directory: str) -> tuple[int, int]:
+    """One in-place rebuild: reload the sources, wipe, build again.
+
+    Parameters are re-read from `arguments` every time so that a `--set=` on the
+    launch command still applies, and so that an edit to `params.py` is picked
+    up — the dataclass is rebuilt by the reload above, and the defaults come off
+    the new one.
+
+    Returns (meshes, vertices) so the loop can print them. That is not decoration:
+    a live rebuild is a fast, silent success, and a silent success is
+    indistinguishable from an edit that changed nothing. A vertex count that did
+    not move says the save did not reach the mesh.
+    """
+    reload_modules()
+    parameters = parameters_from(arguments)
+    detail = (
+        build.Detail.high(parameters)
+        if arguments.get("detail", "low") == "high"
+        else build.Detail.low(parameters)
+    )
+    wipe_kart()
+    materials = build.make_materials()
+    context = build_kart(parameters, detail, bpy.context.scene, materials, out_directory)
+    check_face_winding(context)
+
+    meshes = [obj for obj in exportable(context) if obj.type == "MESH"]
+    return len(meshes), sum(len(obj.data.vertices) for obj in meshes)
+
+
+def watch(arguments: dict[str, str], out_directory: str) -> None:
+    """Poll `kartlib/` and rebuild on change, forever.
+
+    `main` refuses `--background` before building anything; by the time this
+    runs the window is real.
+    """
+    sources = watch_sources()
+    state = {"stamp": source_stamp(sources), "builds": 0}
+
+    def poll() -> float:
+        stamp = source_stamp(sources)
+        if stamp != state["stamp"]:
+            state["stamp"] = stamp
+            state["builds"] += 1
+            started = time.perf_counter()
+            try:
+                meshes, vertices = rebuild(arguments, out_directory)
+            except Exception:
+                # A half-written file raises SyntaxError and a wrong dimension
+                # raises whatever the module raises. Neither may kill the timer:
+                # fixing the file and saving again is the entire loop, and a
+                # watcher that dies on the first typo is worse than no watcher,
+                # because it dies silently and the next save does nothing.
+                traceback.print_exc()
+                print(
+                    "==> rebuild %d FAILED -- still watching, save again to retry"
+                    % state["builds"],
+                    flush=True,
+                )
+            else:
+                print(
+                    "==> rebuild %d in %.1f s -- %d meshes, %s verts"
+                    % (
+                        state["builds"],
+                        time.perf_counter() - started,
+                        meshes,
+                        "{:,}".format(vertices),
+                    ),
+                    flush=True,
+                )
+        return WATCH_INTERVAL
+
+    bpy.app.timers.register(poll, first_interval=WATCH_INTERVAL, persistent=True)
+    print(
+        "==> watching %d files under kartlib/ -- save one to rebuild"
+        % len(sources),
+        flush=True,
+    )
+
+
 def main() -> None:
     arguments = parse(script_arguments())
 
@@ -503,7 +683,24 @@ def main() -> None:
     if not os.path.isabs(manifest_path):
         manifest_path = os.path.join(_project_root(), manifest_path)
 
-    requested = arguments.get("stages", "all")
+    # `--watch` is a shape-review loop, so it defaults to geometry only: a bake
+    # on every keystroke-and-save is 20 s of Cycles nobody asked for, and an
+    # export would rewrite assets/generated/ from a half-finished module. An
+    # explicit --stages still wins, because someone watching a UV change has a
+    # reason.
+    watching = arguments.get("watch") == "true"
+    # Checked before anything is built. Doing it at the point of use meant a
+    # full headless build ran and *then* the mode was refused, which reads as a
+    # successful run with an error stapled to the end of it.
+    if watching and bpy.app.background:
+        raise SystemExit(
+            "--watch needs a windowed Blender: the rebuild runs off\n"
+            "bpy.app.timers, and headless Blender has no event loop to fire it.\n"
+            "Drop --background, or run\n"
+            "    tools/blender/genkart.sh --watch\n"
+            "which does it for you."
+        )
+    requested = arguments.get("stages", "geometry" if watching else "all")
     stages = set(STAGES) if requested == "all" else {
         stage.strip() for stage in requested.split(",") if stage.strip()
     }
@@ -568,6 +765,16 @@ def main() -> None:
         os.makedirs(os.path.dirname(blend), exist_ok=True)
         bpy.ops.wm.save_as_mainfile(filepath=blend, compress=False)
         print("    blend %s" % blend)
+
+    # The manifest describes an exported mesh, and a watch session never exports
+    # one. Writing it anyway would leave assets/generated/kart.json describing a
+    # .glb that was not rebuilt with it — the same stale-caption failure the
+    # SKIP_IMPORT trap produces, arriving from the other end.
+    if watching:
+        elapsed = time.perf_counter() - started
+        print("==> first build in %.1f s" % elapsed)
+        watch(arguments, out_directory)
+        return
 
     elapsed = time.perf_counter() - started
     manifest = write_manifest(context, out, manifest_path, elapsed)

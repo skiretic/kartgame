@@ -7,6 +7,8 @@
 #     tools/blender/genkart.sh --stages=geometry,export  # skip the bake
 #     tools/blender/genkart.sh --set=track_rear=1.38     # parameter sweep
 #     tools/blender/genkart.sh --check                   # determinism gate
+#     tools/blender/genkart.sh --watch                   # windowed live rebuild
+#     tools/blender/genkart.sh --watch --detail=high     # ...at export density
 #
 # Every argument is forwarded verbatim to genkart.py, so what a mesh contains is
 # fully described by the command that produced it -- the same rule tools/shots/
@@ -30,6 +32,7 @@ PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 BLENDER="${BLENDER:-}"
 CHECK=0
 QUIET=0
+WATCH=0
 FORWARDED=()
 
 for argument in "$@"; do
@@ -37,9 +40,19 @@ for argument in "$@"; do
 		--blender=*) BLENDER="${argument#*=}" ;;
 		--check)     CHECK=1 ;;
 		--quiet)     QUIET=1 ;;
+		# Recognized here *and* forwarded: this script has to know not to pass
+		# --background, and genkart.py has to know to start the timer.
+		--watch)     WATCH=1; FORWARDED+=("$argument") ;;
 		*)           FORWARDED+=("$argument") ;;
 	esac
 done
+
+if [ "$WATCH" = "1" ] && [ "$CHECK" = "1" ]; then
+	echo "error: --watch cannot be combined with --check." >&2
+	echo "       --check is the determinism gate and runs twice, headless;" >&2
+	echo "       --watch is a windowed loop that never exits." >&2
+	exit 2
+fi
 
 # Blender does not install itself onto the PATH on macOS, so the .app is checked
 # before giving up. Linux and Windows package it normally.
@@ -79,7 +92,17 @@ run_blender() {
 	# disables add-ons, and Cycles is an add-on that the normal bake needs. The
 	# script resets the scene from factory settings itself, which discards the
 	# user's startup file without unloading anything.
-	"$BLENDER" --background --python "$PROJECT_ROOT/tools/blender/genkart.py" -- "$@"
+	#
+	# --watch is the sole exception and drops --background, because it is a
+	# windowed review loop: there is nothing to look at otherwise, and the
+	# rebuild runs off `bpy.app.timers`, which needs an event loop that headless
+	# Blender does not have. genkart.py refuses the combination rather than
+	# hanging, so this is belt and braces.
+	if [ "$WATCH" = "1" ]; then
+		"$BLENDER" --python "$PROJECT_ROOT/tools/blender/genkart.py" -- "$@"
+	else
+		"$BLENDER" --background --python "$PROJECT_ROOT/tools/blender/genkart.py" -- "$@"
+	fi
 }
 
 if [ "$CHECK" = "1" ]; then
@@ -172,5 +195,11 @@ fi
 # Blender writes its splash and add-on chatter to stdout before the script runs.
 # Dropping it keeps the useful output -- the stage list, counts and hash -- from
 # scrolling away, while anything on stderr still comes through.
-run_blender ${FORWARDED[@]+"${FORWARDED[@]}"} | grep -vE '(^Blender |^Read prefs|^found bundled|^Warning: |^Writing |INFO: |^Info: )'
+#
+# --line-buffered matters only for --watch, and it matters a lot: grep block
+# buffers whenever its stdout is not a terminal, so redirecting a watch session
+# to a file produced an empty file for as long as the session ran. It looked
+# exactly like the watcher had died on startup. A batch run finishes and flushes,
+# so it never showed up there.
+run_blender ${FORWARDED[@]+"${FORWARDED[@]}"} | grep --line-buffered -vE '(^Blender |^Read prefs|^found bundled|^Warning: |^Writing |INFO: |^Info: )'
 exit "${PIPESTATUS[0]}"
