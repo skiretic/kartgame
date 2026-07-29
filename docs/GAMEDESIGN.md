@@ -429,15 +429,33 @@ un-diagnosable. A championship standings table is configuration of the same kind
 Screens, in the order a first-time player meets them:
 
 ```
-boot  ->  paddock (main menu)  ->  mode  ->  session setup  ->  loading
+boot  ->  paddock (main menu)  ->  session setup  ->  loading
       ->  grid / countdown  ->  driving  ->  results  ->  standings  ->  paddock
 ```
 
 Plus: pause (resume, restart session, controls, quit), settings (comfort per
 `ARCHITECTURE.md` §18, controls, assists), and a profile screen.
 
-The menu is the paddock — diegetic, per the fiction level in §7 — and it is the
-subject of the storyboard that accompanies this doc.
+**There is no mode screen** — the three modes sit directly on the paddock, and
+an unbuilt mode is visible with an honest statement of what it needs ("needs a
+field — M7") rather than absent or greyed.
+[ADR-0052](DECISIONS.md#adr-0052--the-paddock-is-a-place-and-the-eight-decisions-that-shape-the-shell)
+records that and seven more decisions the storyboard could not make:
+
+- **The paddock is a generated 3D environment, built in stages** — the same
+  deterministic Blender pipeline as the kart, starting from a vignette (kart on
+  a stand, awning, parked camera) and growing outward in later rounds. The menu
+  is that place with document-styled UI over it, diegetic per §7.
+- **Pause-invalidates-lap is a player option**, default on, living with the
+  assists — and a best set with forgiveness enabled is flagged on the record.
+- **The ghost delta tracks the selected ghost and says so**; sector deltas
+  against session best are a separate channel.
+- **Settings are one grouped list**, not tabs — no second navigation axis on a
+  pad.
+- **The driver's name is typed**, surname and forename separately, rendered
+  "Surname, Forename" as the entry list does.
+- **Results list every lap**, best and optimal pinned, struck laps with their
+  reason.
 
 **The storyboard settles hierarchy and information design, and settles nothing
 about how any of it looks.** It is wireframes on purpose.

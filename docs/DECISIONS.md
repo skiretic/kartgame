@@ -3218,3 +3218,100 @@ fail before a lap is swallowed.
   the speed in closed form, and carries its own negative control: a 40 m jump over
   a checkpoint that clears no sector mark. A timer that owed only its splits passes
   every other check in this file and fails that one.
+
+## ADR-0052 — The paddock is a place, and the eight decisions that shape the shell
+
+**Status.** Accepted, front-end design phase, issue #171. Design only — nothing
+here is built, and the phase producing it deliberately writes no code.
+
+**Context.** `GAMEDESIGN.md` §9 fixed the screen list and the storyboard fixed
+what information lives on each screen. Between them they left eleven decisions
+open, four of which block code rather than paint. This ADR records the ones now
+settled. The visual pass itself (#171) stays blocked on reference photographs
+and is not decided here — these are structure and rules, not looks.
+
+**Decisions.**
+
+1. **The paddock is a generated 3D environment, built in stages.** Not a 2D
+   backdrop and not a one-shot vignette. It is produced by the same
+   deterministic Blender pipeline as the kart — modules under `tools/blender/`,
+   parameters single-owner, `--check` gate — because that pipeline is the
+   project's way of making geometry and the paddock is geometry. Staged on
+   purpose: stage 1 is a vignette (the kart on a stand, an awning, a parked
+   camera, `look_env.gd` lighting), and the environment grows outward in later
+   rounds — trailers, tire stacks, neighboring teams' setups. An earlier answer
+   in this session chose the vignette as the *end state*; that choice was made
+   against an inflated cost estimate ("weeks of Blender work" for what the
+   pipeline does in days) and is superseded. The staging survives because it is
+   how everything else here is built: a first pass that is wrong in useful ways,
+   then rounds.
+
+2. **There is no mode screen.** The three modes sit directly on the paddock.
+   The flow loses a screen: boot → paddock → session setup → loading → driving.
+   Storyboard plate 03 is deleted, and its one orphaned job — saying what a mode
+   *is* in one line — moves onto the paddock's mode entries.
+
+3. **An unbuilt mode is visible and says why it is unavailable** — "needs a
+   field — M7" in the place a released build would put a difficulty hint.
+   §13's rule that a stubbed mode reads worse than an absent one is about modes
+   that *pretend*: a greyed row that does nothing, a grid that punts you. A card
+   that states its precondition is a third thing, and it keeps the paddock from
+   claiming the game is smaller than it is designed to be.
+
+4. **Whether pausing invalidates the lap in progress is a player option**, and
+   it lives with the assists. Default is on — invalidate — because pause is
+   otherwise a free look at the corner ahead. The load-bearing consequence: a
+   best lap set with pause-forgiveness enabled is **flagged on the saved
+   record**, the same family as the assist flags, or every saved best silently
+   absorbs an advantage the screen never mentions. A stored preference that can
+   move a recorded number must leave a mark on the record it moved —
+   `assist_settings.gd`'s rule, extended from validation figures to bests.
+
+5. **The ghost delta is measured against the selected ghost and labeled as
+   such.** In Practice today the ghost *is* the saved best, so the two candidate
+   definitions produce the same number — which is exactly why the choice had to
+   be written down before they diverge. The moment a ghost can come from another
+   session, another layout's time, or another player, "delta to what I am
+   racing" and "delta to my best" split, and the HUD follows the ghost it is
+   drawing. Sector deltas against session best remain a separate channel, as
+   `timing_hud.gd` already draws them.
+
+6. **Settings are one grouped list, not tabs.** Section headers — comfort,
+   controls, assists, audio — in a single scroll. A tab strip needs a second
+   navigation axis on a pad; a list reuses the one interaction the tuning
+   overlay already taught, d-pad up-down and left-right on a row. The menu's own
+   `menu_*` actions apply, per the storyboard's settled note: the engine's
+   `ui_*` defaults sit on the arrow keys, and the arrow keys are throttle,
+   brake and steer.
+
+7. **The driver's name is typed, in the sport's format.** Surname and forename
+   are entered as two fields and rendered "Surname, Forename" everywhere the
+   entry list does it. Empty is refused; beyond that the player may call
+   themselves what they like — a standings table with "aaaaa" fourth is the
+   player's own doing, and a name picker defending the fiction against its one
+   human participant defends it from the wrong direction.
+
+8. **Results list every lap**, scrollable, with best and the theoretical
+   optimal pinned above the scroll and struck laps shown with their reason. A
+   real classification sheet is the whole session on one page, and hiding rows
+   from the person who drove them is the wrong kind of tidy. The optimal stays
+   labeled for what it is — a sum of sector bests nobody drove.
+
+**Still open, and staying open through the mockup rounds:** the config hash on
+screen; the entrant-nationality column against the equipment string; a Practice
+countdown; boot behavior when `kart.glb` is missing; whether pause stops the
+clock in Practice; the loading tip line; whether F2's tuning overlay survives
+into a shipped build; whether Career creates the profile or requires one; and
+naming, deferred per §12 because it is cheap and late.
+
+**Consequences.**
+
+- `GAMEDESIGN.md` §9 is updated to match; the storyboard artifact drops plate
+  03, redraws the flow, and re-inks the settled marks.
+- The pause option adds a field to the saved best-lap record (a flag set, like
+  the assist flags) — filed as a ticket for after the design phase, not built
+  now.
+- The paddock environment gets a module plan in the kart pipeline's style,
+  written from reference photographs before any module is coded. #171's
+  reference gate applies to the paddock's geometry exactly as it does to the
+  screens' typography.
