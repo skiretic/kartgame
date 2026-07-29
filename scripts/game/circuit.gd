@@ -18,6 +18,16 @@ extends Node3D
 ##   --hud=true          the driving HUD and the corner overlay
 ##   --curbs=true        build the kerb colliders
 ##   --runoff=true       build the run-off aprons, gravel and barriers
+##   --scatter=true      the trackside dressing, placed from the file
+##   --terrain=true      ground that follows the circuit's elevation; false
+##                       restores the flat slab this scene shipped with
+##   --terrain-cell=5.0  meters per terrain grid cell
+##   --gi=none           none or baked. **Default none, on purpose** — see
+##                       `_build_lightmap`. `baked` consumes valdirone.lmbake and
+##                       turns sky ambient off, and blows every dynamic object in
+##                       the scene out to white
+##   --scatter-gi=off    off or probes, and only under `--gi=baked`
+##   --probe=true        the reflection probe; false is for A/B work
 ##   --mesh=true         load the generated `.glb` for the visual track; false
 ##                       draws the collider's own triangles instead, which is what
 ##                       to use when the question is whether the two agree
@@ -67,11 +77,24 @@ extends Node3D
 ## replay recorded before a corner was smoothed refuses to play back and says which
 ## file moved.
 ##
+## ## The ground, and why it stopped being flat
+##
+## Issue #182. This scene used to put one flat `PlaneMesh` under the whole world at
+## the circuit's lowest point, which is invisible while the only thing standing on
+## it is the road — the road stands on its own spline. Valdirone climbs 12.55 m, so
+## at the top of the climb the asphalt and its run-off were a ribbon hanging
+## 12.05 m in the air over a lawn, and the first prop placed beside the track had
+## its roots in the sky. `TrackTerrain` replaces it with a height field taken from
+## the circuit itself, and the old slab stays underneath as the backstop it always
+## was. `--terrain=false` restores the flat version, which is what to use if a
+## measurement ever has to be compared against a still taken before this.
+##
 ## ## What it deliberately does not do yet
 ##
-## **No runtime scatter and no lightmap bake.** Both are M5 bullets and neither is
-## in this pass; the mesh carries a UV2 channel ready for the bake and
-## `tools/bake/preflight.gd` is the gate that would run first. Issue #182.
+## **The scatter has no colliders.** `TrackScatter`'s header has the argument: a
+## kart that clears the barrier drives through a tree. The barrier is the collider
+## that matters and adding more static bodies beside a racing line is a way to move
+## a measured figure for a decoration.
 ##
 ## **No pit lane.** The stations are in the file and the *asphalt* is not:
 ## reversed, a deceleration lane at 20° to the direction of travel is a 160° merge
@@ -80,6 +103,17 @@ extends Node3D
 
 const DEFAULT_TRACK := "res://data/tracks/valdirone_nuova.track.json"
 const TRACK_MESH_PATH := "res://assets/generated/valdirone_nuova.glb"
+
+## What `tools/bake/bake.sh --scene=res://scenes/game/valdirone_bake.tscn` writes.
+##
+## The bake happens in that scene and is consumed in this one, and the join is a
+## node path: `LightmapGIData` stores its users as paths relative to the
+## `LightmapGI`'s parent — `GroundVisual`, `TrackMesh/Asphalt` and so on — so the
+## two scenes have to name their geometry identically. They do, because both build
+## it from the same two places. That is the whole contract, and it is fragile
+## enough to be worth stating: rename `GroundVisual` and the ground silently stops
+## being lit.
+const LIGHTMAP_PATH := "res://scenes/game/valdirone.lmbake"
 
 ## `kart::core::SurfaceType` from `src/core/surface.h`. **These integers are a wire
 ## format** — that header says so — so they are written out rather than derived.
@@ -129,6 +163,11 @@ var _assists := {}
 var _hint := -1.0
 var _surface_text := ""
 var _triangles := {}
+var _corridor: TrackCorridor
+var _terrain: TrackTerrain
+var _scatter: TrackScatter
+var _build_ms := {}
+var _lightmap_users := 0
 
 
 func _ready() -> void:
@@ -155,6 +194,15 @@ func _ready() -> void:
 	_build_environment()
 	_build_ground()
 	_build_track()
+	# After the ground, because every prop stands on the terrain's height field and
+	# before the kart, so a still taken with `--eye` frames a dressed circuit rather
+	# than one that gains its trees a frame later.
+	_build_scatter()
+	# After every mesh it lights exists. `LightmapGI` binds its data on entering the
+	# tree, so one added before the geometry finds nothing, warns that it needs a
+	# rebake, and leaves the scene unlit — `bake_test.gd` documented this ordering
+	# and it applies to every procedurally built scene in the project.
+	_build_lightmap()
 	_build_kart()
 	_build_tuning()
 	# After the tuning, because `adopt_tuning` records what the session was driven
@@ -202,6 +250,8 @@ func _build_environment() -> void:
 	# layout puts a hard rectangular seam across the grass at its own boundary,
 	# because `AMBIENT_DISABLED` stops a probe adding ambient but not specular, and
 	# broad rough-surface specular is exactly what a lawn is made of.
+	if not Cmdline.as_bool(_args, "probe", true):
+		return
 	var extent := _world_extent()
 	var centre := _bounds().get_center()
 	add_child(LookEnv.reflection_probe(
@@ -211,7 +261,8 @@ func _build_environment() -> void:
 	))
 
 
-## The run-off: one slab under everything, `surface_type` 2.
+## The ground: a height field taken off the circuit, over the slab that was here
+## before. Both are `surface_type` 2.
 ##
 ## A field with a circuit-shaped hole in it would be the physically honest shape
 ## and it is a great deal of geometry for nothing — the road stands above this and
@@ -221,25 +272,24 @@ func _build_environment() -> void:
 ## track does not have to think about because it is flat. Valdirone's hairpin sits
 ## 10.8 m below the start line; a slab at zero would put the bottom of the bowl
 ## underground and the kart would drive into a hillside made of grass.
+##
+## The slab is *kept* rather than replaced. `TrackTerrain` builds a surface
+## collider and a surface has one failure mode a volume does not — 2 m of slab
+## cannot be passed through in one tick at any speed this kart reaches, and this
+## circuit puts one into a kerb at 129 km/h by design. It is sunk
+## `TrackTerrain.BASE_CLEARANCE` below the field's own base so the two are never
+## coplanar, which is the condition that makes a wheel raycast's answer arbitrary
+## along a whole boundary.
 func _build_ground() -> void:
 	var box := _bounds()
 	var extent := _world_extent()
 	var centre := box.get_center()
 	var floor_y := box.position.y - 0.5
 
-	var plane := PlaneMesh.new()
-	plane.size = Vector2(extent, extent)
-	plane.subdivide_width = 64
-	plane.subdivide_depth = 64
-
-	var visual := MeshInstance3D.new()
-	visual.mesh = plane
-	var material := TrackRibbon.grass_material()
-	material.uv1_scale = Vector3(extent * 0.5, extent * 0.5, 1.0)
-	visual.material_override = material
-	visual.position = Vector3(centre.x, floor_y, centre.z)
-	visual.name = "GroundVisual"
-	add_child(visual)
+	var started := Time.get_ticks_usec()
+	_corridor = TrackCorridor.new()
+	_corridor.measure(_track)
+	_build_ms["corridor"] = (Time.get_ticks_usec() - started) / 1000.0
 
 	var body := StaticBody3D.new()
 	body.name = "Ground"
@@ -253,13 +303,163 @@ func _build_ground() -> void:
 	body.physics_material_override = physics_material
 	body.set_meta("surface_type", 2)
 
+	var slab_top := floor_y
+	if Cmdline.as_bool(_args, "terrain", true):
+		started = Time.get_ticks_usec()
+		_terrain = TrackTerrain.new()
+		_terrain.build(_track, _corridor, extent, centre, floor_y,
+				Cmdline.as_float(_args, "terrain-cell", 5.0))
+		_build_ms["terrain"] = (Time.get_ticks_usec() - started) / 1000.0
+		add_child(_terrain.visual())
+		add_child(_terrain.body(2))
+		slab_top = _terrain.base_y()
+	else:
+		var plane := PlaneMesh.new()
+		plane.size = Vector2(extent, extent)
+		plane.subdivide_width = 64
+		plane.subdivide_depth = 64
+		var visual := MeshInstance3D.new()
+		visual.mesh = plane
+		var material := TrackRibbon.grass_material()
+		material.uv1_scale = Vector3(extent * 0.5, extent * 0.5, 1.0)
+		visual.material_override = material
+		visual.position = Vector3(centre.x, floor_y, centre.z)
+		visual.name = "GroundVisual"
+		add_child(visual)
+
 	var shape := BoxShape3D.new()
 	shape.size = Vector3(extent, GROUND_THICKNESS, extent)
 	var collider := CollisionShape3D.new()
 	collider.shape = shape
-	collider.position = Vector3(centre.x, floor_y - GROUND_THICKNESS * 0.5, centre.z)
+	collider.position = Vector3(centre.x, slab_top - GROUND_THICKNESS * 0.5, centre.z)
 	body.add_child(collider)
 	add_child(body)
+
+
+## The trackside dressing. Issue #182.
+##
+## Placement is `TrackScatter`'s and every object is a function of the file, so a
+## corner that moves takes its trees with it. Nothing here carries a collider —
+## that argument is in `TrackScatter`'s header and in this script's own.
+func _build_scatter() -> void:
+	if not Cmdline.as_bool(_args, "scatter", true):
+		return
+	if _terrain == null:
+		# Without the height field there is nothing to stand a prop on: the flat
+		# slab is up to 12.05 m below the road, so scatter placed at road level
+		# floats and scatter placed on the slab is buried under the run-off.
+		push_warning("--scatter needs --terrain; nothing placed")
+		return
+	var started := Time.get_ticks_usec()
+	_scatter = TrackScatter.new()
+	_scatter.generate(_track, _corridor, _terrain)
+	_scatter.build(self)
+	_build_ms["scatter"] = (Time.get_ticks_usec() - started) / 1000.0
+
+
+## The baked lightmap, if one has been made and if it is asked for. Issue #182.
+##
+## **Default off, and that is a measurement rather than caution.** The bake itself
+## works — `tools/bake/bake.sh --scene=res://scenes/game/valdirone_bake.tscn`
+## produces it in 38 s and the static geometry renders correctly from it. What
+## does not work is putting anything that *moves* in the same scene: a dynamic
+## object takes its indirect light from the `.lmbake`'s probe field, that field is
+## stored as unnormalized physical radiance, and under physical light units it
+## arrives about four orders of magnitude too bright. Every kart, and all 5,187
+## scatter instances, render clipped to white.
+##
+## `LightmapGI.camera_attributes` is the only lever on baked exposure and it does
+## not reach the probes: baking with it set moved the *texture* path (the far band
+## at the reference camera from 96.0 to 126.6 mean channel value) and left the
+## probe path **byte-identical** at 253.9. So no setting of it makes both paths
+## right. `docs/adr_pending_182.md` has the full table.
+##
+## The node is created here rather than sitting in `valdirone.tscn` because the
+## data is loaded rather than referenced: an `ext_resource` to a `.lmbake` would
+## make the scene fail to load on a checkout where nobody has run the bake, which
+## is the same argument the scene file already makes about the two `.glb` files.
+##
+## **Sky ambient goes off when the lightmap goes on**, and that is ADR-0022 rather
+## than a look choice: the bake already contains the sky, so leaving
+## `AMBIENT_SOURCE_SKY` on counts it once in the lightmap and once live. It is the
+## third of the four ambient double-counts this project has found and the only one
+## that arrives with a lightmap. `LookEnv` is not changed — every scene without a
+## lightmap still wants sky ambient, and this is the only scene with one.
+func _build_lightmap() -> void:
+	if Cmdline.as_string(_args, "gi", "none") != "baked":
+		return
+	if not ResourceLoader.exists(LIGHTMAP_PATH):
+		# Not a warning. A checkout that has never run the bake is the normal case,
+		# and the scene is complete without it.
+		return
+	var data := load(LIGHTMAP_PATH) as LightmapGIData
+	if data == null:
+		push_warning("%s did not load as LightmapGIData" % LIGHTMAP_PATH)
+		return
+	# **Before the node is added, and it is the fifth ambient double-count.**
+	#
+	# `LightmapGI` binds its data to a mesh by node path and does not care what
+	# that mesh's `gi_mode` is. `GI_MODE_DYNAMIC` — the default, and what the
+	# glTF importer leaves on the track mesh at `light_baking=1` — means "take
+	# indirect light from probes", and the `.lmbake` carries probe data. So a mesh
+	# on the default gets the baked lightmap *and* the probe field that was baked
+	# from the same light, and the two add. Measured on the ground at this camera:
+	# 226.1/255 with `GI_MODE_DYNAMIC` against 38.4 unlit, where the same lightmap
+	# in `valdirone_bake.tscn` — which sets the mode — renders 64.1. Blown to
+	# white, from one property nobody set.
+	#
+	# CLAUDE.md's lighting note predicts a fifth of these and says to assume it.
+	# This is it, and it is the first one that only appears when a bake exists.
+	for node in _static_lit_meshes():
+		node.gi_mode = GeometryInstance3D.GI_MODE_STATIC
+
+	# **The scatter's GI is switched off when a lightmap is present, and the
+	# measurement that forced it is worth keeping.**
+	#
+	# `MultiMeshInstance3D` cannot be baked, so the scatter is `GI_MODE_DYNAMIC`
+	# and takes its indirect light from the `.lmbake`'s probe field — which is what
+	# probes are for and is the arrangement `docs/adr_pending_182.md` argues for.
+	# Rendered, it blows the whole frame to white. Measured at this camera, mean
+	# channel value over the near-ground third: 46.8 with no lightmap, 53.8 with
+	# the lightmap and no scatter, and **210.6** with both. The far band goes from
+	# 89.1 to 253.9, which is clipped. Turning off the reflection probe changes
+	# none of those three numbers, so it is not that; removing the scatter fixes
+	# all of them, so it is the scatter.
+	#
+	# `GI_MODE_DISABLED` is a stop, not the fix — it costs the foliage its bounce
+	# light, so a tree in the shade is lit by nothing. The real answer is either
+	# the probe scaling or dropping the `MultiMesh`, and both are more than this
+	# ticket. `--scatter-gi=probes` reproduces the failure.
+	var scatter_root := get_node_or_null("Scatter")
+	if scatter_root != null and Cmdline.as_string(_args, "scatter-gi", "off") == "off":
+		for node in scatter_root.get_children():
+			(node as GeometryInstance3D).gi_mode = GeometryInstance3D.GI_MODE_DISABLED
+
+	var lightmap := LightmapGI.new()
+	lightmap.name = "LightmapGI"
+	lightmap.light_data = data
+	add_child(lightmap)
+	_lightmap_users = data.get_user_count()
+
+	var world_environment := get_node_or_null("WorldEnvironment") as WorldEnvironment
+	if world_environment != null:
+		world_environment.environment.ambient_light_source = Environment.AMBIENT_SOURCE_DISABLED
+
+
+## Exactly the meshes the `.lmbake` names as its users: the ground and the
+## generated track. **Not the scatter** — it is `MultiMeshInstance3D`, which the
+## baker never saw, so it stays `GI_MODE_DYNAMIC` and takes its indirect light
+## from the lightmap's probes. That is the intended arrangement, not an omission.
+func _static_lit_meshes() -> Array[MeshInstance3D]:
+	var found: Array[MeshInstance3D] = []
+	var ground := get_node_or_null("GroundVisual") as MeshInstance3D
+	if ground != null:
+		found.append(ground)
+	var mesh := get_node_or_null("TrackMesh")
+	if mesh != null:
+		for node in mesh.find_children("*", "MeshInstance3D", true, false):
+			found.append(node as MeshInstance3D)
+	return found
 
 
 ## The circuit: colliders from `KartTrack`, mesh from `gentrack.py`.
@@ -597,6 +797,34 @@ func _report() -> void:
 	for surface_name in _triangles:
 		parts.append("%s %d" % [surface_name, _triangles[surface_name]])
 	print("  collision triangles: %s" % ", ".join(parts))
+	if _lightmap_users > 0:
+		var modes := PackedStringArray()
+		for node in _static_lit_meshes():
+			modes.append("%s gi=%d" % [node.name, node.gi_mode])
+		print("  lightmap: %d meshes lit, sky ambient off — %s" % [
+			_lightmap_users, ", ".join(modes),
+		])
+	else:
+		print("  lightmap: off — real-time GI, sky ambient on. --gi=baked to try it; "
+			+ "issue #182 has why it is not the default")
+	if _terrain != null:
+		print("  terrain %d verts, %d tris, worst step %.3f m, built in %.0f ms" % [
+			_terrain.vertex_count(), _terrain.triangle_count(),
+			_terrain.roughness(), _build_ms.get("terrain", 0.0),
+		])
+	# The digest is the determinism claim, and it is printed on every launch rather
+	# than kept in a gate: two runs of the same command that disagree here have
+	# placed different scatter, and that is visible without running anything else.
+	# `tools/verify/scatter_probe.gd` is the version that compares whole transforms.
+	if _scatter != null:
+		var counted := PackedStringArray()
+		var placement: Dictionary = _scatter.placement()
+		for key in placement:
+			counted.append("%s %d" % [key, (placement[key] as Array).size()])
+		print("  scatter %d objects (%s)" % [_scatter.total(), ", ".join(counted)])
+		print("  scatter %d triangles over 7 MultiMesh draws, digest %s, placed in %.0f ms" % [
+			_scatter.triangle_count(), _scatter.digest(), _build_ms.get("scatter", 0.0),
+		])
 	print("  sector marks %s   %d checkpoints   %d grid slots" % [
 		_track.sector_marks(), _track.checkpoints().size(), _track.grid_count(),
 	])

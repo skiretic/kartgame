@@ -2271,15 +2271,31 @@ no logo, no copy of the chrome, and not the FIA's exact navy/green pair.
     was present by 2024 at the latest. The 2023 text itself remains
     unreachable, which no longer matters.
 
+### The outdoor paddock — swept 2026-07-28
+
+| Ref | Subject | Source |
+| --- | --- | --- |
+| F9 | **A club paddock lane, outdoors** — the module list in one photograph: camper with roll-out awning, row of white 3×3 pop-up gazebos, panel vans between them, kart on a stand under canvas, folding camp chairs, ground tarps over grass and gravel, paved lane in front, tree line behind | Flickr via Openverse (`65517846@N03/13629851635`), CC BY-SA 2.0. `refs/frontend/01_paddock_rows.jpg` |
+| F10 | **Pit apron furniture** — red/white interlocking plastic barriers, a timing display board on a pole, a marshal/timing hut, signage gantry, painted lines on the apron, catch fencing | Flickr via Openverse (`8363794@N07/2628157903`), CC BY-**NC** 2.0 — **reference only**. `refs/frontend/05_pit_apron.jpg` |
+| F11 | **A kart being worked on in a paddock** — nose fairing removed and leaning on the ground, tech-inspection sticker, battery on the seat, coarse weathered asphalt | Flickr via Openverse (`40182362@N02/12615399535`), CC BY-**NC**-SA 2.0 — **reference only**. `refs/frontend/06_kart_stand.jpg` |
+| F12 | **A temporary-circuit paddock row** — box trailers and campers in a line behind barrier fencing with sponsor banners | Wikimedia Commons, *2017 Montevideo Karting GP - 17*, CC BY-SA 4.0. `refs/frontend/10_paddock_trailers.jpg` |
+
+Nine further sweep candidates, with licenses and the dead-query list so the
+search is not repeated, are recorded in `refs/frontend/sweep_manifest.txt`.
+
+13. **The outdoor paddock is campsite-vernacular, not garage-vernacular**
+    (F9). The permanent structures are the track's; everything a team brings
+    folds: pop-up gazebos, roll-out camper awnings, folding chairs, ground
+    tarps. Ground is three materials meeting — paved lane, gravel, worn grass
+    — and the tents stand on the unpaved part. This is the fact that makes a
+    generated paddock read as occupied rather than built.
+
 ### What could not be sourced, yet
 
-1. **An outdoor paddock wide shot** — awning exteriors, trailers, the ground
-   between teams. F1 covers one tent's interior only. Openverse/Flickr CC is
-   the next pool to sweep, per the HUD section's finding that Commons is thin
-   on karting.
-2. **Race-control signage and the light-panel standard in use.** The standard
+1. **Race-control signage and the light-panel standard in use.** The standard
    document is linked from the circuit-regulations pass; a photograph of the
-   panels lit at a kart race is not in hand.
+   panels lit at a kart race is not in hand. F10's timing board and hut are
+   the nearest sourced cousins.
 3. ~~The panel yellow's measured value.~~ **Sampled from F3/F4**: median of
    yellow-masked pixels reads `rgb(202,175,51)` on F3's shaded side panel,
    `rgb(240,205,96)` on its sunlit nose panel, and `rgb(215,195,84)` on F4's
