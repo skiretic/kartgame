@@ -80,6 +80,29 @@ GRID_COLUMN_OFFSET_M = 3.0
 GRID_FRONT_ROW_SETBACK_M = 4.0
 BANKING_TRANSITION_M = 20.0
 CHECKPOINT_MAX_SPACING_M = 100.0
+#: Clear ground between the track's asphalt edge and the pit lane's, meters. Ours,
+#: and the derivation is in the header: art 7.5's 1.80 m of mandatory verge, which
+#: the pit lane may not eat, plus a kart's own 1.400 m so that a kart sitting
+#: sideways on its verge is still short of the lane.
+PIT_LANE_SEPARATION_M = 1.80 + KART_WIDTH_M
+
+#: The pit lane's own figures. The width is the design's 3.5 m and it is inside
+#: art 7.4's sourced 3-4 m band; the two branch angles are the design's 22 deg and
+#: 16 deg and both are inside art 7.2's sourced 30 deg cap. `pit_geometry` derives
+#: everything else, because the taper length is `separation / tan(angle)` and an
+#: authored taper is a second place for the angle to be wrong.
+PIT_LANE_WIDTH_M = 3.5
+PIT_ENTRY_ANGLE_DEG = 22.0
+PIT_EXIT_ANGLE_DEG = 16.0
+PIT_ENTRY_M = 1305.0
+PIT_EXIT_M = 62.0
+
+#: How far past the outermost gore the parallel run continues, meters. Not a
+#: design figure: it is there so the lane's authored ends cannot land a rounding
+#: unit *inside* a gore's own end and fail the containment rule, and so the ribbon
+#: does not stop dead on a gore's last vertex. The lane really continues into the
+#: servicing park, which is Appendix 9's and is not modelled.
+PIT_LANE_OVERRUN_M = 0.5
 
 #: How far apart two control points may be before one is inserted between them,
 #: meters. Nothing needs it for correctness - the arcs are exact and the elevation
@@ -763,6 +786,111 @@ def build_spline(design, geometry, widths, crowns, banks, elevation) -> list[dic
     return points
 
 
+def pit_side_for(direction: str, corners: dict, total: float) -> str:
+    """Which edge this layout's two junctions leave from, derived rather than typed.
+
+    Part I art 7.2: the deceleration and exit lanes must be placed *"in such a way
+    that there may be no crossing between the lines of karts that are on the track
+    and those of karts that enter the Repairs Area or leave it."* A kart on the
+    line tracks out to the **outside** of the corner it has just left and sets up
+    on the outside of the corner it is about to enter, so the free edge at a
+    junction is that corner's own **inside** - which is its hand.
+
+    Derived here and checked again in `src/core/track.h`, because this is the whole
+    reason the two layouts cannot share one pair of stubs: forward, T8b and T1 are
+    both lefts and both junctions go left; reversed they are both rights and both
+    go right, which is **the same physical edge**. A design whose two junctions
+    disagree is a design that needs re-authoring, and this raises rather than
+    picks one.
+    """
+    forward = direction == "forward"
+
+    def station(forward_distance: float) -> float:
+        return forward_distance % total if forward else (total - forward_distance) % total
+
+    def hand_of(corner) -> str:
+        hand = corner["hand"]
+        return hand if forward else ("right" if hand == "left" else "left")
+
+    left_before = min(
+        corners.values(),
+        key=lambda c: (station(PIT_ENTRY_M)
+                       - station(c["from_m"] if not forward else c["to_m"])) % total,
+    )
+    entered_after = min(
+        corners.values(),
+        key=lambda c: (station(c["to_m"] if not forward else c["from_m"])
+                       - station(PIT_EXIT_M)) % total,
+    )
+    entry_side = hand_of(left_before)
+    exit_side = hand_of(entered_after)
+    if entry_side != exit_side:
+        raise SystemExit(
+            "author_track: the %s layout leaves the track on the %s at %.1f m and "
+            "rejoins on the %s at %.1f m. Two edges is two pit lanes; art 7.2's "
+            "no-crossing rule wants the inside of %s and of %s and they disagree."
+            % (direction, entry_side, PIT_ENTRY_M, exit_side, PIT_EXIT_M,
+               left_before["name"], entered_after["name"])
+        )
+    return entry_side
+
+
+def pit_geometry(corners: dict, total: float) -> dict:
+    """The shared parallel run, from the four gores it has to reach.
+
+    The band is **derived and not authored** because it has exactly one job: cover
+    every junction and every gore end. An authored span is a second number that can
+    drift away from the angles, and the failure it produces is a wedge of asphalt
+    leading to grass.
+
+    A gore's length is `separation / tan(angle)`, so the eight stations are the four
+    junctions and the four outboard ends. The minimal arc covering eight points on a
+    circle is the complement of the **largest gap** between two cyclically adjacent
+    ones, which is 1,234.9 m of open circuit here and leaves a 140.2 m lane.
+    """
+    stations: list[float] = []
+    for direction in ("forward", "reverse"):
+        forward = direction == "forward"
+        sign = 1.0 if forward else -1.0
+        for station_m, angle, opening in (
+            (PIT_ENTRY_M, PIT_ENTRY_ANGLE_DEG, 1.0),
+            (PIT_EXIT_M, PIT_EXIT_ANGLE_DEG, -1.0),
+        ):
+            junction = (station_m if forward else total - station_m) % total
+            taper = PIT_LANE_SEPARATION_M / math.tan(math.radians(angle))
+            stations.append(junction)
+            stations.append((junction + opening * sign * taper) % total)
+    stations.sort()
+
+    widest = 0.0
+    after = 0
+    for index in range(len(stations)):
+        following = (index + 1) % len(stations)
+        gap = (stations[following] - stations[index]) % total
+        if gap > widest:
+            widest = gap
+            after = following
+    start = (stations[after] - PIT_LANE_OVERRUN_M) % total
+    end = (stations[after - 1] + PIT_LANE_OVERRUN_M) % total
+    return {
+        # Forward-frame side, the same convention `surfaces[].side` uses. Both
+        # layouts' junctions land here or the loader refuses the file.
+        "side": pit_side_for("forward", corners, total),
+        "from_m": round(start, PLACES),
+        "to_m": round(end, PLACES),
+        "width_m": PIT_LANE_WIDTH_M,
+        "separation_m": round(PIT_LANE_SEPARATION_M, PLACES),
+        "note": (
+            "One piece of asphalt, both layouts. The circuit turns -360 deg net, so "
+            "the inside of the loop is the left of forward travel and is the right "
+            "of reverse travel - the same edge. Width is art 7.4's 3-4 m; the 3.20 m "
+            "separation is ours, being art 7.5's 1.80 m verge plus a kart's 1.400 m. "
+            "Art 7.4 also requires a chicane at the entry to the deceleration lane "
+            "and gives no geometry for one, so none is built. Issue #184."
+        ),
+    }
+
+
 def build_layout(name, direction, design, geometry, corners, elevation, sector_marks) -> dict:
     total = geometry.total
     forward = direction == "forward"
@@ -837,9 +965,24 @@ def build_layout(name, direction, design, geometry, corners, elevation, sector_m
             "pole_note": "Pole takes the inside of the first corner: %s. The design measures that at 13.0 km/h of corner ceiling forward." % first_corner_hand,
             "positions": slots,
         },
-        "pit_entry_m": 1305.0,
-        "pit_exit_m": 62.0,
-        "pit_note": "Stations only. A deceleration lane at 20 deg to the direction of travel is a 160 deg merge driven the other way, over Part I art 7.4's 30 deg cap, so each layout needs its own stubs and no pit-lane asphalt is generated yet. Issue #181.",
+        "pit_entry_m": PIT_ENTRY_M,
+        "pit_exit_m": PIT_EXIT_M,
+        "pit": {
+            # In THIS layout's frame. Forward reads "left" and reverse reads
+            # "right" and they name the same edge of the same road, which is the
+            # whole point: a 22 deg branch is a 158 deg merge driven the other way,
+            # over art 7.2's 30 deg cap, so the two layouts need their own gores
+            # even though they share the lane those gores feed.
+            "side": pit_side_for(direction, corners, total),
+            "entry_angle_deg": PIT_ENTRY_ANGLE_DEG,
+            "exit_angle_deg": PIT_EXIT_ANGLE_DEG,
+        },
+        "pit_note": "The gore length is derived, not authored: separation / tan(angle), so %.2f m at %.0f deg in and %.2f m at %.0f deg out. Art 7.2 caps the angle at 30 deg and art 7.4 the lane width at 3-4 m; the 3.20 m separation is ours. Issue #181, ADR-0053." % (
+            PIT_LANE_SEPARATION_M / math.tan(math.radians(PIT_ENTRY_ANGLE_DEG)),
+            PIT_ENTRY_ANGLE_DEG,
+            PIT_LANE_SEPARATION_M / math.tan(math.radians(PIT_EXIT_ANGLE_DEG)),
+            PIT_EXIT_ANGLE_DEG,
+        ),
         "racing_line_seed": seed,
         "corner_speeds_kmh": speeds,
         "vertical_curve_speeds_kmh": curve_speeds,
@@ -916,6 +1059,7 @@ def author(design: dict, stem: str) -> tuple[dict, dict]:
                 "span_m": 12.0,
                 "note": "Design's figures, quoted from Part I art 7.7: 10-15 m ahead of the front row, 2.5-3.5 m above the track.",
             },
+            "pit_lane": pit_geometry(corners, geometry.total),
         },
         "layouts": [
             build_layout("forward", "forward", design, geometry, corners, elevation, forward_marks),

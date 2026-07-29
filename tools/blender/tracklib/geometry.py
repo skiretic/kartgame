@@ -91,6 +91,7 @@ class Track:
         self.surfaces = self.raw.get("surfaces", [])
         self.layouts = self.raw.get("layouts", [])
         self.starts = [float(p["distance_m"]) for p in self.points]
+        self.pit_lane = self.raw.get("furniture", {}).get("pit_lane")
 
     # --- geometry ---------------------------------------------------------
 
@@ -202,6 +203,75 @@ class Track:
         closing = self.sample(0.0)
         closing.distance_m = self.length_m
         out.append(closing)
+        return out
+
+    # --- the pit lane -----------------------------------------------------
+    #
+    # The second implementation of `docs/TRACK_SCHEMA.md`'s "Pit geometry, in
+    # arithmetic"; `src/core/track.h`'s `pit_stubs` is the first. They share no
+    # code and `circuit.sh --case=pit` measures them against each other, which is
+    # the only reason the two can be trusted to draw one road.
+
+    def signed_gap(self, a: float, b: float) -> float:
+        """The shortest signed arc from `a` to `b`, positive forward.
+
+        Subtraction is wrong here and quietly: one of Valdirone's four gores sits
+        eleven meters the far side of the start line, and `b - a` there is -1,364 m,
+        which runs the taper backwards round the whole circuit.
+        """
+        gap = (b - a) % self.length_m
+        if gap > self.length_m * 0.5:
+            gap -= self.length_m
+        return gap
+
+    def pit_stubs(self) -> list[dict]:
+        """Every junction, in the forward frame, in layout order.
+
+        The taper length is derived and not authored - the regulated quantity is
+        the **angle** (Part I art 7.2 caps it at 30 deg), so the gore is
+        `separation / tan(angle)` long and a design that wants a longer one branches
+        more shallowly. `sign` is how a forward station moves as the layout's own
+        station increases and is the only place the direction enters.
+        """
+        if not self.pit_lane:
+            return []
+        separation = float(self.pit_lane["separation_m"])
+        out = []
+        for layout in self.layouts:
+            pit = layout.get("pit")
+            if not pit:
+                continue
+            reversed_ = layout.get("direction") == "reverse"
+            sign = -1.0 if reversed_ else 1.0
+            # The layout's own frame becomes the forward frame here and nowhere
+            # else: "left" in the reverse layout is the right of forward travel,
+            # which is how both layouts name the same edge.
+            hand = (-1.0 if pit["side"] == "left" else 1.0) * sign
+            for is_entry, key, angle_key in (
+                (True, "pit_entry_m", "entry_angle_deg"),
+                (False, "pit_exit_m", "exit_angle_deg"),
+            ):
+                station = float(layout.get(key, -1.0))
+                angle = float(pit.get(angle_key, 0.0))
+                if station < 0.0 or angle <= 0.0:
+                    continue
+                junction = (self.length_m - station if reversed_ else station) % self.length_m
+                taper = separation / math.tan(math.radians(angle))
+                out.append(
+                    {
+                        "layout": layout.get("name", ""),
+                        "is_entry": is_entry,
+                        "junction_m": junction,
+                        # An entry gore opens ahead of its junction and an exit gore
+                        # closes into it, so the two run opposite ways along the lap -
+                        # and both flip again when the layout does.
+                        "outboard_m": (junction + (1.0 if is_entry else -1.0) * sign * taper)
+                        % self.length_m,
+                        "angle_deg": angle,
+                        "separation_m": separation,
+                        "hand": hand,
+                    }
+                )
         return out
 
     # --- surfaces ---------------------------------------------------------

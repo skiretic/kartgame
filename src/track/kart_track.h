@@ -116,6 +116,17 @@ public:
 	godot::Dictionary corner(int p_index) const;
 	godot::Dictionary measurements() const;
 
+	// --- the pit lane -----------------------------------------------------
+	//
+	// Both in **forward** stations, not in the selected layout's, and deliberately:
+	// there is one pit lane and there are four junctions, and all five exist on the
+	// ground whichever way the circuit is being driven. A caller that wants the
+	// selected layout's own stations has `to_station` for that; a caller that wants
+	// to know whether a kart is in the pits asks the station and not the surface,
+	// because pit asphalt is asphalt.
+	godot::Dictionary pit_lane() const;
+	godot::TypedArray<godot::Dictionary> pit_stubs() const;
+
 	// --- collision --------------------------------------------------------
 
 	// One entry per surface type: `{name, surface_type, faces}`. See the class

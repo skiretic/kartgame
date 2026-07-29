@@ -1605,6 +1605,14 @@
    "height_m": 3.0,
    "span_m": 12.0,
    "note": "Design's figures, quoted from Part I art 7.7: 10-15 m ahead of the front row, 2.5-3.5 m above the track."
+  },
+  "pit_lane": {
+   "side": "left",
+   "from_m": 1304.5,
+   "to_m": 70.619417,
+   "width_m": 3.5,
+   "separation_m": 3.2,
+   "note": "One piece of asphalt, both layouts. The circuit turns -360 deg net, so the inside of the loop is the left of forward travel and is the right of reverse travel - the same edge. Width is art 7.4's 3-4 m; the 3.20 m separation is ours, being art 7.5's 1.80 m verge plus a kart's 1.400 m. Art 7.4 also requires a chicane at the entry to the deceleration lane and gives no geometry for one, so none is built. Issue #184."
   }
  },
  "layouts": [
@@ -1680,7 +1688,12 @@
    },
    "pit_entry_m": 1305.0,
    "pit_exit_m": 62.0,
-   "pit_note": "Stations only. A deceleration lane at 20 deg to the direction of travel is a 160 deg merge driven the other way, over Part I art 7.4's 30 deg cap, so each layout needs its own stubs and no pit-lane asphalt is generated yet. Issue #181.",
+   "pit": {
+    "side": "left",
+    "entry_angle_deg": 22.0,
+    "exit_angle_deg": 16.0
+   },
+   "pit_note": "The gore length is derived, not authored: separation / tan(angle), so 7.92 m at 22 deg in and 11.16 m at 16 deg out. Art 7.2 caps the angle at 30 deg and art 7.4 the lane width at 3-4 m; the 3.20 m separation is ours. Issue #181, ADR-0053.",
    "racing_line_seed": [
     {
      "at_m": 87.998899,
@@ -1900,7 +1913,12 @@
    },
    "pit_entry_m": 1305.0,
    "pit_exit_m": 62.0,
-   "pit_note": "Stations only. A deceleration lane at 20 deg to the direction of travel is a 160 deg merge driven the other way, over Part I art 7.4's 30 deg cap, so each layout needs its own stubs and no pit-lane asphalt is generated yet. Issue #181.",
+   "pit": {
+    "side": "right",
+    "entry_angle_deg": 22.0,
+    "exit_angle_deg": 16.0
+   },
+   "pit_note": "The gore length is derived, not authored: separation / tan(angle), so 7.92 m at 22 deg in and 11.16 m at 16 deg out. Art 7.2 caps the angle at 30 deg and art 7.4 the lane width at 3-4 m; the 3.20 m separation is ours. Issue #181, ADR-0053.",
    "racing_line_seed": [
     {
      "at_m": 76.998899,

@@ -18,7 +18,9 @@ other reader and builds the collider; this one builds the mesh. They share no co
 - one is C++ inside the engine and the other is Python inside Blender - so what
 keeps them honest is `docs/TRACK_SCHEMA.md` stating the interpolation rules in
 arithmetic, and `--manifest` writing out sampled edge points that
-`tools/verify/circuit.sh` compares against the collider's own.
+`tools/verify/circuit.sh` compares against the collider's own — twice over, because
+the centerline rows cannot see the pit lane at all and `--manifest` writes a second
+set for it. ADR-0053.
 
 **That check is the point.** "Cannot drift apart" is a claim about a pipeline, and
 a claim about a pipeline with nothing measuring it is a comment.
@@ -53,6 +55,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import os
 import sys
 
@@ -114,6 +117,7 @@ def build_strips(track: geometry.Track) -> list[surfaces.Strip]:
         surfaces.build_start_line(track, LIGHTMAP_ROWS),
         surfaces.build_kerbs(track, line, LIGHTMAP_ROWS),
         surfaces.build_verge(track, line, LIGHTMAP_ROWS),
+        surfaces.build_pit(track, LIGHTMAP_ROWS, MAX_SPACING),
         apron,
         gravel,
         barrier,
@@ -255,6 +259,52 @@ def write_manifest(track, strips, gltf_path: str, manifest_path: str) -> dict:
         )
         station += 25.0
 
+    # The pit lane's own cross-check rows, and they exist for the same reason the
+    # road's do. `edges` samples the *centerline's* cross-section, which the pit
+    # asphalt is not on: a collider that built the lane at the wrong separation, on
+    # the wrong edge, or with the gores tapering the wrong way would agree with
+    # `edges` at every one of its 55 stations and be a different piece of road.
+    #
+    # Every 5 m along the parallel run, plus each gore's junction, midpoint and
+    # outboard end - the three stations where a taper's arithmetic can be wrong in
+    # three different ways.
+    pit_edges = []
+    if track.pit_lane:
+        lane = track.pit_lane
+        lane_hand = -1.0 if lane["side"] == "left" else 1.0
+        separation = float(lane["separation_m"])
+        lane_width = float(lane["width_m"])
+        from_m = float(lane["from_m"])
+        run = (float(lane["to_m"]) - from_m) % track.length_m
+        cells = max(1, int(math.ceil(run / 5.0)))
+        for cell in range(cells + 1):
+            frame = track.sample(from_m + run * cell / cells)
+            inner = lane_hand * (frame.width_m * 0.5 + separation)
+            pit_edges.append(
+                {
+                    "kind": "lane",
+                    "distance_m": round(frame.distance_m, 6),
+                    "inner": [round(v, 6) for v in frame.surface_point(inner)],
+                    "outer": [round(v, 6) for v in frame.surface_point(
+                        inner + lane_hand * lane_width)],
+                }
+            )
+        for stub in track.pit_stubs():
+            reach = track.signed_gap(stub["junction_m"], stub["outboard_m"])
+            for fraction in (0.0, 0.5, 1.0):
+                frame = track.sample(stub["junction_m"] + reach * fraction)
+                edge = stub["hand"] * frame.width_m * 0.5
+                pit_edges.append(
+                    {
+                        "kind": "%s_%s" % (stub["layout"],
+                                           "entry" if stub["is_entry"] else "exit"),
+                        "distance_m": round(frame.distance_m, 6),
+                        "inner": [round(v, 6) for v in frame.surface_point(edge)],
+                        "outer": [round(v, 6) for v in frame.surface_point(
+                            edge + stub["hand"] * separation * fraction)],
+                    }
+                )
+
     manifest = {
         "generator": "tools/blender/gentrack.py",
         "track": os.path.relpath(track.path, project_root()),
@@ -280,6 +330,7 @@ def write_manifest(track, strips, gltf_path: str, manifest_path: str) -> dict:
         # runs as differing - correctly, because a wall-clock number cannot be
         # reproducible.
         "edges": edges,
+        "pit_edges": pit_edges,
     }
     os.makedirs(os.path.dirname(os.path.abspath(manifest_path)), exist_ok=True)
     with open(manifest_path, "w", encoding="utf-8") as handle:

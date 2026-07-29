@@ -439,7 +439,7 @@ Effort: M
 - [x] First fictional circuit built to §11 constraints — **Valdirone Nuova**, 1,375.12 m, 8 corners, 12.55 m of elevation (#63). Designed and adversarially verified under `docs/circuits/`, authored into the schema by `tools/circuits/author_track.py`
 - [x] Validation: closed loop, no self-intersection, no radius the kart physically cannot take — twenty rules, part of `load` rather than a later pass, and `load` **refuses**
 - [ ] Triplanar detail blending on the surface material
-- [ ] Pit-lane asphalt. The stations are in the file and the geometry is not: reversed, a deceleration lane at 20° is a 160° merge over Part I art 7.4's 30° cap, so each layout needs its own stubs
+- [x] Pit-lane asphalt, both layouts (#181). The stations were in the file and the geometry was not: reversed, a deceleration lane at 20° is a 160° merge over Part I **§7.2**'s 30° cap, so each layout needs its own stubs. One shared lane plus four per-layout gores; six new validator rules; `circuit.sh --case=pit` measures both gores against closed form and the collider against the mesh at **0.0005 mm**, and carries two negative controls — an illegal 40° merge and a stub on the wrong edge, both refused. The cap is **§7.2**, not §7.4: five places in this repo said 7.4, all tracing to one planning-session sentence. §7.4 is the 3–4 m lane width and the required entry chicane
 
 **Accept:** a track authored in `track.json` is driveable end to end with correct collision, materials, scatter, and a clean lightmap bake. Visual mesh and collision agree everywhere. Validation rejects a deliberately self-intersecting spline.
 

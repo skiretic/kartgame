@@ -186,6 +186,40 @@ inline constexpr double GRAVEL_BED_MIN_DEPTH_M = 0.30;
 // why `track.json` carries a corner list at all.
 inline constexpr double RUNOFF_MANDATORY_OVER_DEG = 80.0;
 
+// --- The pit lane ---------------------------------------------------------
+//
+// **The merge cap is in §7.2 and not in §7.4**, and this project cited it as 7.4
+// in five places before the text was read line by line. §7.2's *Characteristics*
+// block, immediately before the edge-line sentence this file already quotes:
+// *"The angle of the deceleration lane and of the pit exit lane relative to the
+// track must not exceed 30 deg."*
+//
+// The same block carries the rule the *side* of a junction has to satisfy, and it
+// is a geometry rule rather than a caption: *"intersections of deceleration and
+// exit lanes relating to the track must be located in such a way that there may be
+// no crossing between the lines of karts that are on the track and those of karts
+// that enter the Repairs Area or leave it."* A kart on the line tracks out to the
+// **outside** of the corner it is leaving and sets up on the outside of the corner
+// it is entering, so the edge that is free at a junction is the corner's own
+// **inside**, and `track.h` checks a stub's side against exactly that.
+inline constexpr double PIT_MERGE_MAX_DEG = 30.0;
+
+// §7.4, *Servicing Parks and Parc Ferme*: *"The width of the deceleration lane
+// must be between 3 m and 4 m."* That is the only pit dimension anywhere in the
+// text - the lane's own width, its length, any speed-limit line and the servicing
+// park's plan are all in **Appendix No. 9**, which is not published (see the
+// `ours::` block below, and ADR-0050 for the identical hole under the grid).
+inline constexpr double PIT_LANE_WIDTH_MIN_M = 3.0;
+inline constexpr double PIT_LANE_WIDTH_MAX_M = 4.0;
+
+// Same article: *"There must be a chicane at the entry to the deceleration lane
+// aimed at reducing the speed of the karts."*
+//
+// A constant rather than a comment because it is a rule with **no geometry
+// attached anywhere in the text**, so the honest state of it is "required, not
+// built" rather than a chicane invented to fill the sentence. Issue #184.
+inline constexpr bool PIT_ENTRY_CHICANE_REQUIRED = true;
+
 // --- Paint ----------------------------------------------------------------
 
 // T1 §7.2: the track edges are delimited by white or yellow lines *"with a maximum
@@ -305,6 +339,28 @@ inline constexpr double GRID_MIN_TRACK_WIDTH_M = 2.0 * GRID_COLUMN_OFFSET_M + 1.
 // than overlapping the neighbouring ramp.
 inline constexpr double BANKING_TRANSITION_M = 20.0;
 inline constexpr bool BANKING_TRANSITION_SOURCED = false;
+
+// ## Clear ground between the track's asphalt and the pit lane's, meters
+//
+// The regulation gives the deceleration lane's *width* (3-4 m, §7.4) and the
+// *angle* it may leave at (30 deg, §7.2) and says nothing whatever about how far
+// from the track it then runs. The servicing-park plan that would say is
+// **Appendix No. 9**, referenced by §7.4 and not published - the same hole as the
+// grid's Appendix 10 in ADR-0050, probed again for this issue and still a 404 on
+// fiakarting.com. So this figure is ours.
+//
+// It is the sum of two sourced numbers and it is stated that way so a reader can
+// check it rather than take it: **§7.5's 1.80 m of mandatory verge, which the pit
+// lane may not eat, plus FIA Karting Art. 8.1.1's 1.400 m kart width**, so that a
+// kart which leaves the track sideways and lands squarely on its own verge is
+// still short of the pit lane's asphalt. 3.20 m.
+//
+// Consequence worth reading off: with the taper set by the branch angle, the
+// junction gore is `3.20 / tan(theta)` long - 7.92 m at 22 deg and 11.16 m at
+// 16 deg. Widen the separation and both gores lengthen proportionally, which is
+// the trade a real figure would settle.
+inline constexpr double PIT_LANE_SEPARATION_M = VERGE_MIN_WIDTH_M + 1.400;
+inline constexpr bool PIT_LANE_SEPARATION_SOURCED = false;
 
 // ## Checkpoint spacing, meters
 //

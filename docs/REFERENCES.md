@@ -2084,3 +2084,83 @@ looser one is the wrong one.
    The identical R = V²/K formula with the same K = 20 / K = 15 constants is
    long-standing in the FIA's circuit rules for cars, which was not fetched here —
    so "new in 2026" is a statement about the *karting* text only. INFERRED.
+
+---
+
+## The pit lane — issue #181, ROADMAP M5
+
+`track.json` carried `pit_entry_m` and `pit_exit_m` from the M5 pass and no
+asphalt. Issue #181 is that gap, and it needed four dimensions: the angle a lane
+may leave the track at, the lane's width, how far from the track it then runs, and
+whatever governs a taper. **Three of the four are in the text and the fourth is not
+in any published document.** T1 was re-fetched for this pass and its SHA-256 still
+matches the `6ade6bd1…8ac6193` recorded above, so the quotations below are off the
+same file the rest of this section is.
+
+**The 30° cap is in §7.2, not §7.4.** This matters because the project had it as
+7.4 in five places — `CLAUDE.md`, `scripts/game/circuit.gd`, `docs/TRACK_SCHEMA.md`,
+the design document and `track.json`'s own `pit_note` — all of them tracing back to
+one sentence in the design that was never checked against the article number. §7.2
+*Caractéristiques / Characteristics*, in the block that ends with the edge-line
+sentence this document already quotes:
+
+> Deceleration lane and exit lane: intersections of deceleration and exit lanes
+> relating to the track must be located in such a way that there may be no
+> crossing between the lines of karts that are on the track and those of karts
+> that enter the Repairs Area or leave it.
+>
+> The angle of the deceleration lane and of the pit exit lane relative to the
+> track **must not exceed 30°**.
+
+The first sentence is not a caption — it is a geometry rule, and it decides which
+*edge* a junction may go on. A kart tracks out to the **outside** of the corner it
+is leaving and sets up on the outside of the corner it is entering, so the free
+edge at a junction is that corner's own **inside**. That is a rule a validator can
+run, and `src/core/track.h` runs it: forward, Valdirone's T8b and T1 are both
+lefts and both junctions go left; reversed they are both rights and both go right,
+which is the same physical asphalt.
+
+**What §7.4 does say**, in *Parcs d'Assistance et Parc Fermé / Servicing Parks and
+Parc Fermé*:
+
+> There must be a chicane at the entry to the deceleration lane aimed at reducing
+> the speed of the karts.
+>
+> The width of the deceleration lane must be between **3 m and 4 m**.
+
+So the lane's width is sourced at 3–4 m — Valdirone's 3.5 m is the design's and is
+inside it — and a chicane is **required with no geometry attached anywhere in the
+text**: no length, no offset, no width. None is built, and
+`circuit::PIT_ENTRY_CHICANE_REQUIRED` records it as required-and-absent rather
+than inviting a fifth invented figure. Issue #184.
+
+**What could not be sourced, and it is the same hole as the grid's.** How far the
+pit lane runs from the track is not in Part I, Part II or Appendix 13. §7.4 refers
+the servicing park's whole plan — *"measurements, dimensions and facilities on the
+plan of Appendix 9"* — to **Appendix No. 9**, which is one of the three appendices
+[ADR-0050](DECISIONS.md#adr-0050--the-starting-grid-is-ours-and-it-is-namespaced-so-it-reads-that-way)
+already records as unpublished. It was probed again for this issue:
+`fiakarting.com/sites/default/files/…/Appendix%209%20-%20Servicing%20Parks.pdf`
+returns **404**, and the circuit-regulations page serves a 1,725-byte shell with no
+PDF links in it at all. Nor is there any speed-limit line, pit-lane length or
+taper-length figure anywhere in the two Parts — a full-text search for *"speed
+limit"*, *"limitation de vitesse"* and *"km/h"* over the 1,495-line extraction
+returns only the vertical-radius formula's own `V in km/h`.
+
+So the separation is **ours**, and it is a sum of two sourced numbers rather than
+a chosen one, the same contract ADR-0050's four grid figures are recorded under:
+
+| Term | Value | Source |
+| --- | --- | --- |
+| Mandatory verge the pit lane may not eat | 1.80 m | T1 §7.5 |
+| Kart width, so a kart sideways on its own verge is still short of the lane | 1.400 m | FIA Karting Art. 8.1.1 |
+| **`ours::PIT_LANE_SEPARATION_M`** | **3.20 m** | **ours**, `_SOURCED = false` |
+
+Read off the consequence rather than left as a number: with the taper length
+derived as `separation / tan(angle)`, the junction gore is **7.920 m** at the
+design's 22° entry and **11.160 m** at its 16° exit. A real Appendix 9 figure
+dropped in place of the 3.20 m lengthens both proportionally and changes nothing
+else, which is what a derivation is for.
+
+[ADR-0053](DECISIONS.md#adr-0053) is the decision and
+`tools/verify/circuit.sh --case=pit` is the gate.

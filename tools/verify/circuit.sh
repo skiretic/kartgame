@@ -13,10 +13,15 @@
 # *editor* import of a cold project dies, after .godot/ has been seeded, so the
 # second run is clean. Import twice, ignore the first exit code. ADR-0018.
 #
-# The gate includes a negative control. data/tracks/self_intersecting.track.json
+# The gate includes three negative controls. data/tracks/self_intersecting.track.json
 # is a circuit that closes, turns +360 degrees, is 1,105 m long and crosses
-# itself; if it LOADS, this script fails. A validator with nothing proving it can
-# say no is a validator nobody has tested.
+# itself; if it LOADS, this script fails. --case=pit builds two more at run time
+# out of one-field edits of the real circuit -- a merge angle over Part I art
+# 7.2's 30 degree cap, and a reverse pit stub moved onto the far edge -- and both
+# must be refused for the thing they break. A validator with nothing proving it
+# can say no is a validator nobody has tested.
+#
+#     --case=schema|measure|agree|layouts|timing|pit|place|all
 
 set -uo pipefail
 

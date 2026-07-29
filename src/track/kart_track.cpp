@@ -280,6 +280,20 @@ Error KartTrack::load(const String &p_path) {
 	const Dictionary start_line = furniture.get("start_line", Dictionary());
 	_track.start_line_m = number_of(start_line, "distance_m", 0.0);
 
+	// The pit lane's parallel run is furniture and not a layout's, because it is one
+	// piece of asphalt that both layouts branch onto - see `PitLane` in
+	// `core/track.h`. Its `side` is in the **forward** frame, the same convention
+	// `surfaces[].side` already uses, so that the file has one meaning of "left".
+	if (furniture.has("pit_lane")) {
+		const Dictionary lane = furniture["pit_lane"];
+		_track.pit_lane.declared = true;
+		_track.pit_lane.from_m = number_of(lane, "from_m", -1.0);
+		_track.pit_lane.to_m = number_of(lane, "to_m", -1.0);
+		_track.pit_lane.width_m = number_of(lane, "width_m", 0.0);
+		_track.pit_lane.separation_m = number_of(lane, "separation_m", 0.0);
+		_track.pit_lane.hand = side_from(text_of(lane, "side"));
+	}
+
 	const Array layouts = root.get("layouts", Array());
 	for (int index = 0; index < layouts.size(); ++index) {
 		const Dictionary entry = layouts[index];
@@ -318,6 +332,17 @@ Error KartTrack::load(const String &p_path) {
 		}
 		layout.pit_entry_m = number_of(entry, "pit_entry_m", -1.0);
 		layout.pit_exit_m = number_of(entry, "pit_exit_m", -1.0);
+		if (entry.has("pit")) {
+			const Dictionary pit = entry["pit"];
+			// `side` here is in the LAYOUT's own frame and the lane's is in the
+			// forward frame. That reads like a trap and is the point: Valdirone's
+			// forward layout says "left", its reverse layout says "right", and both
+			// name the same edge of the same road. A file that used one frame for both
+			// could not say that.
+			layout.pit_side = side_from(text_of(pit, "side"));
+			layout.pit_entry_angle_deg = number_of(pit, "entry_angle_deg", 0.0);
+			layout.pit_exit_angle_deg = number_of(pit, "exit_angle_deg", 0.0);
+		}
 		layout.estimated_lap_time_s = number_of(entry, "estimated_lap_time_s", 0.0);
 		_track.layouts.push_back(layout);
 	}
@@ -584,6 +609,42 @@ Dictionary KartTrack::corner(int p_index) const {
 	return out;
 }
 
+Dictionary KartTrack::pit_lane() const {
+	Dictionary out;
+	out["declared"] = _track.pit_lane.declared;
+	out["from"] = _track.pit_lane.from_m;
+	out["to"] = _track.pit_lane.to_m;
+	out["width"] = _track.pit_lane.width_m;
+	out["separation"] = _track.pit_lane.separation_m;
+	out["side"] = _track.pit_lane.hand == ct::SIDE_LEFT ? "left" : "right";
+	// The length of the parallel run, which is the number a pit-limiter zone would
+	// be timed against and the one figure here that is not in the file.
+	out["run"] = _track.pit_lane.declared
+			? _track.wrap(_track.pit_lane.to_m - _track.pit_lane.from_m)
+			: 0.0;
+	return out;
+}
+
+TypedArray<Dictionary> KartTrack::pit_stubs() const {
+	TypedArray<Dictionary> out;
+	for (const ct::PitStub &stub : _track.pit_stubs()) {
+		Dictionary entry;
+		entry["layout"] = String::utf8(stub.layout.c_str());
+		entry["is_entry"] = stub.is_entry;
+		entry["junction"] = stub.junction_m;
+		entry["outboard"] = stub.outboard_m;
+		entry["angle_deg"] = stub.angle_deg;
+		entry["separation"] = stub.separation_m;
+		entry["side"] = stub.hand == ct::SIDE_LEFT ? "left" : "right";
+		// Signed, so a consumer can see which way along the lap the gore opens
+		// without re-deriving the layout's direction. Negative means the gore runs
+		// back down the lap, which every reverse-layout entry does.
+		entry["reach"] = _track.signed_gap(stub.junction_m, stub.outboard_m);
+		out.push_back(entry);
+	}
+	return out;
+}
+
 Dictionary KartTrack::measurements() const {
 	Dictionary out;
 	double straight_at = 0.0;
@@ -649,6 +710,7 @@ TypedArray<Dictionary> KartTrack::surface_meshes(double p_sagitta, double p_max_
 	PackedVector3Array grass;
 	PackedVector3Array gravel;
 	PackedVector3Array barrier;
+	PackedVector3Array pit;
 
 	// The road. Three columns and not two, because a crown is a roof and a two-
 	// column quad would draw its two edges joined by a flat plane through the
@@ -819,6 +881,70 @@ TypedArray<Dictionary> KartTrack::surface_meshes(double p_sagitta, double p_max_
 		}
 	}
 
+	// The pit lane: one parallel band shared by both layouts, plus one gore per
+	// junction. `docs/TRACK_SCHEMA.md`'s "Pit geometry, in arithmetic" is the
+	// specification and `tools/blender/tracklib/surfaces.py` is the other
+	// implementation of it.
+	//
+	// Sampled on its own stations rather than off the shared polyline, and that is
+	// not an optimization: the polyline is subdivided to a chord tolerance, so its
+	// samples land wherever they land, and a gore whose tip is 0.6 m past its own
+	// junction is a wedge of asphalt starting in the middle of the verge. Stepping
+	// from the junction to the outboard station puts both ends exactly where the
+	// schema says, in both consumers, which is what makes `--case=agree` a
+	// measurement rather than a coincidence.
+	if (_track.pit_lane.declared) {
+		const double hand = static_cast<double>(_track.pit_lane.hand);
+		const double separation = _track.pit_lane.separation_m;
+		const double lane_width = _track.pit_lane.width_m;
+
+		const double run = _track.wrap(_track.pit_lane.to_m - _track.pit_lane.from_m);
+		int steps = static_cast<int>(std::ceil(run / p_max_spacing));
+		if (steps < 1) {
+			steps = 1;
+		}
+		for (int step = 0; step < steps; ++step) {
+			const ct::Frame near = _track.sample(
+					_track.pit_lane.from_m + run * step / steps);
+			const ct::Frame far = _track.sample(
+					_track.pit_lane.from_m + run * (step + 1) / steps);
+			const double near_in = hand * (near.width_m * 0.5 + separation);
+			const double far_in = hand * (far.width_m * 0.5 + separation);
+			add_quad(pit,
+					_surface_point(near, near_in, 0.0),
+					_surface_point(near, near_in + hand * lane_width, 0.0),
+					_surface_point(far, far_in + hand * lane_width, 0.0),
+					_surface_point(far, far_in, 0.0),
+					Vector3(0.0, 1.0, 0.0));
+		}
+
+		for (const ct::PitStub &stub : _track.pit_stubs()) {
+			const double reach = _track.signed_gap(stub.junction_m, stub.outboard_m);
+			int gore_steps = static_cast<int>(std::ceil(std::fabs(reach) / p_max_spacing));
+			if (gore_steps < 1) {
+				gore_steps = 1;
+			}
+			const double gore_hand = static_cast<double>(stub.hand);
+			for (int step = 0; step < gore_steps; ++step) {
+				const double near_t = static_cast<double>(step) / gore_steps;
+				const double far_t = static_cast<double>(step + 1) / gore_steps;
+				const ct::Frame near = _track.sample(stub.junction_m + reach * near_t);
+				const ct::Frame far = _track.sample(stub.junction_m + reach * far_t);
+				// The gore's inner edge is the white line itself and its outer edge is
+				// the opening separation, so at the junction the two coincide and the
+				// first cell is a triangle. `add_triangle` drops the zero-area half.
+				const double near_edge = gore_hand * near.width_m * 0.5;
+				const double far_edge = gore_hand * far.width_m * 0.5;
+				add_quad(pit,
+						_surface_point(near, near_edge, 0.0),
+						_surface_point(near, near_edge + gore_hand * separation * near_t, 0.0),
+						_surface_point(far, far_edge + gore_hand * separation * far_t, 0.0),
+						_surface_point(far, far_edge, 0.0),
+						Vector3(0.0, 1.0, 0.0));
+			}
+		}
+	}
+
 	auto publish = [&](const char *name, int surface_type, const PackedVector3Array &faces) {
 		if (faces.is_empty()) {
 			return;
@@ -834,6 +960,12 @@ TypedArray<Dictionary> KartTrack::surface_meshes(double p_sagitta, double p_max_
 	publish("Verge", kart::core::SURFACE_GRASS, grass);
 	publish("Gravel", kart::core::SURFACE_DIRT, gravel);
 	publish("Barriers", kart::core::SURFACE_ASPHALT, barrier);
+	// Asphalt by surface type and a body of its own by name: a pit lane is the
+	// same stuff the road is made of, and a caller that wants to know whether a
+	// kart is in the pits asks the *station*, not the surface. Named separately
+	// so `--mesh=false` can draw it on its own and so `circuit_probe.gd` can
+	// measure these triangles rather than the whole circuit's.
+	publish("PitLane", kart::core::SURFACE_ASPHALT, pit);
 	return out;
 }
 
@@ -878,6 +1010,8 @@ void KartTrack::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("corner_count"), &KartTrack::corner_count);
 	ClassDB::bind_method(D_METHOD("corner", "index"), &KartTrack::corner);
 	ClassDB::bind_method(D_METHOD("measurements"), &KartTrack::measurements);
+	ClassDB::bind_method(D_METHOD("pit_lane"), &KartTrack::pit_lane);
+	ClassDB::bind_method(D_METHOD("pit_stubs"), &KartTrack::pit_stubs);
 	ClassDB::bind_method(D_METHOD("surface_meshes", "sagitta", "max_spacing"),
 			&KartTrack::surface_meshes, DEFVAL(0.02), DEFVAL(2.0));
 }

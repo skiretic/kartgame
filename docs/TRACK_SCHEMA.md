@@ -309,13 +309,20 @@ than resolved silently.
 
 ## `furniture`
 
-What is the same in every layout: the start line and the light gantry. Everything
-that is *not* — grid, sectors, checkpoints, pit stubs — belongs to a layout.
+What is the same in every layout: the start line, the light gantry, and the pit
+lane's parallel run. Everything that is *not* — grid, sectors, checkpoints, the
+four pit junctions — belongs to a layout.
 
 ```json
 { "start_line": { "distance_m": 0.0, "width_m": 0.30 },
-  "lights":     { "distance_m": 10.0, "height_m": 3.0, "span_m": 12.0 } }
+  "lights":     { "distance_m": 10.0, "height_m": 3.0, "span_m": 12.0 },
+  "pit_lane":   { "side": "left", "from_m": 1304.5, "to_m": 70.619417,
+                  "width_m": 3.5, "separation_m": 3.2 } }
 ```
+
+`pit_lane.side` is in the **forward** frame, the same convention `surfaces[].side`
+uses, because there is one meaning of "left" in this file and it is the forward
+layout's.
 
 ---
 
@@ -337,6 +344,7 @@ driven backwards, over Part I §7.4's 30° cap, on either edge.
   "grid": { "slots": 8, "pole_side": "right" },
   "pit_entry_m": 1305.0,
   "pit_exit_m": 62.0,
+  "pit": { "side": "right", "entry_angle_deg": 22.0, "exit_angle_deg": 16.0 },
   "racing_line_seed": [ { "at_m": 77.0, "lateral_m": 5.3 }, ... ],
   "corner_speeds_kmh": [ ... ],
   "vertical_curve_speeds_kmh": [ 132.5, 52.0, 122.0 ]
@@ -385,6 +393,119 @@ road the closed form gives an 87.89 m apex radius and a minimum-curvature solver
 gives 66.98 m, and both are right. A future session that feeds a minimum-curvature
 line into this document's speed model will get corner speeds 15–25% low and will
 not know why.
+
+---
+
+## Pit geometry, in arithmetic
+
+The pit lane is the one thing in this file that is **geometry and does not
+reverse**, and it is the reason ADR-0046's "reverse is an authored layout" is not
+just a convenience. A deceleration lane leaving at 22° to the direction of travel
+is a **158° merge** driven the other way, over §7.2's 30° cap, on either edge. So
+the *lane* is shared and the four *junctions* are not.
+
+Two implementations, `src/core/track.h`'s `pit_stubs` and
+`tools/blender/tracklib/geometry.py`'s, and `circuit.sh --case=pit` measures them
+against each other. Everything below is stated as arithmetic for that reason.
+
+### The three sourced figures and the one that is ours
+
+| Figure | Value | Source |
+| --- | --- | --- |
+| Merge angle, entry and exit | ≤ **30°** | Part I §7.2 |
+| Deceleration lane width | **3–4 m** | Part I §7.4 |
+| Chicane at the entry to the deceleration lane | required, **no geometry given** | Part I §7.4 |
+| Clear ground between track edge and lane edge | **3.20 m** | **ours** |
+
+The 30° cap is in **§7.2**, not §7.4 — this project cited it as 7.4 in five places
+before the text was read line by line. §7.4 is where the 3–4 m and the chicane are.
+
+3.20 m is `circuit::ours::PIT_LANE_SEPARATION_M`, and like every figure in that
+namespace it is a sum of sourced numbers rather than a choice: §7.5's **1.80 m of
+mandatory verge**, which the pit lane may not eat, plus FIA Karting Art. 8.1.1's
+**1.400 m kart width**, so a kart that lands squarely on its own verge is still
+short of the lane. The servicing-park plan that would give a real figure is
+**Appendix No. 9**, referenced by §7.4 and not published — the same hole as the
+grid's Appendix 10 in ADR-0050, probed again for this issue and still a 404.
+
+### Which edge a junction goes on
+
+§7.2 again: the two lanes must meet the track *"in such a way that there may be no
+crossing between the lines of karts that are on the track and those of karts that
+enter the Repairs Area or leave it."*
+
+    entry junction side = hand of the corner most recently LEFT
+    exit  junction side = hand of the corner about to be ENTERED
+
+because a kart tracks out to a corner's **outside** and sets up on the **outside**
+of the next one, so the free edge is that corner's own **inside**, which is its
+hand. Valdirone forward: T8b and T1 are both lefts, both junctions go left.
+Reversed: both are rights, both junctions go right — **the same physical edge**,
+which is why one pit lane serves both and only the gores are per layout.
+
+### The gore
+
+A junction is a **gore**: the wedge of asphalt between the white line and the pit
+lane's inner edge. Not a full-width ribbon laid over the lane — built that way the
+two occupy one band for the length of the taper, and coplanar collider faces along
+a boundary make a suspension raycast's answer arbitrary.
+
+The taper length is **derived, never authored**, because the angle is the
+regulated quantity and an authored length is a second place for it to be wrong:
+
+    taper = separation / tan(angle)
+
+which is 7.9203 m at 22° and 11.1597 m at 16°. Then, with `sign = −1` for a
+reversed layout and `+1` otherwise, and `hand` the layout's own side times `sign`:
+
+    junction_m = to_forward(layout, pit_entry_m or pit_exit_m)
+    outboard_m = wrap(junction_m + (entry ? +1 : −1) * sign * taper)
+
+An entry gore opens *ahead* of its junction and an exit gore closes *into* it, and
+both flip again with the layout — which is exactly the four different signs the
+two consumers have to agree on.
+
+At a forward station `d`, with `t` the fraction of the gore's own signed span:
+
+    t         = clamp(signed_gap(junction_m, d) / signed_gap(junction_m, outboard_m), 0, 1)
+    u_inner   = hand * half_width(d)
+    u_outer   = hand * (half_width(d) + separation * t)
+
+`signed_gap` and not a subtraction: one of Valdirone's four gores sits eleven
+meters the far side of the start line, and `b − a` there is −1,364 m, which runs
+the taper backwards round the whole circuit.
+
+### The lane
+
+    u_inner = hand * (half_width(d) + separation)
+    u_outer = hand * (half_width(d) + separation + width)
+
+over the arc `from_m → to_m`, wrapping. Because the gore's offset never exceeds
+`separation` and the lane's never falls below it, the two are adjacent bands and
+**cannot overlap** — which is what lets both be built unconditionally, for both
+layouts, with no selected-layout state anywhere in either consumer.
+
+### Sampling
+
+Both consumers step the pit geometry on **its own stations**, not off the shared
+polyline. The polyline is subdivided to a chord tolerance, so its samples land
+where the sagitta rule puts them; a 7.92 m gore snapped to that grid starts most of
+a meter past its own junction, which draws a wedge of asphalt beginning in the
+middle of the verge. The step count is the same rule in both:
+
+    steps = max(1, ceil(span / max_spacing))      max_spacing = 2.0 m
+
+so the lane is 71 cells and an entry gore is 4. `y` comes from the same
+cross-section formula the road uses, so the lane continues the track's transverse
+profile outward exactly as §7.5 requires of the verge it sits beyond.
+
+### What is not built
+
+**The chicane §7.4 requires at the entry to the deceleration lane.** The
+regulation requires one and gives no geometry for it anywhere — not a length, not
+an offset, not a width. Inventing one would put a fifth unsourced figure in a
+namespace built to keep them countable, so it is recorded as required-and-absent
+rather than filled in. Issue #184.
 
 ---
 
@@ -452,6 +573,28 @@ reported minimum of all four candidate designs. Four for four.
     from the last back to the first counts as a spacing.
 20. Pit entry and exit stations are on the lap and do not sit inside a corner arc.
 
+### The pit lane
+
+21. Every layout with pit stations declares a side and two angles, and both angles
+    are inside §7.2's 30°. Stations with no side are refused rather than ignored —
+    that state loaded for a milestone and the pit lane did not exist.
+22. The lane's width is inside §7.4's 3–4 m and its separation is at least §7.5's
+    1.80 m of verge.
+23. Every junction is on the **inside** of its adjacent corner, per §7.2's
+    no-crossing rule above. The two layouts' sides therefore differ in their own
+    frames and agree in the forward frame; a stub that comes out on the far
+    physical edge is **two pit lanes** and is refused as such.
+24. The lane's arc contains every gore's junction and outboard station, so no gore
+    is a wedge of asphalt leading to grass.
+25. The **whole** gore is on a straight, walked at nine stations — not just the
+    junction rule 20 checks. An 11.16 m exit gore can have its mouth on a straight
+    and its far end in an arc, where the merge angle is a function of how far along
+    the junction you are.
+26. The lane does not share a side and a station range with any corner's run-off.
+    Both are built outboard of the verge on a named side, and where they overlap
+    the collider has two surfaces over one band — which is how a kart ends up
+    reported as standing on gravel in the pit lane.
+
 ### The negative control
 
 `data/tracks/self_intersecting.track.json` is a deliberately broken circuit: a
@@ -459,3 +602,10 @@ figure-eight whose two legs cross at 4.4 m of clear ground. It is committed, it 
 run by `tools/verify/circuit.sh`, and **the gate fails if it loads**. Same
 principle as `input_push_probe.gd --break`: a validator with no negative control
 is a validator nobody has proven can say no.
+
+`--case=pit` carries two more of its own, built at run time from one-field edits of
+the real circuit rather than committed: a 40° merge angle, which must be refused
+naming §7.2's cap, and a reverse stub moved onto the far edge, which must be
+refused as two pit lanes. Run time rather than committed because committing them
+would mean four track files to keep in step with every schema bump, and a one-line
+mutation is more legible than a 2,000-line diff.

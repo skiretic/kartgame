@@ -454,6 +454,91 @@ def build_runoff(track, line, rows: int) -> tuple[Strip, Strip, Strip]:
     return apron, gravel, barrier
 
 
+def build_pit(track, rows: int, max_spacing: float) -> Strip:
+    """The pit lane: one parallel band shared by both layouts, plus one gore each.
+
+    ## Why it is sampled on its own stations rather than off the shared polyline
+
+    The polyline is subdivided to a chord tolerance, so its samples land wherever
+    the sagitta rule puts them. A gore is 7.92 m long; snapped to that grid its tip
+    would start most of a meter past its own junction, which draws a wedge of
+    asphalt beginning in the middle of the verge. Stepping from the junction to the
+    outboard station puts both ends exactly where `docs/TRACK_SCHEMA.md` says, here
+    and in `src/track/kart_track.cpp`, which is what makes `--case=agree` a
+    measurement rather than a coincidence.
+
+    ## Why the gore is a wedge and not a ribbon
+
+    A stub is the asphalt **between the white line and the pit lane's inner edge** -
+    zero wide at the junction, exactly `separation_m` wide where it meets the lane.
+    Laid instead as a 3.5 m ribbon it would occupy the same band as the lane for the
+    length of the taper, and two coplanar collider faces along a whole boundary are
+    what makes a suspension raycast's answer arbitrary. Gore inboard, lane outboard,
+    and they cannot overlap because the gore's offset never exceeds the lane's.
+    """
+    strip = Strip("PitLane", "asphalt")
+    lane = track.pit_lane
+    if not lane:
+        return strip
+    hand = -1.0 if lane["side"] == "left" else 1.0
+    separation = float(lane["separation_m"])
+    width = float(lane["width_m"])
+    from_m = float(lane["from_m"])
+
+    run = (float(lane["to_m"]) - from_m) % track.length_m
+    steps = max(1, int(math.ceil(run / max_spacing)))
+    for step in range(steps):
+        near = track.sample(from_m + run * step / steps)
+        far = track.sample(from_m + run * (step + 1) / steps)
+        near_in = hand * (near.width_m * 0.5 + separation)
+        far_in = hand * (far.width_m * 0.5 + separation)
+        strip.quad(
+            (
+                near.surface_point(near_in),
+                near.surface_point(near_in + hand * width),
+                far.surface_point(far_in + hand * width),
+                far.surface_point(far_in),
+            ),
+            _uv_pair(near, far, 0.0, width),
+            [
+                snake_uv2(near.distance_m, near_in, near.width_m, track.length_m, rows),
+                snake_uv2(near.distance_m, near_in + hand * width, near.width_m, track.length_m, rows),
+                snake_uv2(far.distance_m, far_in + hand * width, far.width_m, track.length_m, rows),
+                snake_uv2(far.distance_m, far_in, far.width_m, track.length_m, rows),
+            ],
+        )
+
+    for stub in track.pit_stubs():
+        reach = track.signed_gap(stub["junction_m"], stub["outboard_m"])
+        gore_steps = max(1, int(math.ceil(abs(reach) / max_spacing)))
+        gore_hand = stub["hand"]
+        for step in range(gore_steps):
+            near_t = step / gore_steps
+            far_t = (step + 1) / gore_steps
+            near = track.sample(stub["junction_m"] + reach * near_t)
+            far = track.sample(stub["junction_m"] + reach * far_t)
+            near_edge = gore_hand * near.width_m * 0.5
+            far_edge = gore_hand * far.width_m * 0.5
+            near_out = near_edge + gore_hand * separation * near_t
+            far_out = far_edge + gore_hand * separation * far_t
+            strip.quad(
+                (
+                    near.surface_point(near_edge),
+                    near.surface_point(near_out),
+                    far.surface_point(far_out),
+                    far.surface_point(far_edge),
+                ),
+                _uv_pair(near, far, 0.0, separation),
+                [
+                    snake_uv2(near.distance_m, near_edge, near.width_m, track.length_m, rows),
+                    snake_uv2(near.distance_m, near_out, near.width_m, track.length_m, rows),
+                    snake_uv2(far.distance_m, far_out, far.width_m, track.length_m, rows),
+                    snake_uv2(far.distance_m, far_edge, far.width_m, track.length_m, rows),
+                ],
+            )
+    return strip
+
+
 #: Base colours, so a still reads without a material library. Deliberately drab -
 #: `docs/ROADMAP.md` M1 settled that the measured asphalt albedo of 0.15 renders
 #: pale and is kept, because a track surface is darkened by *use* and that arrives

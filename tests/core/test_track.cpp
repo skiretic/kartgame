@@ -588,3 +588,217 @@ TEST_CASE("a span of no length is rejected") {
 	const std::vector<std::string> problems = track.validate(1);
 	CHECK(mentions(problems, "a span must have length"));
 }
+
+// --- the pit lane ----------------------------------------------------------
+//
+// Issue #181, ADR-0053. The pit lane is the one part of this schema that is
+// *geometry* and does not survive a reversal: a 22 deg branch is a 158 deg merge
+// driven the other way, over Part I art 7.2's 30 deg cap, on whichever edge it is
+// on. So each layout carries its own two junctions onto one shared piece of
+// asphalt, and these are the rules that keep the two from becoming two pit lanes.
+
+namespace {
+
+constexpr double PIT_SEPARATION = 3.20;
+constexpr double PIT_WIDTH = 3.50;
+constexpr double PIT_ENTRY_ANGLE = 22.0;
+constexpr double PIT_EXIT_ANGLE = 16.0;
+
+// The oval plus a pit complex on its start/finish straight, and a reverse layout
+// to hang the second pair of junctions off.
+//
+// Both oval corners are right-handers, so forward the free edge at both junctions
+// is the **right** - a kart tracks out to the outside and the inside is the edge
+// nobody is using. Reversed they are both lefts and the free edge reads "left",
+// which is **the same asphalt**, and that identity is what half of these tests are
+// about.
+//
+// The stations are chosen so every gore lands on a straight: forward enters at
+// 1,100 m (on the 1,053.98-1,153.98 m straight) and rejoins at 40 m; reversed the
+// two are at its own 1,100 m and 40 m, which are forward 53.98 m and 1,113.98 m.
+// The eight resulting stations span 1,100 m to 53.98 m the long way, which is the
+// 107.96 m of lane below plus half a meter of overrun at each end.
+Track with_pit(Track track) {
+	Layout reverse;
+	reverse.name = "reverse";
+	reverse.reversed = true;
+	reverse.sector_marks_m = { 384.0, 769.0 };
+	reverse.checkpoints_m = track.layouts[0].checkpoints_m;
+	reverse.grid = track.layouts[0].grid;
+	track.layouts.push_back(reverse);
+
+	track.pit_lane.declared = true;
+	track.pit_lane.hand = SIDE_RIGHT;
+	track.pit_lane.from_m = 1099.5;
+	track.pit_lane.to_m = 54.48;
+	track.pit_lane.width_m = PIT_WIDTH;
+	track.pit_lane.separation_m = PIT_SEPARATION;
+
+	for (Layout &layout : track.layouts) {
+		layout.pit_entry_m = 1100.0;
+		layout.pit_exit_m = 40.0;
+		layout.pit_entry_angle_deg = PIT_ENTRY_ANGLE;
+		layout.pit_exit_angle_deg = PIT_EXIT_ANGLE;
+		// In the LAYOUT's own frame. Two different words, one edge of one road.
+		layout.pit_side = layout.reversed ? SIDE_LEFT : SIDE_RIGHT;
+	}
+	return track;
+}
+
+}  // namespace
+
+TEST_CASE("a circuit with a pit lane still loads, so a later break is attributable") {
+	const Track track = with_pit(make_oval());
+	const std::vector<std::string> problems = track.validate(1);
+	for (const std::string &problem : problems) {
+		MESSAGE(problem);
+	}
+	CHECK(problems.empty());
+}
+
+TEST_CASE("a gore is separation over tan of its own angle, and nothing else") {
+	// The taper length is derived rather than authored, because the *angle* is the
+	// regulated quantity and an authored length is a second place for it to be
+	// wrong. Both directions of both layouts, because the sign of the reach is what
+	// tells an entry from an exit and a forward layout from a reverse one.
+	const Track track = with_pit(make_oval());
+	const std::vector<PitStub> stubs = track.pit_stubs();
+	REQUIRE(stubs.size() == 4);
+	const double entry_taper = PIT_SEPARATION
+			/ std::tan(PIT_ENTRY_ANGLE * kart::core::PI / 180.0);
+	const double exit_taper = PIT_SEPARATION
+			/ std::tan(PIT_EXIT_ANGLE * kart::core::PI / 180.0);
+	// Absolute, because `Approx().epsilon()` is not a relative tolerance - it
+	// compares against `e * (1.0 + max(|a|, |b|))` and reads a thousand times
+	// tighter than it is on a value of this size.
+	CHECK(std::fabs(entry_taper - 7.9202779) < 1e-6);
+	CHECK(std::fabs(exit_taper - 11.1597262) < 1e-6);
+	for (const PitStub &stub : stubs) {
+		const double reach = track.signed_gap(stub.junction_m, stub.outboard_m);
+		const double want = stub.is_entry ? entry_taper : exit_taper;
+		CHECK(std::fabs(std::fabs(reach) - want) < 1e-9);
+		// An entry opens *ahead* of its junction and an exit closes *into* it, and
+		// both flip again with the layout. Forward entry runs up the lap, forward
+		// exit runs down it, and the reverse layout does the opposite of each.
+		const bool forward_layout = stub.layout == "forward";
+		const bool expect_positive = stub.is_entry == forward_layout;
+		CHECK((reach > 0.0) == expect_positive);
+	}
+}
+
+TEST_CASE("both layouts' junctions land on one piece of asphalt") {
+	// The whole point of the issue. Each layout names its own side in its own frame
+	// - "right" forward and "left" reversed - and both come out on the same physical
+	// edge, which is the lane's. A programmatic reversal of the spline flips the
+	// sign and leaves the asphalt where it was, and that is what this catches.
+	const Track track = with_pit(make_oval());
+	for (const PitStub &stub : track.pit_stubs()) {
+		CHECK(stub.hand == track.pit_lane.hand);
+	}
+	CHECK(track.layout_named("forward")->pit_side != track.layout_named("reverse")->pit_side);
+	// And the lane reaches every gore: it covers all eight stations.
+	for (const PitStub &stub : track.pit_stubs()) {
+		CHECK(track.arc_contains(track.pit_lane.from_m, track.pit_lane.to_m, stub.junction_m));
+		CHECK(track.arc_contains(track.pit_lane.from_m, track.pit_lane.to_m, stub.outboard_m));
+	}
+}
+
+TEST_CASE("the gore opens linearly and never reaches the lane's own band") {
+	// Gore inboard, lane outboard, and they cannot overlap. Built instead as a
+	// full-width ribbon laid over the lane, the two would share a band for the whole
+	// taper - and two coplanar collider faces along a boundary is the exact
+	// condition that makes a suspension raycast's answer arbitrary.
+	const Track track = with_pit(make_oval());
+	// Held by value. `pit_stubs()` returns a vector and `operator[]` on the temporary
+	// hands back a reference into it, which lifetime extension does *not* cover - the
+	// first version of this test bound a dangling reference and read zeros out of it.
+	const std::vector<PitStub> stubs = track.pit_stubs();
+	const PitStub &stub = stubs[0];
+	CHECK(std::fabs(track.pit_gore_separation(stub, stub.junction_m)) < 1e-12);
+	CHECK(std::fabs(track.pit_gore_separation(stub, stub.outboard_m) - PIT_SEPARATION) < 1e-9);
+	const double middle = stub.junction_m
+			+ 0.5 * track.signed_gap(stub.junction_m, stub.outboard_m);
+	CHECK(std::fabs(track.pit_gore_separation(stub, middle) - 0.5 * PIT_SEPARATION) < 1e-9);
+	// Clamped outside its own run, so a consumer that walks the whole lap gets the
+	// lane's own offset rather than a taper that keeps opening for a kilometer.
+	CHECK(std::fabs(track.pit_gore_separation(stub, stub.junction_m - 50.0)) < 1e-12);
+	CHECK(std::fabs(track.pit_gore_separation(stub, stub.outboard_m + 50.0) - PIT_SEPARATION)
+			< 1e-9);
+}
+
+TEST_CASE("a merge angle over art 7.2's 30 degrees is rejected") {
+	Track track = with_pit(make_oval());
+	track.layouts[0].pit_entry_angle_deg = 40.0;
+	CHECK(mentions(track.validate(1), "over art 7.2's 30 deg cap"));
+}
+
+TEST_CASE("a pit lane outside art 7.4's 3-4 m is rejected") {
+	Track track = with_pit(make_oval());
+	track.pit_lane.width_m = 6.0;
+	CHECK(mentions(track.validate(1), "outside art 7.4's 3.0-4.0 m"));
+}
+
+TEST_CASE("a junction on the outside of its own corner is rejected") {
+	// Art 7.2: the junctions must be placed so there is "no crossing between the
+	// lines of karts that are on the track and those of karts that enter the Repairs
+	// Area or leave it". A kart tracks out to the outside, so a lane leaving on the
+	// outside crosses it - and this is the rule that makes the reverse layout need
+	// its own stubs rather than a flipped copy of the forward ones.
+	Track track = with_pit(make_oval());
+	track.layouts[0].pit_side = SIDE_LEFT;
+	const std::vector<std::string> problems = track.validate(1);
+	CHECK(mentions(problems, "art 7.2 forbids the crossing"));
+	CHECK(mentions(problems, "that is two pit lanes"));
+}
+
+TEST_CASE("a gore that runs off the end of the pit lane is rejected") {
+	// A wedge of asphalt leading to grass. It is what an authored lane span drifting
+	// away from a changed angle produces, and it is the reason `author_track.py`
+	// derives the span from the gores rather than carrying it as a number.
+	Track track = with_pit(make_oval());
+	track.pit_lane.from_m = 1120.0;
+	CHECK(mentions(track.validate(1), "the gore does not reach the lane"));
+}
+
+TEST_CASE("a gore that reaches into a corner is rejected, not just its junction") {
+	// Rule 20 checks the station the file declares. A 16 deg branch is eleven meters
+	// long and can start on a straight and finish in an arc, where the merge angle is
+	// a function of how far along the junction you are - so the whole gore is walked
+	// and not only its mouth.
+	Track track = with_pit(make_oval());
+	// The exit gore closes *into* its junction, so a junction four meters past T1's
+	// turn-in at 100 m has its mouth in the corner and its far end on the straight.
+	track.layouts[0].pit_exit_m = 104.0;
+	track.pit_lane.to_m = 110.0;
+	CHECK(mentions(track.validate(1), "which is inside a corner"));
+}
+
+TEST_CASE("a pit lane over a run-off on the same side is rejected") {
+	// Both are built outboard of the verge on a named side. Where they overlap the
+	// collider has two surfaces over one band, which is how a kart ends up reported
+	// as standing on gravel in the pit lane.
+	// T2's run-off window is its corner plus 30 m either side, so 646.99-1,083.98 m,
+	// and the lane starts at 1,099.5 m and clears it by 15.5 m. Both moves are needed
+	// and both are the realistic mistake: a run-off put on the pit side, and a lane
+	// extended back far enough to meet it.
+	Track track = with_pit(make_oval());
+	track.corners[1].runoff.side = SIDE_RIGHT;
+	track.pit_lane.from_m = 1080.0;
+	CHECK(mentions(track.validate(1), "are both on the right over"));
+}
+
+TEST_CASE("a pit lane inside the mandatory verge is rejected") {
+	// Art 7.5 wants 1.80 m of compact verge along the whole track. A pit lane laid
+	// closer than that is not beside the track, it is on its shoulder.
+	Track track = with_pit(make_oval());
+	track.pit_lane.separation_m = 1.0;
+	CHECK(mentions(track.validate(1), "inside art 7.5's 1.80 m of mandatory verge"));
+}
+
+TEST_CASE("pit stations with no side are rejected rather than silently ignored") {
+	// The state this issue started from: two stations in the file and no asphalt
+	// anywhere. It loaded, and the pit lane did not exist.
+	Track track = with_pit(make_oval());
+	track.layouts[0].pit_side = SIDE_FULL;
+	CHECK(mentions(track.validate(1), "declares pit stations and no pit side"));
+}

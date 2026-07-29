@@ -153,6 +153,45 @@ struct SeedPoint {
 	double lateral_m = 0.0;
 };
 
+// The pit lane's parallel run: one band of asphalt, shared by both layouts.
+//
+// Shared because it is one piece of concrete. Valdirone turns -360 deg net, so the
+// inside of the loop is the **left** of forward travel; reversed, that same edge is
+// the driver's right. Both layouts therefore branch onto the same asphalt and only
+// the four junction gores differ, which is the whole of what ADR-0049's "the
+// geometry is shared; nothing else is assumed to be" does not cover.
+struct PitLane {
+	bool declared = false;
+	// Forward stations. The band wraps past the start line on this circuit, which
+	// is not a special case: `contains` walks the arc rather than comparing twice.
+	double from_m = -1.0;
+	double to_m = -1.0;
+	double width_m = 0.0;
+	double separation_m = 0.0;
+	// Physical side, in the FORWARD frame. Same convention as `SurfaceSpan::side`.
+	int hand = SIDE_LEFT;
+};
+
+// One junction, as built. Four of them on a two-layout circuit.
+//
+// A stub is the **gore**: the wedge of asphalt between the track's own edge and the
+// pit lane's inner edge, zero wide where it meets the white line and exactly
+// `separation_m` wide where it meets the lane. It is not a 3.5 m ribbon laid over
+// the lane - built that way the two would occupy the same band for the length of
+// the taper, and coplanar collider faces along a whole boundary are what makes a
+// suspension raycast's answer arbitrary. Gore inboard, lane outboard, and the two
+// can never overlap because the gore's lateral offset never exceeds the lane's.
+struct PitStub {
+	// Forward stations. `junction_m` is where the separation is zero.
+	double junction_m = 0.0;
+	double outboard_m = 0.0;
+	double angle_deg = 0.0;
+	double separation_m = 0.0;
+	int hand = SIDE_LEFT;
+	bool is_entry = true;
+	std::string layout;
+};
+
 struct Layout {
 	std::string name;
 	// True for the authored reverse layout. Every distance in a layout is a
@@ -166,6 +205,14 @@ struct Layout {
 	std::vector<double> vertical_curve_speeds_kmh;
 	double pit_entry_m = -1.0;
 	double pit_exit_m = -1.0;
+	// The junction geometry, in the LAYOUT's own frame: `SIDE_LEFT`/`SIDE_RIGHT`
+	// relative to this layout's direction of travel, or `SIDE_FULL` (0) for a layout
+	// with no pit access at all. `Track::pit_stubs` converts to the forward frame,
+	// and that conversion is the reason the two layouts read as opposite sides while
+	// standing on the same asphalt.
+	int pit_side = SIDE_FULL;
+	double pit_entry_angle_deg = 0.0;
+	double pit_exit_angle_deg = 0.0;
 	double estimated_lap_time_s = 0.0;
 };
 
@@ -208,6 +255,7 @@ struct Track {
 	std::vector<Layout> layouts;
 
 	double start_line_m = 0.0;
+	PitLane pit_lane;
 
 	// --- geometry ---------------------------------------------------------
 
@@ -507,6 +555,151 @@ struct Track {
 			}
 		}
 		return nullptr;
+	}
+
+	// --- the pit lane ------------------------------------------------------
+	//
+	// `docs/TRACK_SCHEMA.md`'s "Pit geometry, in arithmetic" is the specification;
+	// this and `tools/blender/tracklib/surfaces.py` are its two implementations, and
+	// `circuit.sh --case=pit` measures them against each other rather than trusting
+	// either. Nothing here reads a layout's *selected* state: the four gores and the
+	// one lane are all built, always, because all five are asphalt on the ground
+	// whichever way the circuit is being driven that session.
+
+	// The shortest signed arc from `a` to `b`, positive forward. Used rather than a
+	// subtraction because a stub is ten meters long on a 1,375 m lap and one of the
+	// four sits eleven meters the far side of the start line - subtracting there
+	// gives -1,364 and puts the taper backwards round the whole circuit.
+	double signed_gap(double a, double b) const {
+		double gap = wrap(b - a);
+		if (gap > length_m * 0.5) {
+			gap -= length_m;
+		}
+		return gap;
+	}
+
+	// Is `d` on the arc that runs forward from `from` to `to`? Wrapping, so a band
+	// that straddles the start line is one band and not two.
+	bool arc_contains(double from, double to, double d) const {
+		return wrap(d - from) <= wrap(to - from) + 1e-9;
+	}
+
+	// Every junction on the circuit, in the forward frame, in layout order.
+	//
+	// The taper length is derived and not authored: the regulated quantity is the
+	// **angle**, so the length is `separation / tan(angle)` and a design that wants a
+	// longer gore says so by branching more shallowly. `sign` is how a forward
+	// station moves as the layout's own station increases, and it is the only place
+	// the direction enters.
+	std::vector<PitStub> pit_stubs() const {
+		std::vector<PitStub> out;
+		if (!pit_lane.declared) {
+			return out;
+		}
+		for (const Layout &layout : layouts) {
+			if (layout.pit_side == SIDE_FULL) {
+				continue;
+			}
+			const double sign = layout.reversed ? -1.0 : 1.0;
+			const int hand = static_cast<int>(layout.pit_side * sign);
+			const double angles[2] = { layout.pit_entry_angle_deg, layout.pit_exit_angle_deg };
+			const double stations[2] = { layout.pit_entry_m, layout.pit_exit_m };
+			for (int which = 0; which < 2; ++which) {
+				if (stations[which] < 0.0 || angles[which] <= 0.0) {
+					continue;
+				}
+				const double tangent = std::tan(angles[which] * kart::core::PI / 180.0);
+				if (tangent <= 0.0) {
+					continue;
+				}
+				PitStub stub;
+				stub.is_entry = which == 0;
+				stub.angle_deg = angles[which];
+				stub.separation_m = pit_lane.separation_m;
+				stub.hand = hand;
+				stub.layout = layout.name;
+				stub.junction_m = wrap(to_forward(layout, stations[which]));
+				// An entry gore opens *ahead* of its junction and an exit gore closes
+				// *into* its junction, so the two run opposite ways along the lap - and
+				// both flip again when the layout does.
+				const double taper = pit_lane.separation_m / tangent;
+				stub.outboard_m = wrap(stub.junction_m
+						+ (stub.is_entry ? 1.0 : -1.0) * sign * taper);
+				out.push_back(stub);
+			}
+		}
+		return out;
+	}
+
+	// How far the gore has opened at a forward station, meters. Zero at the junction,
+	// the full separation at the outboard end, linear in between and clamped outside.
+	//
+	// Linear in **arc length** and not in plan distance, which is the one place this
+	// could have differed between the two consumers: both gores on this circuit sit on
+	// straights - the loader refuses a junction inside a corner, rule 20 - so the two
+	// are the same number here, and stating the rule as arc length keeps them the same
+	// number on a circuit whose junction is not.
+	double pit_gore_separation(const PitStub &stub, double distance) const {
+		const double span = signed_gap(stub.junction_m, stub.outboard_m);
+		if (span == 0.0) {
+			return 0.0;
+		}
+		double t = signed_gap(stub.junction_m, wrap(distance)) / span;
+		if (t < 0.0) {
+			t = 0.0;
+		}
+		if (t > 1.0) {
+			t = 1.0;
+		}
+		return stub.separation_m * t;
+	}
+
+	// The corner a layout has most recently left at one of its own stations, and the
+	// one it is about to enter. Both return -1 when the circuit has no corners.
+	//
+	// Driven the other way a corner's exit is its entry, so the two station bounds
+	// swap with the layout - which is exactly why the "does not cross the racing
+	// line" check cannot be run once and shared between the two layouts.
+	int corner_left_before(const Layout &layout, double station) const {
+		int best = -1;
+		double nearest = length_m;
+		for (std::size_t index = 0; index < corners.size(); ++index) {
+			const double exit_station = to_station(layout,
+					layout.reversed ? corners[index].from_m : corners[index].to_m);
+			const double gap = wrap(station - exit_station);
+			if (gap < nearest) {
+				nearest = gap;
+				best = static_cast<int>(index);
+			}
+		}
+		return best;
+	}
+
+	int corner_entered_after(const Layout &layout, double station) const {
+		int best = -1;
+		double nearest = length_m;
+		for (std::size_t index = 0; index < corners.size(); ++index) {
+			const double entry_station = to_station(layout,
+					layout.reversed ? corners[index].to_m : corners[index].from_m);
+			const double gap = wrap(entry_station - station);
+			if (gap < nearest) {
+				nearest = gap;
+				best = static_cast<int>(index);
+			}
+		}
+		return best;
+	}
+
+	// A corner's hand as this layout meets it: `SIDE_LEFT` or `SIDE_RIGHT`. The hand
+	// is also the side of the road that is **free** at that corner's mouth, because a
+	// kart tracks out to the outside and sets up on the outside.
+	int corner_hand(const Layout &layout, int index) const {
+		if (index < 0 || index >= static_cast<int>(corners.size())) {
+			return SIDE_FULL;
+		}
+		const bool left = corners[index].hand == "left";
+		const bool flipped = layout.reversed ? !left : left;
+		return flipped ? SIDE_LEFT : SIDE_RIGHT;
 	}
 
 	// --- surfaces ---------------------------------------------------------
@@ -1059,6 +1252,95 @@ struct Track {
 		for (const Layout &layout : layouts) {
 			validate_layout(layout, problems);
 		}
+
+		// 21-25. The pit lane, which is one piece of asphalt shared by layouts that
+		// each reach it through their own junction. Issue #181, ADR-0053.
+		if (pit_lane.declared) {
+			if (pit_lane.width_m < circuit::PIT_LANE_WIDTH_MIN_M - 1e-9
+					|| pit_lane.width_m > circuit::PIT_LANE_WIDTH_MAX_M + 1e-9) {
+				say("the pit lane is %.2f m wide, outside art 7.4's %.1f-%.1f m",
+						pit_lane.width_m, circuit::PIT_LANE_WIDTH_MIN_M,
+						circuit::PIT_LANE_WIDTH_MAX_M);
+			}
+			if (pit_lane.separation_m < circuit::VERGE_MIN_WIDTH_M - 1e-9) {
+				say("the pit lane sits %.2f m off the track edge, inside art 7.5's %.2f m "
+					"of mandatory verge",
+						pit_lane.separation_m, circuit::VERGE_MIN_WIDTH_M);
+			}
+			if (pit_lane.from_m < 0.0 || pit_lane.from_m >= length_m
+					|| pit_lane.to_m < 0.0 || pit_lane.to_m >= length_m) {
+				say("the pit lane runs from %.1f m to %.1f m, off a lap of %.1f m",
+						pit_lane.from_m, pit_lane.to_m, length_m);
+			}
+			const std::vector<PitStub> stubs = pit_stubs();
+			if (stubs.empty()) {
+				say("a pit lane is declared over %.1f-%.1f m and no layout branches onto "
+					"it, so it is asphalt nothing can reach",
+						pit_lane.from_m, pit_lane.to_m);
+			}
+			for (const PitStub &stub : stubs) {
+				// 21. One pit lane, not two. A stub on the far edge is a second pit
+				// complex the design does not have, and it is the exact mistake a
+				// programmatic reversal makes: flipping the spline flips the *sign* of
+				// the side and leaves the asphalt where it was.
+				if (stub.hand != pit_lane.hand) {
+					say("the %s %s stub is on the %s of the forward direction and the pit "
+						"lane is on the %s; that is two pit lanes",
+							stub.layout.c_str(), stub.is_entry ? "entry" : "exit",
+							stub.hand == SIDE_LEFT ? "left" : "right",
+							pit_lane.hand == SIDE_LEFT ? "left" : "right");
+				}
+				// 22. The gore has to be on the lane it feeds, both ends of it. This is
+				// what catches a stub whose taper runs off the end of the lane, which
+				// draws a wedge of asphalt leading to grass.
+				if (!arc_contains(pit_lane.from_m, pit_lane.to_m, stub.junction_m)
+						|| !arc_contains(pit_lane.from_m, pit_lane.to_m, stub.outboard_m)) {
+					say("the %s %s stub runs %.1f m to %.1f m and the pit lane covers "
+						"%.1f m to %.1f m; the gore does not reach the lane",
+							stub.layout.c_str(), stub.is_entry ? "entry" : "exit",
+							stub.junction_m, stub.outboard_m, pit_lane.from_m, pit_lane.to_m);
+				}
+				// 23. The **whole** gore is on a straight, not just the junction point.
+				// Rule 20 checks the station the file declares; a 22 deg branch is eight
+				// meters long and can start on a straight and finish in a corner, where
+				// the merge angle is a function of how far along the junction you are.
+				const int steps = 8;
+				for (int step = 0; step <= steps; ++step) {
+					const double where = wrap(stub.junction_m
+							+ signed_gap(stub.junction_m, stub.outboard_m) * step / steps);
+					if (sample(where).curvature != 0.0) {
+						say("the %s %s gore reaches %.1f m, which is inside a corner; a "
+							"branch off an arc has a merge angle that changes along it",
+								stub.layout.c_str(), stub.is_entry ? "entry" : "exit", where);
+						break;
+					}
+				}
+			}
+			// 24. Run-off and pit lane cannot be the same ground. Both are built
+			// outboard of the verge on a named side, and where they overlap the collider
+			// gets two surfaces over one band - which is how a kart ends up reported on
+			// gravel in the pit lane.
+			for (const Corner &corner : corners) {
+				if (!corner.has_runoff || corner.runoff.apron_m <= 0.0) {
+					continue;
+				}
+				if (corner.runoff.side != SIDE_BOTH && corner.runoff.side != pit_lane.hand) {
+					continue;
+				}
+				const double window_from = wrap(corner.from_m - 30.0);
+				const double window_to = wrap(corner.to_m + 30.0);
+				const bool overlaps =
+						arc_contains(pit_lane.from_m, pit_lane.to_m, window_from)
+						|| arc_contains(pit_lane.from_m, pit_lane.to_m, window_to)
+						|| arc_contains(window_from, window_to, pit_lane.from_m);
+				if (overlaps) {
+					say("%s's run-off and the pit lane are both on the %s over %.1f-%.1f m",
+							corner.name.c_str(),
+							pit_lane.hand == SIDE_LEFT ? "left" : "right",
+							window_from, window_to);
+				}
+			}
+		}
 		return problems;
 	}
 
@@ -1146,6 +1428,57 @@ struct Track {
 			if (here.curvature != 0.0) {
 				say("%s pit %s at %.1f m is inside a corner", layout.name.c_str(),
 						pit_names[index], pit_stations[index]);
+			}
+		}
+
+		// 25. The junction geometry, which is what makes a pit lane asphalt rather
+		// than a pair of stations. ADR-0053.
+		if (layout.pit_side == SIDE_FULL) {
+			if (layout.pit_entry_m >= 0.0 || layout.pit_exit_m >= 0.0) {
+				say("%s declares pit stations and no pit side, so nothing can be built "
+					"from them",
+						layout.name.c_str());
+			}
+			return;
+		}
+		const double angles[2] = { layout.pit_entry_angle_deg, layout.pit_exit_angle_deg };
+		for (int index = 0; index < 2; ++index) {
+			if (angles[index] <= 0.0) {
+				say("%s's pit %s branches at %.1f deg; a junction needs an angle",
+						layout.name.c_str(), pit_names[index], angles[index]);
+			} else if (angles[index] > circuit::PIT_MERGE_MAX_DEG + 1e-9) {
+				say("%s's pit %s branches at %.1f deg, over art 7.2's %.0f deg cap",
+						layout.name.c_str(), pit_names[index], angles[index],
+						circuit::PIT_MERGE_MAX_DEG);
+			}
+		}
+		// 26. §7.2's *"no crossing between the lines of karts that are on the track
+		// and those of karts that enter the Repairs Area or leave it"*, as geometry.
+		//
+		// A kart on the line tracks out to the **outside** of the corner it has just
+		// left and sets up on the outside of the corner it is about to enter, so the
+		// free edge at a junction is that corner's own **inside**. Forward, T8b and T1
+		// are both lefts and both junctions go left; reversed they are both rights and
+		// both junctions go right - which is the same physical edge and the reason the
+		// two layouts need their own gores rather than their own pit lane.
+		{
+			const int before = corner_left_before(layout, layout.pit_entry_m);
+			const int after = corner_entered_after(layout, layout.pit_exit_m);
+			const int want_entry = corner_hand(layout, before);
+			const int want_exit = corner_hand(layout, after);
+			auto side_name = [](int side) { return side == SIDE_LEFT ? "left" : "right"; };
+			if (before >= 0 && layout.pit_side != want_entry) {
+				say("%s's deceleration lane leaves on the %s at %.1f m, and the kart it "
+					"is taking off the line is tracking out to that edge from %s; art 7.2 "
+					"forbids the crossing",
+						layout.name.c_str(), side_name(layout.pit_side), layout.pit_entry_m,
+						corners[before].name.c_str());
+			}
+			if (after >= 0 && layout.pit_side != want_exit) {
+				say("%s's exit lane rejoins on the %s at %.1f m, which is the line into "
+					"%s; art 7.2 forbids the crossing",
+						layout.name.c_str(), side_name(layout.pit_side), layout.pit_exit_m,
+						corners[after].name.c_str());
 			}
 		}
 	}

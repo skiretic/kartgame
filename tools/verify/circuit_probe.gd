@@ -18,6 +18,9 @@ extends SceneTree
 ##   --case=layouts     the reverse layout: stations, hands, grid, furniture
 ##   --case=timing      the authored sector marks and checkpoints, through the
 ##                      timer the session actually runs. Issue #180
+##   --case=pit         the pit lane's asphalt: both layouts' gores against closed
+##                      form, the collider against the mesh, and a track whose
+##                      merge angle is illegal, which must not load. Issue #181
 ##   --case=place       put the kart down at forty stations and read the surface
 ##                      under all four wheels. Needs the scene and the kart mesh
 ##   --track=res://...  which circuit
@@ -123,7 +126,8 @@ func _initialize() -> void:
 
 	if _wants("schema"):
 		_case_schema()
-	if _wants("measure") or _wants("agree") or _wants("layouts") or _wants("timing"):
+	if _wants("measure") or _wants("agree") or _wants("layouts") or _wants("timing") \
+			or _wants("pit"):
 		_track = KartTrack.new()
 		if _track.load(_track_path) != OK:
 			_fail("%s does not load, so nothing after this can be measured" % _track_path)
@@ -139,6 +143,8 @@ func _initialize() -> void:
 		_case_layouts()
 	if _wants("timing"):
 		_case_timing()
+	if _wants("pit"):
+		_case_pit()
 
 	_wants_placement = _wants("place")
 	if not _wants_placement:
@@ -606,6 +612,361 @@ func _split_text(splits: PackedFloat64Array) -> String:
 	for value in splits:
 		parts.append("%.3f" % value)
 	return " / ".join(parts)
+
+
+# --- the pit lane ----------------------------------------------------------
+
+
+## Issue #181. The pit lane is the one piece of this circuit that is **geometry
+## rather than furniture and does not reverse**, so it is the one piece where a
+## programmatic flip of the spline produces something that loads and cannot be
+## driven: a 22° branch is a 158° merge taken the other way, over Part I art 7.2's
+## 30° cap, on whichever edge it is on.
+##
+## Five things, and each one is a way the join has been wrong somewhere in this
+## project before:
+##
+##   1. The gores are the closed form. `taper = separation / tan(angle)` — derived,
+##      never authored, so the angle has exactly one home.
+##   2. Both layouts stand on **one** piece of asphalt. Forward reads "left" and
+##      reverse reads "right" and they name the same edge; two stubs that came out
+##      on opposite edges would be a second pit lane nobody built.
+##   3. Art 7.2's *"no crossing between the lines of karts"*, as geometry: a
+##      junction goes on the **inside** of its adjacent corner, because that is the
+##      edge a kart tracking out is not using.
+##   4. The collider and the mesh are one road. Same claim `--case=agree` makes for
+##      the centerline, re-asked off the *pit* rows — a collider built at the wrong
+##      separation agrees with all 55 centerline rows and is a different circuit.
+##   5. The negative control, and it is two of them: a merge angle over the cap and
+##      a reverse stub on the far edge. Both must be refused, and refused for the
+##      thing they break rather than for a missing field.
+const PIT_BAD_ANGLE_DEG := 40.0
+const PIT_BAD_TRACK := "user://circuit_probe_pit_angle.track.json"
+const PIT_BAD_SIDE_TRACK := "user://circuit_probe_pit_side.track.json"
+
+
+func _case_pit() -> void:
+	print("-- pit lane")
+	var lane := _track.pit_lane()
+	if not bool(lane.get("declared", false)):
+		_fail("%s declares no pit lane; issue #181 is the asphalt, not the stations"
+				% _track_path.get_file())
+		return
+	var separation := float(lane["separation"])
+	var lane_width := float(lane["width"])
+	var lane_hand := -1.0 if String(lane["side"]) == "left" else 1.0
+	print("  lane on the %s, %.2f m wide, %.2f m clear of the track edge, %.1f m of "
+			% [lane["side"], lane_width, separation, float(lane["run"])]
+			+ "parallel run from %.1f m to %.1f m" % [lane["from"], lane["to"]])
+	# Art 7.4's 3–4 m and art 7.5's 1.80 m of verge. The loader checks both and this
+	# restates them, because a gate that only asked the loader would pass on a build
+	# where the loader stopped checking.
+	if lane_width < 3.0 - 1e-9 or lane_width > 4.0 + 1e-9:
+		_fail("the pit lane is %.2f m wide, outside art 7.4's 3-4 m" % lane_width)
+	if separation < 1.80 - 1e-9:
+		_fail("the pit lane sits %.2f m off the track, inside art 7.5's 1.80 m verge"
+				% separation)
+
+	# 1. Every gore is `separation / tan(angle)` long, signed the way its layout runs.
+	var stubs := _track.pit_stubs()
+	if stubs.size() != 4:
+		_fail("%d pit stubs; two layouts with an entry and an exit each is 4" % stubs.size())
+	print("  %-10s %-6s %9s %9s %7s %9s %9s"
+			% ["layout", "which", "junction", "outboard", "angle", "reach", "closed form"])
+	for stub in stubs:
+		var predicted: float = separation / tan(deg_to_rad(float(stub["angle_deg"])))
+		var reach: float = float(stub["reach"])
+		print("  %-10s %-6s %9.3f %9.3f %6.1f° %+9.4f %9.4f" % [
+			stub["layout"], "entry" if stub["is_entry"] else "exit",
+			stub["junction"], stub["outboard"], stub["angle_deg"], reach, predicted,
+		])
+		if absf(absf(reach) - predicted) > 1e-6:
+			_fail("the %s %s gore reaches %.4f m and %.2f / tan(%.1f deg) is %.4f m"
+					% [stub["layout"], "entry" if stub["is_entry"] else "exit",
+					absf(reach), separation, stub["angle_deg"], predicted])
+		if float(stub["angle_deg"]) > 30.0 + 1e-9:
+			_fail("the %s %s branches at %.1f deg, over art 7.2's 30 deg cap"
+					% [stub["layout"], stub["is_entry"], stub["angle_deg"]])
+		# 2. One pit lane. This is the check a programmatic reversal fails: flipping
+		# the spline flips the *sign* of the side and leaves the asphalt where it was.
+		if String(stub["side"]) != String(lane["side"]):
+			_fail("the %s %s stub is on the %s and the lane is on the %s; that is two "
+					% [stub["layout"], "entry" if stub["is_entry"] else "exit",
+					stub["side"], lane["side"]] + "pit lanes")
+
+	# The same fact from the other end: read in each layout's OWN frame the two
+	# sides must differ, because the layouts face opposite ways down one road. Both
+	# reading "left" is the bug this whole issue exists to rule out.
+	var own_sides := {}
+	for name in _track.layout_names():
+		_track.select_layout(name)
+		# 3. Art 7.2: the free edge at a junction is the inside of the corner beside
+		# it, recomputed here from the corner list rather than read off the file.
+		var entry_station := _pit_station(name, "pit_entry_m")
+		var exit_station := _pit_station(name, "pit_exit_m")
+		var before := _corner_left_before(entry_station)
+		var after := _corner_entered_after(exit_station)
+		var side := _layout_pit_side(name)
+		own_sides[name] = side
+		print("  %-8s junctions on the %-5s  leaves %-16s (a %s) at %.1f m, joins %-16s (a %s) at %.1f m"
+				% [name, side, before["name"], before["hand"], entry_station,
+				after["name"], after["hand"], exit_station])
+		if side != String(before["hand"]):
+			_fail("%s leaves the track on the %s at %.1f m and a kart is tracking out "
+					% [name, side, entry_station]
+					+ "to that edge from %s, a %s" % [before["name"], before["hand"]])
+		if side != String(after["hand"]):
+			_fail("%s rejoins on the %s at %.1f m, which is the line into %s, a %s"
+					% [name, side, exit_station, after["name"], after["hand"]])
+	_track.select_layout("forward")
+	if own_sides.size() == 2 and own_sides["forward"] == own_sides["reverse"]:
+		_fail("both layouts put their junctions on their own %s. Driven opposite ways "
+				% own_sides["forward"]
+				+ "down one road that is two different edges, so it is two pit lanes.")
+
+	# 4. The collider's own triangles, projected back onto the centerline.
+	#
+	# Not a restatement of the loader: these are the vertices `KartBody`'s suspension
+	# will actually raycast against. A gore built with its taper the wrong way round,
+	# or a lane laid on top of the verge, shows up here and nowhere else.
+	var faces := _pit_faces()
+	if faces.is_empty():
+		_fail("surface_meshes() publishes no PitLane body, so the asphalt does not exist")
+	else:
+		var lowest := 1e30
+		var highest := -1e30
+		var wrong_side := 0
+		for vertex in faces:
+			var found := _track.project(vertex, -1.0)
+			var frame := _track.sample(found["distance"])
+			var lateral := float(found["lateral"])
+			if lateral * lane_hand <= 0.0:
+				wrong_side += 1
+			# Clear ground between the white line and this vertex.
+			var clear: float = absf(lateral) - float(frame["width"]) * 0.5
+			lowest = minf(lowest, clear)
+			highest = maxf(highest, clear)
+		print("  %d collider vertices, %.4f m to %.4f m clear of the white line "
+				% [faces.size(), lowest, highest]
+				+ "(gore tip 0, lane far edge %.2f)" % (separation + lane_width))
+		if wrong_side > 0:
+			_fail("%d of %d pit vertices are on the %s of the road and the lane is on "
+					% [wrong_side, faces.size(), "right" if lane_hand < 0.0 else "left"]
+					+ "the %s" % lane["side"])
+		# Nothing may sit on the road. The gore's tip is *on* the white line, so the
+		# floor is zero and not a margin — a millimeter of tolerance for the
+		# projection's own arc solve.
+		if lowest < -0.001:
+			_fail("a pit vertex is %.4f m inside the white line; the pit lane is "
+					% lowest + "overlapping the road")
+		if absf(highest - (separation + lane_width)) > 0.001:
+			_fail("the pit asphalt reaches %.4f m off the road edge and the lane's far "
+					% highest + "edge is %.4f m" % (separation + lane_width))
+		# The two ends of every gore, as points, against closed form. This is the
+		# check that catches a taper built backwards: the outboard corner would land
+		# the far side of the junction and miss by twice the gore's length.
+		var worst_point := 0.0
+		var worst_name := ""
+		for stub in stubs:
+			var hand := -1.0 if String(stub["side"]) == "left" else 1.0
+			for end in [[float(stub["junction"]), 0.0, "tip"],
+					[float(stub["outboard"]), separation, "outboard"]]:
+				var frame := _track.sample(float(end[0]))
+				var offset: float = hand * (float(frame["width"]) * 0.5 + float(end[1]))
+				var want := _cross_section(frame, offset)
+				var nearest := 1e30
+				for vertex in faces:
+					nearest = minf(nearest, vertex.distance_to(want))
+				if worst_name.is_empty() or nearest > worst_point:
+					worst_point = nearest
+					worst_name = "%s %s %s" % [stub["layout"],
+							"entry" if stub["is_entry"] else "exit", end[2]]
+		print("  worst gore corner missing from the collider: %.4f mm (%s)"
+				% [worst_point * 1000.0, worst_name])
+		if worst_point > 0.001:
+			_fail("the %s corner is %.4f mm from the nearest collider vertex; the gore "
+					% [worst_name, worst_point * 1000.0] + "is not where the schema says")
+
+	# 5. The mesh, off the manifest's own pit rows. Same claim as `--case=agree`,
+	# re-asked where the centerline rows cannot see.
+	_pit_against_manifest(lane)
+
+	# The negative controls.
+	_pit_negative_control(PIT_BAD_TRACK, "merge angle",
+			"over art 7.2's 30 deg cap", func(root: Dictionary) -> void:
+		root["layouts"][0]["pit"]["entry_angle_deg"] = PIT_BAD_ANGLE_DEG)
+	_pit_negative_control(PIT_BAD_SIDE_TRACK, "stub side",
+			"that is two pit lanes", func(root: Dictionary) -> void:
+		root["layouts"][1]["pit"]["side"] = root["layouts"][0]["pit"]["side"])
+
+
+## `docs/TRACK_SCHEMA.md`'s one cross-section formula, written out here so the
+## comparison is against the **schema** and not against whichever consumer was
+## asked first. Same reason `--case=agree` carries its own copy.
+func _cross_section(frame: Dictionary, lateral: float) -> Vector3:
+	var centre: Vector3 = frame["position"]
+	var heading: float = frame["heading"]
+	var right := Vector3(cos(heading), 0.0, sin(heading))
+	var y := float(frame["elevation"]) \
+			- float(frame["crown_pct"]) * 0.01 * absf(lateral) \
+			- float(frame["bank_pct"]) * 0.01 * lateral
+	return Vector3(centre.x + right.x * lateral, y, centre.z + right.z * lateral)
+
+
+func _pit_faces() -> PackedVector3Array:
+	for entry in _track.surface_meshes():
+		if String(entry["name"]) == "PitLane":
+			return entry["faces"]
+	return PackedVector3Array()
+
+
+## The authored file, read as JSON. The probe needs the layout's own-frame side and
+## its own-frame pit stations, and `KartTrack` deliberately publishes the stubs in
+## the **forward** frame — converting back here would be re-implementing the thing
+## under test.
+func _raw_track() -> Dictionary:
+	var parsed = JSON.parse_string(FileAccess.get_file_as_string(_track_path))
+	return parsed if typeof(parsed) == TYPE_DICTIONARY else {}
+
+
+func _raw_layout(name: String) -> Dictionary:
+	for layout in _raw_track().get("layouts", []):
+		if String(layout.get("name", "")) == name:
+			return layout
+	return {}
+
+
+func _layout_pit_side(name: String) -> String:
+	return String(_raw_layout(name).get("pit", {}).get("side", ""))
+
+
+func _pit_station(name: String, key: String) -> float:
+	return float(_raw_layout(name).get(key, -1.0))
+
+
+## The corner this layout has most recently left at one of its own stations, and the
+## one it is about to enter. Both read through `_track.corner()`, which already
+## reports the selected layout's own stations and its own hands — so the same two
+## functions answer for forward and reverse without knowing which is selected.
+func _corner_left_before(station: float) -> Dictionary:
+	var best := {}
+	var nearest := _track.length()
+	for index in _track.corner_count():
+		var corner := _track.corner(index)
+		var gap: float = fposmod(station - float(corner["to"]), _track.length())
+		if gap < nearest:
+			nearest = gap
+			best = corner
+	return best
+
+
+func _corner_entered_after(station: float) -> Dictionary:
+	var best := {}
+	var nearest := _track.length()
+	for index in _track.corner_count():
+		var corner := _track.corner(index)
+		var gap: float = fposmod(float(corner["from"]) - station, _track.length())
+		if gap < nearest:
+			nearest = gap
+			best = corner
+	return best
+
+
+func _pit_against_manifest(lane: Dictionary) -> void:
+	if not FileAccess.file_exists(MANIFEST):
+		_fail("no %s, so the pit mesh cannot be compared" % MANIFEST)
+		return
+	var parsed = JSON.parse_string(FileAccess.get_file_as_string(MANIFEST))
+	if typeof(parsed) != TYPE_DICTIONARY:
+		_fail("%s is not an object" % MANIFEST)
+		return
+	var rows: Array = parsed.get("pit_edges", [])
+	if rows.is_empty():
+		_fail("the manifest carries no pit_edges — re-run gentrack.py; a pit lane the "
+				+ "mesh does not know about is half a pipeline")
+		return
+	var separation := float(lane["separation"])
+	var lane_width := float(lane["width"])
+	var hand := -1.0 if String(lane["side"]) == "left" else 1.0
+	var worst := 0.0
+	var worst_where := 0.0
+	var worst_kind := ""
+	for row in rows:
+		var station := float(row["distance_m"])
+		var frame := _track.sample(station)
+		var half := float(frame["width"]) * 0.5
+		var inner: float = hand * (half + separation) if String(row["kind"]) == "lane" \
+				else hand * half
+		# A lane row's two columns are its own two edges; a gore row's are the white
+		# line and however far that gore has opened, which the manifest carries as the
+		# point rather than as the fraction — so this compares positions and not a
+		# parameter both sides could get wrong the same way.
+		var outer_offset: float = inner + hand * lane_width \
+				if String(row["kind"]) == "lane" else 0.0
+		for column in [["inner", inner], ["outer", outer_offset]]:
+			if String(row["kind"]) != "lane" and String(column[0]) == "outer":
+				# The gore's outer point is not a fixed offset — take the manifest's own
+				# and check it is on the road's cross-section at the right clearance.
+				var theirs_raw: Array = row["outer"]
+				var theirs_point := Vector3(theirs_raw[0], theirs_raw[1], theirs_raw[2])
+				var found := _track.project(theirs_point, -1.0)
+				var here := _track.sample(found["distance"])
+				var clear: float = absf(float(found["lateral"])) - float(here["width"]) * 0.5
+				if clear < -0.001 or clear > separation + 0.001:
+					_fail("a %s gore vertex sits %.4f m clear of the white line, outside "
+							% [row["kind"], clear] + "0 to %.2f m" % separation)
+				continue
+			var ours := _cross_section(frame, float(column[1]))
+			var theirs: Array = row[String(column[0])]
+			var gap := ours.distance_to(Vector3(theirs[0], theirs[1], theirs[2]))
+			if gap > worst:
+				worst = gap
+				worst_where = station
+				worst_kind = "%s %s" % [row["kind"], column[0]]
+	print("  %d pit rows in the manifest, worst disagreement %.4f mm on the %s at %.1f m"
+			% [rows.size(), worst * 1000.0, worst_kind, worst_where])
+	if worst > 0.001:
+		_fail("the pit mesh and the pit collider disagree by %.4f mm" % (worst * 1000.0))
+
+
+## Break one thing, write the file, and require the loader to refuse it and say why.
+##
+## `input_push_probe.gd --break` is the pattern and `self_intersecting.track.json` is
+## the committed version of it. These two are built at run time rather than committed
+## because they are one-field edits of the real circuit: committing them would mean
+## four track files to keep in step with every schema change, and the edit is more
+## legible as one line here than as a 2,000-line diff.
+func _pit_negative_control(path: String, what: String, expected: String,
+		mutate: Callable) -> void:
+	var root := _raw_track()
+	if root.is_empty():
+		_fail("could not re-read %s to build the %s control" % [_track_path, what])
+		return
+	mutate.call(root)
+	var handle := FileAccess.open(path, FileAccess.WRITE)
+	if handle == null:
+		_fail("could not write the %s control to %s" % [what, path])
+		return
+	handle.store_string(JSON.stringify(root))
+	handle.close()
+
+	var broken := KartTrack.new()
+	var error := broken.load(path)
+	if error == OK:
+		_fail("the %s control LOADED. %s was supposed to be refused, so the pit rules "
+				% [what, what] + "are not being enforced and every circuit is unchecked.")
+		return
+	var named := false
+	for problem in broken.problems():
+		if problem.contains(expected):
+			named = true
+	print("  %-12s control refused with %d, %d problem(s)"
+			% [what, error, broken.problems().size()])
+	for problem in broken.problems():
+		print("      ! " + problem)
+	if not named:
+		_fail("the %s control was refused, but not for %s — it is meant to break "
+				% [what, expected] + "exactly one rule and something else is firing first.")
 
 
 # --- placement -------------------------------------------------------------
