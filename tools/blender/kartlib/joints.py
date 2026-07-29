@@ -155,37 +155,198 @@ JOINTS: tuple[Joint, ...] = (
     ),
     Joint(
         a="chassis_rail_l",
-        b="chassis_seat_strut_*_l",
+        b="chassis_seat_strut_front_l",
         kind="welded",
-        why="both seat stays start on the rail. Same side only: a strut welded "
-        "to the opposite rail would be a mirroring bug and this is where it "
-        "would surface",
+        why="the FRONT seat stay starts on the rail, at the central strut's "
+        "station. Same side only: a strut welded to the opposite rail would be a "
+        "mirroring bug and this is where it would surface. **The rear stay is no "
+        "longer here** -- Art. 9.1.2 puts the extra seat stays *between the rear "
+        "axle brackets and the seat*, so the rear pair roots on the bearing "
+        "hanger and has its own entry. It used to start on the rail at y -400 "
+        "and end 78.07 mm from the shell, aimed at nothing",
     ),
     Joint(
         a="chassis_rail_r",
-        b="chassis_seat_strut_*_r",
+        b="chassis_seat_strut_front_r",
         kind="welded",
         why="the right-hand pair of the same joint",
     ),
     Joint(
-        a="chassis_rail_l",
-        b="chassis_side_bar_l",
+        a="chassis_bearing_hanger_l",
+        b="chassis_seat_strut_rear_l",
         kind="welded",
-        why="the side bar leaves the rail just behind the front axle line and "
-        "returns to it at the rear; those two tangent points are the weld",
+        why="Art. 9.1.2: *\"Extra seat stays are allowed between the rear axle "
+        "brackets and the seat.\"* The bracket is this hanger, and the stay welds "
+        "to its plate 40 mm behind the axle line -- 40 rather than 0 because "
+        "`axle_rear` occupies y -550..-500 at z 122.5..172.5 and a stay rooted on "
+        "the axle line runs straight through it",
     ),
     Joint(
-        a="chassis_rail_r",
+        a="chassis_bearing_hanger_r",
+        b="chassis_seat_strut_rear_r",
+        kind="welded",
+        why="the right-hand pair of the same joint",
+    ),
+    Joint(
+        a="chassis_bearing_hanger_l",
+        b="chassis_rail_l",
+        kind="welded",
+        why="the outer hanger plates moved from x +-185 to +-300 (spec §10.9), "
+        "which is inside the rail's own tube at the axle line -- so they weld to "
+        "the rail as well as to the rear cross member, and the axle line is "
+        "carried by the two members that actually run under it",
+    ),
+    Joint(
+        a="chassis_bearing_hanger_r",
+        b="chassis_rail_r",
+        kind="welded",
+        why="the right-hand pair of the same joint",
+    ),
+    # Art. 9.4.2 puts each side bar in **two welded tube attachments 500 +-5 mm
+    # apart**, so the bar no longer touches the rail at all: it is seated in the
+    # sockets and the sockets are welded to the rail. The old
+    # `chassis_rail_?`/`chassis_side_bar_?` entries are deleted rather than
+    # waived, because a bar that runs into its own rail is not what the article
+    # describes -- and the built bar had no sockets at all.
+    Joint(
+        a="chassis_bumper_socket_side_*_l",
+        b="chassis_rail_l",
+        kind="welded",
+        why="all four sockets on the left stand on the rail centerline, 10 mm "
+        "inside the tube so the weld measures 0 mm rather than being a standoff "
+        "nobody chose. Art. 9.4.2's *\"two welded tube attachments\"*",
+    ),
+    Joint(
+        a="chassis_bumper_socket_side_*_r",
+        b="chassis_rail_r",
+        kind="welded",
+        why="the right-hand four of the same joint",
+    ),
+    Joint(
+        a="chassis_bumper_socket_side_lower_*_l",
+        b="chassis_side_bar_l",
+        kind="seated",
+        why="Art. 9.4.2: the attachments must *\"allow for a 50.0 mm insertion of "
+        "the bar\"*, so the sleeve is 50 mm long and the bar's end is inside it",
+    ),
+    Joint(
+        a="chassis_bumper_socket_side_lower_*_r",
+        b="chassis_side_bar_r",
+        kind="seated",
+        why="the right-hand pair of the same joint",
+    ),
+    Joint(
+        a="chassis_bumper_socket_side_upper_*_l",
+        b="chassis_side_bar_upper_l",
+        kind="seated",
+        why="the upper bar's 50 mm insertion, same article",
+    ),
+    Joint(
+        a="chassis_bumper_socket_side_upper_*_r",
+        b="chassis_side_bar_upper_r",
+        kind="seated",
+        why="the right-hand pair of the same joint",
+    ),
+    Joint(
+        a="chassis_bumper_socket_side_upper_*_l",
+        b="chassis_side_bar_l",
+        kind="welded",
+        why="the upper socket is a 135 mm post and the lower bar crosses it on "
+        "the way out, so the two are welded where they meet. That is also what "
+        "makes the pair one bracket rather than two",
+    ),
+    Joint(
+        a="chassis_bumper_socket_side_upper_*_r",
         b="chassis_side_bar_r",
         kind="welded",
         why="the right-hand pair of the same joint",
     ),
     Joint(
-        a="chassis_nose_hoop_lower",
+        a="chassis_bumper_socket_side_lower_front_l",
+        b="chassis_bumper_socket_side_upper_front_l",
+        kind="welded",
+        why="the two posts at one station are 40 mm apart in y and share their "
+        "root on the rail. Written per station rather than as a glob because the "
+        "front and rear pairs are 500 mm apart and a glob would demand they touch",
+    ),
+    Joint(
+        a="chassis_bumper_socket_side_lower_front_r",
+        b="chassis_bumper_socket_side_upper_front_r",
+        kind="welded",
+        why="the right-hand front station",
+    ),
+    Joint(
+        a="chassis_bumper_socket_side_lower_rear_l",
+        b="chassis_bumper_socket_side_upper_rear_l",
+        kind="welded",
+        why="the left rear station",
+    ),
+    Joint(
+        a="chassis_bumper_socket_side_lower_rear_r",
+        b="chassis_bumper_socket_side_upper_rear_r",
+        kind="welded",
+        why="the right rear station",
+    ),
+    # The two front bumper bars are **not** welded to each other. Art. 9.4.1
+    # keeps them 132 mm apart in two different height bands and joins them with
+    # the front bumper support, which is a part rather than a joint -- *"Both bars
+    # must be connected by the front bumper support."* The old entry said they
+    # *"share their rearmost control point at the front cross member"*, which was
+    # true of a kart with one bar at a height no bar may occupy.
+    Joint(
+        a="chassis_front_bumper_support",
+        b="chassis_nose_hoop_lower",
+        kind="welded",
+        why="the two posts stand on the lower bar's straight run at x +-75",
+    ),
+    Joint(
+        a="chassis_front_bumper_support",
         b="chassis_nose_hoop_upper",
         kind="welded",
-        why="the two nose tiers share their rearmost control point at the front "
-        "cross member, so the tubes converge and touch there",
+        why="and reach the upper bar's straight run 132 mm above it",
+    ),
+    Joint(
+        a="chassis_bumper_socket_front_*",
+        b="chassis_cross_front",
+        kind="welded",
+        why="Art. 9.4.1's *\"two welded chassis frame attachments\"* per bar. All "
+        "four land on the front loop's legs, and the spacing is the article's: "
+        "450 mm for the lower bar and 550 for the upper. None of this was modeled "
+        "before #190",
+    ),
+    Joint(
+        a="chassis_bumper_socket_front_lower_?",
+        b="chassis_nose_hoop_lower",
+        kind="seated",
+        why="*\"allow for a 50.0 mm insertion of the bar\"*, and the riser is what "
+        "lifts the socket from the loop at z 50 to the bar at z 85 -- the bar is "
+        "planar and horizontal because the 70..110 window is stated for the bar, "
+        "not for its front straight",
+    ),
+    Joint(
+        a="chassis_bumper_socket_front_upper_?",
+        b="chassis_nose_hoop_upper",
+        kind="seated",
+        why="the same insertion on a 167 mm post, which is what a 200..250 mm "
+        "height band forces",
+    ),
+    Joint(
+        a="chassis_cross_front",
+        b="chassis_kingpin_boss_?",
+        kind="welded",
+        why="the boss sits on the front loop's leg at the front axle line. Art. "
+        "4.2.2 allows an articulated connection *\"only for the steering knuckle "
+        "(through the king pin) and the steering\"*, so this is the one place the "
+        "frame is permitted to articulate -- and there was nothing here at all "
+        "before #190, which is why `frame.py` invented a rail position from the "
+        "front hub and built the kingpins 925 mm apart",
+    ),
+    Joint(
+        a="chassis_cross_mid_front",
+        b="chassis_steering_support_upper",
+        kind="welded",
+        why="Art. 9.5.3's *\"one or more independent bars\"*: an inverted V off the "
+        "central strut's top surface, leaning forward against the column",
     ),
     Joint(
         a="chassis_bearing_hanger_?",
@@ -210,28 +371,67 @@ JOINTS: tuple[Joint, ...] = (
         why="the tray bolts on **top** of the rails -- frame.py item 2, and a "
         "tray under the rails puts the frame into the asphalt",
     ),
+    # **Three tray joints are deleted rather than waived**, and that is the point
+    # of Art. 4.6: the tray *"stretch[es] from the central strut to the front of
+    # the chassis frame"*, so it runs y +40..+760 and the hangers, the rear cross
+    # member and all four seat stays are between 460 and 1,285 mm away from it. A
+    # declared joint whose two parts are half a meter apart is a statement about a
+    # kart that no longer exists, and `_expand_or_die` is what would have caught
+    # it. Deleted: `chassis_floor_tray`/`chassis_cross_rear`,
+    # `chassis_floor_tray`/`chassis_bearing_hanger_?`,
+    # `chassis_floor_tray`/`chassis_seat_strut_*`.
     Joint(
         a="chassis_floor_tray",
-        b="chassis_cross_rear",
-        kind="seated",
-        why="the tray runs back past the rear axle and lands on this member on "
-        "its way; it is not fastened here but it does bear on it",
+        b="chassis_cross_mid_front",
+        kind="bolted",
+        why="the central strut is the tray's rear edge, by Art. 4.6's own "
+        "enumeration of the perimeter -- *\"the central strut, the longitudinal "
+        "tubes and the front of the chassis frame\"*. The pan's underside is flush "
+        "with the tube's top surface",
     ),
     Joint(
         a="chassis_floor_tray",
-        b="chassis_bearing_hanger_?",
-        kind="pierced",
-        why="the hangers stand up through the tray, which is cut around them. "
-        "The tray covers the main rail through the whole engine bay -- see "
-        "powertrain._engine_mount, which had to give up its inboard clamp "
-        "because of it",
+        b="chassis_cross_front",
+        kind="bolted",
+        why="and the loop's frontmost segment is its front edge, which is what "
+        "*\"the front of the chassis frame\"* means. Both edges land on a tube "
+        "rather than in mid-air, which is how the article is scrutineered",
     ),
     Joint(
         a="chassis_floor_tray",
-        b="chassis_seat_strut_*",
+        b="chassis_tray_edge_?",
+        kind="welded",
+        why="Art. 4.6's last sentence is mandatory and this part did not exist: "
+        "*\"It must be laterally edged by a tube or a rim preventing the driver's "
+        "feet from sliding off the floor tray.\"* The rails cannot serve -- their "
+        "top is at z 65 and the pan's is at 69, so the rail stands 4 mm *below* "
+        "the surface a foot slides off",
+    ),
+    Joint(
+        a="chassis_floor_tray",
+        b="chassis_steering_support_upper",
         kind="pierced",
-        why="the four seat stays leave the rails inboard of the tray's edge and "
-        "pass up through it",
+        why="the pan is notched at its rear edge around the support's two feet. "
+        "**Art. 4.6's two-hole allowance is not what covers this** -- that is for "
+        "the steering column and the gear shift lever, and this is an edge notch "
+        "rather than a hole, which is the reading spec §99 W1 asks for and the "
+        "one every kart in the reference set is built to",
+    ),
+    Joint(
+        a="chassis_tray_edge_l",
+        b="chassis_rail_l",
+        kind="welded",
+        why="aft of the waist the pan's edge *is* the rail centerline, so the "
+        "edging tube runs directly above the rail and welds to it continuously. "
+        "Its centerline is at z 73 rather than spec §10.7's 77 for exactly this "
+        "reason: at 77 the tube's underside is 4 mm clear of the rail's top and "
+        "this weld would be declared and measured apart",
+    ),
+    Joint(
+        a="chassis_tray_edge_r",
+        b="chassis_rail_r",
+        kind="welded",
+        why="the right-hand pair of the same joint",
     ),
     # --- wheels.py -----------------------------------------------------------
     Joint(
@@ -817,7 +1017,17 @@ JOINTS: tuple[Joint, ...] = (
         a="shifter_base",
         b="chassis_floor_tray",
         kind="bolted",
-        why="the hand shifter's base bolts down to the tray beside the seat",
+        why="the hand shifter's base bolts down to the tray beside the seat. It "
+        "survived the tray moving to Art. 4.6's extent by 1 mm: the base's "
+        "underside is at z 70 and the pan's top at 69",
+    ),
+    Joint(
+        a="shifter_base",
+        b="chassis_tray_edge_r",
+        kind="bolted",
+        why="and it butts against the pan's edging tube, which runs along the "
+        "pan's edge at x 273..286 through the base's own y band. The base is "
+        "inboard of the tube and shares its bolts",
     ),
     Joint(
         a="shifter_base",
@@ -840,7 +1050,13 @@ JOINTS: tuple[Joint, ...] = (
         a="bodywork_rear_panel",
         b="chassis_rear_bumper",
         kind="bolted",
-        why="the rear protector mounts over the bumper hoop the same way",
+        why="the rear protector mounts on the bumper hoop -- and after #190 moved "
+        "the hoop 179 mm forward, to y -725 where Art. 9.5.5.1's 400 mm overhang "
+        "cap and the panel's own 187 mm depth put it, the two are **in contact for "
+        "the first time**: this pair was a waived 5.5 mm gap and the waiver is "
+        "deleted. The panel now meets the hoop's front face rather than wrapping "
+        "over it, which is a fact about the panel -- spec §50.11 respecifies it at "
+        "1390 x 187 x 177 and §Bodywork owns the change",
     ),
     Joint(
         a="bodywork_sidepod_l",
@@ -976,14 +1192,167 @@ OPEN_DEFECTS: tuple[Defect, ...] = (
         "anchored off the core's inboard end and neither was placed against "
         "the other",
     ),
+    # -- gate 1, #190: the footprint moved and four other assemblies did not --
+    #
+    # Every entry below is the *same* fact seen from a different part: a chassis
+    # built to `docs/KART_SPEC.md` §10 collides with bodywork, powertrain and
+    # cockpit parts that are still built to the old footprint. They are waivers
+    # rather than declarations because none of them is a joint -- a fairing is not
+    # welded to a frame loop -- and they are recorded per pair, with the number,
+    # so the wave that owns the other part can see exactly what it has to clear.
+    Defect(
+        a="bodywork_nose_fairing",
+        b="chassis_cross_front",
+        gate="overlap",
+        measured=236,
+        issue="#190",
+        why="the front of the frame is now a loop reaching y +760 (`G2` = 250 +-10 "
+        "on the CRG form) and the built fairing spans y +618..+902 with its lower "
+        "skin at z 46..51, so the loop passes through that skin. The fairing is "
+        "the part that is wrong: spec §50 puts its front face at y +1029 and its "
+        "rear at +742, i.e. entirely forward of the loop, and sizes it 1090 mm "
+        "wide against Art. 9.5.2's 1000 mm **minimum** -- the built panel is "
+        "512 mm wide. §Bodywork owns it",
+    ),
+    Defect(
+        a="bodywork_sidepod_?",
+        b="chassis_side_bar_upper_?",
+        gate="overlap",
+        measured=108,
+        issue="#190",
+        why="Art. 9.4.2 requires *two* bars per side and the kart had one, so the "
+        "upper bar is new -- and its legs have to come inboard to the frame "
+        "through the volume the built pod occupies (pod top edge z 232, outer face "
+        "480; the bar is at z 175 and x 560). There is no legal height for it that "
+        "clears: the article's floor is a 160 mm tube top and the pod spans "
+        "z 48..232. Spec §50.4 moves the pod's outer face to Art. 9.5.4's tapered "
+        "datum at x 618..664, outboard of both bars, which is where a pod that is "
+        "*"
+        "securely attached to the side bumpers"
+        "* has to be",
+    ),
+    Defect(
+        a="chassis_side_bar_upper_l",
+        b="radiator_*",
+        gate="overlap",
+        measured=42,
+        issue="#190",
+        why="the left upper bar and its rear socket pass through the radiator's "
+        "low tank. **This is not solvable by moving the bar**, and the arithmetic "
+        "is why it is a waiver: the tank reaches x -497.5 at y -96..-144, and the "
+        "front tire's disc blocks x 500 forward of y +385, which leaves 481 mm of "
+        "clear rail for an attachment pitch Art. 9.4.2 fixes at 500 +-5. Spec "
+        "§30.7 re-places the core (x -240..-490, z 408 top against 480 today) and "
+        "moves its brackets onto `chassis_rail_l`; §Powertrain owns it",
+    ),
+    Defect(
+        a="chassis_bumper_socket_side_upper_rear_l",
+        b="radiator_tank_low",
+        gate="overlap",
+        measured=107,
+        issue="#190",
+        why="the socket half of the same fact, recorded separately because it is "
+        "the part that would have to move if the radiator did not",
+    ),
+    Defect(
+        a="chassis_side_bar_upper_r",
+        b="exhaust_chamber",
+        gate="overlap",
+        measured=114,
+        issue="#190",
+        why="the right upper bar against the built exhaust, which runs *forward* "
+        "along the pod at x 290..424, z 47..299 from y -202 all the way to +240. "
+        "That is the volume Art. 9.4.2's upper bar has to cross to reach the rail. "
+        "Spec §30.6 replaces the whole pipe with the 15-cone form geometry and "
+        "§30.4's 25 degree cylinder lean, which re-routes it entirely",
+    ),
+    Defect(
+        a="chassis_side_bar_upper_r",
+        b="engine_starter",
+        gate="overlap",
+        measured=54,
+        issue="#190",
+        why="and the starter motor, 90 mm of the same intrusion at the rear "
+        "socket. Same resolution as the exhaust: §30 re-places the cluster",
+    ),
+    Defect(
+        a="chassis_bumper_socket_side_upper_rear_r",
+        b="engine_*",
+        gate="overlap",
+        measured=90,
+        issue="#190",
+        why="the right rear socket post against the starter. The two clear "
+        "windows on this rail are y > +240 and y < -345, and a 500 mm pitch does "
+        "not fit between them",
+    ),
+    Defect(
+        a="chassis_bumper_socket_side_upper_rear_r",
+        b="exhaust_chamber",
+        gate="overlap",
+        measured=64,
+        issue="#190",
+        why="the same post against the pipe",
+    ),
+    Defect(
+        a="chassis_floor_tray",
+        b="pedal_*",
+        gate="overlap",
+        measured=72,
+        issue="#190",
+        why="Art. 4.6 puts the floor tray *"
+        "from the central strut to the front of "
+        "the chassis frame"
+        "*, i.e. y +40..+760 -- so it is now under the pedals "
+        "instead of under the engine, and both pedal plates and both pads pass "
+        "through it. §40.5 saw this coming and says so: a pivot at z +50 is "
+        "19..44 mm **below** the pan's top surface, and Art. 4.6 forbids ribs and "
+        "wants a single element, so the pan cannot simply be notched. It "
+        "respecifies the pedal box at `pedal_z` 228 on a new `chassis_cross_pedal` "
+        "at y +610, which puts the pads above the pan. §Cockpit owns it",
+    ),
+    Defect(
+        a="chassis_steering_hoop",
+        b="pedal_mount_?",
+        gate="overlap",
+        measured=64,
+        issue="#190",
+        why="the lower steering support's arms run level at bore height (z 97) "
+        "from x +-170 inboard, because at rail height they would cross Art. 4.6's "
+        "edging tube. The pedal mounts are plates on edge at x +-120..+-130 "
+        "spanning z 87..175, aimed at a cross member that no longer exists, so the "
+        "arms pass through them. Same resolution as the tray/pedal pair: §40.5's "
+        "pedal box is 138 mm higher and 50 mm further forward",
+    ),
+    Defect(
+        a="chassis_seat_strut_front_r",
+        b="exhaust_chamber",
+        gate="overlap",
+        measured=60,
+        issue="#190",
+        why="the right front seat stay roots on the rail at the central strut's "
+        "station, per Art. 4.2.3, and the built exhaust belly is 296 mm from the "
+        "centerline at that station -- 10 mm outboard of the rail's own "
+        "centerline. The channel between the belly and `shifter_base` (x 235..276) "
+        "is 20 mm wide and the stay is a Ø20 tube, so there is no path: the stay "
+        "either clears the pipe or clears the shifter. It clears the shifter, "
+        "because §30.6 moves the pipe and §40 keeps the lever where it is",
+    ),
     # -- gate 2: declared joints that do not touch ---------------------------
     Defect(
         a="steering_bearing",
         b="chassis_steering_hoop",
         gate="gap",
-        measured=23.1,
+        measured=37.46,
         issue="#192",
-        why="issue #192's headline. The hoop tops out at z 127.2 mm and the "
+        why="issue #192's headline, and #190 moved the hoop rather than the "
+        "column: its bore is now at (0, +477, +97), sourced off "
+        "`refs/kart-visual/notes_column.md` and consistent with a Ø20 column at "
+        "36 degrees from vertical, while `cockpit.py` still derives the column "
+        "from `wheel_angle` = 0.470 rad and puts its lower end at (0, +502, +121). "
+        "So the two are 37.5 mm apart and the frame is the one that is right. "
+        "§Cockpit owns the column and spec §40.2 moves it onto this bore, which "
+        "is also what makes the upper support's apex land on it. Original "
+        "finding, for the record: the hoop tops out at z 127.2 mm and the "
         "column's lower bearing bottoms at 140.4 mm -- 13.2 mm of air in the "
         "vertical, 23.1 mm as a true surface gap because the two are not "
         "coaxial. cockpit.COLUMN_LOWER_CLEAR lifts the column off the hoop "
@@ -993,46 +1362,22 @@ OPEN_DEFECTS: tuple[Defect, ...] = (
         "twice what the module thinks. The column itself is 19.1 mm clear",
     ),
     Defect(
-        a="chassis_steering_hoop",
-        b="chassis_cross_front",
-        gate="gap",
-        measured=5.1,
-        issue="#192",
-        why="and the hoop is not welded to the frame either. Its feet are "
-        "authored at x +-0.150 at rail height, where the rails are out at "
-        "x 0.30 and the front cross member is 60 mm further forward",
-    ),
-    Defect(
         a="seat_shell",
         b="chassis_seat_strut_*",
         gate="gap",
-        measured=78.1,
+        measured=17.67,
         issue="#192",
-        why="the seat floats above its own stays: 16.6 mm off the front pair and "
-        "78.1 mm off the rear pair, which do not reach it at all. Its nearest "
-        "part of any kind is the floor tray at 6.9 mm, which is not what "
-        "carries a seat",
-    ),
-    Defect(
-        a="engine_mount_clamp_front",
-        b="chassis_rail_r",
-        gate="gap",
-        measured=12.1,
-        issue="#192",
-        why="the engine mount clamps nothing: _engine_mount's own docstring "
-        "puts the clamps 'about 11 mm outboard of the 30 mm tube's surface'. "
-        "So the whole powertrain's only attachment to the chassis is 12 mm "
-        "of air, and the mount plate is a further 3 mm clear of the tray on "
-        "purpose",
-    ),
-    Defect(
-        a="engine_mount_clamp_rear",
-        b="chassis_rail_r",
-        gate="gap",
-        measured=22.8,
-        issue="#192",
-        why="the rear clamp of the same mount, further out again because the "
-        "rail is still pinching inward at y -0.305",
+        why="the seat still floats above its own stays, and #190 closed most of "
+        "the gap rather than all of it: from 16.6 mm (front) and 78.1 mm (rear) "
+        "to contact at the front pair and 17.67 mm at the rear. The rear pair now starts where Art. 9.1.2 says it does "
+        "-- on the bearing hanger -- and both pairs end on `frame.SEAT_EAR_*`, "
+        "which are constants read off `cockpit.py`'s loft. **That is why the last "
+        "10 mm cannot be closed from here:** the shell's outer edge is a sampled "
+        "surface and a constant authored in a second module will always miss it "
+        "by a few millimeters and never say so. The fix is §Cockpit publishing "
+        "four `seat_ear_*` empties off the loft and this module reading them "
+        "through `context` -- spec §10.9 calls it the highest-value follow-up in "
+        "the section and it is",
     ),
     Defect(
         a="radiator_bracket_*",
@@ -1063,30 +1408,32 @@ OPEN_DEFECTS: tuple[Defect, ...] = (
         a="exhaust_hanger",
         b="chassis_side_bar_r",
         gate="gap",
-        measured=15.7,
-        issue="#192",
-        why="the exhaust hanger holds the silencer and is bolted to nothing",
+        measured=60.47,
+        issue="#190",
+        why="the exhaust hanger holds the silencer and is bolted to nothing, and "
+        "#190 moved the bar it reaches for: Art. 9.4.2 sets the lower bar at "
+        "480..520 mm from the axis and it was built at 445, so it went outboard "
+        "55 mm and its front bend came back to y +382 to clear the front tire. "
+        "The hanger sits at x 363..405, y +289..+303. Spec §30.6 re-routes the "
+        "whole exhaust and puts the hanger on `chassis_cross_rear`, which is a "
+        "different part on a different tube -- so this closes by being replaced",
     ),
     Defect(
         a="pedal_mount_?",
         b="chassis_cross_front",
         gate="gap",
-        measured=5.2,
-        issue="#192",
-        why="both pedal mounts hang 5.2 mm off the cross member they bolt to. "
-        "The pedal box is therefore held on by the cross tube alone, and the "
-        "cross tube is held by the mounts",
-    ),
-    Defect(
-        a="bodywork_rear_panel",
-        b="chassis_rear_bumper",
-        gate="gap",
-        measured=5.5,
-        issue="#192",
-        why="the rear protector is 5.5 mm off the bumper hoop it mounts to, "
-        "where MOUNT_STANDOFF asks for 1.5 mm. The nose fairing gets its "
-        "standoff right at 1.5 mm, so this is the rear panel's own pickup "
-        "and not the standoff constant",
+        measured=104.97,
+        issue="#190",
+        why="the mounts reach for a straight cross member at the front axle line "
+        "and there is not one: spec §10.1 item 3 measures the front of a CRG "
+        "chassis as a U-loop plus two stub-axle fixations, so `chassis_cross_front` "
+        "now runs y +500..+760 out at x +-110..+-304. `_pedal_mounts` aims its "
+        "brackets at `(0, front_axle_y, rail_z + 0.025)`, which is empty air 105 mm "
+        "away. The number this bracket has to hit is in spec §10.6 item 3 and it "
+        "is exact: the loop's leg centerline passes (+-259, +560, +50), so a mount "
+        "plate whose bore straddles x +-259 at z +50 contacts the tube at 0 mm. "
+        "§40.5 owns the plate and moves the whole pedal box to a pivot at z +228 "
+        "on a new `chassis_cross_pedal`; this waiver closes with it",
     ),
 )
 

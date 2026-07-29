@@ -77,6 +77,18 @@ PANEL_THICKNESS = 0.003
 #: inside that, and it must also clear the tube itself, whose center is at 0.905.
 NOSE_DEPTH = 0.284
 
+#: Fore-aft center of the nose fairing.
+#:
+#: **This was `params.nose_y`, and #190 gave that field to the front bumper's
+#: frontmost tube** -- the two had been one parameter meaning two things 179 mm
+#: apart, because `frame.py` placed the bumper from `length_overall` and this
+#: module placed the panel from `nose_y`. The panel is deliberately *not* moved
+#: here: spec §50 respecifies the whole fairing to 1090 x 287 x 227 with its front
+#: face at y +1029, and this module is not the one that owns that change. So the
+#: value is the panel exactly as it was built, and it now says which part it
+#: describes.
+FAIRING_CENTER_Y = 0.760
+
 #: Ground clearance of the fairing's lowest edge. Below `rail_z` - tube/2 = 0.035
 #: the fairing would be the lowest thing on the kart, which is wrong: on a real
 #: kart the rails are, and a fairing that grounds before the frame does is a part
@@ -311,12 +323,19 @@ SIDEPOD_MOUNT_PROFILE_T = 0.50
 #: may not read another module's objects (see `build.BuildContext`), and because
 #: the mount stubs have to end on the *filleted* centerline rather than on the
 #: control polyline. It belongs in params.py with the rest of the frame.
+#: Updated at #190 for Art. 9.4.2: the bar moved from x 445 -- 35 mm inboard of
+#: the article's 480 mm minimum -- to x 500, flat at z 80, with its two sockets on
+#: the rail centerline 500 mm apart. Both mount stations below sit on the bar's
+#: 420 mm straight run, so the pickup is (0.500, y, 0.080) whatever the corner
+#: arithmetic does, and the stubs now reach *outboard* rather than inboard: the
+#: built pod's outer face is at 480 and the bar is outside it. That is a fact
+#: about the pod, not about the bar -- Art. 9.5.4's datum puts the pod's face at
+#: 618..664 and spec §50 moves it there.
 SIDE_BAR_PATH: tuple[tuple[float, float, float], ...] = (
-    (0.335, 0.465, 0.065),
-    (0.430, 0.300, 0.105),
-    (0.445, 0.000, 0.110),
-    (0.430, -0.330, 0.105),
-    (0.320, -0.560, 0.065),
+    (0.220, 0.190, 0.080),
+    (0.500, 0.202, 0.080),
+    (0.500, -0.355, 0.080),
+    (0.310, -0.310, 0.080),
 )
 
 #: Half-width of the rear plastics. The rear bumper turns forward at x = ±0.310
@@ -636,8 +655,8 @@ def _nose_section(p: P.KartParams, s: float, steps: int) -> list[Vector]:
     a = abs(s)
     x = s * _nose_half_width(p)
 
-    front_y = p.nose_y + NOSE_DEPTH * 0.5
-    back_y = p.nose_y - NOSE_DEPTH * 0.5
+    front_y = FAIRING_CENTER_Y + NOSE_DEPTH * 0.5
+    back_y = FAIRING_CENTER_Y - NOSE_DEPTH * 0.5
 
     # The three z tables are keyed on absolute |x| because the hoops that
     # constrain them are; the plan-view tables are keyed on the section fraction
@@ -729,13 +748,22 @@ def _nose_fairing(
 
 
 def _lower_hoop_y(p: P.KartParams) -> float:
-    """Forward tube center of the nose hoop, as `frame.py:_bumpers` derives it."""
-    return p.length_overall * 0.5 - p.tube_bumper * 0.5
+    """Forward tube center of the nose hoop's lower bar.
+
+    Was `length_overall * 0.5 - tube_bumper * 0.5`, reproducing an arithmetic
+    `frame.py` no longer does: issue #190 deleted `length_overall` as an input,
+    because both halves of it are bodywork depths and a frame tube placed from it
+    is a frame dimension fitted to a bodywork envelope. The bar's position is now
+    a single-owner parameter and this reads it.
+    """
+    return P.nose_y(p)
 
 
 def _lower_hoop_z(p: P.KartParams) -> float:
-    """Height of the lower nose hoop tier — `rail_z` + 10 mm in `frame.py`."""
-    return P.rail_z(p) + 0.010
+    """Height of the lower nose bar. Art. 9.4.1 puts its tube top in a 70..110 mm
+    band and `nose_lower_z` is the middle of it; this used to hardcode
+    `rail_z + 10`, which was 60 -- on the floor of the band."""
+    return p.nose_lower_z
 
 
 def _nose_pins(

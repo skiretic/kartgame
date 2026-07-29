@@ -1976,10 +1976,16 @@ def _radiator_frame(p: P.KartParams) -> tuple[Matrix, Vector]:
     volume gate catches that, but the fix is a right-handed basis rather than a
     sign patched in somewhere downstream.
 
-    The rake is `seat_back_angle` plus `radiator_rake_delta`, so the radiator
-    cannot drift away from the seat it is derived from.
+    The rake is `radiator_rake` and nothing else. It used to be
+    `seat_back_angle + radiator_rake_delta`, on the claim that the core sits in
+    the plane a second seat's back would occupy -- which spec §30 measured false:
+    the core rakes 45 degrees from vertical and the seat shell's chord is 22. So
+    the two parts were sharing an angle they do not share, and because **no gate
+    measures a rake**, correcting the seat would have tipped the radiator 13
+    degrees with nothing objecting. The value is unchanged at 0.610; only its
+    owner is. Issue #190.
     """
-    rake = p.seat_back_angle + p.radiator_rake_delta
+    rake = p.radiator_rake
     sin_rake, cos_rake = math.sin(rake), math.cos(rake)
 
     # Columns are where local +x, +y and +z land. At rake 0 this is a vertical

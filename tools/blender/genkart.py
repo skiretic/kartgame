@@ -215,6 +215,30 @@ def build_kart(
     return context
 
 
+def check_parameter_coverage() -> None:
+    """Fail the build if a `KartParams` field is read by no module. Issue #190.
+
+    Spec §10.7's recommendation, and it is the same shape of check as
+    `joints.py`'s "a pattern that matches nothing is fatal": a parameter that no
+    mesh reads cannot be verified against anything, so it drifts away from the
+    kart in silence. Four had. `frame_height` was read by nothing at all until a
+    seat strut was pointed at it; `nose_width` says 680 mm while
+    `bodywork.NOSE_HALF_WIDTH_LIMIT` builds 512; `tray_width`/`tray_length`
+    described a rectangle Art. 4.6 forbids; `lod_ratios` is read by a stage module
+    that does not exist.
+
+    Fatal rather than a warning, and printed when it passes, because a gate that
+    is silent on success is a gate nobody notices has stopped running. The
+    exemption list lives in `params.py` beside the fields it excuses.
+    """
+    package = os.path.join(os.path.dirname(os.path.abspath(__file__)), "kartlib")
+    checked, exempt = P.check_field_coverage(package)
+    print(
+        "    params   %d/%d field(s) read by at least one module; %d exempt"
+        % (checked - exempt, checked, exempt)
+    )
+
+
 def check_face_winding(context: build.BuildContext) -> None:
     """Fail the build if any watertight part is wound inside out.
 
@@ -1036,6 +1060,7 @@ def rebuild(arguments: dict[str, str], out_directory: str) -> tuple[int, int]:
     wipe_kart()
     materials = build.make_materials()
     context = build_kart(parameters, detail, bpy.context.scene, materials, out_directory)
+    check_parameter_coverage()
     check_face_winding(context)
     check_assembly(context)
 
@@ -1166,6 +1191,7 @@ def main() -> None:
 
     print("==> geometry (%s detail)" % detail.name)
     context = build_kart(parameters, detail, scene, materials, out_directory)
+    check_parameter_coverage()
     check_face_winding(context)
     # Before the high-poly pass is paired in, and before any stage renames or
     # decimates anything: both gates measure the kart as it was built.
