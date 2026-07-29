@@ -135,6 +135,45 @@ so the top entry is 1.000 by construction and the shoulder number lives in
 literal, which is the two-copies-of-one-number failure this file has three other
 notes about."""
 
+#: How much is cut off the **right** flank's half-width, in meters, against the same
+#: normalized arc length. Zero everywhere else, and the left flank never sees it.
+#:
+#: **This is the chain relief, and it is forced rather than styled.** Wave 3 measured
+#: the driveline through the corrected shell -- 90 triangle pairs on
+#: `drive_output_shaft`, 60 on `drive_chain_guard`, 50 on `drive_chain`, 48 on
+#: `drive_output_sprocket` -- and the arithmetic says no lateral lane exists for the
+#: chain to run in:
+#:
+#:     shell's right edge at the driveline's height      x 173..179
+#:     `engine_clutch_cover`'s inboard face              x 182
+#:     free window between them                          6.8 mm
+#:     what has to fit in it: a 9 mm chain band inside
+#:     a 32 mm Art. 5.9 guard                            32 mm
+#:
+#: So the chain cannot pass outboard of the shell whatever `chain_x` is: the engine's
+#: own clutch cover caps it at 182 and the shell reaches 179. It cannot pass inboard
+#: either -- that is the driver. It passes **through** the shell's right flank, which
+#: is why real KZ shells are sold handed with this flank relieved, and this table is
+#: that relief rather than a decision anybody here made.
+#:
+#: The depth is set by the innermost driveline part in the seat's own y band, which is
+#: `drive_output_shaft`'s inboard end at x 100 and the guard's inboard wall at 101 --
+#: not by the chain at 110.5. 92 mm of half-width leaves 8 mm to both.
+#:
+#: The band ends at t 0.84 on purpose: `SEAT_PAD_UPPER` is at z 300, i.e. t ~0.87, and
+#: a relief that reached it would take away the fiberglass Art. 4.2.3's fourth seat
+#: support lands on. Below it ends at t 0.44, which is above the hip -- the pan and
+#: the hip roll are full width on both sides.
+SEAT_CHAIN_RELIEF: tuple[tuple[float, float], ...] = (
+    (0.00, 0.000),
+    (0.44, 0.000),
+    (0.50, 0.040),
+    (0.56, 0.083),
+    (0.76, 0.087),
+    (0.84, 0.000),
+    (1.00, 0.000),
+)
+
 #: How far the wing edge stands proud of the shell's spine, in meters, against
 #: the same normalized arc length. Deepest just above the hip, which is where a
 #: kart seat actually grips the driver, and shallow at the top.
@@ -394,6 +433,18 @@ SHIFT_RATIO = 0.5312
 SHIFTER_KNOB_DIAMETER = 0.028
 SHIFTER_KNOB_LENGTH = 0.047
 SHIFTER_BUSH = (0.013, 0.020, 0.050)
+#: The bracket that clamps the gear lever's bushes to the lower side bumper.
+#:
+#: `SHIFT_BRACKET_PLATE_OFFSET` is where the plate's outboard face sits relative to the
+#: pivot -- the same +11 mm the plate box is built at, named once instead of twice.
+#: The strap is a Ø14 bar and the collar an 8 mm-walled sleeve on the bumper's own
+#: Ø20, both `estimated`: no homologation form dimensions a gear-lever bracket, and
+#: what the article does fix is the tube it grips. See `_shifter_clamp`.
+SHIFT_BRACKET_PLATE_OFFSET = 0.011
+SHIFT_BRACKET_STRAP_DIAMETER = 0.014
+SHIFT_BRACKET_COLLAR_WIDTH = 0.030
+SHIFT_BRACKET_COLLAR_WALL = 0.004
+
 SHIFTER_ARM_LENGTH = 0.055
 SHIFTER_ARM_SECTION = (0.020, 0.006)
 SHIFT_ROD_END_DIAMETER = 0.022
@@ -742,7 +793,12 @@ def _seat(
     root: bpy.types.Object,
 ) -> None:
     """The fiberglass shell, lofted from a spine and a lateral cross-section, plus
-    the four brackets Art. 4.2.3's *"seat with four seat supports"* requires."""
+    the four brackets Art. 4.2.3's *"seat with four seat supports"* requires.
+
+    The right flank carries `SEAT_CHAIN_RELIEF` and the left does not, so this is a
+    **handed** shell. That is not a shortcut: see the table's own note for the 6.8 mm
+    lateral window between the shell's edge and the clutch cover that makes it forced.
+    """
     p = context.params
     detail = context.detail
 
@@ -783,10 +839,16 @@ def _seat(
         normal = tangent.cross(right).normalized()
 
         half_width = _seat_half_width(p, t)
+        relieved = max(0.030, half_width - _table(SEAT_CHAIN_RELIEF, t))
         flare = _table(SEAT_WING_FLARE, t)
+        # Asymmetric on purpose: `SEAT_CHAIN_RELIEF` is the handed cutaway the chain
+        # runs through and it applies to the kart's right only. `point.x` is negative
+        # on the left half of the mirrored section, so the sign is the side.
         grid.append(
             [
-                position + right * (half_width * point.x) + normal * (flare * point.y)
+                position
+                + right * ((relieved if point.x > 0.0 else half_width) * point.x)
+                + normal * (flare * point.y)
                 for point in lateral
             ]
         )
@@ -1744,14 +1806,14 @@ def _shifter(
     rod_axis = (unit * math.cos(offset) + perpendicular * math.sin(offset)).normalized()
     kink = r0 + rod_axis * rod_length
 
-    # The bracket: two nylon bushes on a plate clamped to the Ø30 rail. **No shift
-    # gate** -- see the SHIFT_ROD_DIAMETER block for why the slotted plate that used
-    # to be here was the one invented part in the assembly.
+    # The bracket: two nylon bushes on a plate, and a clamp on the tube the plate
+    # actually reaches. **No shift gate** -- see the SHIFT_ROD_DIAMETER block for why
+    # the slotted plate that used to be here was the one invented part in the assembly.
     bm = bmesh.new()
     build.box(
         bm,
         (0.006, 0.040, 0.046),
-        tuple(r0 + Vector((0.011, 0.006, 0.014))),
+        tuple(r0 + Vector((SHIFT_BRACKET_PLATE_OFFSET, 0.006, 0.014))),
     )
     for along in (0.0, SHIFTER_BUSH[2]):
         build.sweep_tube(
@@ -1763,6 +1825,7 @@ def _shifter(
             SHIFTER_BUSH[1] * 0.5,
             detail.tube_segments,
         )
+    _shifter_clamp(context, bm, r0)
     base = build.object_from_bmesh(
         "shifter_base", bm, collection, material=steel, shade_smooth=True
     )
@@ -1814,6 +1877,70 @@ def _shifter(
     build.set_parent(knob_object, root)
 
     _shift_linkage(context, collection, root, r0, rod_axis)
+
+
+def _shifter_clamp(
+    context: build.BuildContext,
+    bm: bmesh.types.BMesh,
+    r0: Vector,
+) -> None:
+    """What the gear lever's bracket is actually bolted to. #190 wave 3b.
+
+    **Spec §40.4's own cross-check was false and this is the correction.** It reads
+    *"the right main rail's centreline at y +330 interpolates to x 323 ... The bracket
+    lands on the rail"*, and §10 has since waisted the frame: `frame_half_waist` is 139
+    at y +375, so at the lever's own y +335 the rail is at x **156**, measured off the
+    built tube. The bracket was 106.85 mm from it -- the worst gate-2 finding on the
+    kart -- and the lever's position is not what is wrong: two `sourced` shift-rod
+    lengths and the two-finger gap to the rim fix it.
+
+    What is wrong is the claim about which member is under it. The nearest structure to
+    the bracket plate is `chassis_side_bar_r`'s **forward leg**, which crosses
+    (325, 366, 81) on its way inboard from the straight run to its front socket --
+    **5.34 mm** away, against 106.85 to the rail, 93.62 to the nearer bumper socket and
+    124.91 to the tray's edging tube. So the bracket clamps the Art. 9.4.2 lower side
+    bumper, which is also where a real KZ hand shifter's bracket goes: the lever stands
+    beside the driver's knee, and at the knee the only frame tube out at x 320 is the
+    side bumper. The main rail is 160 mm inboard of it and always was.
+
+    The leg's two ends come from `frame.py` through `context.pivots` rather than being
+    re-derived here, because `_corner` pushes the built corner 72 mm along +y off the
+    authored tangent point -- so a copy of the authored polyline gets the leg's
+    *direction* wrong, not just its length. §98.3.
+    """
+    detail = context.detail
+    socket = Vector(context.pivots["side_bar_front_socket_r"].location)
+    corner = Vector(context.pivots["side_bar_front_corner_r"].location)
+
+    # Foot of the perpendicular from the plate's outboard face to the leg's axis,
+    # clamped to the segment: the collar goes round the tube where the plate meets it,
+    # not at an authored station that a later frame edit would move away from.
+    plate = r0 + Vector((SHIFT_BRACKET_PLATE_OFFSET, 0.0, 0.014))
+    span = corner - socket
+    length_squared = span.length_squared
+    along = 0.0 if length_squared < 1e-12 else (plate - socket).dot(span) / length_squared
+    along = max(0.0, min(1.0, along))
+    station = socket + span * along
+    axis = span.normalized() if length_squared > 1e-12 else Vector((1.0, 0.0, 0.0))
+
+    # The strap from the plate out to the tube, then the collar round it. The collar's
+    # bore is the bumper's own diameter, so it grips rather than floats: Art. 9.4.2
+    # fixes that tube at Ø20.0 and `tube_bumper` is the single owner of the number.
+    build.sweep_tube(
+        bm,
+        [plate, station],
+        SHIFT_BRACKET_STRAP_DIAMETER * 0.5,
+        max(6, detail.tube_segments // 2),
+    )
+    build.sweep_tube(
+        bm,
+        [
+            station - axis * (SHIFT_BRACKET_COLLAR_WIDTH * 0.5),
+            station + axis * (SHIFT_BRACKET_COLLAR_WIDTH * 0.5),
+        ],
+        context.params.tube_bumper * 0.5 + SHIFT_BRACKET_COLLAR_WALL,
+        detail.tube_segments,
+    )
 
 
 def _shift_linkage(

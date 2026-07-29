@@ -1656,6 +1656,16 @@ JOINTS: tuple[Joint, ...] = (
         "end channel",
     ),
     Joint(
+        a="radiator_core",
+        b="radiator_hose_lower",
+        kind="routed",
+        why="and the tube pack itself, for the same reason: the low tank's inlet is in "
+        "the core's own footprint, so a hose reaching it is inside the core. Was a #190 "
+        "overlap waiver reading *\"the outboard half of the same 33 mm problem\"*; with "
+        "`HOSE_LOWER_ROUTE`'s waypoint order fixed the 20 remaining pairs are all at the "
+        "inlet, which is a joint and not a collision",
+    ),
+    Joint(
         a="engine_water_outlet",
         b="radiator_hose_upper",
         kind="routed",
@@ -1997,13 +2007,26 @@ JOINTS: tuple[Joint, ...] = (
     ),
     Joint(
         a="shifter_base",
-        b="chassis_rail_r",
+        b="chassis_side_bar_r",
         kind="clamped",
-        why="**replaces `shifter_base`/`chassis_floor_tray`**: Art. 4.6 puts the tray's "
-        "edge at the main tubes' centreline seen from above, and the bracket is "
-        "outboard of that. The rail's centreline at y +330 is at x 310-323 and the "
-        "estimated pivot x is +320, so the bracket lands on the tube -- a check nobody "
-        "arranged, because the pivot's station came from the shift rod's length",
+        why="**replaces `shifter_base`/`chassis_rail_r`, which was 106.85 mm apart -- the "
+        "worst gate-2 finding on the kart.** Spec §40.4's own cross-check is false on "
+        "this chassis: it reads *\"the right main rail's centreline at y +330 "
+        "interpolates to x 323 ... The bracket lands on the rail\"*, and §10 has since "
+        "waisted the frame -- `frame_half_waist` is 139 at y +375, so at the lever's "
+        "y +335 the rail is at x **156**. The lever's own position is not in doubt: two "
+        "`sourced` shift-rod lengths and the two-finger gap to the rim fix it. What was "
+        "wrong is the claim about which member is under it. Measured, the four "
+        "candidates are `chassis_side_bar_r` **5.34 mm**, "
+        "`chassis_bumper_socket_side_lower_front_r` 93.62, `chassis_rail_r` 106.85 and "
+        "`chassis_tray_edge_r` 124.91 -- so the bracket clamps Art. 9.4.2's lower side "
+        "bumper, whose forward leg crosses (325, 366, 81) on its way inboard to its "
+        "front socket. That is also where a real KZ's gear-lever bracket goes: the lever "
+        "stands beside the knee and at the knee the only tube out at x 320 is the side "
+        "bumper. `cockpit._shifter_clamp` builds the strap and the Ø20 collar, and it "
+        "reads the leg's two ends off `frame.py`'s published empties rather than "
+        "re-deriving them -- `_corner` pushes the built corner 72 mm along +y, so a copy "
+        "of the authored polyline gets the leg's *direction* wrong",
     ),
     Joint(
         a="shifter_base",
@@ -2663,25 +2686,15 @@ OPEN_DEFECTS: tuple[Defect, ...] = (
         "inboard face at 294 by 9 mm, so it has no room to go further inboard, and the "
         "stay has no room to go further outboard without meeting the pipe itself",
     ),
-    Defect(
-        a="chassis_steering_support_upper",
-        b="fuel_tank*",
-        gate="overlap",
-        measured=212,
-        issue="#190",
-        why="**a three-way conflict between two regulations, and neither section can settle "
-        "it alone.** Art. 4.7 *mandates* the tank between the main tubes, ahead of the "
-        "seat and behind the front wheel axis -- that is the whole of x 0, y +100..+350, "
-        "and it is why `tank_center_*` is `derived`. Art. 9.5.3 requires the front "
-        "panel's upper part attached to the column support, which §10.6 builds as a V "
-        "from (+-200, +40, 65) up to an apex at (0, +262, +393). At y +150 that V is at "
-        "x +-101 and z 227, i.e. inside a tank whose flank is at +-127 and whose top is "
-        "at 299. The legs pass through the tank's shoulders. Neither position is free: "
-        "a real kart's support legs stand *outboard* of the tank and converge above it, "
-        "which means the V is the part that is wrong -- its feet want to be wider than "
-        "+-200 and its apex reached later. Reported rather than edited, because §10.6's "
-        "own docstring says +-200 was chosen to clear the *old* seat shell",
-    ),
+    # **`chassis_steering_support_upper`/`fuel_tank*` is deleted, not waived.** It was 192
+    # pairs against the tank and 212 against its rear strap, and both are zero. The V is
+    # now four points a leg: up outboard of Art. 4.7's tank, level across above its rear
+    # strap's crown, and only then in to the apex. `params.steering_support_shoulder_x`
+    # carries the arithmetic that says no *straight* V can do it -- a straight leg needs
+    # its foot at x 445 to cross the tank's flank above the tank's top, and the rails are
+    # at 286. The final segment is collinear with the straight foot-to-apex line, which is
+    # what keeps §Bodywork's `bodywork_front_panel_bar` landing on real tube; see
+    # `frame.SUPPORT_COLLINEAR_FROM`.
     Defect(
         a="cooling_hose_pump_engine",
         b="engine_battery",
@@ -2692,26 +2705,16 @@ OPEN_DEFECTS: tuple[Defect, ...] = (
         "x 143..228 to clear the re-routed intake boot. 18 pairs; the battery has one "
         "free axis left and it is forward, into the crankcase",
     ),
-    Defect(
-        a="drive_*",
-        b="seat_shell",
-        gate="overlap",
-        measured=76,
-        issue="#190",
-        why="**the chain plane and the corrected seat occupy the same volume, and this is "
-        "the most important finding of the wave.** §30.9 fixes `chain_x` at +115 and "
-        "§40.3 moves `seat_y` from -60 to **-230** -- 170 mm, and the single error that "
-        "made issue #13's hip-to-pedal reach 618 mm. The consequence nobody costed is "
-        "that the seat back now leans over the driveline: the back rises from "
-        "(0, -230, 36) to (0, -365, 367) and is 166-184 mm half-wide through that run, "
-        "while the output sprocket is at (115, -268.5, 150) and the chain runs from "
-        "there to the axle. At x 115 the shell is 51 to 69 mm outboard of the chain "
-        "**laterally**, so the collision is entirely in y and z. §30.6 checked the "
-        "*pipe* against `seat_shell` at x +-184 and found 108 mm; nobody checked the "
-        "chain. Either the seat's back is cut away on the right -- which real KZ shells "
-        "are, and Tillett sells them handed -- or the hip point is forward of -230. It "
-        "is a design decision and it needs both sections",
-    ),
+    # **`drive_*`/`seat_shell` is deleted, not waived**, and the resolution is the seat's.
+    # Wave 3 found 90 pairs on `drive_output_shaft`, 60 on `drive_chain_guard`, 50 on
+    # `drive_chain` and 48 on `drive_output_sprocket`, and called it a design decision
+    # needing both sections. It is, and the arithmetic settles it one way: the shell's
+    # right edge at the driveline's height is x 173..179 and `engine_clutch_cover`'s
+    # inboard face is at 182, so the free lateral window is **6.8 mm** and a 9 mm chain
+    # inside a compulsory 32 mm Art. 5.9 guard does not fit in it at any `chain_x`. The
+    # chain cannot go outboard of the shell and it cannot go inboard of it -- that is the
+    # driver -- so the shell is relieved on the right, which is why real KZ shells are
+    # sold handed. `cockpit.SEAT_CHAIN_RELIEF` is the cutaway and it carries the depth.
     Defect(
         a="engine_cylinder",
         b="engine_plug_lead",
@@ -2741,31 +2744,23 @@ OPEN_DEFECTS: tuple[Defect, ...] = (
         "tank's Art. 4.7 position, so the two cross at about y +90. The line is the free "
         "one and it wants a lane below the rod rather than beside it",
     ),
-    Defect(
-        a="radiator_hose_lower",
-        b="seat_*",
-        gate="overlap",
-        measured=101,
-        issue="#190",
-        why="**the corridor is 33 mm wide and a Ø28 hose does not fit in it with anything "
-        "else.** The seat's lower bracket reaches x -207 and the core's inboard edge is "
-        "at -240 (§30.7.1, stated once and read from there), so the cold return has "
-        "2.5 mm a side at best -- and the shell's own flank is a sampled surface, so "
-        "2.5 mm is inside its sampling error. The hose cannot go inboard, because above "
-        "z 36 and inboard of the bracket is the inside of the seat, and it cannot go "
-        "outboard, because that is the core. Either the core moves outboard -- it has "
-        "60 mm of Art. 5.3.1 margin to the 150 mm lateral limit -- or the return runs "
-        "under the pan. First reading, and it is a real packaging result rather than a "
-        "routing slip",
-    ),
-    Defect(
-        a="radiator_core",
-        b="radiator_hose_lower",
-        gate="overlap",
-        measured=21,
-        issue="#190",
-        why="the outboard half of the same 33 mm problem, seen from the core",
-    ),
+    # **`radiator_hose_lower`/`seat_*` is deleted, not waived, and the waiver's diagnosis
+    # was wrong even though its measurement was right.** It read the 101 pairs on
+    # `seat_shell` and 48 on `seat_bracket_lower_l` as a 33 mm corridor between the
+    # bracket at x -207 and the core's inboard face at -240, and proposed spending the
+    # radiator's Art. 5.3.1 lateral margin on it. The leg in that corridor was never the
+    # leg touching the seat: `_cooling` built the hose from
+    # `[core fitting] + reversed(waypoints) + [engine fitting]`, so a waypoint list
+    # authored radiator-first was swept engine-first and two of the four legs crossed the
+    # driver. `HOSE_LOWER_ROUTE` has the four legs and every clearance on them. The core
+    # did not move and did not need to.
+    # **`radiator_core`/`radiator_hose_lower` is deleted and replaced by a declared
+    # `routed` joint.** The waiver called it *"the outboard half of the same 33 mm
+    # problem, seen from the core"*, and with the hose's waypoint order fixed the 20
+    # remaining pairs are all at the low tank's own inlet -- the same fact as the three
+    # joints already declared there against `radiator_tank_low`, `radiator_end_inboard`
+    # and `radiator_fin_17`. A hose entering a tank in the corner of a core is inside the
+    # core's footprint by construction, so it is a joint and not a collision.
     Defect(
         a="shifter_base",
         b="shifter_connector_arm",
@@ -2892,24 +2887,11 @@ OPEN_DEFECTS: tuple[Defect, ...] = (
         "pump instead. A real bracket is an L and this one is a bar; internal to §30 and "
         "the only part of the cooling drive still floating",
     ),
-    Defect(
-        a="chassis_rail_r",
-        b="shifter_base",
-        gate="gap",
-        measured=106.85,
-        issue="#190",
-        why="**spec §40.4's own cross-check is false on this chassis.** It reads *\"the "
-        "right main rail's centerline at y +330 interpolates to x 323 in "
-        "`frame._rail_path`, and the estimated pivot x is +320. The bracket lands on the "
-        "rail\"* -- and §10 has since waisted the frame: `frame_half_strut` is 286 at "
-        "y +40 and `frame_half_waist` is 139 at y +375, so at y +335 the rail is at "
-        "x 156, not 323. The lever's own position is not in doubt: it is fixed by two "
-        "`sourced` shift-rod lengths and the two-finger gap to the rim. What is wrong is "
-        "the *claim* that the rail is under it. Either the bracket grows a 165 mm arm "
-        "inboard or it picks up on `chassis_tray_edge_r`, whose crown is at z 81 and "
-        "x 273..286 -- 44 mm from the bushes and the nearest structure there is. Needs "
-        "§Chassis and §Cockpit together, which is why it is recorded rather than nudged",
-    ),
+    # **`chassis_rail_r`/`shifter_base` is deleted, not waived.** It was 106.85 mm and it
+    # is now a closed `clamped` joint on `chassis_side_bar_r` -- see that entry for which
+    # of the four candidate members the bracket actually reaches and by how much. The
+    # rail was never under the lever; §40.4's cross-check was arithmetic on a frame that
+    # §10 had already waisted.
     Defect(
         a="engine_battery",
         b="engine_crankcase_upper",

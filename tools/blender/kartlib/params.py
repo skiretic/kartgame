@@ -420,6 +420,47 @@ class KartParams:
     #107 -- and this is a number chosen to survive until it is fixed.
     """
 
+    steering_support_shoulder_x: float = 0.150
+    """Where the upper steering support's legs stand as they pass the fuel tank's
+    flank. `derived`: Art. 4.7 fixes the tank between the main tubes and its flank is
+    at x +-127.5, so a Ø16 leg centered at 150 clears the tank's side by
+    150 - 8 - 127.5 = **14.5 mm** and needs nothing from the tank.
+
+    **A straight V cannot do this and the arithmetic is short.** On a straight leg
+    from (foot_x, +30, 65) to the apex at (0, +262, 393), x and z are both linear, so
+    the leg reaches x 137.5 at s = 1 - 137.5/foot_x and is at z = 65 + 328 s there.
+    Requiring z >= 309 -- above the tank's own top at 299 -- needs foot_x >= **445 mm**,
+    and the rails are at +-286 at the strut. So the legs have to stand outboard of the
+    tank and converge *above* it, which is what a real column support does and what
+    wave 3's #190 measurement (192 pairs against the tank, 212 against its rear strap)
+    was reporting."""
+
+    steering_support_shoulder_z: float = 0.335
+    """Height of the run that crosses over the tank. `derived` from the part it has to
+    clear, which is **not** the tank: `fuel_tank_strap_rear`'s crown is at z 311.6,
+    12.6 mm above the tank's own top at 299, and it is the strap the old V's 212-pair
+    overlap was mostly against.
+
+    Measured on the built tube, after the 24 mm bend radius has cut the two corners:
+    **15.62 mm** to the rear strap and **21.26 mm** to the tank. 325 was the first value
+    and measured 5.65 to the strap, because the fillet at the outboard knee dips ~5 mm
+    below the authored corner -- which is the difference between an authored offset and a
+    built one, and the reason both figures here are the built ones.
+
+    Read with `steering_support_shoulder_y`: the two legs run level at this height from
+    outboard of the tank to the point where they rejoin the straight foot-to-apex line,
+    which is the constraint below."""
+
+    steering_support_shoulder_y: float = 0.150
+    """Fore-aft station of the outboard knee, i.e. where each leg stops rising and
+    starts running inboard. `estimated`: anywhere between the strut and the tank's rear
+    strap works, and 150 keeps the leg's own y monotonic from foot to apex.
+
+    It is bounded on one side by something real: `fuel_tank_strap_rear` occupies
+    y +183.5..+208.5 out to x +-227.6, so a knee at y 150 keeps the *rising* leg -- the
+    one that is still outboard and below the shoulder -- entirely out of the strap's
+    fore-aft band."""
+
     steering_support_apex_y: float = 0.262
     steering_support_apex_z: float = 0.393
     """Apex of the upper steering support, where the column passes through a

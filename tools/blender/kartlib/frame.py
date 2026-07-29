@@ -406,6 +406,19 @@ def _kingpin_bosses(
         build.set_parent(obj, root)
 
 
+#: The published contract on `chassis_steering_support_upper`: from this fraction of
+#: the way from a foot to the apex, the tube **is** the straight foot-to-apex line.
+#:
+#: Any module landing a part on this support has to use a fraction at or above this,
+#: because below it the legs detour outboard of Art. 4.7's fuel tank and a straight-line
+#: interpolation lands in mid-air. §Bodywork's `FRONT_PANEL_BAR_SUPPORT_T` is 0.90.
+#:
+#: A floor rather than a copy of that 0.90 on purpose -- two copies of one number is the
+#: failure this file has three notes about. What this constant asserts is the *shape* of
+#: the tube, which is this module's business; what fraction a consumer picks is theirs.
+SUPPORT_COLLINEAR_FROM: float = 0.85
+
+
 def _steering_support_lower(
     context: build.BuildContext,
     collection: bpy.types.Collection,
@@ -469,31 +482,81 @@ def _steering_support_upper(
     material: bpy.types.Material,
     root: bpy.types.Object,
 ) -> None:
-    """Art. 9.5.3's *"one or more independent bars"*. New at #190.
+    """Art. 9.5.3's *"one or more independent bars"*. New at #190, re-routed at #190
+    wave 3b because a straight V and Art. 4.7's fuel tank cannot both exist.
 
-    An inverted V off the central strut, leaning **forward** 34.1° against the
-    column's 36° rearward -- opposed, 70.1° included, which is what makes it a
-    brace rather than a second parallel tube. Its apex carries the 20 mm block
-    the column passes through, and it is what the front panel's upper edge bolts
-    to once §Bodywork builds the panel.
+    Two legs off the central strut, leaning **forward** against the column's 36°
+    rearward -- so it is a brace rather than a second parallel tube. The apex carries
+    the 20 mm block the column passes through, and it is what the front panel's upper
+    edge bolts to.
 
     The feet sit 10 mm behind the strut's own station so the two legs clear the
     floor tray's rear edge instead of standing in the middle of it. They still
     weld to the strut: at 10 mm off center a Ø30 tube's surface is at z 61.2 and
     the leg's is at 57, so they overlap by 4 mm.
+
+    **Why it is four points per leg and not two.** Art. 4.7 mandates the tank between
+    the main tubes ahead of the seat, which is x +-127.5, y +100..+350, z 69..299 with
+    its rear strap's crown at 311.6. A straight leg from the foot to the apex crosses
+    x 137.5 at z 65 + 328 (1 - 137.5/foot_x), and putting that above the strap needs a
+    foot at x 445 -- see `params.steering_support_shoulder_x`. So each leg rises
+    outboard of the tank to a knee at (`shoulder_x`, `shoulder_y`, `shoulder_z`), runs
+    level inboard over the strap, and only then turns up to the apex.
+
+    **The third knee is on the straight foot-to-apex line and that is load-bearing.**
+    §Bodywork lands `bodywork_front_panel_bar` at a *fraction* along this support --
+    `foot.lerp(apex, FRONT_PANEL_BAR_SUPPORT_T)` -- so it assumes the tube is where a
+    straight line puts it. Making the final segment collinear with that line keeps the
+    assumption true without either module restating the other's number: any landing
+    fraction at or above `SUPPORT_COLLINEAR_FROM` lands on real tube. That fraction is
+    (shoulder_z - foot_z) / (apex_z - foot_z) = 0.793 here, and §Bodywork's 0.90 clears
+    it by 0.107 -- 48 mm of tube. The assertion below is what stops a future edit to
+    `shoulder_z` from silently breaking a gate-2 joint in a file this one does not own.
     """
     p = context.params
+    foot_x = p.steering_support_foot_x
     foot_y = p.cross_strut_y - 0.010
     foot_z = P.rail_top_z(p)
-    apex = (0.0, p.steering_support_apex_y, p.steering_support_apex_z)
+    apex = Vector((0.0, p.steering_support_apex_y, p.steering_support_apex_z))
+
+    # The knee where each leg rejoins the straight foot-to-apex line, at the shoulder
+    # height. Solved rather than authored, for the reason in the docstring.
+    foot = Vector((foot_x, foot_y, foot_z))
+    rejoin_t = (p.steering_support_shoulder_z - foot_z) / (apex.z - foot_z)
+    if not 0.0 < rejoin_t < SUPPORT_COLLINEAR_FROM:
+        raise SystemExit(
+            "frame.py: the upper steering support's shoulder is at z %.1f mm, which "
+            "puts its\n"
+            "          rejoin fraction at %.3f. §Bodywork lands "
+            "`bodywork_front_panel_bar` at\n"
+            "          %.3f of the way from foot to apex and that landing has to be on "
+            "the\n"
+            "          collinear final segment, so the rejoin has to come first. Lower "
+            "the\n"
+            "          shoulder or move the landing."
+            % (
+                p.steering_support_shoulder_z * 1000.0,
+                rejoin_t,
+                SUPPORT_COLLINEAR_FROM,
+            )
+        )
+    rejoin = foot.lerp(apex, rejoin_t)
+
+    def leg(sign: float) -> list[tuple[float, float, float]]:
+        return [
+            (sign * foot_x, foot_y, foot_z),
+            (
+                sign * p.steering_support_shoulder_x,
+                p.steering_support_shoulder_y,
+                p.steering_support_shoulder_z,
+            ),
+            (sign * rejoin.x, rejoin.y, rejoin.z),
+        ]
+
     _tube(
         context,
         "chassis_steering_support_upper",
-        [
-            (-p.steering_support_foot_x, foot_y, foot_z),
-            apex,
-            (p.steering_support_foot_x, foot_y, foot_z),
-        ],
+        leg(-1.0) + [tuple(apex)] + list(reversed(leg(1.0))),
         p.tube_steering_hoop,
         collection,
         material,
@@ -900,6 +963,29 @@ def _side_bumpers(
         )
         left = build.mirror_x(right, "chassis_side_bar%s_l" % suffix, collection)
         build.set_parent(left, root)
+
+        # The forward leg's two ends, **published rather than re-derived**. §Cockpit's
+        # gear-lever bracket clamps this leg -- see `joints.py`'s note on
+        # `chassis_rail_r`/`shifter_base` for why it is this tube and not the rail --
+        # and it cannot compute the outboard end for itself: `_corner` solves the
+        # fillet's tangent by iteration and pushes the control point 72 mm along +y,
+        # so the authored tangent point and the built corner are different objects
+        # and a consumer interpolating between the authored ones misses the leg's
+        # *direction*, not just its length. §98.3, and `bodywork.SIDE_BAR_PATH` is
+        # the copy that already drifted.
+        for tag, sign in (("r", 1.0), ("l", -1.0)):
+            for station, position in (
+                ("socket", front_socket),
+                ("corner", corner_front),
+            ):
+                pivot = build.empty(
+                    "side_bar%s_front_%s_%s" % (suffix, station, tag),
+                    (sign * position.x, position.y, position.z),
+                    collection,
+                    size=0.02,
+                )
+                context.publish("side_bar%s_front_%s_%s" % (suffix, station, tag), pivot)
+                build.set_parent(pivot, root)
 
         # Art. 9.4.2 wants the attachments *"parallel to the ground,
         # perpendicular to the axis of the chassis"*, so the sleeve runs straight

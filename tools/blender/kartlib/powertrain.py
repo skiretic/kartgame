@@ -712,14 +712,67 @@ tubing at 150 C and 10 bar."""
 HOSE_UPPER_LOCAL: tuple[float, float, float] = (0.0, 0.85, 0.95)
 HOSE_LOWER_LOCAL: tuple[float, float, float] = (0.0, 0.85, -0.95)
 HOSE_UPPER_ROUTE: tuple[tuple[float, float, float], ...] = (
-    (0.150, -0.300, 0.375),
     (0.0, -0.400, 0.390),
+    (0.150, -0.300, 0.375),
 )
 HOSE_LOWER_ROUTE: tuple[tuple[float, float, float], ...] = (
-    (-0.224, -0.200, 0.102),
-    (-0.224, -0.350, 0.105),
-    (0.0, -0.455, 0.090),
+    (-0.213, -0.150, 0.115),
+    (-0.213, -0.370, 0.100),
+    (-0.020, -0.392, 0.081),
+    (0.135, -0.390, 0.081),
 )
+"""**Both routes run radiator-first, and getting that wrong is what wave 3 measured.**
+
+#190 wave 3b, and the finding is not the one the waiver described. `_cooling` built
+each hose as `[fitting_on_the_core] + reversed(waypoints) + [fitting_on_the_engine]`,
+so a list authored radiator-to-engine was *consumed* engine-to-radiator. The upper
+route happened to be authored the other way round and came out right; the lower one
+did not, and the hose it built went from the low tank straight across the kart to
+x 0 at y -455, back **outboard** to x -224, forward to y -200, and only then
+diagonally back across to the pump at (160, -386). Two of those four legs cross the
+driver, which is the 101 pairs on `seat_shell` and the 48 on `seat_bracket_lower_l`.
+
+Wave 3 read the same overlap as a packaging result -- *"the corridor is 33 mm wide and
+a Ø28 hose does not fit in it with anything else"*, `seat_bracket_lower_l` at x -207
+against the core's -240 -- and proposed spending the radiator's Art. 5.3.1 margin on
+it. That measurement is correct and it is not what was wrong: the leg in that corridor
+was never the leg touching the seat. The `reversed()` is gone and both lists are
+authored in one direction, which is also why `HOSE_UPPER_ROUTE`'s two points swapped
+with no change to the pipe it builds.
+
+**The core does not move.** It has 60 mm to Art. 5.3.1's 150 mm lateral limit, but
+`bodywork_sidepod_l` is 21.25 mm outboard of `radiator_tank_low` and `chassis_rail_l`
+is 8.51, so only ~15 of that 60 exists before the core is inside a panel §Bodywork
+owns -- and moving it would make three standing waivers worse for a corridor that was
+not the fault.
+
+The four waypoints, and what each one is against:
+
+    (-213, -150, 115)   down the left flank. 5.9 mm inboard of
+                        `radiator_bracket_lower`'s inboard end at -232.9, reached
+                        before the bracket's own y band rather than across it
+    (-213, -370, 100)   rearward past the seat. 15.3 mm to the shell's widest flank
+                        at -183.7 and 13.0 mm to the core's inboard face at -240
+    ( -20, -392,  81)   the crossing, and it is **forward of** `chassis_cross_seat`
+                        (y -402.4..-431.6, top z 65) on purpose: between that tube
+                        and the chain's lower strand the window is 33.8 mm, which a
+                        Ø28 hose does not thread with any margin either side
+    ( 135, -390,  81)   still under the chain's lower strand -- at y -390 that strand's
+                        band is z 106..113 -- and it stops 7 mm short of
+                        `cooling_pump_bracket` (x 156..300, z 72..88) so the climb to
+                        the pump's inlet happens outboard of the bar rather than
+                        through it
+
+Measured on the built tube, surface to surface, after the 50 mm bend radius has had its
+say -- the fillet is why these are not the authored offsets:
+
+    seat_shell                21.11      cooling_pump_bracket       5.82
+    seat_bracket_lower_l      19.43      chassis_cross_seat        11.42
+    radiator_bracket_lower    16.90      drive_chain                4.53
+    chassis_rail_l            41.97      drive_chain_guard         38.09
+
+A hose cannot cross the spinning axle plane, so the upper goes above and behind it and
+the lower stays forward of it: 100.6 mm to `axle_rear` and 61.6 to the crown wheel."""
 WATER_OUTLET_LOCAL: tuple[float, float, float] = (0.299, -0.207, 0.376)
 """Hot water enters the **high** tank so the core drains downward, which New-Line's
 *"curved top tank inlet designed to evenly distribute water"* confirms is the inlet
@@ -727,12 +780,11 @@ end; the cold return is the low run by construction, because the pump is at axle
 height. Both `estimated` as routes.
 
 The upper run crosses **behind the seat back**, which is the shorter way across
-from a head outlet and stays above the axle. The lower run's x -215 leg is inboard
-of both radiator brackets -- 19 mm from the lower rod's surface and 17 from the
-shell -- which is what clears the 58-pair overlap, and its crossing at z 95 passes
-28 mm under the chain's lower strand and 26 above the tray. **A hose cannot cross
-the spinning axle plane**, so the upper goes above and behind it and the lower
-stays forward of it."""
+from a head outlet and stays above the axle. The lower run's geometry and every
+clearance on it are in `HOSE_LOWER_ROUTE`'s own note, because #190 wave 3b moved it
+and a clearance quoted in two places is a clearance that will disagree with itself.
+**A hose cannot cross the spinning axle plane**, so the upper goes above and behind
+it and the lower stays forward of it."""
 
 WATER_INLET_BOSS: tuple[float, float, float] = (0.240, -0.330, 0.165)
 """A **new** cast boss on the crankcase's inboard face, low. Art. 9.10.1
@@ -2136,9 +2188,24 @@ def _driveline(
     **The pitch radius is `p / (2 sin(pi/N))` and this used to be `p*N/(2*pi)`.**
     The approximation is 0.03% small at 82 teeth and 1.1% small at 12, i.e. 0.24 mm
     of radius -- and that 0.24 mm is what put the chain's inner strand 1.9 mm inside
-    a Ø18 output shaft. Correcting it leaves 1.0 mm, which is still not enough, so
-    the shaft steps down to **Ø16 outboard of x 130** and the clearance becomes
-    2.7 mm. Ø16 is the smaller change; 13 teeth would be the other one.
+    a Ø18 output shaft.
+
+    **The shaft is Ø12 inboard of x 130 and the margins that once read 1.0 and 2.7 mm
+    were measured to the wrong circle.** They were taken to the *pitch* circle at
+    10.745 mm, and the chain is a 9 x 8 mm band straddling the tooth, so its inner
+    edge is `CHAIN_HALF_HEIGHT` further in at **7.245 mm** from the axis. Against that:
+
+        Ø18   9.000   1.755 mm INSIDE the band
+        Ø16   8.000   0.755 mm INSIDE the band
+        Ø12   6.000   1.245 mm of clearance          <- built
+
+    13 teeth is the other answer and it is a worse one: `p / (2 sin(pi/13))` is 11.622,
+    so the band's inner edge moves out to 8.122 and Ø16 clears it by **0.122 mm**. A
+    tenth of a millimetre is not a clearance, and `sprocket_teeth_engine` is
+    `estimated` inside a real 10-14 range -- bending a ratio to rescue a shaft diameter
+    would put a gear ratio at the mercy of a lathe operation. Ø12 is the shaft's own
+    retaining nose, which is what a real gearbox output has there anyway: the sprocket
+    is on the end of the shaft, not partway along it.
 
     No teeth. They cannot come out of a revolution and a hundred of them would
     cost more than the rest of this module; `wheels.py` reaches the same
@@ -2449,10 +2516,17 @@ def _exhaust_centerline(
     table's 674.6 mm however finely it is sampled. Sampling density comes from
     `context.detail`, so low and high are the same pipe at two densities.
 
-    **Where this disagrees with spec §30.6.3's centreline table, the table is the
-    one that is wrong**, by up to 19 mm in x at s 623: its own stations put a 95.2 mm
-    chord across cone 14, whose sourced slant length is 109.5. The cone lengths are
-    sourced and the station list is derived, so the sourced figures win.
+    **Where this disagrees with spec §30.6.3's centreline table, the table is the one
+    that is wrong, and the disagreement is one station wide.** Measured against all
+    eight of the table's own rows, the built walk is within **0.4 mm** on every axis at
+    s = 0, 135, 213, 409, 472, 513 and 675 -- and **-15.0 mm in x at s 623**, with y and
+    z still inside 0.1. That is exactly where the table contradicts itself: its stations
+    at s 513 and 623 are 95.2 mm apart in space --
+    `sqrt(92.4^2 + 2.4^2 + 22.7^2)` -- across cone 14, whose two `sourced` slant lengths
+    make it **109.5 mm** long. A row cannot be 109.5 mm of pipe and 95.2 mm of chord at a
+    3.6 degree turn. The cone lengths come off the homologation forms and the station
+    list was derived from them, so the sourced figures win and the table's s-623 row is
+    the one to correct. Nothing else on the pipe moves.
     """
     tilt = EXHAUST_BEND_TILT
     forward = Vector((0.0, -1.0, 0.0))
@@ -3153,7 +3227,10 @@ def _radiator(
     ):
         start = attach(local)
         route = [tuple(start)]
-        route.extend(reversed([tuple(point) for point in waypoints]))
+        # **Not `reversed()`.** Both lists are authored radiator-first, from the core's
+        # own fitting toward the engine, which is the order the tube is swept in. It was
+        # `reversed()` here, and `HOSE_LOWER_ROUTE`'s note has the four legs that built.
+        route.extend(tuple(point) for point in waypoints)
         route.append(tuple(fitting))
         _tube_object(
             "radiator_hose_%s" % label,
