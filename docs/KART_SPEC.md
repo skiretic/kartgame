@@ -2987,19 +2987,29 @@ Two of those change what this repo believed:
 only load path to the chassis is air. A clamp that is beside a tube is not a
 clamp; it has to be **bored on the tube's own centerline**.
 
-The right rail's centerline through the engine bay, read out of
-`frame.py:_rail_path` rather than guessed — between its control points
-(0.285, −0.100) and (0.245, −0.420) it is a straight run at constant height:
+The right rail's centerline through the engine bay. **This section originally read
+it out of `frame.py:_rail_path` as built — a run pinching inboard from x 285 at
+y −100 to x 245 at y −420, 7.13° in plan — and §Chassis has since respecified the
+rail as straight.** The two disagreed by 36 to 47 mm on the powertrain's only load
+path to the chassis, which the recheck pass flagged as the one cross-section
+conflict that would have broken a build. §Chassis wins: its rail comes from the CRG
+homologation form's published frame widths, and it establishes that the frame is
+**widest at the rear**, where `frame.py` and the built mesh both have it backwards.
 
-    z_rail   = ground_clearance + tube_main/2 = 35 + 15 = 50          derived
-    x_rail(y) = 285 + 0.125 * (y + 100)      for -420 <= y <= -100    derived
-    plan angle = atan(40 / 320) = 7.13 deg, pinching inboard rearward derived
+Restated against §Chassis's rail:
 
-**Required rail station, stated as a number for the §Chassis agent:** the right
-main rail's centerline must pass through **(x 273.6, z 50.0) at y = −191.5** and
-**(x 262.7, z 50.0) at y = −278.5**, OD **30.0**. Both clamp bores are generated
-from those two points and the local tangent, so if the rail moves the clamps move
-with it and nothing has to be re-derived by hand.
+    z_rail   = ground_clearance + tube_main/2 = 35 + 15 = 50            derived
+    x_rail(y) = 310                for -720 <= y <= -48                 §Chassis
+    plan angle = 0 deg -- the run is straight, so the bore axis is
+                 parallel to the kart's axis and the 7.13 deg tangent
+                 this section carried is withdrawn                      derived
+
+**Required rail station:** the right main rail's centerline must pass through
+**(x 310.0, z 50.0)** at both **y = −191.5** and **y = −278.5**, OD **30.0**. Both
+clamp bores are generated from the rail's own path and tangent, so this section
+states the requirement and does not duplicate the geometry — if the rail moves
+again the clamps follow and nothing here needs re-deriving by hand. That property
+is what made this reconciliation two numbers rather than a rewrite.
 
 ### `engine_mount_clamp_front`, `engine_mount_clamp_rear`
 **Status:** built, **geometry replaced**
@@ -3010,22 +3020,33 @@ with it and nothing has to be re-derived by hand.
 | dimension | value | prov | basis |
 | --- | --- | --- | --- |
 | bore diameter | 30.0 | `derived` | equal to `tube_main`; a clamp bore is the tube it grips, so contact is 0.0 by construction and the pair is `clamped`, which permits the facet-level overlap |
-| bore axis | the rail's local tangent, 7.13° in plan | `derived` | above |
+| bore axis | the rail's local tangent, **0° in plan** | `derived` | above. §Chassis's rail is straight through the engine bay; the 7.13° this row carried came from the as-built pinching rail |
 | front clamp, y span | −213 … −170 (43 long) | `estimated` | unchanged from the build; 43 mm is a clamp block's length |
-| front clamp, x span | 271.6 … 296.6 | `derived` | rail_x(−191.5) − 2 to +23: 2 mm past the centerline guarantees engagement, 23 mm outboard carries the bolts |
+| front clamp, x span | **308 … 333** | `derived` | rail_x(−191.5) = 310, so 310 − 2 to 310 + 23: 2 mm past the centerline guarantees engagement, 23 mm outboard carries the bolts |
 | rear clamp, y span | −300 … −257 | `estimated` | unchanged |
-| rear clamp, x span | 260.7 … 285.7 | `derived` | rail_x(−278.5) − 2 … +23 |
+| rear clamp, x span | **308 … 333** | `derived` | rail_x(−278.5) = 310, same construction. The two clamps now share one x span, because the rail is straight |
 | both, z span | 36 … 72 | `derived` | 36 is 1 mm above the rail's underside at 35, because `ground_clearance` is measured to the rail and nothing may hang below it; 72 is `tray_top_z` + 3, which is the mount plate's underside, so clamp and plate touch at 0.0 mm |
 | bolts | 2× M8 per clamp, vertical, at x = rail_x + 19, y = centre ± 15 | `estimated` | an M8 pair is what a kart engine clamp carries; nothing publishes the pattern |
 
-**The clamps pierce the floor tray, and that is not a defect in this section.**
-`chassis_floor_tray` runs to x ±280 from y +180 to −580 while the rail centerline
-here is at x 262.7–273.6 — the rail is *under* the tray, 6.4 to 17.3 mm inboard
-of its edge, so **any** mount that reaches the rail must go through the pan.
-Overlap: 8.4 mm of x at the front clamp, 19.3 mm at the rear, 4 mm of z at each.
-Declared `pierced`, exactly as the seat stays already are. `frame.py`'s own
-report says a real kart's floor pan stops at the back of the footwell and this
-one does not; that is the underlying fault and it is §Chassis's.
+**The clamps no longer pierce the floor tray, and the reason is worth keeping.**
+This section originally declared four `pierced` joints: `chassis_floor_tray` as
+built runs to x ±280 from y +180 back to −580, so with the rail at x 262.7–273.6
+the rail passed *under* the pan and any mount reaching it had to go through the
+tray — 8.4 mm of x at the front clamp, 19.3 at the rear.
+
+Both halves of that have now moved. §Chassis puts the rail at x 310, outboard of
+the pan's edge rather than inboard of it; and Art. 4.6 requires the tray to stretch
+*"from the central strut to the front of the chassis frame"*, which puts it at
+roughly y +40 to +760 — **565 mm forward of both clamps**. The clamps are at
+y −170 to −300. There is no tray anywhere near them.
+
+So the four `pierced` declarations are withdrawn, and `joints.py`'s existing
+tray-to-bearing-hanger and tray-to-cross-rear entries must be **deleted rather than
+waived** for the same reason: a declared joint whose parts are half a meter apart is
+not an outstanding defect, it is a statement about a kart that no longer exists.
+`frame.py`'s own report already said a real kart's floor pan stops at the back of
+the footwell and this one does not; the article is what makes that a build failure
+instead of an observation.
 
 ### `engine_mount_plate`
 **Status:** built, unchanged
@@ -3744,7 +3765,7 @@ bearing hanger by 19.
 
 ### `radiator_bracket_lower`, `radiator_bracket_upper`
 **Status:** built; **both ends re-anchored**. #192 measures them **12.25 / 12.32 mm** off `radiator_end_inboard` and **44.09 / 68.62 mm** off `seat_shell`
-**Attaches to:** `radiator_end_inboard` (bolted), `chassis_rail_l` (clamped, Ø30.0 bore), `chassis_floor_tray` (pierced)
+**Attaches to:** `radiator_end_inboard` (bolted), `chassis_rail_l` (clamped, Ø30.0 bore). **Not** `chassis_floor_tray` — Art. 4.6 puts the tray forward of the central strut, 500+ mm from here
 **Envelope:** Art. 4.2.3 puts the welded attachment points for *"the radiator(s)"* on the frame and Art. 4.2.5 lists *"radiator(s), holder"* as a chassis component (PDF p. 8). **Art. 5.3.1, §5a: the radiator *"must not interfere with the seat."***
 **Verification:** gate 2 at both ends; gate 1's **inverted** assertion at `seat_shell`
 
@@ -3768,8 +3789,8 @@ above the chassis frame"* points the same way: the frame is what it stands on.
 | dimension | value | prov | basis |
 | --- | --- | --- | --- |
 | core-end anchor fraction | (−1.0, **1.0**, −0.52) and (−1.0, **1.0**, +0.44) of the core's own half-extents | `derived` | **1.15 is the bug**: 1.15 × 125 = 143.75 is 18.75 mm past the core's edge and the rod's radius is 8, which is the 12.3 mm gap almost exactly. 1.0 puts the rod's axis in the plane of the inboard end channel's outer face, so the rod is 8 mm engaged in a 12 mm channel — contact 0.0, and `bolted` permits the overlap. Anchoring in *fractions* was the right fix for a bracket that started inside the fin pack; 1.15 was the wrong fraction |
-| lower bracket | **(−240, −169.2, 145.9) → (−276.4, −169.2, 50)**, 102.6 mm | `derived` | core end from the fractions above at rake 45° and z 240; rail end from `x_rail(y)` mirrored |
-| upper bracket | **(−240, −316.8, 293.5) → (−257.9, −316.8, 50)**, 244.1 mm | `derived` | same. Near-vertical, which is what the photograph shows |
+| lower bracket | **(−240, −169.2, 145.9) → (−310, −169.2, 50)**, 118.7 mm | `derived` | core end from the fractions above at rake 45° and z 240; rail end is §Chassis's straight rail mirrored, x −310. Was 102.6 mm to a rail at −276.4, which was the as-built pinching rail |
+| upper bracket | **(−240, −316.8, 293.5) → (−310, −316.8, 50)**, 253.4 mm | `derived` | same, against the straight rail at x −310. Was 244.1 mm to −257.9. Still near-vertical, which is what the photograph shows — it leans 16° outboard rather than 4° |
 | rod | Ø16, bent, mid-point 18 below the chord | `estimated` | unchanged; a bracket bowing upward looks sprung |
 | rail clamp bore | **30.0** | `sourced` | the mushroom clamp family is 28/30/32 and `tube_main` is 30 |
 | fasteners | 4 into the core (2 per side rail) + 2 clamping the rail | `estimated` | counted off the CRG close-up. A read of one photograph, not a spec |
