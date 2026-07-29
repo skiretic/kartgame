@@ -1823,18 +1823,22 @@ def _front_brakes(context: build.BuildContext, collection: bpy.types.Collection)
 
 
 def _pedal_plate_y(p: P.KartParams, z: float) -> float:
-    """Where the brake pedal's plate crosses a given height, in y.
+    """Where the brake pedal's arm crosses a given height, in y.
 
-    `cockpit.py` hangs both pedals off a cross tube ahead of their pads and leans
-    the pad face back by `PEDAL_FACE_TILT`, so the plate lies in a plane through
-    (`pedal_y`, `pedal_z`) at that tilt: `y = pedal_y + tan(tilt) x (z - pedal_z)`.
-    The tilt is duplicated here for the same reason `SIDE_BAR_PATH` is duplicated in
+    **Rewritten for the organ pedal.** §40.5 replaced the hanging plate with a
+    forged arm on a *bottom* pivot at (`pedal_pivot_y`, `pedal_pivot_z`) leaning
+    rearward by `pedal_arm_rake`, so the arm's line is
+    `y = pedal_pivot_y - tan(rake) x (z - pedal_pivot_z)` -- and the sign of that
+    term flipped, because the old pad hung *forward* of its cross tube and this arm
+    stands *behind* its pivot.
+
+    The lean is duplicated here for the same reason `SIDE_BAR_PATH` is duplicated in
     `bodywork.py` -- a geometry module may not read another module's objects -- and
-    it earns the duplication: aimed at the pad's *center* instead, the push rod
-    starts 11 mm off the plate and Art. 4.12.2's mandatory link is attached to
+    it earns the duplication: aimed at the bar's *centre* instead, the push rod
+    starts 11 mm off the arm and Art. 4.12.2's mandatory link is attached to
     nothing.
     """
-    return p.pedal_y + math.tan(PEDAL_FACE_TILT) * (z - p.pedal_z)
+    return p.pedal_pivot_y - math.tan(p.pedal_arm_rake) * (z - p.pedal_pivot_z)
 
 
 def _brake_hydraulics(
@@ -1911,7 +1915,12 @@ def _brake_hydraulics(
         build.sweep_tube(
             bm,
             [
-                (pedal_x, _pedal_plate_y(p, z) + 0.006, z),
+                # **On the arm's centreline, not 6 mm ahead of it.** The 6 mm was
+                # right for a hanging plate whose face pointed rearward and is wrong
+                # for a forged arm 8 mm thick: at high detail the cable ended 2.48 mm
+                # short of the part it is declared to pierce, and the low-detail bevel
+                # was hiding it.
+                (pedal_x, _pedal_plate_y(p, z), z),
                 (MASTER_FRONT_X - 0.019, MASTER_Y + 0.052, z),
             ],
             diameter * 0.5,

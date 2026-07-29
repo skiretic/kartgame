@@ -32,36 +32,46 @@ sprocket is on the *inboard* end of that shaft, so the chain runs in a plane
 perpendicular to the axle. That plane must contain both sprockets, and a chain
 cannot be skewed by even a few millimeters without throwing itself.
 
-`params.engine_x` is +0.240, i.e. the kart's right, which is correct: every KZ
-engine — TM KZ-R1, Vortex ROK Shifter, IAME Screamer — sits on the driver's
-right, with the chain guard and the axle sprocket on the right as well and the
-rear brake disc on the left to balance it. `wheels.py` puts its axle sprocket at
-x = **-0.115**, on the left, and its docstring says "a KZ drives the left rear".
-A locked rear axle does not drive one wheel: ARCHITECTURE.md §6 makes both rears
-turn together, so there is no left or right rear to drive. The magnitude 0.115 is
-right — it lands the sprocket between `frame.py`'s center and outer bearing
-hangers, exactly as that docstring reasons — it is only the sign that is
-mirrored.
+**Issue #112 is closed by giving the number one owner.** `powertrain.CHAIN_X` and
+`wheels.SPROCKET_X` were the same magnitude with opposite signs and neither owned
+it, so the two modules disagreed about which side of the kart the chain ran on and
+the disagreement was reported rather than resolved. Both now read
+`params.chain_x` = **+0.115**: a KZ carries engine, chain and crown wheel on the
+driver's right and the brake disc on the left, and `wheels.py`'s conclusion that
+*"a KZ drives the left rear"* is not a thing a locked rear axle can do.
 
-So this module puts its output sprocket and its chain at x = **+0.115**, which is
-where a real KZ's chain runs and where `wheels.py`'s own reasoning puts it. The
-two are one sign apart and are reported rather than silently reconciled; nothing
-here reads or writes `wheels.py`'s objects.
+The other half of #112 was the **pitch diameter formula**. It is
+`p / sin(pi/N)` and not `p * N / pi`; the approximation is 0.03% small at 82 teeth
+and 1.1% small at 12, which is 0.24 mm of radius — and that is exactly the 1.9 mm
+by which the chain was built inside a Ø18 output shaft.
 
-EXHAUST ROUTING — which way the port faces
-------------------------------------------
-The 125cc KZ engines above are all water-cooled case-reed two-strokes with the
-reed block and carburetor at the **rear** of the crankcase and the exhaust port
-on the **front** face of the cylinder. So the airbox sits high and rearward, over
-the right rear tire, and the header leaves the cylinder forward, drops outboard
-around the right main rail, and the chamber runs forward along the right flank
-inboard of the sidepod with the silencer ahead of the driver's hip.
+EXHAUST ROUTING — the port faces REARWARD, and this file used to say the opposite
+--------------------------------------------------------------------------------
+Art. **5.10**, PDF p. 17, verbatim: *"It is mandatory for the exhaust to pass
+rearward and not cross the plane defined by the driver seated in the normal
+driving position."* A regulation, read in the pinned text, and it settles it.
 
-That is also the only routing the kart has room for, which is a useful check on
-the reference rather than a substitute for it: rearward of the engine, 0.62 m of
-pipe would have to pass through the right rear tire, which occupies
-x 0.485..0.700, y -0.673..-0.378. There is nowhere for it to go. Getting this
-backwards puts the pipe in the tire and the airbox in the radiator.
+Two independent proofs had already reached the same place. The **photograph**:
+in `tonykart_racer401T_p05.jpg` the intake silencer is on the engine's forward
+face and the exhaust joint, its two retaining springs and the pipe are all on the
+rear face — a topological reading, which is the one thing that image's projection
+does not destroy. And the **arithmetic**: the sourced cone table turns through 95
+degrees in total, and a single-plane 95 degree bend cannot take a forward-pointing
+inlet to a rearward-pointing outlet. That needs ~180; both degenerate solutions
+put the stinger 550 mm outboard of the kart or 430 mm below the ground.
+
+The paragraph that used to stand here reasoned from a forward-facing port —
+*"there is nowhere for it to go […] getting this backwards puts the pipe in the
+tire and the airbox in the radiator"*. **The premise was wrong and so was the
+conclusion.** Rearward is the only family that closes, and the airbox is what has
+to move: the pipe now occupies the volume the intake was built in, so the box
+rises 60 mm and the carburettor drops 12 (see `AIRBOX_LO` and `CARB_AXIS_Z`).
+
+What makes it packageable at all is the cylinder's 25 degree forward lean —
+`params.cylinder_lean`, which is `derived` from the sourced port angle plus the
+axle clearance rather than styled. With the barrel upright the pipe's inlet axis
+points 25 degrees *down* and the pipe is 51 to 63 mm inside the rear axle at
+every roll of the bend plane. At 25 degrees of lean the inlet axis is horizontal.
 
 Coordinates: +X right, +Y forward, +Z up. Everything is authored in world
 coordinates and parented to `powertrain_root` at the origin, the way `frame.py`
@@ -102,24 +112,39 @@ from . import params as P
 # seven `radiator_*` — are read where they are used and are noted there when the
 # reading of them is not the obvious one.
 
-CHAIN_X: float = 0.115
-"""The chain plane. Must equal `wheels.SPROCKET_X` in magnitude *and sign*; see
-the CHAIN LINE note in the module docstring for why it currently does not."""
-
-CHAIN_PITCH: float = 0.005563
-"""#219 chain pitch. "219" is thousandths of an inch: 0.219 in = 5.563 mm."""
-
-ENGINE_SPROCKET_TEETH: int = 12
-"""KZ front sprockets run 10-14 teeth. Pitch diameter is `pitch * teeth / pi`."""
-
 CHAIN_HALF_WIDTH: float = 0.0045
 CHAIN_HALF_HEIGHT: float = 0.0035
 """#219 chain is about 9 mm across the rollers and 8 mm tall. Modeled as a flat
 band rather than a round cord: a chain seen edge-on is a flat plate, and a swept
 circle reads as a bungee."""
 
-SPROCKET_Y: float = -0.268
-SPROCKET_Z: float = 0.150
+SPROCKET_Y: float = -0.2685
+"""Output sprocket station. **Solved for a whole even pitch count, not chosen.**
+
+A chain is an even whole number of pitches. With pitch radii 10.745 and 72.615 the
+closed-belt length is 790.87 mm at a centre distance of 257.01, which is 142.18
+pitches; bringing the centre distance back 0.49 mm to 256.5 lands it on exactly
+**142**. That moves this station from -0.268 to -0.2685, and the 0.5 mm is the
+whole content of the change."""
+
+CHAIN_GUARD_X: tuple[float, float] = (0.101, 0.133)
+CHAIN_GUARD_Y: tuple[float, float] = (-0.610, -0.258)
+CHAIN_GUARD_WALL: float = 0.002
+"""Art. **5.9**, PDF p. **17**, verbatim: *"A chain guard is mandatory in all
+classes. Chain guards may be made of composite material. […] In gearbox classes,
+the chain guard must cover the sprocket and the crown wheel down to the centre of
+the crown wheel axis."*
+
+So the guard is **compulsory** and the kart did not have one. The lateral span is
+`derived`: the chain band is 110.5-119.5 and both sprockets sit inside it, so
+7.5 mm of clearance a side, which is the smallest gap a composite guard holds
+without rubbing. The fore-aft span runs from the small sprocket's front to the
+crown wheel's rear plus 10 mm each end. Its **lower edge is z = rear_axle_z**,
+which is the article's own words rather than a choice.
+
+It is `pierced` by the axle and by the output shaft, and that is correct -- the
+guard is cut around both. Declaring them is what stops gate 1 reading a compulsory
+part as a collision."""
 """Engine output sprocket center. `SPROCKET_Z` is `engine_z` — the crankshaft and
 the gearbox output sit at the same height on a kart engine, and that height is
 what `engine_z` has to mean for the chain line to work at all (see `_engine`).
@@ -204,6 +229,18 @@ axis at z = 0.150 its lower edge would be at 0.098, inside the bar's height
 band, and it clears only because it stops 2 mm short of the bar in x. That is
 not a clearance to rely on."""
 
+CYLINDER_BASE_Z: float = 0.240
+"""The base face, and the pivot the whole cluster leans about. `derived`:
+`MOUNT_PLATE_TOP` 100 + `CRANKCASE_HEIGHT` 140."""
+
+CYLINDER_PORT_RISE: float = 0.0499
+CYLINDER_PORT_WINDOW: tuple[float, float] = (0.0441, 0.0282)
+"""Port centre 49.9 mm above the base face and a 44.1 x 28.2 window, both `derived`
+off KZ-R1 HF p. 3's development at 0.0601 mm/px (830 px and 733 x 470 px). The
+window is 81.6% of the 54 mm bore because the form lists **three** exhaust ports,
+one main plus two auxiliaries. Recorded rather than modelled: the port is a hole
+this mesh does not cut, and it is what places `EXHAUST_INLET`."""
+
 CYLINDER_AXIS_X: float = 0.319
 CYLINDER_AXIS_Y: float = -0.250
 """The bore's axis. x is the crankcase's own center, because the barrel sits over
@@ -260,9 +297,7 @@ The lead is included because the plug cap alone reads as a stub — what says
 ignition is the lead arcing away from it down to the coil.
 """
 
-EXHAUST_FLANGE_HALF: tuple[float, float] = (0.038, 0.030)
-EXHAUST_FLANGE_THICKNESS: float = 0.014
-EXHAUST_FLANGE_NUT_FLATS: float = 0.011
+MANIFOLD_BOLT_FLATS: float = 0.010
 """The exhaust port flange on the barrel's front face, and its two nuts.
 
 The chamber is not welded to the engine: an elbow bolts to the port through this
@@ -271,10 +306,6 @@ flange and the springs as the missing joint hardware, and they are the two parts
 that make the pipe look bolted on rather than grown out of the cylinder.
 """
 
-EXHAUST_SPRING_TURNS: int = 6
-EXHAUST_SPRING_COIL_RADIUS: float = 0.0055
-EXHAUST_SPRING_WIRE_RADIUS: float = 0.0011
-EXHAUST_SPRING_SAMPLES: int = 8
 """Two tension springs from lugs on the flange to lugs on the header. 11 mm coil
 diameter and 2.2 mm wire is a standard exhaust spring; six turns over the ~55 mm
 they span is what a stretched one looks like. `EXHAUST_SPRING_SAMPLES` is the
@@ -299,7 +330,7 @@ carry one — CIK requires an onboard starter for the class — and its bulk plu
 battery is a real part of the silhouette."""
 
 BATTERY_SIZE: tuple[float, float, float] = (0.085, 0.110, 0.070)
-BATTERY_CENTER: tuple[float, float, float] = (0.222, -0.400, 0.195)
+BATTERY_CENTER: tuple[float, float, float] = (0.185, -0.400, 0.195)
 """The starter's battery, on a bracket behind the engine. Sits above the rear
 seat strut, which passes below it at z 0.120..0.148.
 
@@ -310,16 +341,22 @@ inboard. Laid across, its outboard end reached x 0.285 and the carburetor's body
 both the carburetor by 17 mm and the seat shell's edge at 0.164 by 15 mm."""
 
 CARB_AXIS_X: float = 0.312
-CARB_AXIS_Z: float = 0.205
+CARB_AXIS_Z: float = 0.193
 CARB_BODY_RADIUS: float = 0.030
 CARB_FRONT_Y: float = -0.368
 CARB_REAR_Y: float = -0.440
 CARB_SPIGOT_ENGINE_RADIUS: float = 0.0175
 CARB_SPIGOT_AIR_RADIUS: float = 0.032
 CARB_TOP_CAP_RADIUS: float = 0.024
-CARB_TOP_CAP_TOP_Z: float = 0.262
-CARB_BOWL_LO: tuple[float, float, float] = (0.290, -0.434, 0.152)
-CARB_BOWL_HI: tuple[float, float, float] = (0.334, -0.388, 0.184)
+CARB_TOP_CAP_TOP_Z: float = 0.250
+CARB_BOWL_LO: tuple[float, float, float] = (0.290, -0.434, 0.140)
+CARB_BOWL_HI: tuple[float, float, float] = (0.334, -0.388, 0.172)
+"""The carburettor drops **12 mm** because the pipe now runs where its cap was.
+
+Its cap at z 262 fouled the pipe's underside at 260 by 2 mm, and the port height is
+`derived` from the homologation form and does not move -- so the carburettor is what
+moves. Result: 10 mm of clearance. The bowl goes to z 140-172, still 71 mm over the
+tray."""
 """Dell'Orto VHSH 30 — the 30 mm flat-slide the class runs, on the crankcase's
 rear face pointing back at the airbox.
 
@@ -332,81 +369,206 @@ cylinder standing straight up out of the body with the throttle cable entering
 through it, which is the detail that stops the whole part reading as a lump.
 """
 
-AIRBOX_LO: tuple[float, float, float] = (0.250, -0.567, 0.280)
-AIRBOX_HI: tuple[float, float, float] = (0.420, -0.452, 0.400)
-"""The airbox sits high and rearward, over the right rear tire — inboard of it at
-x <= 0.420 against the tire's inner face at 0.485, and above its crown at 0.295.
-It is the highest thing on the kart apart from the steering wheel and it is a
-large part of what says "shifter" from behind."""
+AIRBOX_LO: tuple[float, float, float] = (0.250, -0.567, 0.340)
+AIRBOX_HI: tuple[float, float, float] = (0.420, -0.452, 0.460)
+AIRBOX_DUCT_DIAMETER: float = 0.030
+AIRBOX_DUCT_X: tuple[float, float] = (0.330, 0.390)
+AIRBOX_DUCT_Z: float = 0.350
+AIRBOX_DUCT_LENGTH: float = 0.045
+"""The airbox sits high and rearward, over the right rear tire -- inboard of it at
+x <= 0.420 against the tire's inner face at 0.485. It is the highest thing on the
+kart apart from the steering wheel and a large part of what says "shifter" from
+behind.
+
+**Raised 60 mm from z 280..400, because the exhaust now occupies the volume it was
+built in**: the rearward pipe passes through x 245-344 at z 238-325 there. At
+340..460 it clears the pipe's crown by 15 mm, the driver's shoulder (x +-200) by 50
+and the right rear tyre's inner face by 65.
+
+The two **ducts are compulsory and were missing.** Art. **9.13.1**, PDF p. **30**:
+*"They must have two ducts with a 30.0 mm maximum diameter."* Count and diameter are
+`sourced` -- it is a maximum and every KZ silencer runs it -- and the positions are
+`estimated`: 45 mm long, projecting forward, leaving 8 mm to the leaned head's
+rearmost point."""
 
 INTAKE_BOOT_DIAMETER: float = 0.068
 """Rubber over the carburetor's 64 mm air-filter spigot."""
 
-EXHAUST_PATH: tuple[tuple[float, float, float], ...] = (
-    (0.320, -0.190, 0.288),
-    (0.356, -0.120, 0.205),
-    (0.366, -0.040, 0.138),
-    (0.356, 0.040, 0.112),
-    (0.350, 0.140, 0.108),
-    (0.340, 0.240, 0.116),
-    (0.322, 0.330, 0.122),
-    (0.290, 0.410, 0.135),
-    (0.265, 0.470, 0.145),
+EXHAUST_CONES: tuple[tuple[float, float, float, float], ...] = (
+    (0.0000, 0.0677, 0.0445, 0.0470),
+    (0.0677, 0.1012, 0.0470, 0.0490),
+    (0.1012, 0.1347, 0.0490, 0.0508),
+    (0.1347, 0.1578, 0.0508, 0.0557),
+    (0.1578, 0.1809, 0.0557, 0.0610),
+    (0.1809, 0.2128, 0.0610, 0.0703),
+    (0.2128, 0.2446, 0.0703, 0.0798),
+    (0.2446, 0.2764, 0.0798, 0.0890),
+    (0.2764, 0.3083, 0.0890, 0.0983),
+    (0.3083, 0.3401, 0.0983, 0.1074),
+    (0.3401, 0.4090, 0.1074, 0.1365),
+    (0.4090, 0.4725, 0.1365, 0.1350),
+    (0.4725, 0.5131, 0.1350, 0.1145),
+    (0.5131, 0.6226, 0.1145, 0.0558),
+    (0.6226, 0.6746, 0.0558, 0.0263),
 )
-"""Control polyline of the whole exhaust, from the port forward, before filleting
-and before it is trimmed to `exhaust_length`.
+"""The whole expansion chamber, as (s start, s end, dia start, dia end) in meters.
 
-Every point is set by a clearance rather than by taste. Leaving the port the pipe
-goes outboard to x = 0.366 to clear the starter motor; it then comes back to
-x ~ 0.352 because that is the middle of the only corridor the belly fits through
-— the shifter's lever is at x <= 0.269 and the right side bar's inboard surface
-is at x >= 0.434, and a 130 mm belly between them leaves under 20 mm a side. It
-runs at z ~ 0.11 because `radiator_z` puts the radiator's bottom tank at 0.200
-and the belly's crown has to pass under it. At the front it comes back inboard
-and lifts, because the main rail sweeps out and up to the kingpin from y = 0.30
-and would otherwise be straight through the silencer."""
+**Every one of the fifteen rows is `sourced`**, off the TM homologation forms
+KZ-R1 `041-EZ-75` and KZ-R2 `041-EZ-02`, each of which carries both diameters and
+both slant lengths of all 15 cones. Art. **9.15.1**, PDF p. **30**: *"All KZ
+engines must be fitted with the exhaust homologated with the engine and described
+in the engine´s HF."* That makes this table normative rather than descriptive.
 
-EXHAUST_PROFILE: tuple[tuple[float, float], ...] = (
-    (0.000, 1.000),
-    (0.150, 1.000),
-    (0.185, 1.294),
-    (0.430, 3.824),
-    (0.520, 3.824),
-    (0.560, 3.706),
-    (0.760, 0.941),
-    (0.790, 0.647),
-    (1.000, 0.647),
+Two checks that the transcription is right rather than plausible: summing the 15
+frusta and insetting the wall reproduces each form's own stated internal volume to
+1.07 mm (R1) and 1.29 mm (R2), which is where `params.exhaust_wall` comes from;
+and `outer - inner slant = theta * D_mean` summed per cone gives 95.3 degrees of
+total bend, against a photograph on the facing page showing about a right angle.
+
+**This is a shape, not a scalar, which is why it lives here** rather than in
+`params.py` -- §00's single-owner rule puts scalars there and shapes in the module
+that builds them. The five headline diameters are in `params.py` because other
+things read them.
+
+It replaces `EXHAUST_PROFILE`, whose nine ratio points drew a *smooth silhouette*.
+A KZ chamber is fifteen straight-sided frusta with visible weld beads at the
+joins, and that faceting **is** the shape -- so the pipe is built as a cone
+sequence and not as a profile curve. Cone 12 is the belly and is effectively
+cylindrical; 13 and 14 are the two baffle cones; 15 is the stinger."""
+
+EXHAUST_CONE_TURN: tuple[float, ...] = (
+    0.0, 0.0, 0.0, 8.93, 7.95, 8.99, 10.08, 10.05, 9.97, 10.03,
+    8.13, 6.08, 6.29, 6.06, 2.79,
 )
-"""Chamber radius against fraction of `exhaust_length`, in units of
-`exhaust_pipe_diameter / 2`.
+"""Degrees of bend each cone contributes, `derived` from the two slant lengths of
+that cone: `theta = (outer - inner) / D_mean`. Sums to **95.35**, and the first
+three are zero because the pipe is straight to s = 134.7 -- which is the sourced
+fact that decides where the bend can start."""
 
-Expressed as a ratio so the whole pipe scales with the two parameters that
-describe it: 3.824 is `exhaust_max_diameter / exhaust_pipe_diameter`, so the
-belly is exactly `exhaust_max_diameter` across by construction rather than by a
-number that has to be kept in step by hand. The five sections are the five a real
-expansion chamber has — header, diverging cone, belly, converging (baffle) cone,
-stinger — and the baffle cone is deliberately steeper than the diverging cone,
-which is what a tuned pipe looks like and what a symmetric "rugby ball" does
-not."""
+EXHAUST_INLET: tuple[float, float, float] = (0.319, -0.328, 0.285)
+"""The pipe's inlet face, on the manifold spigot. `derived`, §30.4: the port centre
+is 49.9 mm up the leaned bore axis from the base face, the horizontal port axis
+leaves the Ø128 jacket 70.6 mm rearward of that, and the machined face stands a
+little proud."""
 
-SILENCER_START: float = 0.780
-SILENCER_RADIUS: float = 0.038
-SILENCER_PROFILE: tuple[tuple[float, float], ...] = (
-    (0.00, 0.34),
-    (0.06, 0.84),
-    (0.12, 1.00),
-    (0.88, 1.00),
-    (0.94, 0.84),
-    (1.00, 0.37),
-)
-"""The silencer can, as a fraction of `SILENCER_RADIUS` along its own span. It
-slips over the stinger and the two are coaxial and interpenetrate, which is what
-the real assembly does."""
+EXHAUST_BEND_TILT: float = 0.2094
+"""Nose-down tilt of the bend *plane*, radians (12 degrees). `estimated`, and its
+family is wide -- measured across it, the chamber floor / crown / stinger exit go
+0 deg -> 217/353/285, 8 -> 185/330/225, **12 -> 169/318/195**, 20 -> 124/314/137.
 
-RADIATOR_TANK_HEIGHT: float = 0.030
+12 is the shallowest tilt that leaves the silencer body 130 mm of ground clearance
+while keeping the chamber's crown well under Art. 5.10's 450 mm ceiling. **The
+crown's maximum is not a function of the tilt**: it peaks in the diffuser where the
+bend has barely started, so it is set by the sourced port height and cannot be
+tuned away.
+
+The bend turns **inboard**, `derived`: outboard puts the belly in the right rear
+tyre."""
+
+MANIFOLD_LENGTH: float = 0.028
+MANIFOLD_SPIGOT_DIAMETER: float = 0.043
+MANIFOLD_PLATE: tuple[float, float, float] = (0.078, 0.060, 0.008)
+MANIFOLD_BOLT_PATTERN: tuple[float, float] = (0.062, 0.044)
+"""`exhaust_flange` is renamed `exhaust_manifold`, and the rename is the point:
+**there is no flange on the pipe.** A short manifold bolts to the cylinder and the
+pipe slips over its spigot on springs, which is why the chamber has to be able to
+articulate and why the support downstream is a spring cradle rather than a bolt.
+
+Length **28** is `sourced` and flagged: kartshop sells the TM KZ manifold as
+"D2 28 / 29 / 30.5" and calls the number the length -- three options 2.5 mm apart
+is a length shim, not a restrictor family -- but on Vortex ROK the same designation
+is a bore. The spigot is `estimated` against the pipe's `sourced` 44.5 mm inlet
+bore: a slip joint needs a few tenths plus room for carbon. The plate is a
+62 x 44 bolt rectangle plus M6 heads and edge; the real part exists and nobody
+publishes its dimensions.
+
+Bolts: **4x M6 x 20**, `sourced` (kartshop, *"TM KZ manifold D2 28: 4x allen bolt
+M6 x 20 mm"*). **The build had two nuts and needs four**, so
+`exhaust_flange_nut_0..1` becomes `exhaust_manifold_bolt_0..3`."""
+
+EXHAUST_SPRING_TURNS: int = 6
+EXHAUST_SPRING_COIL_RADIUS: float = 0.006
+EXHAUST_SPRING_WIRE_RADIUS: float = 0.00125
+EXHAUST_SPRING_SAMPLES: int = 8
+EXHAUST_SPRING_STATION: float = 0.070
+"""Two bent-tab hooks side by side at s ~ 70, `measured` off KZ-R2 HF p. 13 at
+500 dpi and scaled on the pipe's own sourced 46.5 mm OD there. Free length **70**
+is `sourced` -- eurokart, *"TM K9/K9B/K9C KZ10/10B/KZ10C/KZ-R1 exhaust spring 70mm
+KZ"*. Wire 2.5 and coil 12 are `estimated` proportions off the same drawing.
+
+What the springs buy is ~3 degrees of cone and ~5 mm of axial play about the slip
+joint, which is why the chamber is **not** rigid to the engine."""
+
+SILENCER_LENGTH: float = 0.450
+SILENCER_DIAMETER: float = 0.120
+SILENCER_INLET_DIAMETER: float = 0.029
+SILENCER_OUTLET_DIAMETER: float = 0.032
+SILENCER_AXIS_Y: float = -0.800
+SILENCER_AXIS_Z: float = 0.190
+SILENCER_SPAN: tuple[float, float] = (-0.170, 0.250)
+"""The can, **transverse**, and the transverse part is forced rather than styled:
+the clear box behind the axle is about 365 mm deep and a 450 mm cylinder cannot lie
+fore-and-aft in it. The stinger already points along -x, i.e. along the body axis.
+
+450 x 120 with a 29 mm inlet spigot is `sourced` -- the Elto ICC/KZ silencer, whose
+retaining hardware is listed as *"large jubilee clip for exhaust silencer x2,
+120-140mm"*, which corroborates the 120. The outlet's **floor** is `sourced`:
+Art. **5.10**, p. 17, requires an external diameter *"more than 3 cm"*, so 32 is
+the smallest round tube above it; the article also requires the outlet not to
+*"exceed the outer limits of the kart"* and to discharge behind the driver, and at
+x 280 it is 420 mm inside the kart's 700 limit.
+
+An alternative family exists at 89 x 349 (MC Racing KZ/ICC) and is recorded so
+nobody reads 120 x 450 as the only shape. The sourced clamps fit the 120."""
+
+CONNECTOR_DIAMETER: float = 0.030
+CONNECTOR_APEX: tuple[float, float, float] = (-0.215, -0.744, 0.192)
+"""The U-bend, `estimated` as a route and `sourced` as a **part**: the catalogues
+sell a *"muffler bent pipe" / "exhaust with U-bend"* as a separate item, which is
+exactly what turns a leftward stinger back into a rightward can."""
+
+HANGER_CLAMP_X: float = 0.054
+HANGER_CLAMP_BORE: float = 0.030
+HANGER_CLAMP_OD: float = 0.046
+HANGER_BOSS_TOP_Z: float = 0.088
+HANGER_CRADLE_STATION: float = 0.513
+HANGER_CRADLE_WIRE: float = 0.006
+"""`exhaust_hanger` was **bolted to nothing** -- 60.47 mm off `chassis_side_bar_r`
+-- and it could not mount where it did. The sourced mushroom clamp comes in
+28/30/32 bores and `chassis_side_bar_r` is a `tube_bumper` = 20 mm bumper tube. The
+30 mm tubes on this kart are `chassis_rail_*`, `chassis_cross_front` and
+`chassis_cross_rear`, and of those only the rear cross member is within reach of a
+rearward pipe. So the clamp goes on `chassis_cross_rear` at x +54, directly under
+the grip point, and the part splits into clamp, arm and cradle.
+
+The arm's 169 mm is `derived` from the two ends it has to join, not read off a
+photograph -- `notes_exhaust.md` estimated ~150 from an image with no dimensioned
+feature. The cradle is a `sourced` eurokart *"exhaust cradle spring D.12mm
+L.130mm"* clipped round the **baffle cone** at s = 513, which is the only part of
+the pipe both stiff enough to clamp and reachable; real installations clip the
+cone, not the belly. One support, `estimated`: one arm, one clip and one clamp is
+what the catalogue sells as a set, and a second would over-constrain a pipe that
+must articulate at the slip joint."""
+
+SILENCER_BRACKET_X: float = 0.230
+SILENCER_BAND_X: tuple[float, float] = (-0.050, 0.160)
+SILENCER_SADDLE_WIDTH: float = 0.110
+SILENCER_ISOLATOR: tuple[float, float] = (0.028, 0.012)
+"""The can's own mount, all `estimated` off `exh_eurokart_3.jpg` and `_5.jpg`
+against the sourced 120 mm body. **Two** bands is `sourced` (*"large jubilee clip
+for exhaust silencer x2"*). The bracket is 96 mm outboard of the pipe support's
+clamp so the two do not collide on the same tube."""
+
+RADIATOR_TANK_HEIGHT: float = 0.022
 RADIATOR_TANK_PROUD: float = 0.007
 """Top and bottom tanks. `radiator_height` covers the tanks *and* the core, so
 the core's own height is `radiator_height - 2 * RADIATOR_TANK_HEIGHT`.
+
+**22 +-6, `estimated`**, was 30: the polished band above the fin block reads about
+16 px in the dead-rear shot, foreshortened by both the rake and the camera
+elevation, so the true height is larger than the reading. Cross-checked against the
+CRG close-up. The fin block is therefore 435 - 2 x 22 = **391**, which is also the
+travel `radiator_curtain` has to cover.
 
 They stand proud of the core on **both** faces, which is what R2's does and what
 makes the core read as a core rather than as a painted panel: the tank is a
@@ -431,7 +593,34 @@ range without shimmering at chase range, and issue #19's normal bake is the
 designed answer for the frequency above it. The count follows from the core's
 length, so it is not a free number, but it does not vary with detail level: a fin
 is part of the radiator's shape, not of its resolution.
+
+The real pitch is **1.8 +-0.5** (`estimated`; unresolvable below ~2 mm at
+1.04 mm/px, checked against 12-16 fins/inch practice) and 288 fins would cost more
+than the rest of the kart. With `radiator_width` 250 the modelled count is **18**,
+and `RADIATOR_DIVIDER_ALONG` at -0.44 of the half-width still lands between fins 4
+and 5, so `joints.py`'s two explicit rows stay correct.
 """
+
+RADIATOR_CURTAIN_THICKNESS: float = 0.002
+RADIATOR_CURTAIN_STANDOFF: float = 0.006
+RADIATOR_CURTAIN_SLOT: float = 0.055
+"""The adjustable blind, and it is **new**. Art. 5.3.1 permits it in as many words
+-- *"a system of fairings and covers may be placed at the front or rear of the
+radiator(s). This device may be adjustable, but it must not be detachable when the
+kart is in motion"* -- and the baffles *"must be securely fixed to the radiator(s)
+with screws. They must be one-piece and may be made of composite material."*
+
+Its width **is** the core's: Direct-Karting sells a 250 mm curtain for the 250 mm
+radiator, 290 for the 125 RS and 230 for the X30 big, and New-Line's air shield is
+25 cm -- so this reads `radiator_width` rather than carrying a number. Travel is
+the full 391 mm fin block, because blanking the core means spanning it. The two
+55 mm slots are `sourced` off the New-Line description, for intermediate settings,
+and the pulley-and-O-ring drive is what makes it adjustable without being
+detachable. `estimated`: the 2 mm composite and the 3 mm standoff, which is a
+faceting allowance.
+
+It does **not** ship with the radiator: EM-01 is listed *"without shutter blind"*
+and the blind is a separate line."""
 
 RADIATOR_SIDE: float = -1.0
 """Which side of the kart the radiator stands on: -1 is the kart's **left**.
@@ -482,52 +671,108 @@ it shows as a raised welded rib splitting the core into a wide forward section
 and a narrow rear one. It is the single most recognizable thing about the face
 of one of these — the photographs read as a kart radiator rather than as a
 generic core largely because of it."""
-HOSE_DIAMETER: float = 0.028
 BRACKET_DIAMETER: float = 0.016
-"""Radiator brackets. On a KZ the radiator is carried off the seat's right wing
-rather than off the frame, and here it has to be: the exhaust belly occupies the
-whole volume between the radiator's underside and the main rail."""
+BRACKET_LOWER_LOCAL: tuple[float, float, float] = (-1.0, 1.0, -0.52)
+BRACKET_UPPER_LOCAL: tuple[float, float, float] = (-1.0, 1.0, 0.44)
+"""Where the two brackets meet the radiator, as **fractions of the core's own
+half-extents in its own frame** rather than world points, so they stay on the back
+of the core when the rake or the size changes -- which is the whole reason the
+radiator is built in a frame at all.
 
-BRACKET_LOWER_LOCAL: tuple[float, float, float] = (-1.0, 1.15, -0.52)
-BRACKET_UPPER_LOCAL: tuple[float, float, float] = (-1.0, 1.15, 0.44)
-BRACKET_LOWER_SEAT: tuple[float, float, float] = (0.180, -0.150, 0.135)
-BRACKET_UPPER_SEAT: tuple[float, float, float] = (0.180, -0.235, 0.330)
-"""Where the two brackets meet the radiator and where they meet the seat's
-wing on whichever side `RADIATOR_SIDE` puts the radiator. The radiator ends are
-**fractions of the radiator's own half-extents in its own frame** rather than
-world points, so they stay on the back of the core when the rake or the size
-changes — which is the whole reason the radiator is built in a frame at all.
+**1.15 was the bug and 1.0 is the rest of the fix.** 1.15 x 125 = 143.75 is
+18.75 mm past the core's edge and the rod's radius is 8, which is the 12.3 mm
+gate-2 gap almost exactly. At 1.0 the rod's axis lies in the plane of the inboard
+end channel's outer face, so the rod is 8 mm engaged in a 12 mm channel: contact
+0.0, and `bolted` permits the overlap. Anchoring in *fractions* was the right fix
+for a bracket that started inside the fin pack; 1.15 was the wrong fraction.
 
-The lateral fraction is 1.15, i.e. just **past** the core's inboard edge, and
-that matters: at 0.34 the bracket started inside the fin pack. It went unnoticed
-while `radiator_y` was 0.000, because the bracket then ran almost straight
-inboard and stayed behind the core face the whole way. Moving the radiator 235 mm
-aft to where V4 puts it left the seat wing forward of the core, so the upper
-bracket crossed from behind the face to in front of it — straight through 47
-triangles of core and 145 of fin. Anchoring outboard of the core's own edge makes
-the bracket independent of where the radiator sits, which is the property that
-was missing rather than the specific number.
+**The other end anchors on `chassis_rail_l`, and that is a regulation reading
+rather than a convenience.** `BRACKET_*_SEAT` used to put it on the seat's wing.
+Three things say the frame: Art. **4.2.3** puts the *welded* attachment points for
+*"the radiator(s)"* on the frame; Art. **4.8.2** requires seat stays to be bolted
+at each end and *removed if unused*, so a stay is a removable member and not a
+mounting rail; and the CRG close-up -- the only image in the repo that shows the
+bracket -- shows a pair of thin vertical rods dropping to a **chassis clamp**.
+Art. 5.3.1's *"radiators must be placed above the chassis frame"* points the same
+way: the frame is what it stands on.
 
-Lower and upper, because that is what they are once the core is raked into the
-seat's plane: both leave the core's **back** face and run rearward and inboard
-to the seat's right wing, one low and one high. They were front and rear while
-the core was wrongly modeled as a long panel lying fore-and-aft."""
+**And there must never be a `radiator_*`/`seat_shell` joint.** Art. 5.3.1: *"They
+must not interfere with the seat."* That is the one place in this project where a
+regulation is expressed as the **absence** of a declaration -- gate 1 makes any
+overlap fatal precisely because no `Joint` is declared, so the missing row is an
+assertion and not an omission. The core's inboard edge at -240 clears the shell's
+outboard face at -184 by 56 mm and must keep doing so."""
+
+HOSE_DIAMETER: float = 0.028
+"""20 mm ID silicone (`sourced`, FTP kart radiator hose; 3/4 in is the trade
+standard) plus 2 x 4 mm of three-ply wall. A photo reading gives 33, which is
+protective sleeving and must not be modelled as bare hose. Art. 5.3.1 rates the
+tubing at 150 C and 10 bar."""
 
 HOSE_UPPER_LOCAL: tuple[float, float, float] = (0.0, 0.85, 0.95)
 HOSE_LOWER_LOCAL: tuple[float, float, float] = (0.0, 0.85, -0.95)
-HOSE_UPPER_ENGINE: tuple[float, float, float] = (0.299, -0.182, 0.376)
-HOSE_LOWER_ENGINE: tuple[float, float, float] = (0.216, -0.168, 0.194)
-"""Top hose from the head's water outlet, bottom hose to the water pump on the
-crankcase. Both leave the tanks on their **inboard** side, which is the side the
-engine is on once the core is raked into the seat's plane.
+HOSE_UPPER_ROUTE: tuple[tuple[float, float, float], ...] = (
+    (0.150, -0.300, 0.375),
+    (0.0, -0.400, 0.390),
+)
+HOSE_LOWER_ROUTE: tuple[tuple[float, float, float], ...] = (
+    (-0.224, -0.200, 0.102),
+    (-0.224, -0.350, 0.105),
+    (0.0, -0.455, 0.090),
+)
+WATER_OUTLET_LOCAL: tuple[float, float, float] = (0.299, -0.207, 0.376)
+"""Hot water enters the **high** tank so the core drains downward, which New-Line's
+*"curved top tank inlet designed to evenly distribute water"* confirms is the inlet
+end; the cold return is the low run by construction, because the pump is at axle
+height. Both `estimated` as routes.
 
-The engine ends are the two fittings' own mouths, so a hose cannot end in mid
-air — that was the state before the water pump boss existed."""
+The upper run crosses **behind the seat back**, which is the shorter way across
+from a head outlet and stays above the axle. The lower run's x -215 leg is inboard
+of both radiator brackets -- 19 mm from the lower rod's surface and 17 from the
+shell -- which is what clears the 58-pair overlap, and its crossing at z 95 passes
+28 mm under the chain's lower strand and 26 above the tray. **A hose cannot cross
+the spinning axle plane**, so the upper goes above and behind it and the lower
+stays forward of it."""
 
-EXHAUST_HANGER_Y: float = 0.300
-"""Where the silencer is strapped to the right side bar. A real pipe hangs on
-springs at the header joint and a strap at the can; the strap is the one that is
-visible."""
+WATER_INLET_BOSS: tuple[float, float, float] = (0.240, -0.330, 0.165)
+"""A **new** cast boss on the crankcase's inboard face, low. Art. 9.10.1
+water-cools *"the crankcase, cylinder and head"* -- all three -- so the coolant has
+to get into the case somewhere, and there was no such part: the lower hose ended on
+the clutch cover instead. 24 dia x 14 proud, `estimated`."""
+
+PUMP_SPINDLE: tuple[float, float, float] = (0.160, -0.386, 0.110)
+PUMP_BODY_DIAMETER: float = 0.060
+PUMP_PULLEY_PD: float = 0.025
+AXLE_PULLEY_PD: float = 0.065
+BELT_WIDTH: float = 0.0079
+BELT_THICKNESS: float = 0.0022
+BELT_PLANE_X: float = 0.190
+"""The water pump, **on the rear axle and not on the engine**, driven by a toothed
+belt. Art. **5.3.2**, PDF p. 15, quoted without substitution because an earlier
+paraphrase made it appear to *force* this: *"In Groups 1 & 2, the water pump must be
+mechanically controlled either by the engine or by the rear wheel axle."* It
+**permits either**, so the axle drive is this spec's choice and kart practice, not a
+requirement. Electric pumps are what it prohibits.
+
+The belt is what places the pump. **170XL031**, `sourced` as a part number and
+`derived` as a decode: XL profile, 5.08 mm pitch, 170 = 17.0 in = **431.8 mm** pitch
+length, 431.8/5.08 = **85 teeth**, 031 = 5/16 in = **7.9 mm** wide. Then
+`L = 2C + (pi/2)(D1+D2) + (D1-D2)^2/(4C)` with 65 and 25 gives
+`2C + 400/C = 290.43`, so **C = 143.8** -- the belt telling us where the pump sits.
+The quadrant is the only one not already occupied: rearward is the exhaust chamber,
+above is the airbox and the battery, and straight down is the floor tray.
+
+The axle pulley's 65 dia is `derived` from the axle's 50 plus 6-9 mm of clamp wall
+and flange a side. The pump pulley is `estimated` at 25: New Line sells a **30 mm**
+pump pulley *to slow the pump down for larger tracks*, which only reads that way if
+the stock one is smaller.
+
+**The pump body stays `estimated` and that is deliberate.** It is not published on
+any page reachable from here and **no reference photograph in this repo shows the
+pump at all** -- every Tony Kart and CRG frame here is a studio chassis shot with
+the pump absent or behind the rear panel. 60 dia +-10 is read off trade photographs
+as roughly a quarter of a 250 mm core, and it has to house an impeller fed by 20 mm
+spigots. This is the softest number in the assembly and it is labelled as one."""
 
 
 # --- entry point -----------------------------------------------------------
@@ -543,12 +788,50 @@ def build_module(context: build.BuildContext) -> None:
     root = build.empty("powertrain_root", (0.0, 0.0, 0.0), collection, size=0.10)
     context.publish("powertrain_root", root)
 
+    _check_cone_table(context.params)
+
     _engine_mount(context, collection, root)
     _engine(context, collection, root)
     _intake(context, collection, root)
     _driveline(context, collection, root)
     _exhaust(context, collection, root)
     _radiator(context, collection, root)
+    _cooling(context, collection, root)
+
+
+def _check_cone_table(p: P.KartParams) -> None:
+    """Assert the 15-cone shape and the five sourced scalars still agree.
+
+    `params.py` owns the headline diameters because other things read them and
+    `EXHAUST_CONES` owns the shape, which is §00's single-owner rule -- and that
+    leaves five numbers written down twice. Two copies of a figure with nothing
+    comparing them is how `SPROCKET_Z` and `engine_z` drifted, and how the chain
+    plane ended up with two signs; so this compares them, at import cost of nothing,
+    and is fatal.
+
+    It also checks the developed length against the table's own walk, which is the
+    one figure a reader is most likely to change by editing a cone and forgetting
+    the scalar.
+    """
+    checks = (
+        ("exhaust_header_diameter", p.exhaust_header_diameter, EXHAUST_CONES[0][2]),
+        ("exhaust_max_diameter", p.exhaust_max_diameter, EXHAUST_CONES[10][3]),
+        ("exhaust_baffle_diameter", p.exhaust_baffle_diameter, EXHAUST_CONES[12][3]),
+        ("exhaust_stinger_diameter", p.exhaust_stinger_diameter, EXHAUST_CONES[-1][3]),
+        ("exhaust_developed_length", p.exhaust_developed_length, EXHAUST_CONES[-1][1]),
+    )
+    for name, scalar, table in checks:
+        if abs(scalar - table) > 1e-6:
+            raise SystemExit(
+                "error: params.%s is %.6f and EXHAUST_CONES says %.6f.\n"
+                "       The cone table is sourced off the homologation form and is "
+                "the shape;\n"
+                "       the scalar is what other modules read. They are the same "
+                "number and\n"
+                "       one of them has been edited alone." % (name, scalar, table)
+            )
+    if abs(p.exhaust_wall) < 1e-6:
+        raise SystemExit("error: params.exhaust_wall is zero; Art. 5.10 floors it at 0.75 mm")
 
 
 # --- geometry helpers ------------------------------------------------------
@@ -571,6 +854,7 @@ def _block(
     material: bpy.types.Material,
     *,
     bevel: bool = True,
+    transform: Matrix | None = None,
 ) -> bpy.types.Object:
     """A box given by its two extreme corners rather than a center and a size.
 
@@ -583,6 +867,8 @@ def _block(
     center = tuple((high[axis] + low[axis]) * 0.5 for axis in range(3))
     bm = bmesh.new()
     build.box(bm, size, center)
+    if transform is not None:
+        bm.transform(transform)
     obj = build.object_from_bmesh(name, bm, collection, material=material)
     if bevel:
         build.bevel_object(obj, context.detail)
@@ -775,8 +1061,15 @@ def _lathe_object(
     axis: str = "X",
     segments: int | None = None,
     shade_smooth: bool = True,
+    transform: Matrix | None = None,
 ) -> bpy.types.Object:
     """A revolution about a world axis, parented to `root`.
+
+    `transform` is applied to the finished vertices, and it exists for exactly one
+    thing: the cylinder cluster leans 25 degrees forward (`params.cylinder_lean`)
+    and every part of it is far easier to author upright and then tip. It must be a
+    rotation -- a mirror would invert the winding, which is the trap
+    `_reverse_if_mirrored` documents on the other side of this module.
 
     `segments` defaults to the detail level's, which is what a part that is meant
     to be round wants. A part whose facet count is part of its *shape* rather
@@ -793,6 +1086,8 @@ def _lathe_object(
         axis=axis,
         center=center,
     )
+    if transform is not None:
+        bm.transform(transform)
     obj = build.object_from_bmesh(
         name, bm, collection, material=material, shade_smooth=shade_smooth
     )
@@ -811,6 +1106,7 @@ def _hex_nut(
     material: bpy.types.Material,
     *,
     axis: str = "Z",
+    transform: Matrix | None = None,
 ) -> bpy.types.Object:
     """A hex fastener head, as a six-sided revolution.
 
@@ -835,6 +1131,7 @@ def _hex_nut(
         axis=axis,
         segments=6,
         shade_smooth=False,
+        transform=transform,
     )
 
 
@@ -1238,13 +1535,28 @@ def _cylinder(
     material: bpy.types.Material,
     crank_top: float,
 ) -> None:
-    """Square base flange, round water jacket, exhaust port flange and springs.
+    """Square base flange, round water jacket, exhaust manifold and springs.
 
-    The shape is the correction. See `CYLINDER_RADIUS`'s docstring for why a KZ
-    barrel carries no fins and why the four that were here read as a 100 cc
-    air-cooled engine instead.
+    The shape is one correction and the **25 degree forward lean** is the other.
+    See `CYLINDER_RADIUS`'s docstring for why a KZ barrel carries no fins, and
+    `params.cylinder_lean` for why the barrel is not upright: with a vertical
+    cylinder the sourced 25 degree port angle points the pipe's inlet axis 25
+    degrees *down*, and the pipe is then 51 to 63 mm inside the rear axle at every
+    roll of the bend plane. At 25 degrees of lean the inlet axis is horizontal.
+
+    The cluster is authored upright and tipped once, about the lateral axis through
+    the base-face centre. Authoring fifteen leaned parts by hand is how one of them
+    ends up at a different angle from the rest.
+
+    **What the lean does not do is re-cut the crankcase.** §30.4's inclined deck
+    plane is expressed here by the *flange* leaning on a case whose top stays flat
+    at z 240, so the flange's forward corner dips into the casting. That pair is a
+    declared `bolted` joint and gate 1 permits it; a prismatic deck is a crankcase
+    change and this wave did not make one. Recorded so nobody reads the flat top as
+    an oversight.
     """
     axis = (CYLINDER_AXIS_X, CYLINDER_AXIS_Y)
+    lean = _lean(context.params)
 
     _block(
         "engine_cylinder_base",
@@ -1254,6 +1566,7 @@ def _cylinder(
         collection,
         root,
         material,
+        transform=lean,
     )
 
     # Four base studs, one near each corner of the flange, inset far enough that
@@ -1272,6 +1585,7 @@ def _cylinder(
             collection,
             root,
             material,
+            transform=lean,
         )
 
     # The jacket. Slightly barrelled — widest just above the flange and drawn in
@@ -1294,56 +1608,86 @@ def _cylinder(
         root,
         material,
         axis="Z",
+        transform=lean,
     )
 
-    _exhaust_flange(context, collection, root, material)
+    _manifold(context, collection, root, material)
 
 
-def _exhaust_flange(
+def _lean(p: P.KartParams) -> Matrix:
+    """The cylinder cluster's 25 degree forward tip, about the base-face centre.
+
+    Forward means the top moves toward **+Y**, so it is a rotation about +X by
+    *minus* `cylinder_lean`: `Matrix.Rotation(+a, 'X')` sends +Z to (0, -sin, cos),
+    which leans the barrel *backwards* over the axle. Getting this sign wrong is
+    invisible in plan and obvious in a side elevation, which is the same class of
+    error as the inclined steering hub in §40.
+    """
+    pivot = Vector((CYLINDER_AXIS_X, CYLINDER_AXIS_Y, CYLINDER_BASE_Z))
+    return (
+        Matrix.Translation(pivot)
+        @ Matrix.Rotation(-p.cylinder_lean, 4, "X")
+        @ Matrix.Translation(-pivot)
+    )
+
+
+def _manifold(
     context: build.BuildContext,
     collection: bpy.types.Collection,
     root: bpy.types.Object,
     material: bpy.types.Material,
 ) -> None:
-    """The port flange on the barrel's front face, its nuts, and two springs.
+    """`exhaust_manifold` — renamed from `exhaust_flange`, because there is no
+    flange on the pipe.
 
-    The flange is placed off the sampled exhaust path rather than off a literal,
-    so it stays on the port when the pipe is re-routed: the path's first point is
-    the port by construction (`EXHAUST_PATH`), and the header's direction there
-    is what the flange is square to. Authoring the two independently is how a
-    flange ends up visibly not perpendicular to its own pipe.
+    `notes_exhaust.md` §1 is unambiguous: a short manifold bolts to the cylinder and
+    the pipe **slips over its spigot on springs**. So the part is a plate plus a
+    spigot rather than a loose ring, and the slip joint is what lets the chamber
+    articulate -- which is why the support downstream is a spring cradle and not a
+    bolt.
+
+    Four M6 bolts, `sourced` (kartshop, *"TM KZ manifold D2 28: 4x allen bolt M6 x
+    20 mm"*) on a 62 x 44 pattern measured off HF p. 3's base view. **The build had
+    two.** The port face is *derived* rather than authored: it is where the
+    horizontal port axis leaves the leaned Ø128 jacket, and `EXHAUST_INLET` is
+    `MANIFOLD_LENGTH` further down the same axis.
     """
-    samples = _exhaust_path(context)
-    port = samples[0]
-    forward = (samples[1] - samples[0]).normalized()
+    inlet = Vector(EXHAUST_INLET)
+    face_y = inlet.y + MANIFOLD_LENGTH + 0.004
+    plate_rear = face_y - MANIFOLD_PLATE[2]
 
-    face_y = CYLINDER_AXIS_Y + CYLINDER_RADIUS
     _block(
-        "exhaust_flange",
-        (
-            port.x - EXHAUST_FLANGE_HALF[0],
-            face_y - 0.004,
-            port.z - EXHAUST_FLANGE_HALF[1],
-        ),
-        (
-            port.x + EXHAUST_FLANGE_HALF[0],
-            face_y + EXHAUST_FLANGE_THICKNESS,
-            port.z + EXHAUST_FLANGE_HALF[1],
-        ),
+        "exhaust_manifold",
+        (inlet.x - MANIFOLD_PLATE[0] * 0.5, plate_rear, inlet.z - MANIFOLD_PLATE[1] * 0.5),
+        (inlet.x + MANIFOLD_PLATE[0] * 0.5, face_y, inlet.z + MANIFOLD_PLATE[1] * 0.5),
         context,
         collection,
         root,
         material,
     )
+    # The spigot the pipe slips over, from the plate's rear face to the inlet.
+    _lathe_object(
+        "exhaust_manifold_spigot",
+        [
+            (0.0, inlet.y),
+            (MANIFOLD_SPIGOT_DIAMETER * 0.5, inlet.y),
+            (MANIFOLD_SPIGOT_DIAMETER * 0.5, plate_rear),
+            (0.0, plate_rear),
+        ],
+        (inlet.x, 0.0, inlet.z),
+        context,
+        collection,
+        root,
+        material,
+        axis="Y",
+    )
 
-    # Two nuts, left and right of the pipe on the flange's face, and two springs
-    # hooked from just outboard of them back to lugs on the header.
-    for index, sign in enumerate((-1, 1)):
-        anchor_x = port.x + sign * (EXHAUST_FLANGE_HALF[0] - 0.009)
+    half = (MANIFOLD_BOLT_PATTERN[0] * 0.5, MANIFOLD_BOLT_PATTERN[1] * 0.5)
+    for index, (sx, sz) in enumerate(((-1, -1), (1, -1), (-1, 1), (1, 1))):
         _hex_nut(
-            "exhaust_flange_nut_%d" % index,
-            (anchor_x, face_y + EXHAUST_FLANGE_THICKNESS, port.z),
-            EXHAUST_FLANGE_NUT_FLATS,
+            "exhaust_manifold_bolt_%d" % index,
+            (inlet.x + sx * half[0], face_y, inlet.z + sz * half[1]),
+            MANIFOLD_BOLT_FLATS,
             0.007,
             context,
             collection,
@@ -1352,12 +1696,15 @@ def _exhaust_flange(
             axis="Y",
         )
 
-        # The far end sits on the header a little way down the pipe. Found by
-        # walking the sampled path so the spring stretches with the pipe rather
-        # than floating when `exhaust_length` changes.
-        far = samples[min(2, len(samples) - 1)]
-        start = Vector((anchor_x, face_y + EXHAUST_FLANGE_THICKNESS + 0.004, port.z))
-        end = far + (Vector((sign, 0.0, 0.0)) * 0.020) - forward * 0.004
+    # Two springs, from the plate back to the bent tabs at s ~ 70. Their station is
+    # `measured` off KZ-R2 HF p. 13; the hook geometry is a helix because the pitch
+    # is what the eye reads and a plain cylinder does not have one.
+    centreline, radii = _exhaust_centerline(context)
+    tab = _station(centreline, EXHAUST_SPRING_STATION)
+    tab_radius = _station_radius(centreline, radii, EXHAUST_SPRING_STATION)
+    for index, sign in enumerate((-1, 1)):
+        start = Vector((inlet.x + sign * half[0], face_y + 0.0035, inlet.z))
+        end = tab + Vector((sign * (tab_radius + 0.004), 0.0, 0.0))
         bm = bmesh.new()
         build.sweep_tube(
             bm,
@@ -1388,8 +1735,14 @@ def _head(
     material: bpy.types.Material,
     head_top: float,
 ) -> None:
-    """The head casting, its six nuts, the spark plug, and the water outlet."""
+    """The head casting, its six nuts, the spark plug, and the water outlet.
+
+    All of it is **carried by the cylinder's 25 degree lean**, which is why every
+    part here takes the same `transform`: the head bolts to the barrel, so it cannot
+    have an orientation of its own.
+    """
     axis = (CYLINDER_AXIS_X, CYLINDER_AXIS_Y)
+    lean = _lean(context.params)
 
     _lathe_object(
         "engine_head",
@@ -1406,6 +1759,7 @@ def _head(
         root,
         material,
         axis="Z",
+        transform=lean,
     )
 
     for index in range(HEAD_BOLT_COUNT):
@@ -1423,6 +1777,7 @@ def _head(
             collection,
             root,
             material,
+            transform=lean,
         )
 
     _spark_plug(context, collection, root, head_top)
@@ -1434,27 +1789,32 @@ def _head(
     _lathe_object(
         "engine_water_outlet",
         _disc_profile(0.015, 0.018),
-        (axis[0] - 0.020, axis[1] + HEAD_RADIUS - 0.010, head_top - 0.024),
+        WATER_OUTLET_LOCAL,
         context,
         collection,
         root,
         material,
         axis="Y",
+        transform=lean,
     )
 
-    # The water pump's boss on the crankcase's inboard wall, so the bottom hose
-    # lands on a fitting rather than on a blank face.
+    # `engine_water_pump` used to be a boss on this casting and it is **gone**:
+    # Art. 5.3.2 permits the pump to be driven by the engine *or* by the rear wheel
+    # axle, the KZ trade sells it as "KZ water pump with HTD axle pulley and tooth
+    # belt", and `_cooling` builds it on the axle as `cooling_pump_body`. What the
+    # crankcase needs instead is somewhere for the coolant to *enter*, because
+    # Art. 9.10.1 water-cools the case as well as the barrel and the head -- there
+    # was no such part, which is why the bottom hose ended on the clutch cover.
     _lathe_object(
-        "engine_water_pump",
+        "engine_water_inlet",
         [
-            (0.0, -0.030),
-            (0.014, -0.030),
-            (0.014, -0.018),
-            (0.026, -0.012),
-            (0.026, 0.0),
+            (0.0, -0.014),
+            (0.010, -0.014),
+            (0.012, -0.010),
+            (0.012, 0.0),
             (0.0, 0.0),
         ],
-        (CRANKCASE_INBOARD_X, -0.168, 0.194),
+        WATER_INLET_BOSS,
         context,
         collection,
         root,
@@ -1468,7 +1828,7 @@ def _spark_plug(
     root: bpy.types.Object,
     head_top: float,
 ) -> None:
-    """Boss, plug body, insulator, cap and lead, on the bore axis.
+    """Boss, plug body, insulator, cap and lead, on the bore axis, leaning with it.
 
     The plug is on the bore axis and nowhere else — it fires into the middle of
     the combustion chamber — so it is placed from `CYLINDER_AXIS_*` rather than
@@ -1477,6 +1837,7 @@ def _spark_plug(
     """
     axis_x, axis_y = CYLINDER_AXIS_X, CYLINDER_AXIS_Y
     alloy = context.material("engine_alloy")
+    lean = _lean(context.params)
 
     boss_top = head_top + PLUG_BOSS_HEIGHT
     _lathe_object(
@@ -1494,6 +1855,7 @@ def _spark_plug(
         root,
         alloy,
         axis="Z",
+        transform=lean,
     )
 
     hex_top = boss_top + 0.010
@@ -1506,6 +1868,7 @@ def _spark_plug(
         collection,
         root,
         context.material("axle_steel"),
+        transform=lean,
     )
 
     # The insulator has to stand clear of the cap, not disappear into it. At the
@@ -1530,14 +1893,15 @@ def _spark_plug(
         root,
         context.material("plug_ceramic"),
         axis="Z",
+        transform=lean,
     )
 
     # The cap slips over the insulator and leans back off the bore axis, and the
     # lead runs from it down the back of the engine. Two swept tubes: the cap is
     # short and fat, the lead is long and thin, and it is the lead that reads at
     # a distance.
-    cap_base = Vector((axis_x, axis_y, hex_top + 0.026))
-    cap_top = Vector((axis_x - 0.004, axis_y - 0.028, hex_top + 0.058))
+    cap_base = lean @ Vector((axis_x, axis_y, hex_top + 0.026))
+    cap_top = lean @ Vector((axis_x - 0.004, axis_y - 0.028, hex_top + 0.058))
     rubber = context.material("rubber_grip")
     bm = bmesh.new()
     build.sweep_tube(
@@ -1555,8 +1919,8 @@ def _spark_plug(
         "engine_plug_lead",
         (
             (cap_top.x, cap_top.y, cap_top.z - 0.004),
-            (0.352, -0.330, hex_top + 0.020),
-            (0.404, -0.352, 0.300),
+            (0.382, -0.250, 0.318),
+            (0.406, -0.300, 0.286),
             (0.404, -0.340, 0.216),
         ),
         PLUG_LEAD_DIAMETER,
@@ -1678,8 +2042,8 @@ def _intake(
         "engine_throttle_cable",
         (
             (CARB_AXIS_X, cap_y, CARB_TOP_CAP_TOP_Z - 0.004),
-            (CARB_AXIS_X - 0.010, cap_y + 0.010, CARB_TOP_CAP_TOP_Z + 0.030),
-            (CARB_AXIS_X - 0.030, cap_y + 0.090, CARB_TOP_CAP_TOP_Z + 0.024),
+            (CARB_AXIS_X - 0.024, cap_y - 0.006, CARB_TOP_CAP_TOP_Z + 0.028),
+            (CARB_AXIS_X - 0.056, cap_y + 0.050, CARB_TOP_CAP_TOP_Z + 0.044),
         ),
         0.008,
         context,
@@ -1711,12 +2075,17 @@ def _intake(
         plastic,
     )
 
+    # The boot has to cross the pipe's z band now, and it can only do it **inboard
+    # of the pipe**: at x 250 +- 34 it clears the pipe's inboard face at 294 by 9 mm
+    # and the seat shell at 184 by 32. A boot that went straight up from the
+    # carburettor to a box 60 mm higher would pass through the chamber.
     _tube_object(
         "engine_intake_boot",
         (
-            (CARB_AXIS_X, CARB_REAR_Y + 0.006, CARB_AXIS_Z),
-            (CARB_AXIS_X + 0.006, CARB_REAR_Y - 0.046, CARB_AXIS_Z + 0.040),
-            (CARB_AXIS_X + 0.010, AIRBOX_LO[1] + 0.070, AIRBOX_LO[2] + 0.040),
+            (CARB_AXIS_X, CARB_REAR_Y + 0.004, CARB_AXIS_Z),
+            (0.268, -0.448, CARB_AXIS_Z),
+            (0.252, -0.478, 0.330),
+            (0.268, -0.470, 0.372),
         ),
         INTAKE_BOOT_DIAMETER,
         context,
@@ -1725,6 +2094,26 @@ def _intake(
         context.material("rubber_grip"),
         bend_radius=0.040,
     )
+
+    # Art. 9.13.1's two ducts, Ø30.0 maximum, projecting forward out of the box's
+    # front wall. Compulsory, and absent until now.
+    for index, duct_x in enumerate(AIRBOX_DUCT_X):
+        _lathe_object(
+            "engine_airbox_duct_%d" % index,
+            [
+                (0.0, AIRBOX_HI[1]),
+                (AIRBOX_DUCT_DIAMETER * 0.5, AIRBOX_HI[1]),
+                (AIRBOX_DUCT_DIAMETER * 0.5, AIRBOX_HI[1] + AIRBOX_DUCT_LENGTH),
+                (AIRBOX_DUCT_DIAMETER * 0.5 - 0.003, AIRBOX_HI[1] + AIRBOX_DUCT_LENGTH),
+                (0.0, AIRBOX_HI[1] + AIRBOX_DUCT_LENGTH),
+            ],
+            (duct_x, 0.0, AIRBOX_DUCT_Z),
+            context,
+            collection,
+            root,
+            plastic,
+            axis="Y",
+        )
 
 
 # --- driveline -------------------------------------------------------------
@@ -1735,14 +2124,21 @@ def _driveline(
     collection: bpy.types.Collection,
     root: bpy.types.Object,
 ) -> None:
-    """Sprocket carrier, output shaft, output sprocket and the chain.
+    """Sprocket carrier, output shaft, output sprocket, chain and the guard.
 
     The chain is built from the two sprockets' pitch circles rather than drawn:
     the two straight runs are the circles' external tangents and the two arcs are
     the wraps between the tangent points, so the wrap angles are what the radii
     and the center distance make them. A hand-drawn loop is the version that
-    looks subtly wrong at the small sprocket, where the wrap is only 145 degrees
+    looks subtly wrong at the small sprocket, where the wrap is only 152 degrees
     and any error in it is the whole shape.
+
+    **The pitch radius is `p / (2 sin(pi/N))` and this used to be `p*N/(2*pi)`.**
+    The approximation is 0.03% small at 82 teeth and 1.1% small at 12, i.e. 0.24 mm
+    of radius -- and that 0.24 mm is what put the chain's inner strand 1.9 mm inside
+    a Ø18 output shaft. Correcting it leaves 1.0 mm, which is still not enough, so
+    the shaft steps down to **Ø16 outboard of x 130** and the clearance becomes
+    2.7 mm. Ø16 is the smaller change; 13 teeth would be the other one.
 
     No teeth. They cannot come out of a revolution and a hundred of them would
     cost more than the rest of this module; `wheels.py` reaches the same
@@ -1750,12 +2146,16 @@ def _driveline(
     pitch circle and therefore interpenetrates both sprocket discs, which is what
     a roller chain straddling a tooth actually does.
     """
+    p = context.params
     material = context.material("axle_steel")
 
-    pitch_radius = CHAIN_PITCH * ENGINE_SPROCKET_TEETH / (2.0 * math.pi)
+    pitch_radius = P.sprocket_pitch_radius(p.chain_pitch, p.sprocket_teeth_engine)
 
     pivot = build.empty(
-        "engine_sprocket", (CHAIN_X, SPROCKET_Y, SPROCKET_Z), collection, size=0.05
+        "engine_sprocket",
+        (p.chain_x, SPROCKET_Y, p.engine_z),
+        collection,
+        size=0.05,
     )
     context.publish("engine_sprocket", pivot)
     build.set_parent(pivot, root)
@@ -1769,17 +2169,25 @@ def _driveline(
     _lathe_object(
         "drive_sprocket_carrier",
         _disc_profile(0.032, 0.0325),
-        (0.2125, SPROCKET_Y, SPROCKET_Z),
+        (0.2125, SPROCKET_Y, p.engine_z),
         context,
         collection,
         root,
         context.material("engine_alloy"),
     )
 
+    # Stepped: Ø18 where it lives inside the carrier, Ø16 where the chain wraps it.
     _lathe_object(
         "drive_output_shaft",
-        _disc_profile(0.009, 0.0425),
-        (0.1425, SPROCKET_Y, SPROCKET_Z),
+        [
+            (0.0, 0.100),
+            (0.006, 0.100),
+            (0.006, 0.130),
+            (0.009, 0.130),
+            (0.009, 0.185),
+            (0.0, 0.185),
+        ],
+        (0.0, SPROCKET_Y, p.engine_z),
         context,
         collection,
         root,
@@ -1792,34 +2200,31 @@ def _driveline(
         _disc_profile(pitch_radius, 0.0035),
         context.detail.exhaust_segments,
         axis="X",
-        center=(CHAIN_X, SPROCKET_Y, SPROCKET_Z),
+        center=(p.chain_x, SPROCKET_Y, p.engine_z),
     )
     sprocket = build.object_from_bmesh(
         "drive_output_sprocket", bm, collection, material=material, shade_smooth=True
     )
     build.set_parent(sprocket, pivot)
 
-    _chain(context, collection, root, material, pitch_radius)
+    large_radius = P.sprocket_pitch_radius(p.chain_pitch, p.sprocket_teeth_axle)
+    _chain(context, collection, root, material, pitch_radius, large_radius)
+    _chain_guard(context, collection, root, large_radius)
 
 
-def _chain(
-    context: build.BuildContext,
-    collection: bpy.types.Collection,
-    root: bpy.types.Object,
-    material: bpy.types.Material,
+def _belt_path(
+    small: Vector,
     small_radius: float,
-) -> None:
-    """The closed belt path around the two sprockets, in the plane x = CHAIN_X."""
-    p = context.params
-    # `wheels.SPROCKET_DIAMETER` is 0.145 and this has to match it. It is not
-    # imported: the contract makes the parameter block the only shared thing, and
-    # importing a sibling module's constant would make this file depend on a file
-    # being edited concurrently. Both belong in params.py — see the report.
-    large_radius = 0.1450 * 0.5
+    large: Vector,
+    large_radius: float,
+    steps: int,
+) -> list[tuple[float, float]]:
+    """The closed external-tangent loop round two circles, in one plane.
 
-    small = Vector((SPROCKET_Y, SPROCKET_Z))
-    large = Vector((P.rear_axle_y(p), P.rear_axle_z(p)))
-
+    Two consumers: the drive chain and the water pump's toothed belt. The geometry
+    is identical and writing it twice is how the two end up with different wrap
+    conventions.
+    """
     delta = large - small
     distance = delta.length
     alpha = math.atan2(delta.y, delta.x)
@@ -1830,8 +2235,6 @@ def _chain(
     # tangent the two radii to the contact points are parallel.
     theta_a = alpha + math.pi - beta
     theta_b = alpha + math.pi + beta
-
-    steps = max(6, context.detail.exhaust_segments)
 
     def arc(
         center: Vector, radius: float, start: float, end: float, count: int
@@ -1848,35 +2251,253 @@ def _chain(
         return points
 
     path: list[tuple[float, float]] = []
-    # Wrap on the small sprocket, 2 * beta, on the side facing away from the axle.
+    # Wrap on the small pulley, 2 * beta, on the side facing away from the axle.
     path.extend(arc(small, small_radius, theta_a, theta_b, steps))
-    # Wrap on the axle sprocket, 2 * pi - 2 * beta, the long way round.
-    path.extend(
-        arc(large, large_radius, theta_b, theta_a + 2.0 * math.pi, steps * 3)
-    )
+    # Wrap on the large one, 2 * pi - 2 * beta, the long way round.
+    path.extend(arc(large, large_radius, theta_b, theta_a + 2.0 * math.pi, steps * 3))
+    return path
+
+
+def _chain(
+    context: build.BuildContext,
+    collection: bpy.types.Collection,
+    root: bpy.types.Object,
+    material: bpy.types.Material,
+    small_radius: float,
+    large_radius: float,
+) -> None:
+    """The closed belt path around the two sprockets, in the plane x = chain_x.
+
+    `large_radius` is `p/(2 sin(pi/82))` = **72.615**, which reproduces the Ø145
+    `wheels.py` builds to 0.2 mm -- so 145 *is* an 82-tooth 219 sprocket and the
+    number now has a tooth count behind it rather than being two literals that
+    happen to agree.
+    """
+    p = context.params
+    small = Vector((SPROCKET_Y, p.engine_z))
+    large = Vector((P.rear_axle_y(p), P.rear_axle_z(p)))
+    steps = max(6, context.detail.exhaust_segments)
 
     bm = bmesh.new()
-    _ribbon(bm, path, CHAIN_X, CHAIN_HALF_WIDTH, CHAIN_HALF_HEIGHT)
+    _ribbon(
+        bm,
+        _belt_path(small, small_radius, large, large_radius, steps),
+        p.chain_x,
+        CHAIN_HALF_WIDTH,
+        CHAIN_HALF_HEIGHT,
+    )
     obj = build.object_from_bmesh("drive_chain", bm, collection, material=material)
     build.set_parent(obj, root)
+
+
+def _slab(
+    bm: bmesh.types.BMesh,
+    a: tuple[float, float],
+    b: tuple[float, float],
+    x_low: float,
+    x_high: float,
+    depth: float,
+) -> None:
+    """One closed facet of a sheet part: a (y, z) segment given width in x and
+    `depth` through its own in-plane normal.
+
+    Built with `build.box` and a rotation about X rather than by emitting eight
+    vertices by hand, because `build.box`'s winding is known-good and hand-wound
+    boxes in this repo were inside out for two milestones without any render
+    showing it.
+    """
+    direction = Vector((b[0] - a[0], b[1] - a[1]))
+    length = direction.length
+    if length < 1e-9:
+        return
+    angle = math.atan2(direction.y, direction.x)
+    center = (
+        (x_low + x_high) * 0.5,
+        (a[0] + b[0]) * 0.5,
+        (a[1] + b[1]) * 0.5,
+    )
+    build.box(
+        bm,
+        (x_high - x_low, length, depth),
+        center,
+        rotation=Matrix.Rotation(angle, 3, "X"),
+    )
+
+
+def _chain_guard(
+    context: build.BuildContext,
+    collection: bpy.types.Collection,
+    root: bpy.types.Object,
+    large_radius: float,
+) -> None:
+    """Art. 5.9's compulsory guard. See `CHAIN_GUARD_X` for the article.
+
+    Built as a **cover** rather than as a solid: two thin side walls plus the crown
+    facets over the top, all in one mesh. A solid prism spanning the guard's lateral
+    band would swallow the chain and both sprockets, which is the shape the name
+    invites and the opposite of the part.
+
+    The lower edge is `rear_axle_z` because the article says *"down to the centre of
+    the crown wheel axis"* and that is where the axis is. It is `pierced` by the axle
+    and by the output shaft and declared as such, which is what stops gate 1 reading
+    a compulsory part as a collision.
+    """
+    p = context.params
+    lower = P.rear_axle_z(p)
+    axle_y = P.rear_axle_y(p)
+    small_crown = p.engine_z + 0.0107 + 0.022
+
+    # (y, z) outline of the guard's edge, front (nearest the engine) to rear.
+    #
+    # **The rear half is a semicircle about the axle, and that is the article rather
+    # than a style.** Art. 5.9 requires the guard *"down to the centre of the crown
+    # wheel axis"*, and a crown that runs flat across the top of the crown wheel and
+    # then stops -- which is what this outline used to do -- covers it to z 204 and
+    # leaves 56 mm of open sprocket below. Following the crown wheel's own circle down
+    # to `lower` at both ends is the only shape that satisfies the sentence.
+    radius = large_radius + 0.010
+    outline = [
+        (CHAIN_GUARD_Y[1], lower),
+        (CHAIN_GUARD_Y[1], small_crown),
+        (SPROCKET_Y, small_crown),
+    ]
+    for step in range(9):
+        angle = math.radians(24.0 + (180.0 - 24.0) * step / 8.0)
+        outline.append((axle_y + math.cos(angle) * radius, lower + math.sin(angle) * radius))
+
+    bm = bmesh.new()
+    for wall_low in (CHAIN_GUARD_X[0], CHAIN_GUARD_X[1] - CHAIN_GUARD_WALL):
+        for index in range(len(outline) - 1):
+            _slab(
+                bm,
+                outline[index],
+                outline[index + 1],
+                wall_low,
+                wall_low + CHAIN_GUARD_WALL,
+                CHAIN_GUARD_WALL,
+            )
+    # The crown, spanning both walls along the outline's upper edge.
+    for index in range(1, len(outline) - 1):
+        _slab(
+            bm,
+            outline[index],
+            outline[index + 1],
+            CHAIN_GUARD_X[0],
+            CHAIN_GUARD_X[1],
+            CHAIN_GUARD_WALL,
+        )
+
+    guard = build.object_from_bmesh(
+        "drive_chain_guard",
+        bm,
+        collection,
+        material=context.material("frame_powdercoat"),
+    )
+    build.set_parent(guard, root)
+
+    # The inboard mounting flange, down onto `chassis_cross_rear` at the axle
+    # station. Art. 4.2.3 already contemplates a welded attachment point here.
+    # Inboard of the guard's own wall and **below** both the axle and the crown
+    # wheel: `axle_sprocket` is a Ø145 disc at x 111..119 and the axle's underside is
+    # at z 122.5, so a flange reaching the guard's lower edge at 147.5 would be
+    # inside both. It stops at z 110 and hangs at x 93..101.
+    # A leg rather than a plate: the guard's own edge only reaches z = `lower` at the
+    # two ends of the crown-wheel arc, 83 mm either side of the axle, so a flange
+    # standing straight up at the axle's own station ends 69 mm short of the part it
+    # is supposed to be welded to.
+    _tube_object(
+        "drive_chain_guard_flange",
+        (
+            (CHAIN_GUARD_X[0] - 0.004, axle_y, 0.048),
+            (CHAIN_GUARD_X[0] - 0.004, axle_y - radius + 0.004, lower),
+        ),
+        0.010,
+        context,
+        collection,
+        root,
+        context.material("frame_powdercoat"),
+        bend_radius=0.020,
+    )
 
 
 # --- exhaust ---------------------------------------------------------------
 
 
-def _exhaust_path(context: build.BuildContext) -> list[Vector]:
-    """The sampled centerline: filleted, trimmed to `exhaust_length`, resampled.
+def _exhaust_centerline(
+    context: build.BuildContext,
+) -> tuple[list[Vector], list[float]]:
+    """The chamber's centreline and its outside radius at every sample.
 
-    The sample count comes from `context.detail.exhaust_segments`, so the low and
-    high builds are the same pipe at two densities rather than two pipes — which
-    is what issue #19's normal bake needs and what a hardcoded count would break.
+    **A construction, and it says so.** No accessible photograph anywhere shows a KZ
+    expansion chamber fitted to a kart -- every manufacturer display kart in `refs/`
+    is shot without one -- so this is sourced part geometry plus regulation
+    constraints, not a measurement. What is sourced is the cone table; what is
+    constructed is where it points.
+
+    Three placement rules, and nothing else:
+
+        inlet face     EXHAUST_INLET, derived off the leaned port
+        inlet axis     (0, -1, 0).  Plan 0 because the port is square in plan and
+                       the crank must be parallel to the rear axle for the chain to
+                       run at all, so the engine is square on its mount and there is
+                       no yaw to inherit.  Elevation 0 by the 25 degree lean.
+        bend           in a plane tilted EXHAUST_BEND_TILT nose-down, turning
+                       inboard, by EXHAUST_CONE_TURN degrees per cone
+
+    The walk is arc-length exact by construction: each cone contributes its own
+    sourced slant length and its own derived turn, so the developed length is the
+    table's 674.6 mm however finely it is sampled. Sampling density comes from
+    `context.detail`, so low and high are the same pipe at two densities.
+
+    **Where this disagrees with spec §30.6.3's centreline table, the table is the
+    one that is wrong**, by up to 19 mm in x at s 623: its own stations put a 95.2 mm
+    chord across cone 14, whose sourced slant length is 109.5. The cone lengths are
+    sourced and the station list is derived, so the sourced figures win.
     """
-    p = context.params
-    filleted = build.fillet(
-        list(EXHAUST_PATH), p.bend_radius * 0.8, context.detail.bend_segments
-    )
-    trimmed = _trim_to_length(filleted, p.exhaust_length)
-    return _resample(trimmed, context.detail.exhaust_segments * 2 + 1)
+    tilt = EXHAUST_BEND_TILT
+    forward = Vector((0.0, -1.0, 0.0))
+    inward = Vector((-math.cos(tilt), 0.0, -math.sin(tilt)))
+
+    steps_per_cone = max(2, context.detail.exhaust_segments // 4)
+    point = Vector(EXHAUST_INLET)
+    turned = 0.0
+    path: list[Vector] = [point.copy()]
+    radii: list[float] = [EXHAUST_CONES[0][2] * 0.5]
+
+    for (start, end, dia_start, dia_end), turn in zip(EXHAUST_CONES, EXHAUST_CONE_TURN):
+        span = end - start
+        delta = math.radians(turn) / steps_per_cone
+        for step in range(steps_per_cone):
+            direction = forward * math.cos(turned) + inward * math.sin(turned)
+            point = point + direction * (span / steps_per_cone)
+            turned += delta
+            fraction = (step + 1) / steps_per_cone
+            path.append(point.copy())
+            radii.append((dia_start + (dia_end - dia_start) * fraction) * 0.5)
+    return path, radii
+
+
+def _station(path: list[Vector], target: float) -> Vector:
+    """The point at developed length `target` along a polyline."""
+    travelled = 0.0
+    for index in range(len(path) - 1):
+        step = (path[index + 1] - path[index]).length
+        if travelled + step >= target:
+            fraction = 0.0 if step < 1e-12 else (target - travelled) / step
+            return path[index].lerp(path[index + 1], fraction)
+        travelled += step
+    return path[-1].copy()
+
+
+def _station_radius(path: list[Vector], radii: list[float], target: float) -> float:
+    """The outside radius at developed length `target`."""
+    travelled = 0.0
+    for index in range(len(path) - 1):
+        step = (path[index + 1] - path[index]).length
+        if travelled + step >= target:
+            return radii[index]
+        travelled += step
+    return radii[-1]
 
 
 def _exhaust(
@@ -1884,63 +2505,276 @@ def _exhaust(
     collection: bpy.types.Collection,
     root: bpy.types.Object,
 ) -> None:
-    """Header, cones, belly, stinger, silencer and the strap that holds it up."""
-    p = context.params
-    material = context.material("exhaust_steel")
-    samples = _exhaust_path(context)
-    count = len(samples)
-    unit = p.exhaust_pipe_diameter * 0.5
+    """The chamber, the U-bend, the silencer and every mount either of them needs.
 
-    # The chamber runs to just inside the silencer's mouth rather than to the end
-    # of the path, so the stinger disappears into the can the way it does on a
-    # real pipe instead of stopping at an open ring in mid-air.
-    chamber_last = max(2, int(round((SILENCER_START + 0.02) * (count - 1))))
-    chamber_path = samples[: chamber_last + 1]
-    chamber_radii = [
-        _profile_at(EXHAUST_PROFILE, index / (count - 1)) * unit
-        for index in range(chamber_last + 1)
-    ]
+    Art. **5.10**, PDF p. 17, is the article this whole assembly answers: magnetic
+    steel, sheet at least 0.75 mm, *"mandatory for the exhaust to pass rearward"*,
+    the outlet's external diameter *"more than 3 cm"* and not past the kart's outer
+    limits, and the system must discharge behind the driver. Art. **9.15.1** makes
+    the HF's own pipe compulsory, which is what `EXHAUST_CONES` is.
+    """
+    material = context.material("exhaust_steel")
+    path, radii = _exhaust_centerline(context)
+
     bm = bmesh.new()
-    _sweep_varying(bm, chamber_path, chamber_radii, context.detail.exhaust_segments)
+    _sweep_varying(bm, path, radii, context.detail.exhaust_segments)
     chamber = build.object_from_bmesh(
         "exhaust_chamber", bm, collection, material=material, shade_smooth=True
     )
-    build.bevel_object(chamber, context.detail)
     build.set_parent(chamber, root)
 
-    silencer_first = int(round(SILENCER_START * (count - 1)))
-    silencer_path = samples[silencer_first:]
-    span = len(silencer_path) - 1
-    silencer_radii = [
-        _profile_at(SILENCER_PROFILE, index / span) * SILENCER_RADIUS
-        for index in range(span + 1)
-    ]
-    bm = bmesh.new()
-    _sweep_varying(bm, silencer_path, silencer_radii, context.detail.exhaust_segments)
-    silencer = build.object_from_bmesh(
-        "exhaust_silencer", bm, collection, material=material, shade_smooth=True
+    _exhaust_hanger(context, collection, root, path, radii)
+    _silencer(context, collection, root, material, path[-1], radii[-1])
+
+
+def _exhaust_hanger(
+    context: build.BuildContext,
+    collection: bpy.types.Collection,
+    root: bpy.types.Object,
+    path: list[Vector],
+    radii: list[float],
+) -> None:
+    """Clamp, arm and cradle — replacing an `exhaust_hanger` bolted to nothing.
+
+    See `HANGER_CLAMP_X` for why the anchor cannot be `chassis_side_bar_r`: that bar
+    is a Ø20 bumper tube and the sourced mushroom clamp is bored 28, 30 or 32.
+    """
+    p = context.params
+    steel = context.material("frame_powdercoat")
+    cross_y = P.rear_axle_y(p)
+    clamp_z = P.rail_z(p)
+
+    # The split clamp body, bored on the cross member's own centreline so contact is
+    # 0.0 by construction and `clamped` permits the facet overlap.
+    _lathe_object(
+        "exhaust_hanger_clamp",
+        [
+            (HANGER_CLAMP_BORE * 0.5, -0.015),
+            (HANGER_CLAMP_OD * 0.5, -0.015),
+            (HANGER_CLAMP_OD * 0.5, 0.015),
+            (HANGER_CLAMP_BORE * 0.5, 0.015),
+        ],
+        (HANGER_CLAMP_X, cross_y, clamp_z),
+        context,
+        collection,
+        root,
+        steel,
+        axis="X",
     )
-    build.bevel_object(silencer, context.detail)
-    build.set_parent(silencer, root)
+    _block(
+        "exhaust_hanger_boss",
+        (HANGER_CLAMP_X - 0.010, cross_y - 0.010, clamp_z),
+        (HANGER_CLAMP_X + 0.010, cross_y + 0.010, HANGER_BOSS_TOP_Z),
+        context,
+        collection,
+        root,
+        steel,
+    )
+
+    grip = _station(path, HANGER_CRADLE_STATION)
+    grip_radius = _station_radius(path, radii, HANGER_CRADLE_STATION)
+
+    # The arm's length is `derived` from the two ends it joins -- 169 mm -- rather
+    # than read off a photograph with no dimensioned feature in it. It runs
+    # **rearward at boss height first and rises afterwards**, because
+    # `chassis_cross_rear` and `axle_rear` share a station: a straight chord from the
+    # boss to the pipe passes through the axle, whose underside is at z 122.5 against
+    # a boss top at 88. Held flat to y -0.600 it clears the axle by 22 mm.
+    _tube_object(
+        "exhaust_hanger_arm",
+        (
+            (HANGER_CLAMP_X, cross_y, HANGER_BOSS_TOP_Z - 0.004),
+            (HANGER_CLAMP_X, -0.600, HANGER_BOSS_TOP_Z),
+            (grip.x, grip.y, grip.z - grip_radius - 0.004),
+        ),
+        0.014,
+        context,
+        collection,
+        root,
+        steel,
+        bend_radius=0.040,
+    )
+
+    # The cradle: a C of Ø6 spring wire round the baffle cone, open at the bottom
+    # where the arm comes up to it.
+    bm = bmesh.new()
+    ring: list[Vector] = []
+    for index in range(19):
+        # 40 to 320 degrees, so the **bottom** of the ring is closed and the gap is
+        # at the top where the pipe drops in. Opened the other way round the arm comes
+        # up to a hole and the cradle grips nothing, which gate 2 read as 36 mm of air.
+        angle = math.radians(40.0 + 280.0 * index / 18.0)
+        ring.append(
+            Vector(
+                (
+                    grip.x + math.sin(angle) * (grip_radius + HANGER_CRADLE_WIRE * 0.5),
+                    grip.y,
+                    grip.z + math.cos(angle) * (grip_radius + HANGER_CRADLE_WIRE * 0.5),
+                )
+            )
+        )
+    build.sweep_tube(bm, ring, HANGER_CRADLE_WIRE * 0.5, 6)
+    cradle = build.object_from_bmesh(
+        "exhaust_hanger_cradle",
+        bm,
+        collection,
+        material=context.material("axle_steel"),
+        shade_smooth=True,
+    )
+    build.set_parent(cradle, root)
+
+
+def _silencer(
+    context: build.BuildContext,
+    collection: bpy.types.Collection,
+    root: bpy.types.Object,
+    material: bpy.types.Material,
+    stinger: Vector,
+    stinger_radius: float,
+) -> None:
+    """The U-bend, the can, its saddle and both bands.
+
+    The can lies **across** the kart, which is forced: the clear box behind the axle
+    is about 365 mm deep and a 450 mm cylinder does not fit in it fore-and-aft. The
+    stinger already points along -x, so the U-bend is what turns a leftward stinger
+    back into a rightward body -- and that part is `sourced` as a catalogue item even
+    though its route is `estimated`.
+    """
+    p = context.params
+    steel = context.material("frame_powdercoat")
+    low, high = SILENCER_SPAN
+    body_low = low + 0.030
+    body_high = high - 0.030
+    axis_y, axis_z = SILENCER_AXIS_Y, SILENCER_AXIS_Z
+
+    _tube_object(
+        "exhaust_connector",
+        (
+            tuple(stinger),
+            CONNECTOR_APEX,
+            (low, axis_y, axis_z),
+        ),
+        CONNECTOR_DIAMETER,
+        context,
+        collection,
+        root,
+        material,
+        bend_radius=0.045,
+    )
+    del stinger_radius
+
+    radius = SILENCER_DIAMETER * 0.5
+    _lathe_object(
+        "exhaust_silencer",
+        [
+            (0.0, low),
+            (SILENCER_INLET_DIAMETER * 0.5, low),
+            (SILENCER_INLET_DIAMETER * 0.5, body_low - 0.004),
+            (radius, body_low),
+            (radius, body_high),
+            (SILENCER_OUTLET_DIAMETER * 0.5, body_high + 0.004),
+            (SILENCER_OUTLET_DIAMETER * 0.5, high),
+            (0.0, high),
+        ],
+        (0.0, axis_y, axis_z),
+        context,
+        collection,
+        root,
+        material,
+        axis="X",
+    )
 
     outlet = build.empty(
-        "exhaust_outlet", tuple(samples[-1]), collection, size=0.04
+        "exhaust_outlet", (high, axis_y, axis_z), collection, size=0.04
     )
     context.publish("exhaust_outlet", outlet)
     build.set_parent(outlet, root)
 
-    # Strap from the can out to the right side bar. Found by walking the sampled
-    # path rather than authored, so it stays on the pipe when the pipe moves.
-    anchor = min(samples, key=lambda point: abs(point.y - EXHAUST_HANGER_Y))
-    _block(
-        "exhaust_hanger",
-        (anchor.x + SILENCER_RADIUS - 0.004, anchor.y - 0.007, anchor.z - 0.006),
-        (0.405, anchor.y + 0.007, anchor.z + 0.006),
+    # Bracket down from the cross member, a rubber isolator, then the saddle.
+    cross_y = P.rear_axle_y(p)
+    _lathe_object(
+        "exhaust_silencer_bracket_clamp",
+        [
+            (HANGER_CLAMP_BORE * 0.5, -0.014),
+            (HANGER_CLAMP_OD * 0.5, -0.014),
+            (HANGER_CLAMP_OD * 0.5, 0.014),
+            (HANGER_CLAMP_BORE * 0.5, 0.014),
+        ],
+        (SILENCER_BRACKET_X, cross_y, P.rail_z(p)),
         context,
         collection,
         root,
-        context.material("frame_powdercoat"),
+        steel,
+        axis="X",
     )
+
+    saddle_top = axis_z - radius + 0.012
+    # Same problem as the pipe support's arm and the same answer: rearward at rail
+    # height first, then up. A straight run from the cross member to the saddle passes
+    # through `axle_rear`, and at x 230 it would also cross the water pump's belt
+    # plane -- which is why the bracket is 80 mm outboard of where §30.6 put it.
+    _tube_object(
+        "exhaust_silencer_bracket",
+        (
+            (SILENCER_BRACKET_X, cross_y, P.rail_z(p) + 0.004),
+            (SILENCER_BRACKET_X, -0.660, 0.062),
+            (SILENCER_BRACKET_X, axis_y, saddle_top - 0.012),
+        ),
+        0.016,
+        context,
+        collection,
+        root,
+        steel,
+        bend_radius=0.040,
+    )
+    _lathe_object(
+        "exhaust_silencer_isolator",
+        _disc_profile(SILENCER_ISOLATOR[0] * 0.5, SILENCER_ISOLATOR[1] * 0.5),
+        (SILENCER_BRACKET_X, axis_y, saddle_top - 0.008 - SILENCER_ISOLATOR[1] * 0.5),
+        context,
+        collection,
+        root,
+        context.material("rubber_grip"),
+        axis="Z",
+    )
+    _block(
+        "exhaust_silencer_saddle",
+        (
+            SILENCER_BAND_X[0] - 0.012,
+            axis_y - SILENCER_SADDLE_WIDTH * 0.5,
+            saddle_top - 0.008,
+        ),
+        (SILENCER_BRACKET_X + 0.014, axis_y + SILENCER_SADDLE_WIDTH * 0.5, saddle_top),
+        context,
+        collection,
+        root,
+        steel,
+    )
+
+    # Two jubilee clips, `sourced` as a pair, threaded through the saddle's slots.
+    for index, band_x in enumerate(SILENCER_BAND_X):
+        bm = bmesh.new()
+        ring: list[Vector] = []
+        for step in range(33):
+            angle = 2.0 * math.pi * step / 32.0
+            ring.append(
+                Vector(
+                    (
+                        band_x,
+                        axis_y + math.sin(angle) * (radius + 0.0015),
+                        axis_z + math.cos(angle) * (radius + 0.0015),
+                    )
+                )
+            )
+        build.sweep_tube(bm, ring, 0.0025, 6)
+        band = build.object_from_bmesh(
+            "exhaust_silencer_band_%d" % index,
+            bm,
+            collection,
+            material=context.material("axle_steel"),
+            shade_smooth=True,
+        )
+        build.set_parent(band, root)
 
 
 # --- radiator --------------------------------------------------------------
@@ -1955,13 +2789,17 @@ def _exhaust(
 def _radiator_frame(p: P.KartParams) -> tuple[Matrix, Vector]:
     """The radiator's local-to-world rotation and its center.
 
-    **The core sits where a second seat's back would sit.** Immediately outboard
-    of the driver's, reclined by the same angle, big fin face pointing forward
-    the way the driver does. That single sentence fixes the whole orientation,
-    and two earlier versions of this function were wrong because they did not
-    have it: both reclined the core about the kart's *fore-and-aft* axis, which
-    tips it sideways out over the sidepod and leaves the fin face pointing
-    outboard. The rake is about the kart's **lateral** axis.
+    **The rake is about the kart's lateral axis and the fin face points forward,
+    the way the driver does.** Two earlier versions of this function reclined the
+    core about the kart's *fore-and-aft* axis instead, which tips it sideways out
+    over the sidepod and leaves the fin face pointing outboard.
+
+    It used to be explained as sitting "where a second seat's back would sit", and
+    that analogy is retired with the parameter it justified: the core rakes 45
+    degrees from vertical and the shell's chord is 22, so they are not the same
+    plane and `radiator_rake` is its own authored number. Yaw in plan is **0 ±3**,
+    `derived`: in the dead-rear frame the core's inboard and outboard edges are
+    parallel to within 7 px over 178.
 
     Local axes:
 
@@ -2248,16 +3086,20 @@ def _radiator(
             tuple(fractions[axis] * halves[axis] for axis in range(3)),
         )
 
-    for label, local, seat in (
-        ("lower", BRACKET_LOWER_LOCAL, BRACKET_LOWER_SEAT),
-        ("upper", BRACKET_UPPER_LOCAL, BRACKET_UPPER_SEAT),
+    _radiator_curtain(context, collection, root, basis, center, half_width, half_height)
+
+    # Both brackets clamp `chassis_rail_l`, whose straight run is at
+    # x = RADIATOR_SIDE * frame_half_rear and z = rail_z. Reading the rail's own two
+    # parameters rather than an authored world point is what makes the brackets
+    # follow the rail if §Chassis moves it again -- the property that was missing
+    # when `BRACKET_*_SEAT` was a literal.
+    rail = (RADIATOR_SIDE * p.frame_half_rear, P.rail_z(p))
+    for label, local in (
+        ("lower", BRACKET_LOWER_LOCAL),
+        ("upper", BRACKET_UPPER_LOCAL),
     ):
         start = attach(local)
-        # The seat wing is a world point and it was authored on the right, where
-        # the radiator used to be. `frame.py` mirrors the seat struts, so the
-        # matching wing exists on whichever side the radiator is; without this
-        # the brackets reached across the kart and ran through the core itself.
-        end = Vector((RADIATOR_SIDE * seat[0], seat[1], seat[2]))
+        end = Vector((rail[0], start.y, rail[1]))
         _tube_object(
             "radiator_bracket_%s" % label,
             (
@@ -2275,29 +3117,47 @@ def _radiator(
             alloy,
             bend_radius=0.045,
         )
+        # The Ø30 clamp that grips the rail, bored on the rail's own centreline so
+        # contact is 0.0 by construction.
+        _lathe_object(
+            "radiator_bracket_%s_clamp" % label,
+            [
+                (0.015, start.y - 0.014),
+                (0.023, start.y - 0.014),
+                (0.023, start.y + 0.014),
+                (0.015, start.y + 0.014),
+            ],
+            (rail[0], 0.0, rail[1]),
+            context,
+            collection,
+            root,
+            alloy,
+            axis="Y",
+        )
 
+    # The radiator is on the left and the engine is on the right, so both hoses
+    # cross the kart. A straight chord does it through the driver -- 142 triangle
+    # pairs, measured -- so both routes are authored waypoint lists rather than
+    # interpolated: the upper goes **behind the seat back and above the axle**, the
+    # lower stays forward of the axle and inboard of both brackets. A hose cannot
+    # cross the spinning axle plane, and that is the constraint, not styling.
     hose_material = context.material("rubber_grip")
-    for label, local, fitting in (
-        ("upper", HOSE_UPPER_LOCAL, HOSE_UPPER_ENGINE),
-        ("lower", HOSE_LOWER_LOCAL, HOSE_LOWER_ENGINE),
+    # **Derived through the lean, not authored.** The outlet elbow is a boss on a head
+    # that `params.cylinder_lean` tips 25 degrees forward, so its mouth is wherever the
+    # rotation puts it -- and a literal for the hose's engine end drifts 10 mm the
+    # moment the lean changes, which is what gate 2 measured.
+    upper_engine = _lean(p) @ Vector(WATER_OUTLET_LOCAL)
+    for label, local, waypoints, fitting in (
+        ("upper", HOSE_UPPER_LOCAL, HOSE_UPPER_ROUTE, upper_engine),
+        ("lower", HOSE_LOWER_LOCAL, HOSE_LOWER_ROUTE, Vector(PUMP_SPINDLE) + Vector((0.0, 0.0, 0.030))),
     ):
         start = attach(local)
-        end = Vector(fitting)
-        # The radiator is on the left and the engine is on the right, so a hose
-        # has to cross the kart. A straight chord does it through the driver:
-        # `seat_shell` spans x +-0.164 and y -0.262..+0.240, and the midpoint
-        # landed inside it -- 142 triangle pairs, measured. Real karts take these
-        # behind the seat back, which is also the shortest way across, so the
-        # waypoint is pinned aft of the shell rather than interpolated.
-        behind_seat = -(p.seat_width * 0.5 + abs(p.seat_y) + 0.030)
-        waypoint = Vector((0.0, min(behind_seat, start.y, end.y), (start.z + end.z) * 0.5))
+        route = [tuple(start)]
+        route.extend(reversed([tuple(point) for point in waypoints]))
+        route.append(tuple(fitting))
         _tube_object(
             "radiator_hose_%s" % label,
-            (
-                tuple(start),
-                tuple(waypoint),
-                tuple(end),
-            ),
+            tuple(route),
             HOSE_DIAMETER,
             context,
             collection,
@@ -2305,3 +3165,177 @@ def _radiator(
             hose_material,
             bend_radius=0.050,
         )
+
+
+def _radiator_curtain(
+    context: build.BuildContext,
+    collection: bpy.types.Collection,
+    root: bpy.types.Object,
+    basis: Matrix,
+    center: Vector,
+    half_width: float,
+    half_height: float,
+) -> None:
+    """The adjustable blind, standing proud of the core's forward face.
+
+    Art. 5.3.1 permits it explicitly and constrains it: adjustable but *"not
+    detachable when the kart is in motion"*, *"securely fixed to the radiator(s) with
+    screws"*, one-piece, composite permitted. So it is threaded to the two end
+    channels and nothing else, and its width **is** the core's -- see
+    `RADIATOR_CURTAIN_THICKNESS` for why that is sourced rather than convenient.
+    """
+    # Two millimetres inside the fin block at each end, because the tanks stand
+    # `RADIATOR_TANK_PROUD` forward of the core and a curtain flush with the block's
+    # ends shares triangles with both of them. The 391 mm of *travel* is still the
+    # full block: the blind slides.
+    fin_half = half_height - RADIATOR_TANK_HEIGHT - 0.002
+    face = half_height * 0.0 + RADIATOR_CURTAIN_STANDOFF
+    del face
+    outer = (
+        context.params.radiator_thickness * 0.5
+        - RADIATOR_TANK_PROUD
+        + RADIATOR_CURTAIN_STANDOFF
+    )
+    _radiator_block(
+        "radiator_curtain",
+        (outer, -half_width, -fin_half),
+        (outer + RADIATOR_CURTAIN_THICKNESS, half_width, fin_half),
+        basis,
+        center,
+        context,
+        collection,
+        root,
+        context.material("frame_powdercoat"),
+        bevel=False,
+    )
+
+
+# --- cooling: the pump is on the axle, not on the engine --------------------
+
+
+def _cooling(
+    context: build.BuildContext,
+    collection: bpy.types.Collection,
+    root: bpy.types.Object,
+) -> None:
+    """Pump body, both pulleys, the toothed belt, the bracket and the short hose.
+
+    `engine_water_pump` was a boss on the clutch cover and it is gone. Art. **5.3.2**
+    permits the pump to be driven *"either by the engine or by the rear wheel axle"*
+    -- it **permits**, it does not require, and this spec chooses the axle because
+    that is what the parts the trade sells are built for: *"KZ water pump with HTD
+    axle pulley and tooth belt"*. Three joints on the engine castings go with it.
+
+    The belt is what places the pump: see `PUMP_SPINDLE`. Nothing here is a free
+    position except the belt plane.
+    """
+    p = context.params
+    alloy = context.material("engine_alloy")
+    spindle = Vector(PUMP_SPINDLE)
+    axle = Vector((P.rear_axle_y(p), P.rear_axle_z(p)))
+
+    _lathe_object(
+        "cooling_pump_body",
+        [
+            (0.0, BELT_PLANE_X - 0.042),
+            (PUMP_BODY_DIAMETER * 0.5 - 0.008, BELT_PLANE_X - 0.042),
+            (PUMP_BODY_DIAMETER * 0.5, BELT_PLANE_X - 0.034),
+            (PUMP_BODY_DIAMETER * 0.5, BELT_PLANE_X - 0.014),
+            (PUMP_BODY_DIAMETER * 0.5 - 0.012, BELT_PLANE_X - 0.005),
+            (0.0, BELT_PLANE_X - 0.005),
+        ],
+        (0.0, spindle.y, spindle.z),
+        context,
+        collection,
+        root,
+        alloy,
+        axis="X",
+    )
+    _lathe_object(
+        "cooling_pump_pulley",
+        [
+            (0.0, BELT_PLANE_X - BELT_WIDTH * 0.5 - 0.002),
+            (PUMP_PULLEY_PD * 0.5 + 0.003, BELT_PLANE_X - BELT_WIDTH * 0.5 - 0.002),
+            (PUMP_PULLEY_PD * 0.5, BELT_PLANE_X - BELT_WIDTH * 0.5),
+            (PUMP_PULLEY_PD * 0.5, BELT_PLANE_X + BELT_WIDTH * 0.5),
+            (PUMP_PULLEY_PD * 0.5 + 0.003, BELT_PLANE_X + BELT_WIDTH * 0.5 + 0.002),
+            (0.0, BELT_PLANE_X + BELT_WIDTH * 0.5 + 0.002),
+        ],
+        (0.0, spindle.y, spindle.z),
+        context,
+        collection,
+        root,
+        alloy,
+        axis="X",
+    )
+    _lathe_object(
+        "cooling_axle_pulley",
+        [
+            (p.axle_diameter * 0.5, BELT_PLANE_X - BELT_WIDTH * 0.5 - 0.004),
+            (AXLE_PULLEY_PD * 0.5 + 0.003, BELT_PLANE_X - BELT_WIDTH * 0.5 - 0.004),
+            (AXLE_PULLEY_PD * 0.5, BELT_PLANE_X - BELT_WIDTH * 0.5),
+            (AXLE_PULLEY_PD * 0.5, BELT_PLANE_X + BELT_WIDTH * 0.5),
+            (AXLE_PULLEY_PD * 0.5 + 0.003, BELT_PLANE_X + BELT_WIDTH * 0.5 + 0.004),
+            (p.axle_diameter * 0.5, BELT_PLANE_X + BELT_WIDTH * 0.5 + 0.004),
+        ],
+        (0.0, axle.x, axle.y),
+        context,
+        collection,
+        root,
+        alloy,
+        axis="X",
+    )
+
+    steps = max(6, context.detail.exhaust_segments)
+    bm = bmesh.new()
+    _ribbon(
+        bm,
+        _belt_path(
+            Vector((spindle.y, spindle.z)),
+            PUMP_PULLEY_PD * 0.5,
+            axle,
+            AXLE_PULLEY_PD * 0.5,
+            steps,
+        ),
+        BELT_PLANE_X,
+        BELT_WIDTH * 0.5,
+        BELT_THICKNESS * 0.5,
+    )
+    belt = build.object_from_bmesh(
+        "cooling_belt", bm, collection, material=context.material("rubber_grip")
+    )
+    build.set_parent(belt, root)
+
+    # The bracket back to the right bearing hanger, which is the nearest
+    # axle-adjacent structure Art. 4.2.3 already contemplates a weld on.
+    hanger_x = p.frame_half_rear - 0.010
+    # **Under** the belt loop, not across it. Straight outboard from the spindle the
+    # bracket would be inside the pump pulley and inside both belt strands; the loop's
+    # lowest point near the pump is `spindle.z - 12.5`, so a bracket whose top is at
+    # `spindle.z - 22` clears it by 9.5 mm and still overlaps the Ø60 body it bolts to.
+    _block(
+        "cooling_pump_bracket",
+        (BELT_PLANE_X - 0.034, spindle.y - 0.011, spindle.z - 0.038),
+        (hanger_x, spindle.y + 0.011, spindle.z - 0.022),
+        context,
+        collection,
+        root,
+        context.material("frame_powdercoat"),
+    )
+
+    # Out of the pump's *forward* face, because its top is where the bottom radiator
+    # hose comes in and two hoses cannot share one port.
+    _tube_object(
+        "cooling_hose_pump_engine",
+        (
+            (BELT_PLANE_X - 0.026, spindle.y + 0.026, spindle.z),
+            (0.190, -0.348, 0.140),
+            WATER_INLET_BOSS,
+        ),
+        HOSE_DIAMETER,
+        context,
+        collection,
+        root,
+        context.material("rubber_grip"),
+        bend_radius=0.040,
+    )

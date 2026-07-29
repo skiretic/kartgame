@@ -547,7 +547,15 @@ def _bearing_hangers(
 
 #: Where the seat's four stays land on the shell, right-hand side. Spec §10.9.
 #:
-#: **Both points are `estimated` and cannot be made exact from here.**
+#: **They are `derived` now, and they agree with `cockpit.SEAT_PAD_*` exactly.**
+#: §Cockpit publishes four `seat_ear_*` empties off the loft's own samples and builds
+#: `seat_bracket_*` from the nearest sampled surface point out to these coordinates,
+#: so the stay, the bracket and the shell meet at one number instead of three. The
+#: old pair predated the corrected seat -- `seat_y` was 170 mm too far forward and
+#: `seat_width_shoulders` did not exist -- and the note below is kept because the
+#: *reason* it could not be exact from here is still the lesson.
+#:
+#: Previously, and still true of any constant authored in this module:
 #: `cockpit.py` lofts `seat_shell` from a half-width table and a wing flare along
 #: a filleted spine, so its outer edge is a sampled surface rather than a
 #: constant -- these are read off that loft (half-width 165 at the widest station,
@@ -559,8 +567,8 @@ def _bearing_hangers(
 #: surface met by a constant authored in a second module is the same failure as
 #: `Dictionary.get(key, default)` -- it drifts and nothing says so. Highest-value
 #: follow-up in spec §10.
-SEAT_EAR_FRONT: tuple[float, float, float] = (0.160, -0.020, 0.150)
-SEAT_EAR_REAR: tuple[float, float, float] = (0.145, -0.215, 0.300)
+SEAT_EAR_FRONT: tuple[float, float, float] = (0.196, -0.215, 0.070)
+SEAT_EAR_REAR: tuple[float, float, float] = (0.205, -0.338, 0.300)
 
 
 def _seat_struts(
@@ -613,7 +621,7 @@ def _seat_struts(
             "front",
             [
                 (_rail_x(p, p.cross_strut_y) + 0.019, p.cross_strut_y, rail),
-                (0.295, 0.005, 0.125),
+                (0.302, -0.020, 0.052),
                 tuple(front_ear),
             ],
         ),
@@ -622,7 +630,7 @@ def _seat_struts(
             [
                 (hanger_x, P.rear_axle_y(p) - 0.040, 0.150),
                 (hanger_x, P.rear_axle_y(p) - 0.040, 0.215),
-                (0.230, -0.450, 0.250),
+                (0.232, -0.450, 0.264),
                 tuple(rear_ear),
             ],
         ),

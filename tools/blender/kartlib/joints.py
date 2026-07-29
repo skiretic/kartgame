@@ -792,18 +792,6 @@ JOINTS: tuple[Joint, ...] = (
         "derivation",
     ),
     Joint(a="tierod_r", b="tierod_end_r_*", kind="threaded", why="the right-hand rod"),
-    Joint(
-        a="steering_column",
-        b="tierod_end_?_inner",
-        kind="bolted",
-        why="**this joint is declared against the wrong part on purpose, and it is "
-        "waived.** The inner rod end belongs on `steering_pitman`, which §Cockpit "
-        "has not built; the pitman is clamped to the column, so the column is the "
-        "part it is attached *through*. The station is not a guess -- OTK's "
-        "\"38/50\" designation puts the outer hole 50 mm off the column axis and a "
-        "KZ runs the outer hole -- and it is 51.7 mm from the column's own surface, "
-        "which is exactly the pitman's reach. Spec §40 closes this",
-    ),
     # --- wheels.py: the brake system ----------------------------------------
     #
     # Absent in its entirety before #190: no disc, no caliper, no master cylinder,
@@ -1134,6 +1122,29 @@ JOINTS: tuple[Joint, ...] = (
         why="the chain wraps the rear sprocket's teeth; the roller band is "
         "inside the tooth profile by design",
     ),
+    # Art. **5.9**, PDF p. 17: *"A chain guard is mandatory in all classes […] In
+    # gearbox classes, the chain guard must cover the sprocket and the crown wheel
+    # down to the centre of the crown wheel axis."* The kart did not have one, which
+    # is a compliance failure and not a detail.
+    Joint(
+        a="drive_chain_guard",
+        b="drive_chain_guard_flange",
+        kind="welded",
+        why="the inboard mounting flange off the guard's own wall",
+    ),
+    Joint(
+        a="drive_chain_guard_flange",
+        b="chassis_cross_rear",
+        kind="bolted",
+        why="Art. 5.9's compulsory guard needs an anchor, and Art. 4.2.3 already "
+        "contemplates a welded attachment point on this member",
+    ),
+    Joint(
+        a="drive_chain_guard",
+        b="drive_output_shaft",
+        kind="pierced",
+        why="the same, at the other end",
+    ),
     Joint(
         a="drive_chain",
         b="drive_output_sprocket",
@@ -1299,24 +1310,20 @@ JOINTS: tuple[Joint, ...] = (
         kind="welded",
         why="the bell housing is part of the case casting",
     ),
-    Joint(
-        a="engine_clutch_bell",
-        b="engine_water_pump",
-        kind="bolted",
-        why="the pump body bolts to the case and its drive spigot reaches into "
-        "the bell, which is where a KZ takes the pump drive from",
-    ),
-    Joint(
-        a="engine_clutch_cover",
-        b="engine_water_pump",
-        kind="bolted",
-        why="the pump sits in a recess in the same cover",
-    ),
+    # The three `engine_water_pump` rows that were here are **deleted, not
+    # renamed**: Art. 5.3.2 permits the pump to be driven by the engine *or* by the
+    # rear wheel axle, the KZ trade sells it as "KZ water pump with HTD axle pulley
+    # and tooth belt", and §30.7 puts it on the axle as `cooling_pump_body`. A joint
+    # to a casting the part no longer touches is not an outstanding defect, it is a
+    # statement about a kart that does not exist.
     Joint(
         a="engine_crankcase_upper",
-        b="engine_water_pump",
-        kind="bolted",
-        why="the third face of the same three-way joint",
+        b="engine_water_inlet",
+        kind="welded",
+        why="Art. 9.10.1 water-cools *\"the crankcase, cylinder and head\"* -- all "
+        "three -- so the coolant has to get into the case somewhere. This is the "
+        "cast boss it enters through, and there was no such part: the lower hose "
+        "used to end on the clutch cover",
     ),
     Joint(
         a="engine_crankcase_upper",
@@ -1384,6 +1391,14 @@ JOINTS: tuple[Joint, ...] = (
     ),
     Joint(
         a="engine_airbox",
+        b="engine_airbox_duct_?",
+        kind="welded",
+        why="Art. **9.13.1**, PDF p. 30: *\"They must have two ducts with a 30.0 mm "
+        "maximum diameter.\"* Two, and Ø30.0 -- a maximum every KZ silencer runs. "
+        "Both were missing",
+    ),
+    Joint(
+        a="engine_airbox",
         b="engine_airbox_lid",
         kind="bolted",
         why="the lid closes the box",
@@ -1391,37 +1406,35 @@ JOINTS: tuple[Joint, ...] = (
     # --- powertrain.py: exhaust ---------------------------------------------
     Joint(
         a="engine_cylinder",
-        b="exhaust_flange",
+        b="exhaust_manifold",
         kind="bolted",
-        why="the flange bolts to the barrel's exhaust port face",
+        why="4x M6 on a 62 x 44 pattern into the barrel's exhaust port face. "
+        "**Renamed from `exhaust_flange`, and the rename is the fact**: there is no "
+        "flange on the pipe, a short manifold bolts to the cylinder and the pipe "
+        "slips over its spigot on springs",
     ),
     Joint(
         a="engine_cylinder_base",
-        b="exhaust_flange",
+        b="exhaust_manifold",
         kind="bolted",
-        why="the flange is tall enough to reach the base casting below the port",
+        why="the plate is tall enough to reach the base casting below the port",
     ),
     Joint(
-        a="engine_cylinder",
-        b="exhaust_chamber",
-        kind="seated",
-        why="the header's spigot goes **into** the exhaust port, 16 mm deep as "
-        "built; a header that only touched the port face would blow gas",
-    ),
-    Joint(
-        a="engine_cylinder_base",
-        b="exhaust_chamber",
-        kind="seated",
-        why="the port is bored through the base casting as well as the barrel, "
-        "so the same spigot is inside both",
+        a="exhaust_manifold",
+        b="exhaust_manifold_spigot",
+        kind="welded",
+        why="the spigot the pipe slips over is part of the manifold casting; two "
+        "meshes because a plate and a tube are two primitives",
     ),
     Joint(
         a="exhaust_chamber",
-        b="exhaust_flange",
+        b="exhaust_manifold_spigot",
         kind="seated",
-        why="the flange is a loose ring around the header pipe -- that is why "
-        "it needs springs rather than being welded on",
+        why="**the slip joint**, and it is what lets the chamber articulate: ~3 "
+        "degrees of cone and ~5 mm of axial play on 70 mm springs. A pipe rigid to "
+        "the engine cracks at the header",
     ),
+
     Joint(
         a="exhaust_chamber",
         b="exhaust_spring_?",
@@ -1430,49 +1443,135 @@ JOINTS: tuple[Joint, ...] = (
         "pipe's lugs, so hook and lug share volume",
     ),
     Joint(
-        a="exhaust_flange",
+        a="exhaust_manifold",
         b="exhaust_spring_?",
         kind="clamped",
-        why="the other hook of each spring, over the flange's studs",
+        why="the other hook of each spring, over the manifold's bolt heads",
     ),
     Joint(
-        a="exhaust_flange",
-        b="exhaust_flange_nut_?",
+        a="exhaust_manifold",
+        b="exhaust_manifold_bolt_?",
         kind="threaded",
-        why="two nuts on those studs",
+        why="**four** M6 x 20, `sourced` off kartshop's own listing for the TM KZ "
+        "manifold. The build had two, and `exhaust_flange_nut_0..1` is renamed with "
+        "the count corrected",
     ),
     Joint(
-        a="exhaust_flange_nut_0",
+        a="exhaust_manifold_bolt_0",
         b="exhaust_spring_0",
         kind="clamped",
-        why="the spring hooks over the stud under the nut, so it wraps the nut's "
-        "hex. Written per side because spring 0 does not reach nut 1",
+        why="the spring hooks over the bolt under its head, so it wraps the hex. "
+        "Written per side because spring 0 does not reach bolt 1",
     ),
     Joint(
-        a="exhaust_flange_nut_1",
+        a="exhaust_manifold_bolt_1",
         b="exhaust_spring_1",
         kind="clamped",
         why="as spring 0",
     ),
+    # -- the hanger: one part bolted to nothing becomes four bolted to a 30 mm tube
+    #
+    # `exhaust_hanger` measured **60.47 mm** off `chassis_side_bar_r` and could not
+    # mount there at any distance: that bar is swept at `tube_bumper` = 20 mm and the
+    # sourced mushroom clamp family is bored 28/30/32. The 30 mm tubes on this kart
+    # are the two rails and the two cross members, and only `chassis_cross_rear` is
+    # within reach of a rearward pipe.
+    Joint(
+        a="exhaust_hanger_clamp",
+        b="chassis_cross_rear",
+        kind="clamped",
+        why="Ø30.0 bore on the rear cross member at x +54, directly under the grip "
+        "point, so contact is 0.0 by construction. Art. 4.2.5 lists *\"exhaust and "
+        "exhaust silencer holder\"* as a chassis component and 4.2.3 puts its welded "
+        "attachment point on the frame",
+    ),
+    Joint(
+        a="exhaust_hanger_clamp",
+        b="exhaust_hanger_boss",
+        kind="welded",
+        why="the Ø20 mushroom boss standing proud of the clamp body",
+    ),
+    Joint(
+        a="exhaust_hanger_boss",
+        b="exhaust_hanger_arm",
+        kind="bolted",
+        why="through the arm's two 30 mm slots, which is what makes the height "
+        "adjustable",
+    ),
+    Joint(
+        a="exhaust_hanger_arm",
+        b="exhaust_hanger_cradle",
+        kind="bolted",
+        why="the cradle spring's tails bolt to the arm's upper end",
+    ),
+    Joint(
+        a="exhaust_hanger_cradle",
+        b="exhaust_chamber",
+        kind="clamped",
+        why="a `sourced` Ø12 x 130 cradle spring round the **baffle cone** at "
+        "s = 513. That cone is the only part of the pipe both stiff enough to clamp "
+        "and reachable; real installations clip the cone, not the belly",
+    ),
+    # -- the U-bend, the can and its own mount
     Joint(
         a="exhaust_chamber",
+        b="exhaust_connector",
+        kind="seated",
+        why="the U-bend slips over the stinger. `sourced` as a part -- the "
+        "catalogues sell a *\"muffler bent pipe\"* separately -- which is what turns "
+        "a leftward stinger back into a rightward can",
+    ),
+    Joint(
+        a="exhaust_connector",
         b="exhaust_silencer",
         kind="seated",
-        why="the silencer slips over the chamber's stinger",
+        why="and into the silencer's Ø29 inlet spigot",
     ),
     Joint(
-        a="exhaust_hanger",
+        a="exhaust_silencer_bracket_clamp",
+        b="chassis_cross_rear",
+        kind="clamped",
+        why="Ø30 bore at x +150, 96 mm outboard of the pipe support's clamp so the "
+        "two do not collide on the same tube",
+    ),
+    Joint(
+        a="exhaust_silencer_bracket_clamp",
+        b="exhaust_silencer_bracket",
+        kind="welded",
+        why="the bracket plate off the clamp body",
+    ),
+    Joint(
+        a="exhaust_silencer_bracket",
+        b="exhaust_silencer_isolator",
+        kind="bolted",
+        why="M8 through a rubber bush, which is what stops the can shaking itself "
+        "off a rigid mount",
+    ),
+    Joint(
+        a="exhaust_silencer_isolator",
+        b="exhaust_silencer_saddle",
+        kind="bolted",
+        why="the saddle on the other side of the same M8",
+    ),
+    Joint(
+        a="exhaust_silencer_saddle",
+        b="exhaust_silencer",
+        kind="seated",
+        why="the can sits in the saddle's cradle",
+    ),
+    Joint(
+        a="exhaust_silencer_band_?",
         b="exhaust_silencer",
         kind="clamped",
-        why="the hanger's strap wraps the silencer body",
+        why="two jubilee clips, `sourced` as a pair: *\"large jubilee clip for "
+        "exhaust silencer x2, 120-140mm\"*, which is also what corroborates the "
+        "120 mm body",
     ),
     Joint(
-        a="exhaust_hanger",
-        b="chassis_side_bar_r",
-        kind="bolted",
-        why="the hanger's other end bolts to the right side bar. It is the only "
-        "thing holding the back of the exhaust up, so a gap here is a "
-        "silencer suspended in air",
+        a="exhaust_silencer_band_?",
+        b="exhaust_silencer_saddle",
+        kind="pierced",
+        why="each band threads through the saddle's slot",
     ),
     # --- powertrain.py: cooling ---------------------------------------------
     Joint(
@@ -1563,20 +1662,33 @@ JOINTS: tuple[Joint, ...] = (
         why="the other end of the top hose, on the head's outlet elbow",
     ),
     Joint(
-        a="engine_water_pump",
+        a="cooling_pump_body",
         b="radiator_hose_lower",
         kind="routed",
-        why="the other end of the bottom hose, on the pump's inlet",
+        why="the other end of the bottom hose, on the pump's inlet. Renamed from "
+        "`engine_water_pump`, and it is a different place on the kart: the pump is on "
+        "the rear axle now, not on the clutch cover",
+    ),
+    Joint(
+        a="radiator_curtain",
+        b="radiator_end_*",
+        kind="threaded",
+        why="Art. 5.3.1: the baffles *\"must be securely fixed to the radiator(s) "
+        "with screws. They must be one-piece\"* -- so it screws to the two end "
+        "channels and to nothing else, and it must not be *\"detachable when the kart "
+        "is in motion\"*",
     ),
     Joint(
         a="radiator_bracket_lower",
         b="radiator_end_inboard",
         kind="bolted",
         why="both brackets pick up on the core's inboard end channel. "
-        "BRACKET_*_LOCAL anchors them at 1.15 of the core's own half-width, "
-        "i.e. deliberately *past* its edge -- which was the fix for a bracket "
-        "that started inside the fin pack, and left the bracket touching "
-        "nothing at all",
+        "`BRACKET_*_LOCAL` anchors them at **1.0** of the core's own half-width, so "
+        "the rod's axis lies in the plane of that channel's outer face and the rod is "
+        "8 mm engaged in a 12 mm channel: contact 0.0. It was 1.15 -- 18.75 mm past "
+        "the edge against a rod radius of 8, which is the 12.3 mm gap almost exactly. "
+        "Anchoring in *fractions* was the right fix for a bracket that started inside "
+        "the fin pack; 1.15 was the wrong fraction",
     ),
     Joint(
         a="radiator_bracket_upper",
@@ -1585,44 +1697,220 @@ JOINTS: tuple[Joint, ...] = (
         why="as the lower bracket",
     ),
     Joint(
-        a="radiator_bracket_*",
-        b="seat_shell",
+        a="radiator_bracket_*_clamp",
+        b="chassis_rail_l",
+        kind="clamped",
+        why="**the radiator's entire attachment to the kart, and it is the frame.** "
+        "`BRACKET_*_SEAT` used to put it on the seat's wing and left both brackets "
+        "44 and 69 mm from anything. Three things say the rail: Art. **4.2.3** puts "
+        "the welded attachment points for *\"the radiator(s)\"* on the frame; "
+        "Art. **4.8.2** requires seat stays bolted at each end and *removed if "
+        "unused*, so a stay is a removable member and not a mounting rail; and the "
+        "only image in the repo that shows the bracket shows thin vertical rods "
+        "dropping to a chassis clamp. Ø30.0 bore, so contact is 0.0",
+    ),
+    Joint(
+        a="radiator_bracket_lower_clamp",
+        b="radiator_bracket_lower",
+        kind="welded",
+        why="the clamp body on the end of its own rod",
+    ),
+    Joint(
+        a="radiator_bracket_upper_clamp",
+        b="radiator_bracket_upper",
+        kind="welded",
+        why="the same, on the upper rod",
+    ),
+    # **There is deliberately no `radiator_*`/`seat_shell` row, and its absence is an
+    # assertion.** Art. 5.3.1, PDF p. 15: *"They must not interfere with the seat."*
+    # This is the one place in this project where a regulation is expressed as the
+    # *absence* of a declaration -- gate 1 makes any overlap fatal precisely because
+    # nothing here permits it. The row that used to be here declared
+    # `radiator_bracket_*`/`seat_shell` as `bolted`, which is a regulation violation
+    # written into the build table. The core's inboard edge at -240 clears the shell's
+    # outboard face at -184 by 56 mm and must keep doing so.
+    # --- powertrain.py: the axle-driven pump --------------------------------
+    #
+    # Art. **5.3.2**, PDF p. 15: *"In Groups 1 & 2, the water pump must be
+    # mechanically controlled either by the engine or by the rear wheel axle."* It
+    # **permits either**; the axle drive is §30.7's choice and kart practice, not a
+    # requirement, and the comment says so because an earlier paraphrase of that
+    # article made it read as a mandate.
+    Joint(
+        a="cooling_pump_body",
+        b="cooling_pump_pulley",
+        kind="pressed",
+        why="the pulley on the pump's spindle",
+    ),
+    Joint(
+        a="cooling_pump_body",
+        b="cooling_pump_bracket",
         kind="bolted",
-        why="on a KZ the radiator hangs off the seat's wing, not off the frame, "
-        "and here it has to: BRACKET_DIAMETER's docstring records that the "
-        "exhaust belly fills the whole volume between the radiator's "
-        "underside and the main rail. So this pair is the radiator's entire "
-        "attachment to the kart",
+        why="the pump hangs off its own bracket, not off the engine",
+    ),
+    Joint(
+        a="cooling_pump_bracket",
+        b="chassis_bearing_hanger_r",
+        kind="bolted",
+        why="the nearest axle-adjacent structure, and Art. 4.2.3 contemplates a "
+        "welded attachment point here",
+    ),
+    Joint(
+        a="cooling_axle_pulley",
+        b="axle_rear",
+        kind="clamped",
+        why="**clamped, not keyed**: Art. 4.3's fourth keyway is the sprocket's. A "
+        "PD 65 pulley round a Ø50 axle is 6-9 mm of clamp wall and flange a side",
+    ),
+    Joint(
+        a="cooling_belt",
+        b="cooling_pump_pulley",
+        kind="meshed",
+        why="170XL031 -- 85 teeth, 431.8 mm, 7.9 mm wide, `sourced` as a part number. "
+        "The belt is what *places* the pump: `2C + 400/C = 290.43` solves to "
+        "C = 143.8 mm",
+    ),
+    Joint(
+        a="cooling_belt",
+        b="cooling_axle_pulley",
+        kind="meshed",
+        why="the other wrap of the same belt",
+    ),
+    Joint(
+        a="cooling_pump_body",
+        b="cooling_hose_pump_engine",
+        kind="routed",
+        why="the pump's outlet",
+    ),
+    Joint(
+        a="engine_water_inlet",
+        b="cooling_hose_pump_engine",
+        kind="routed",
+        why="and the crankcase's inlet boss at the other end. Short by design",
     ),
     # --- cockpit.py ---------------------------------------------------------
+    # Art. **4.2.3** lists *"seat with four seat supports"*, so four is a number and
+    # not a style choice, and Art. **4.8.1** dimensions the reinforcement plates:
+    # 1.5 mm, 13 cm2 and Ø40 minimum. The kart had **two** stays and no brackets, so
+    # `seat_shell`/`chassis_seat_strut_*` was one row doing the work of eight and it
+    # measured 17.67 mm at the rear pair.
+    #
+    # **The four pads are published as empties now** (`seat_ear_*`), off the loft's
+    # own samples. That is the fix rather than a better constant: the shell's flank is
+    # a *sampled surface*, so a number authored in `frame.py` misses it by a few
+    # millimeters and never says so -- the same failure shape as
+    # `Dictionary.get(key, default)`.
     Joint(
         a="seat_shell",
-        b="chassis_seat_strut_*",
+        b="seat_bracket_*",
         kind="bolted",
-        why="the four stays land on the seat's mounting ears -- frame.py calls "
-        "them 'diagonal stays from the rails up to the seat's mounting ears'. "
-        "The seat is not carried by the floor tray, which is why the weak "
-        "test's nearest-neighbor answer for the seat is the wrong part",
+        why="M8 through an Art. 4.8.1 reinforcement plate, and the bracket's shell "
+        "end is snapped to the **nearest sampled point on the loft** rather than to "
+        "an authored coordinate",
+    ),
+    Joint(
+        a="seat_bracket_upper_r",
+        b="chassis_seat_strut_rear_r",
+        kind="bolted",
+        why="the right of the same pair",
+    ),
+    Joint(
+        a="seat_bracket_lower_r",
+        b="chassis_seat_strut_front_r",
+        kind="bolted",
+        why="the right of the front pair",
+    ),
+    Joint(
+        a="seat_bracket_upper_l",
+        b="chassis_seat_strut_rear_l",
+        kind="bolted",
+        why="Art. 4.8.2: bolted at each end. The rear stays start on the bearing "
+        "hanger, where Art. 9.1.2 puts them",
+    ),
+    Joint(
+        a="seat_bracket_lower_l",
+        b="chassis_seat_strut_front_l",
+        kind="bolted",
+        why="the front pair, on the rail at the central strut's station",
     ),
     Joint(
         a="steering_bearing",
         b="steering_column",
         kind="pierced",
-        why="the column turns inside the bearing collar; the collar is the part "
-        "that does not turn",
+        why="the journal turns in the bush; the bush is the part that does not turn. "
+        "**Contact here is now identity**: `params.lower_bore` is the bush's bore "
+        "centre *and* the column's journal centre, one expression, so the only edit "
+        "that can open a gap is the edit that should move the column",
     ),
     Joint(
         a="steering_bearing",
         b="chassis_steering_hoop",
         kind="pressed",
-        why="the collar is carried by the frame's steering hoop, which exists "
-        "for nothing else. This is issue #192's worked example",
+        why="the bush is carried by the frame's lower steering bracket, which exists "
+        "for nothing else. This was issue #192's headline at 37.46 mm, and the frame "
+        "was the half that was right -- its bore is sourced off the column's own "
+        "reference photograph and §40.2 moved the column onto it",
     ),
     Joint(
-        a="steering_boss",
+        a="steering_bearing_upper",
+        b="steering_column",
+        kind="pierced",
+        why="**there are two column supports and this project had collapsed them into "
+        "one.** Art. 4.5.2 says so itself: *\"two collars between the column "
+        "brackets\"*, plural. A Ø20 nylon block, `sourced` -- \"NYLON SUPPORT STEERING "
+        "COLUMN L31\" -- 366 mm up the axis from the bore",
+    ),
+    Joint(
+        a="steering_bearing_upper",
+        b="chassis_steering_support_upper",
+        kind="bolted",
+        why="Art. 9.5.3 makes this structural: the front panel's upper part *\"must be "
+        "securely attached to the steering column support with one or more "
+        "independent bars\"*",
+    ),
+    Joint(
+        a="steering_hub",
         b="steering_column",
         kind="clamped",
-        why="the wheel's boss clamps the column's top",
+        why="Art. 4.5.1: *\"securely attached to the column with at least one M6 "
+        "screw (minimum grade 8.8) and a self-locking nut\"*. Replaces "
+        "`steering_boss`/`steering_column` -- the boss is on the far side of the "
+        "wedge and does not touch the column at all",
+    ),
+    Joint(
+        a="steering_hub",
+        b="steering_hub_wedge",
+        kind="bolted",
+        why="6x M6, and **the wedge is the part that stops the wheel being built "
+        "wrong**: its two faces are 7 degrees apart, so the hub is square to the "
+        "column and the boss is square to the wheel. Art. 4.5 permits it in as many "
+        "words -- *\"A spacer may be used between the steering wheel and the hub\"* -- "
+        "and OTK sells the inclined hub and the inclined spacer as catalogue items",
+    ),
+    Joint(
+        a="steering_hub_wedge",
+        b="steering_boss",
+        kind="bolted",
+        why="the other side of the same six bolts",
+    ),
+    Joint(
+        a="steering_pitman",
+        b="steering_column",
+        kind="clamped",
+        why="**this part did not exist**, which is the whole of the 46.00 mm waiver "
+        "on `steering_column`/`tierod_end_?_inner`: the rod ends were declared "
+        "against the column because a pitman is what they really bolt to. The 46 mm "
+        "was never slack -- it is the pitman's reach, `sourced` off OTK's \"38/50\" "
+        "designation with a KZ on the outer hole",
+    ),
+    Joint(
+        a="steering_pitman",
+        b="tierod_end_?_inner",
+        kind="bolted",
+        why="Art. 4.5.3 permits the rose joints by name. `wheels.PITMAN_EAR` is "
+        "(0.050, 0.431, 0.160) and the column's own line passes through "
+        "(0, 0.431, 0.1603) -- the ear is **on** the column's plane to 0.3 mm, which "
+        "is what makes this plate buildable rather than fitted",
     ),
     Joint(
         a="steering_boss",
@@ -1638,9 +1926,13 @@ JOINTS: tuple[Joint, ...] = (
     ),
     Joint(
         a="steering_clutch_lever",
-        b="steering_spokes",
-        kind="bolted",
-        why="the clutch lever's pivot bolts to the spoke plate",
+        b="steering_column",
+        kind="clamped",
+        why="OTK **0113.A0KIT** *\"Forged clutch lever Kit, KZ\"* is a **two-bolt clamp "
+        "around a tube**, so it clamps the column and not the spoke plate -- which is "
+        "what the row here used to say. On the left, because the right hand is busy "
+        "with the gear lever and OTK's forged kit exists because that is where KZ "
+        "drivers put it",
     ),
     Joint(
         a="pedal_cross_tube",
@@ -1651,42 +1943,391 @@ JOINTS: tuple[Joint, ...] = (
     Joint(
         a="pedal_mount_?",
         b="chassis_cross_front",
-        kind="bolted",
-        why="the pedal mounts bolt to the front cross member, which is the tube "
-        "at the front axle line carrying the kingpins",
+        kind="clamped",
+        why="**this is the 104.97 mm gate-2 failure and the fix is one coordinate.** "
+        "The plates used to aim at `(0, front_axle_y, rail_z + 0.025)` -- a straight "
+        "cross member at the front axle line, which this chassis does not have: "
+        "`chassis_cross_front` is a U-loop running y +500..+760 out at x ±110..±304, "
+        "so the brackets were reaching into empty air. The loop's leg centreline "
+        "passes (±259, +560, +50), so each plate's bore straddles that point and "
+        "touches the tube. Art. 4.2.3 puts the pedals' welded attachment points on "
+        "the frame and Art. 4.4 makes the kit the manufacturer's",
     ),
     Joint(
         a="pedal_brake",
         b="pedal_cross_tube",
         kind="pierced",
-        why="the pedal's boss swings on the cross tube",
+        why="the arm's bushed eye swings on the cross tube -- **at the bottom of the "
+        "arm**, not above the pad: OTK 0014.DC and 0015.DCA are organ pedals",
     ),
     Joint(a="pedal_throttle", b="pedal_cross_tube", kind="pierced", why="as the brake pedal"),
-    Joint(a="pedal_brake", b="pedal_brake_pad", kind="bolted", why="the rubber pad on the plate"),
-    Joint(a="pedal_throttle", b="pedal_throttle_pad", kind="bolted", why="as the brake pedal"),
     Joint(
-        a="shifter_base",
-        b="chassis_floor_tray",
+        a="pedal_brake",
+        b="pedal_brake_pad",
+        kind="welded",
+        why="**`welded`, was `bolted` (\"the rubber pad on the plate\")**: the part is a "
+        "Ø18 x 80 transverse round bar welded across a forged arm, not a rubber pad "
+        "on a 70 x 120 plate. A plate is a rental-kart pedal",
+    ),
+    Joint(a="pedal_throttle", b="pedal_throttle_pad", kind="welded", why="as the brake pedal"),
+    Joint(
+        a="pedal_brake",
+        b="pedal_brake_clevis",
+        kind="welded",
+        why="the slotted plate carrying the pushrod clevis, 56 mm up the arm -- which "
+        "*is* the brake pedal's 3.2 : 1 ratio, 180/56. Its \"adjustable\" in 0015.DCA's "
+        "own name is three clevis heights in that slot",
+    ),
+    Joint(
+        a="pedal_brake_clevis",
+        b="brake_pushrod_link",
         kind="bolted",
-        why="the hand shifter's base bolts down to the tray beside the seat. It "
-        "survived the tray moving to Art. 4.6's extent by 1 mm: the base's "
-        "underside is at z 70 and the pan's top at 69",
+        why="Art. 4.12.2 requires the pedal-to-pump link **doubled for safety**, with a "
+        "homologated cable at 1.8 mm minimum. This is the second link, and it lands on "
+        "the same slotted plate as the rod",
+    ),
+    Joint(
+        a="pedal_brake_clevis",
+        b="brake_pushrod",
+        kind="bolted",
+        why="Art. 4.4: *\"The brake pedal must be placed in front of the master "
+        "cylinder.\"* The clevis is at (-85, +602, +105) and a `sourced` 68 mm OTK "
+        "0119.01 push rod puts the cylinder's mouth at y ~ +534 -- entirely behind the "
+        "pedal, which is the whole content of the article",
     ),
     Joint(
         a="shifter_base",
-        b="chassis_tray_edge_r",
-        kind="bolted",
-        why="and it butts against the pan's edging tube, which runs along the "
-        "pan's edge at x 273..286 through the base's own y band. The base is "
-        "inboard of the tube and shares its bolts",
+        b="chassis_rail_r",
+        kind="clamped",
+        why="**replaces `shifter_base`/`chassis_floor_tray`**: Art. 4.6 puts the tray's "
+        "edge at the main tubes' centreline seen from above, and the bracket is "
+        "outboard of that. The rail's centreline at y +330 is at x 310-323 and the "
+        "estimated pivot x is +320, so the bracket lands on the tube -- a check nobody "
+        "arranged, because the pivot's station came from the shift rod's length",
     ),
     Joint(
         a="shifter_base",
         b="shifter_lever",
         kind="pierced",
-        why="the lever pivots inside the base's fork",
+        why="the lever turns in **two nylon bushes** about its own rod's axis. OTK "
+        "0111.002, sold with no dimensions; two of them is `sourced` as a shape from "
+        "the part set. **There is no shift gate** -- the slotted plate that used to be "
+        "here was the one invented part in this assembly, and a KZ's sequential detent "
+        "is inside the gearbox",
     ),
     Joint(a="shifter_knob", b="shifter_lever", kind="pressed", why="the knob is on the lever"),
+    Joint(
+        a="shifter_lever",
+        b="shifter_connector_arm",
+        kind="clamped",
+        why="a **serrated collet**, which is the hardware that lets the arm be set to "
+        "the `sourced` 90 degrees against the rod. OTK 0111.B0A, and the linkage "
+        "cannot exist without it: without the arm there is nothing for the rod to push",
+    ),
+    Joint(
+        a="shifter_connector_arm",
+        b="shift_rod_end_front",
+        kind="bolted",
+        why="a uniball joint on the arm's plain hole",
+    ),
+    Joint(
+        a="shift_rod",
+        b="shift_rod_end_*",
+        kind="threaded",
+        why="M8 on **opposing pitches** -- the assembly is a turnbuckle and adjusts "
+        "with a wrench on the rod's own 13 mm flats without disconnecting",
+    ),
+    # `shift_rod_end_rear`/`engine_selector_arm` is **not** declared, because
+    # §Powertrain has not built the selector arm. The rear end is left touching only
+    # the rod, and the weak form of gate 2 catches it -- which is the correct outcome:
+    # the arm is a real missing part and not a tolerance.
+    # --- cockpit.py: the fuel tank Art. 9.3 requires -------------------------
+    #
+    # Art. **9.3**, PDF p. 22: **8 litres minimum**, and the kart had no tank at all.
+    # Art. **4.7** *mandates* the position rather than permitting one, which is why
+    # all three of `tank_center_*`'s coordinates are `derived`.
+    Joint(
+        a="fuel_tank",
+        b="chassis_floor_tray",
+        kind="seated",
+        why="it sits on the pan, which is where Art. 4.6 now puts the pan -- forward "
+        "of the central strut, under the driver's feet and the tank rather than under "
+        "his backside",
+    ),
+    Joint(
+        a="fuel_tank",
+        b="fuel_tank_strap_*",
+        kind="clamped",
+        why="two straps over the molded channels; the count follows the channels. "
+        "Art. 4.7: *\"A quick attachment to the chassis is strongly recommended\"*, so "
+        "a cam buckle rather than a bolted steel band",
+    ),
+    Joint(
+        a="fuel_tank_strap_*",
+        b="chassis_rail_?",
+        kind="clamped",
+        why="both ends of both straps, down to the two main tubes Art. 4.7 puts the "
+        "tank between",
+    ),
+    Joint(
+        a="fuel_tank",
+        b="fuel_tank_filler",
+        kind="threaded",
+        why="the cap screws into the tank's top-rear third, reached between the legs "
+        "past the steering wheel",
+    ),
+    Joint(
+        a="fuel_tank",
+        b="fuel_tank_fitting_?",
+        kind="welded",
+        why="**three**, and the third is the point: the KZ tank differs from the OK "
+        "tank by an extra fitting for a **return** line. Molded bosses on this mesh, "
+        "which is a mesh-count decision and not a claim about the real part",
+    ),
+    Joint(
+        a="fuel_tank_fitting_0",
+        b="fuel_line_feed",
+        kind="routed",
+        why="Art. **5.6.1**: *\"Only one fuel line from the tank to the "
+        "carburettor/fuel pump is allowed.\"* **One**, and it is a scrutineering fact "
+        "rather than a styling choice. The return line is not a feed line and does "
+        "not count against it",
+    ),
+    Joint(
+        a="fuel_tank_fitting_2",
+        b="fuel_line_return",
+        kind="routed",
+        why="the return, which is what the KZ tank has and the OK tank does not",
+    ),
+    # --- wave 3 (#190): joints the new powertrain and cockpit parts need -----
+    Joint(
+        a="chassis_cross_rear",
+        b="exhaust_hanger_boss",
+        kind="clamped",
+        why="the mushroom boss stands out of a clamp bored on this tube's own "
+        "centreline, so it reaches the tube",
+    ),
+    Joint(
+        a="chassis_cross_rear",
+        b="exhaust_silencer_bracket",
+        kind="clamped",
+        why="the same, at x +230",
+    ),
+    Joint(
+        a="chassis_rail_l",
+        b="radiator_bracket_upper",
+        kind="clamped",
+        why="as the lower rod",
+    ),
+    Joint(
+        a="chassis_rail_l",
+        b="radiator_bracket_lower",
+        kind="clamped",
+        why="each rod runs to the rail's own centreline inside its clamp, which is "
+        "what makes the contact 0.0 rather than a tolerance",
+    ),
+    Joint(
+        a="chassis_steering_hoop",
+        b="steering_column",
+        kind="pierced",
+        why="the column passes **through** the lower bracket's bore. It used to be "
+        "lifted 26 mm clear of it by `COLUMN_LOWER_CLEAR` on the reasoning that the "
+        "filleted hoop's crown came up to meet it -- `build.tube` pulls that crown "
+        "*below* the control point, so the lift bought 19 mm of air at the one joint "
+        "the bracket exists for",
+    ),
+    Joint(
+        a="steering_pitman",
+        b="tierod_r",
+        kind="bolted",
+        why="the other side",
+    ),
+    Joint(
+        a="steering_pitman",
+        b="tierod_l",
+        kind="bolted",
+        why="the rod's own end reaches the plate alongside its rod end, because a "
+        "uniball is a ball in the rod's eye and not a separate link",
+    ),
+    Joint(
+        a="radiator_hose_upper",
+        b="radiator_core",
+        kind="routed",
+        why="both hoses enter their tank in the corner, and a Ø28 hose on a 40 mm "
+        "core cannot reach a tank without crossing the core's own face. Declared "
+        "rather than dodged: moving the fitting off the corner is not what a real "
+        "core does",
+    ),
+    Joint(
+        a="radiator_hose_upper",
+        b="radiator_end_inboard",
+        kind="routed",
+        why="the same, against the inboard end channel",
+    ),
+    Joint(
+        a="radiator_hose_lower",
+        b="radiator_fin_17",
+        kind="routed",
+        why="and against the outermost fin, which is the one beside that corner",
+    ),
+    Joint(
+        a="engine_cylinder_base",
+        b="exhaust_manifold_spigot",
+        kind="pierced",
+        why="the port is bored through the base casting as well as the barrel, so "
+        "the manifold's spigot is inside both",
+    ),
+    Joint(
+        a="engine_cylinder_base",
+        b="exhaust_manifold_bolt_[01]",
+        kind="threaded",
+        why="the lower pair of the four M6 threads into the base casting -- the "
+        "62 x 44 pattern straddles the parting between barrel and base",
+    ),
+    Joint(
+        a="engine_cylinder_base",
+        b="exhaust_spring_?",
+        kind="clamped",
+        why="each spring's forward hook wraps a bolt head that stands on the base "
+        "casting's own face",
+    ),
+    Joint(
+        a="engine_crankcase_upper",
+        b="engine_cylinder",
+        kind="bolted",
+        why="**new with the 25 degree lean.** The deck plane inclines but the case's "
+        "top stays flat at z 240, so the barrel's forward skirt dips into the "
+        "casting. A prismatic deck is a crankcase change and this wave did not make "
+        "one; the pair is a real bolted joint either way",
+    ),
+    Joint(
+        a="engine_head",
+        b="engine_plug_lead",
+        kind="routed",
+        why="the lead leaves the cap and lies against the head's rear quadrant on "
+        "its way down the back of the engine",
+    ),
+    Joint(
+        a="engine_head",
+        b="radiator_hose_upper",
+        kind="routed",
+        why="the top hose leaves the outlet elbow, which is a boss on this casting, "
+        "so the hose's first bend is against the head",
+    ),
+    Joint(
+        a="fuel_tank",
+        b="fuel_line_*",
+        kind="routed",
+        why="each line leaves its own fitting on the tank's top-rear face, so its "
+        "first 20 mm is against the molding",
+    ),
+    Joint(
+        a="fuel_tank_filler",
+        b="fuel_tank_fitting_1",
+        kind="welded",
+        why="the vent nipple is molded into the filler's own neck boss",
+    ),
+    Joint(
+        a="engine_carb_bowl",
+        b="engine_intake_boot",
+        kind="routed",
+        why="the boot goes over the carburettor's 64 mm air spigot and the float bowl "
+        "hangs off the same body 2 mm forward of it, so the rubber lies against the "
+        "bowl's rear corner",
+    ),
+    Joint(
+        a="cooling_hose_pump_engine",
+        b="engine_crankcase_upper",
+        kind="routed",
+        why="the hose's last 40 mm lies along the case's inboard face on its way into "
+        "`engine_water_inlet`, which is a boss on that face",
+    ),
+    Joint(
+        a="bodywork_rear_panel",
+        b="exhaust_chamber",
+        kind="pierced",
+        why="§30.6 states this as a number rather than a hope: the rear protection's "
+        "inner clear volume must *contain* the chamber at x -117..346, y -652..-734, "
+        "z 170..318, and its own front face lands at y -687..-722 per Art. 9.5.5.1's "
+        "15-50 mm gap. So both parts are inside its fore-aft band by construction and "
+        "**the shell is cut for them rather than stopping in front of them**",
+    ),
+    Joint(
+        a="bodywork_rear_panel",
+        b="exhaust_connector",
+        kind="pierced",
+        why="the U-bend crosses the same shell",
+    ),
+    Joint(
+        a="bodywork_rear_panel",
+        b="exhaust_silencer",
+        kind="pierced",
+        why="and the can, which Art. 5.10 requires to discharge behind the driver and "
+        "not past the kart's outer limits -- at x 280 the outlet is 420 mm inside the "
+        "700 limit, so it is inside the protection and not beyond it",
+    ),
+    Joint(
+        a="bodywork_rear_panel",
+        b="exhaust_silencer_band_0",
+        kind="pierced",
+        why="the two jubilee clips are on the body, inside the same cut",
+    ),
+    Joint(
+        a="bodywork_rear_panel",
+        b="exhaust_silencer_bracket",
+        kind="pierced",
+        why="the bracket reaches the saddle through the same cut",
+    ),
+    Joint(
+        a="drive_chain",
+        b="drive_chain_guard",
+        kind="pierced",
+        why="**a guard that clears the chain everywhere is not covering it.** Art. 5.9 "
+        "requires the guard down to the crown wheel's axis, which is below the chain's "
+        "lower strand for the whole rear wrap, so the strand passes inside the cover's "
+        "own outline. The pair that must *not* touch is the guard and the two sprockets, "
+        "and 7.5 mm a side is what holds there",
+    ),
+    Joint(
+        a="engine_crankcase_upper",
+        b="engine_cylinder_base_nut_[23]",
+        kind="threaded",
+        why="the 25 degree lean drops the flange's forward corner into the casting, so "
+        "the two forward base studs thread through the case as well as the flange. Only "
+        "those two -- nuts 0 and 1 are the rear pair and stay clear",
+    ),
+    Joint(
+        a="exhaust_silencer_bracket",
+        b="exhaust_silencer_saddle",
+        kind="bolted",
+        why="the bracket's upper end reaches the saddle's underside beside the rubber "
+        "isolator it bolts through",
+    ),
+    Joint(
+        a="fuel_tank_strap_*",
+        b="chassis_floor_tray",
+        kind="pierced",
+        why="each strap's ends come down past the pan's edge to reach the rail beneath "
+        "it, so the pan is cut for two 25 mm straps. Art. 4.6 permits holes up to 10 mm "
+        "and two 35 mm ones for the column and the shift lever, so a molded slot is "
+        "outside its list -- **the honest reading is that the strap goes round the pan's "
+        "edge**, and this declaration is what the built geometry says instead. Recorded "
+        "as a joint and flagged in the report rather than made to look clean",
+    ),
+    Joint(
+        a="fuel_tank_strap_*",
+        b="chassis_tray_edge_?",
+        kind="clamped",
+        why="and over the pan's edging tube, which is the structure the buckle actually "
+        "pulls against at that station",
+    ),
+    Joint(
+        a="exhaust_silencer",
+        b="exhaust_silencer_isolator",
+        kind="seated",
+        why="the rubber bush sits directly under the can's own barrel where the saddle "
+        "cradles it, 8 mm below the saddle's top face",
+    ),
     # --- bodywork.py: the front fairing and its mounting kit -----------------
     #
     # **`bodywork_nose_fairing`/`chassis_nose_hoop_lower` is deleted.** Art. 4.10.1
@@ -1774,7 +2415,7 @@ JOINTS: tuple[Joint, ...] = (
         "-- a single central bar passes 5.5 mm from the steering column's surface",
     ),
     Joint(
-        a="bodywork_front_panel_stay_?",
+        a="bodywork_front_panel_stay_*",
         b="chassis_cross_front",
         kind="clamped",
         why="both stays land on the front loop's leg centerline at x +-250, y +572. "
@@ -1933,27 +2574,209 @@ OPEN_DEFECTS: tuple[Defect, ...] = (
         "`bodywork_rear_support_?` is what carries the panel now -- so this is a "
         "collision to clear rather than a contact to keep",
     ),
+    # -- gate 1, #190 wave 3: the powertrain and cockpit moved and four other
+    # assemblies did not -------------------------------------------------------
+    #
+    # Every entry below was measured on the built mesh after §30 and §40 landed, and
+    # each names the pair that has to move rather than the one that did. They are
+    # waivers and not declarations because none of them is a joint.
+    Defect(
+        a="bodywork_front_panel",
+        b="pedal_*_pad",
+        gate="overlap",
+        measured=27,
+        issue="#190",
+        why="the front panel hangs to `front_panel_bottom_z` 190 and §40.5 raised the pedal "
+        "face from z 90 to **228** -- 138 mm of correction, because 90 put the sole "
+        "21 mm above the floor tray. The panel and the pads now occupy the same z "
+        "band. Art. 9.5.3 fixes the panel between the fairing and the top-of-wheel "
+        "plane, so it is the panel's lower edge that has to come up; §Bodywork owns it",
+    ),
+    Defect(
+        a="bodywork_front_panel_bar",
+        b="steering_bearing_upper",
+        gate="overlap",
+        measured=30,
+        issue="#190",
+        why="Art. 4.5.2's *\"two collars between the column brackets\"* is now built -- the "
+        "upper nylon block at (0, +262, +393) -- and Art. 9.5.3 requires the panel's "
+        "upper part attached to *that* support with independent bars. So the bar and "
+        "the block belong together and the pair is a **missing joint on the bodywork "
+        "side**, not a collision: the bar has to end on the block rather than pass "
+        "through where the block used to not exist",
+    ),
+    Defect(
+        a="bodywork_front_panel_stay_?",
+        b="pedal_mount_*",
+        gate="overlap",
+        measured=24,
+        issue="#190",
+        why="the panel's stays run down to the frame through x +-125..+-259, which is the "
+        "corridor §40.5 moved the pedal mounts into when it re-aimed them at the front "
+        "loop's legs at (+-259, +560, +50). Both are right about where they belong and "
+        "the two have not been reconciled",
+    ),
+    Defect(
+        a="brake_*",
+        b="radiator_*",
+        gate="overlap",
+        measured=92,
+        issue="#190",
+        why="**the left main rail is now carrying three assemblies at one station.** §20.6 "
+        "puts `brake_balance_regulator` and `brake_line_rear` on the left rail's "
+        "straight run inboard of the centreline, and §30.7 moves both radiator brackets "
+        "onto the same rail with Ø30 clamps -- the lower one lands at y -169, which is "
+        "inside the regulator. The radiator's anchor is a regulation (Art. 4.2.3 puts "
+        "the welded radiator points on the frame) and the regulator's station is not, "
+        "so the regulator is the part that should move. §Running gear owns it",
+    ),
+    Defect(
+        a="chassis_bumper_socket_side_*_rear_l",
+        b="radiator_*",
+        gate="overlap",
+        measured=96,
+        issue="#190",
+        why="the left side bumper's rear sockets against the re-placed core. **Not solvable "
+        "by moving the bar**, and the arithmetic is why it is a waiver: Art. 9.4.2 fixes "
+        "the attachment pitch at 500 +-5 and the front tyre blocks the forward station, "
+        "so the rear socket has to land where the radiator is. §30.7 brought the core "
+        "in from 265 to 250 wide and down from z 497 to 408, which is 15 mm and 89 mm "
+        "in the right direction and not enough. §Chassis and §Bodywork own the bar",
+    ),
+    Defect(
+        a="chassis_side_bar_l",
+        b="radiator_tank_low",
+        gate="overlap",
+        measured=51,
+        issue="#190",
+        why="the same fact at the bar itself rather than at its socket",
+    ),
+    Defect(
+        a="chassis_seat_strut_rear_r",
+        b="engine_intake_boot",
+        gate="overlap",
+        measured=82,
+        issue="#190",
+        why="the right rear stay climbs from the bearing hanger to the seat's upper ear "
+        "across the volume the intake boot now uses. The boot is where it is because "
+        "the rearward pipe took its old lane: at x 252 +-34 it clears the pipe's "
+        "inboard face at 294 by 9 mm, so it has no room to go further inboard, and the "
+        "stay has no room to go further outboard without meeting the pipe itself",
+    ),
+    Defect(
+        a="chassis_steering_support_upper",
+        b="fuel_tank*",
+        gate="overlap",
+        measured=212,
+        issue="#190",
+        why="**a three-way conflict between two regulations, and neither section can settle "
+        "it alone.** Art. 4.7 *mandates* the tank between the main tubes, ahead of the "
+        "seat and behind the front wheel axis -- that is the whole of x 0, y +100..+350, "
+        "and it is why `tank_center_*` is `derived`. Art. 9.5.3 requires the front "
+        "panel's upper part attached to the column support, which §10.6 builds as a V "
+        "from (+-200, +40, 65) up to an apex at (0, +262, +393). At y +150 that V is at "
+        "x +-101 and z 227, i.e. inside a tank whose flank is at +-127 and whose top is "
+        "at 299. The legs pass through the tank's shoulders. Neither position is free: "
+        "a real kart's support legs stand *outboard* of the tank and converge above it, "
+        "which means the V is the part that is wrong -- its feet want to be wider than "
+        "+-200 and its apex reached later. Reported rather than edited, because §10.6's "
+        "own docstring says +-200 was chosen to clear the *old* seat shell",
+    ),
+    Defect(
+        a="cooling_hose_pump_engine",
+        b="engine_battery",
+        gate="overlap",
+        measured=18,
+        issue="#190",
+        why="the pump-to-crankcase hose passes under the battery, which moved inboard to "
+        "x 143..228 to clear the re-routed intake boot. 18 pairs; the battery has one "
+        "free axis left and it is forward, into the crankcase",
+    ),
+    Defect(
+        a="drive_*",
+        b="seat_shell",
+        gate="overlap",
+        measured=76,
+        issue="#190",
+        why="**the chain plane and the corrected seat occupy the same volume, and this is "
+        "the most important finding of the wave.** §30.9 fixes `chain_x` at +115 and "
+        "§40.3 moves `seat_y` from -60 to **-230** -- 170 mm, and the single error that "
+        "made issue #13's hip-to-pedal reach 618 mm. The consequence nobody costed is "
+        "that the seat back now leans over the driveline: the back rises from "
+        "(0, -230, 36) to (0, -365, 367) and is 166-184 mm half-wide through that run, "
+        "while the output sprocket is at (115, -268.5, 150) and the chain runs from "
+        "there to the axle. At x 115 the shell is 51 to 69 mm outboard of the chain "
+        "**laterally**, so the collision is entirely in y and z. §30.6 checked the "
+        "*pipe* against `seat_shell` at x +-184 and found 108 mm; nobody checked the "
+        "chain. Either the seat's back is cut away on the right -- which real KZ shells "
+        "are, and Tillett sells them handed -- or the hip point is forward of -230. It "
+        "is a design decision and it needs both sections",
+    ),
+    Defect(
+        a="engine_cylinder",
+        b="engine_plug_lead",
+        gate="overlap",
+        measured=38,
+        issue="#190",
+        why="the plug lead leaves a cap that the 25 degree lean rotated 46 mm forward and "
+        "10 mm down, and its first waypoint still assumes an upright barrel. Cosmetic, "
+        "internal to §30, and the only one in this list that is simply unfinished",
+    ),
+    Defect(
+        a="engine_head_nut_5",
+        b="engine_plug_lead",
+        gate="overlap",
+        measured=31,
+        issue="#190",
+        why="the same lead against one of the six head nuts",
+    ),
+    Defect(
+        a="fuel_line_feed",
+        b="shift_rod",
+        gate="overlap",
+        measured=20,
+        issue="#190",
+        why="both run rearward along the driver's right and the corridor is shared: the rod "
+        "is pinned by a `sourced` 495 mm length between two joints and the line by the "
+        "tank's Art. 4.7 position, so the two cross at about y +90. The line is the free "
+        "one and it wants a lane below the rod rather than beside it",
+    ),
+    Defect(
+        a="radiator_hose_lower",
+        b="seat_*",
+        gate="overlap",
+        measured=101,
+        issue="#190",
+        why="**the corridor is 33 mm wide and a Ø28 hose does not fit in it with anything "
+        "else.** The seat's lower bracket reaches x -207 and the core's inboard edge is "
+        "at -240 (§30.7.1, stated once and read from there), so the cold return has "
+        "2.5 mm a side at best -- and the shell's own flank is a sampled surface, so "
+        "2.5 mm is inside its sampling error. The hose cannot go inboard, because above "
+        "z 36 and inboard of the bracket is the inside of the seat, and it cannot go "
+        "outboard, because that is the core. Either the core moves outboard -- it has "
+        "60 mm of Art. 5.3.1 margin to the 150 mm lateral limit -- or the return runs "
+        "under the pan. First reading, and it is a real packaging result rather than a "
+        "routing slip",
+    ),
+    Defect(
+        a="radiator_core",
+        b="radiator_hose_lower",
+        gate="overlap",
+        measured=21,
+        issue="#190",
+        why="the outboard half of the same 33 mm problem, seen from the core",
+    ),
+    Defect(
+        a="shifter_base",
+        b="shifter_connector_arm",
+        gate="overlap",
+        measured=16,
+        issue="#190",
+        why="the collet is 75 mm up the rod, above both nylon bushes, and the arm still "
+        "grazes the bracket plate's upper corner. 16 pairs, internal to §40, and the "
+        "plate is 46 mm tall where a real OTK bracket is slotted rather than solid",
+    ),
     # -- gate 1: parts built inside other parts ------------------------------
-    Defect(
-        a="exhaust_chamber",
-        b="engine_crankcase_upper",
-        gate="overlap",
-        measured=50,
-        issue="#192",
-        why="the header is 12.9 mm inside the crankcase. The spigot in the "
-        "exhaust port is a declared joint; this is 60 mm further down the "
-        "pipe and is not",
-    ),
-    Defect(
-        a="drive_chain",
-        b="drive_output_shaft",
-        gate="overlap",
-        measured=112,
-        issue="#192",
-        why="the chain grazes the output shaft by 1.9 mm. The chain has to "
-        "clear the shaft it is driven by; the sprocket's pitch radius is "
-        "what should separate them",
-    ),
     Defect(
         a="drive_output_shaft",
         b="engine_clutch_bolt_4",
@@ -1962,35 +2785,6 @@ OPEN_DEFECTS: tuple[Defect, ...] = (
         issue="#192",
         why="a clutch cover bolt is buried in the output shaft -- the bolt "
         "circle is inside the shaft's radius at that angle",
-    ),
-    Defect(
-        a="radiator_hose_lower",
-        b="engine_clutch_cover",
-        gate="overlap",
-        measured=33,
-        issue="#192",
-        why="the bottom hose is routed 12.1 mm through the clutch cover on its "
-        "way from the pump to a radiator that is now on the other side of "
-        "the kart. The hose's engine end was not re-routed when the radiator "
-        "moved",
-    ),
-    Defect(
-        a="radiator_hose_lower",
-        b="engine_clutch_bolt_1",
-        gate="overlap",
-        measured=15,
-        issue="#192",
-        why="the same hose through one of that cover's bolts",
-    ),
-    Defect(
-        a="radiator_hose_lower",
-        b="radiator_bracket_lower",
-        gate="overlap",
-        measured=58,
-        issue="#192",
-        why="the lower mounting bracket passes through the lower hose. Both are "
-        "anchored off the core's inboard end and neither was placed against "
-        "the other",
     ),
     # -- gate 1, #190: the footprint moved and four other assemblies did not --
     #
@@ -2001,20 +2795,6 @@ OPEN_DEFECTS: tuple[Defect, ...] = (
     # welded to a frame loop -- and they are recorded per pair, with the number,
     # so the wave that owns the other part can see exactly what it has to clear.
     Defect(
-        a="chassis_side_bar_upper_l",
-        b="radiator_*",
-        gate="overlap",
-        measured=42,
-        issue="#190",
-        why="the left upper bar and its rear socket pass through the radiator's "
-        "low tank. **This is not solvable by moving the bar**, and the arithmetic "
-        "is why it is a waiver: the tank reaches x -497.5 at y -96..-144, and the "
-        "front tire's disc blocks x 500 forward of y +385, which leaves 481 mm of "
-        "clear rail for an attachment pitch Art. 9.4.2 fixes at 500 +-5. Spec "
-        "§30.7 re-places the core (x -240..-490, z 408 top against 480 today) and "
-        "moves its brackets onto `chassis_rail_l`; §Powertrain owns it",
-    ),
-    Defect(
         a="chassis_bumper_socket_side_upper_rear_l",
         b="radiator_tank_low",
         gate="overlap",
@@ -2022,18 +2802,6 @@ OPEN_DEFECTS: tuple[Defect, ...] = (
         issue="#190",
         why="the socket half of the same fact, recorded separately because it is "
         "the part that would have to move if the radiator did not",
-    ),
-    Defect(
-        a="chassis_side_bar_upper_r",
-        b="exhaust_chamber",
-        gate="overlap",
-        measured=114,
-        issue="#190",
-        why="the right upper bar against the built exhaust, which runs *forward* "
-        "along the pod at x 290..424, z 47..299 from y -202 all the way to +240. "
-        "That is the volume Art. 9.4.2's upper bar has to cross to reach the rail. "
-        "Spec §30.6 replaces the whole pipe with the 15-cone form geometry and "
-        "§30.4's 25 degree cylinder lean, which re-routes it entirely",
     ),
     Defect(
         a="chassis_side_bar_upper_r",
@@ -2055,14 +2823,6 @@ OPEN_DEFECTS: tuple[Defect, ...] = (
         "not fit between them",
     ),
     Defect(
-        a="chassis_bumper_socket_side_upper_rear_r",
-        b="exhaust_chamber",
-        gate="overlap",
-        measured=64,
-        issue="#190",
-        why="the same post against the pipe",
-    ),
-    Defect(
         a="chassis_floor_tray",
         b="pedal_*",
         gate="overlap",
@@ -2079,148 +2839,89 @@ OPEN_DEFECTS: tuple[Defect, ...] = (
         "respecifies the pedal box at `pedal_z` 228 on a new `chassis_cross_pedal` "
         "at y +610, which puts the pads above the pan. §Cockpit owns it",
     ),
-    Defect(
-        a="chassis_steering_hoop",
-        b="pedal_mount_?",
-        gate="overlap",
-        measured=64,
-        issue="#190",
-        why="the lower steering support's arms run level at bore height (z 97) "
-        "from x +-170 inboard, because at rail height they would cross Art. 4.6's "
-        "edging tube. The pedal mounts are plates on edge at x +-120..+-130 "
-        "spanning z 87..175, aimed at a cross member that no longer exists, so the "
-        "arms pass through them. Same resolution as the tray/pedal pair: §40.5's "
-        "pedal box is 138 mm higher and 50 mm further forward",
-    ),
-    Defect(
-        a="chassis_seat_strut_front_r",
-        b="exhaust_chamber",
-        gate="overlap",
-        measured=60,
-        issue="#190",
-        why="the right front seat stay roots on the rail at the central strut's "
-        "station, per Art. 4.2.3, and the built exhaust belly is 296 mm from the "
-        "centerline at that station -- 10 mm outboard of the rail's own "
-        "centerline. The channel between the belly and `shifter_base` (x 235..276) "
-        "is 20 mm wide and the stay is a Ø20 tube, so there is no path: the stay "
-        "either clears the pipe or clears the shifter. It clears the shifter, "
-        "because §30.6 moves the pipe and §40 keeps the lever where it is",
-    ),
     # -- gate 2: declared joints that do not touch ---------------------------
     Defect(
-        a="steering_column",
-        b="tierod_end_?_inner",
+        a="exhaust_manifold_bolt_?",
+        b="exhaust_spring_?",
         gate="gap",
-        measured=46.12,
+        measured=10.19,
         issue="#190",
-        why="**the part these belong on does not exist.** Art. 4.5.3 permits the "
-        "rose joints and §Cockpit owns the pitman plate they bolt to; until it is "
-        "built the inner rod ends are declared against `steering_column`, which is "
-        "what a pitman is clamped to. The 46.12 mm is not slack -- it is the pitman's "
-        "reach: OTK's \"38/50\" designation puts the outer tie-rod hole 50 mm off the "
-        "column axis and a KZ runs the outer hole, which leaves 50 less the column's "
-        "9 mm radius less the rod end's 11 mm. The station is corroborated the other "
-        "way round: rod end here to the outer end at (320, 417, 140) measures "
-        "**271 mm** against a sourced OTK *\"STEERING TIE-ROD 270 mm\"*, and that "
-        "0.3% agreement is the third leg of spec §20.3.1's kingpin derivation. Closes "
-        "when §40 builds `steering_pitman`",
+        why="each spring's forward hook is 10 mm from the bolt head it wraps. `_helix` "
+        "starts its coil one `EXHAUST_SPRING_COIL_RADIUS` off the axis it is given, so "
+        "the hook's own first turn is 6 mm out from the point it is authored at and the "
+        "M6 head's across-corners radius is 5.8 -- the two miss by construction and the "
+        "fix is a hook that is not a helix. Cosmetic, internal to §30, and the springs "
+        "themselves are `sourced` at 70 mm free length and correctly placed on the pipe's "
+        "own tabs at s = 70",
     ),
     Defect(
-        a="steering_bearing",
-        b="chassis_steering_hoop",
+        a="brake_master_rear",
+        b="brake_pushrod*",
         gate="gap",
-        measured=37.46,
-        issue="#192",
-        why="issue #192's headline, and #190 moved the hoop rather than the "
-        "column: its bore is now at (0, +477, +97), sourced off "
-        "`refs/kart-visual/notes_column.md` and consistent with a Ø20 column at "
-        "36 degrees from vertical, while `cockpit.py` still derives the column "
-        "from `wheel_angle` = 0.470 rad and puts its lower end at (0, +502, +121). "
-        "So the two are 37.5 mm apart and the frame is the one that is right. "
-        "§Cockpit owns the column and spec §40.2 moves it onto this bore, which "
-        "is also what makes the upper support's apex land on it. Original "
-        "finding, for the record: the hoop tops out at z 127.2 mm and the "
-        "column's lower bearing bottoms at 140.4 mm -- 13.2 mm of air in the "
-        "vertical, 23.1 mm as a true surface gap because the two are not "
-        "coaxial. cockpit.COLUMN_LOWER_CLEAR lifts the column off the hoop "
-        "on purpose to stop it running through the tube, but build.tube "
-        "fillets the hoop's apex and pulls the tube's crown *down* below the "
-        "control point that was supposed to meet it, so the clearance is "
-        "twice what the module thinks. The column itself is 19.1 mm clear",
-    ),
-    Defect(
-        a="seat_shell",
-        b="chassis_seat_strut_*",
-        gate="gap",
-        measured=17.67,
-        issue="#192",
-        why="the seat still floats above its own stays, and #190 closed most of "
-        "the gap rather than all of it: from 16.6 mm (front) and 78.1 mm (rear) "
-        "to contact at the front pair and 17.67 mm at the rear. The rear pair now starts where Art. 9.1.2 says it does "
-        "-- on the bearing hanger -- and both pairs end on `frame.SEAT_EAR_*`, "
-        "which are constants read off `cockpit.py`'s loft. **That is why the last "
-        "10 mm cannot be closed from here:** the shell's outer edge is a sampled "
-        "surface and a constant authored in a second module will always miss it "
-        "by a few millimeters and never say so. The fix is §Cockpit publishing "
-        "four `seat_ear_*` empties off the loft and this module reading them "
-        "through `context` -- spec §10.9 calls it the highest-value follow-up in "
-        "the section and it is",
-    ),
-    Defect(
-        a="radiator_bracket_*",
-        b="radiator_end_inboard",
-        gate="gap",
-        measured=12.7,
-        issue="#192",
-        why="both brackets stop 12.7 mm short of the core they carry. "
-        "BRACKET_*_LOCAL's 1.15 of the core half-width is 19.9 mm past the "
-        "edge and the bracket rod's own radius is 8 mm, which is exactly the "
-        "gap. Anchoring outboard of the core was the right fix for the "
-        "bracket crossing the fin pack; 1.0 rather than 1.15 is the rest of "
-        "it",
-    ),
-    Defect(
-        a="radiator_bracket_*",
-        b="seat_shell",
-        gate="gap",
-        measured=68.2,
-        issue="#192",
-        why="and the other end of both brackets reaches for a seat wing that "
-        "is not there. BRACKET_*_SEAT is a world point authored at x 0.180 "
-        "and mirrored by RADIATOR_SIDE, so it tracks the correct side of the "
-        "kart but not the seat's actual surface. The radiator is attached to "
-        "the kart at neither end",
-    ),
-    Defect(
-        a="exhaust_hanger",
-        b="chassis_side_bar_r",
-        gate="gap",
-        measured=60.47,
+        measured=8.93,
         issue="#190",
-        why="the exhaust hanger holds the silencer and is bolted to nothing, and "
-        "#190 moved the bar it reaches for: Art. 9.4.2 sets the lower bar at "
-        "480..520 mm from the axis and it was built at 445, so it went outboard "
-        "55 mm and its front bend came back to y +382 to clear the front tire. "
-        "The hanger sits at x 363..405, y +289..+303. Spec §30.6 re-routes the "
-        "whole exhaust and puts the hanger on `chassis_cross_rear`, which is a "
-        "different part on a different tube -- so this closes by being replaced",
+        why="Art. 4.12.2's doubled link is a **balance bar** and §20.6 built it as one "
+        "rod plus one cable reaching both cylinders from the brake pedal's plate. §40.5 "
+        "moved that plate: an organ arm on a bottom pivot at y +610 crosses a given "
+        "height 38 mm further forward than the old hanging plate did, so the rod's "
+        "direction changed and it no longer grazes the rear cylinder. The rod still "
+        "reaches the front one. §Running gear owns the re-aim, and the number to aim at "
+        "is `wheels._pedal_plate_y`, which this wave rewrote for the new arm",
     ),
     Defect(
-        a="pedal_mount_?",
-        b="chassis_cross_front",
+        a="brake_pushrod",
+        b="pedal_mount_l",
         gate="gap",
-        measured=104.97,
+        measured=55.63,
         issue="#190",
-        why="the mounts reach for a straight cross member at the front axle line "
-        "and there is not one: spec §10.1 item 3 measures the front of a CRG "
-        "chassis as a U-loop plus two stub-axle fixations, so `chassis_cross_front` "
-        "now runs y +500..+760 out at x +-110..+-304. `_pedal_mounts` aims its "
-        "brackets at `(0, front_axle_y, rail_z + 0.025)`, which is empty air 105 mm "
-        "away. The number this bracket has to hit is in spec §10.6 item 3 and it "
-        "is exact: the loop's leg centerline passes (+-259, +560, +50), so a mount "
-        "plate whose bore straddles x +-259 at z +50 contacts the tube at 0 mm. "
-        "§40.5 owns the plate and moves the whole pedal box to a pivot at z +228 "
-        "on a new `chassis_cross_pedal`; this waiver closes with it",
+        why="the same fact at the other end: the mount plates moved 105 mm to reach the "
+        "front loop's legs at (+-259, +560, +50), and the pushrod was declared against "
+        "the plate it used to pass through",
+    ),
+    Defect(
+        a="chassis_bearing_hanger_r",
+        b="cooling_pump_bracket",
+        gate="gap",
+        measured=90.50,
+        issue="#190",
+        why="§30.7 gives the pump bracket as *\"~145 mm, `chassis_bearing_hanger_r` to "
+        "the pump\"* and `estimated`, and 145 mm is not enough: the belt places the pump "
+        "spindle at (160, -386, 110) and the hanger plate spans y -562..-487 at z "
+        "100..200, which is 100 mm behind it. The bracket also cannot run straight "
+        "outboard, because that crosses the belt loop -- it passes 22 mm *under* the "
+        "pump instead. A real bracket is an L and this one is a bar; internal to §30 and "
+        "the only part of the cooling drive still floating",
+    ),
+    Defect(
+        a="chassis_rail_r",
+        b="shifter_base",
+        gate="gap",
+        measured=106.85,
+        issue="#190",
+        why="**spec §40.4's own cross-check is false on this chassis.** It reads *\"the "
+        "right main rail's centerline at y +330 interpolates to x 323 in "
+        "`frame._rail_path`, and the estimated pivot x is +320. The bracket lands on the "
+        "rail\"* -- and §10 has since waisted the frame: `frame_half_strut` is 286 at "
+        "y +40 and `frame_half_waist` is 139 at y +375, so at y +335 the rail is at "
+        "x 156, not 323. The lever's own position is not in doubt: it is fixed by two "
+        "`sourced` shift-rod lengths and the two-finger gap to the rim. What is wrong is "
+        "the *claim* that the rail is under it. Either the bracket grows a 165 mm arm "
+        "inboard or it picks up on `chassis_tray_edge_r`, whose crown is at z 81 and "
+        "x 273..286 -- 44 mm from the bushes and the nearest structure there is. Needs "
+        "§Chassis and §Cockpit together, which is why it is recorded rather than nudged",
+    ),
+    Defect(
+        a="engine_battery",
+        b="engine_crankcase_upper",
+        gate="gap",
+        measured=12.85,
+        issue="#190",
+        why="the battery went inboard to x 143..228 because the intake boot took its "
+        "old lane, and the case's inboard face is at 240. The boot's own lane is fixed "
+        "at both edges -- 9 mm to the pipe's inboard face at 294 and 32 mm to the seat "
+        "shell -- so the battery has one free axis left and it is forward, into the "
+        "crankcase's own y band. 12.85 mm, and it wants the strap bracket lengthened "
+        "rather than the battery moved",
     ),
 )
 

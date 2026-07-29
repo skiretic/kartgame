@@ -806,53 +806,244 @@ class KartParams:
 
     # --- seat --------------------------------------------------------------
 
-    seat_width: float = 0.330
-    seat_height: float = 0.290
-    seat_back_angle: float = 0.610
-    """Radians from vertical, ~35 deg. `estimated`. A KZ seat is reclined hard.
+    seat_width: float = 0.333
+    """Shell width **at the hips**, external. `sourced` + `derived`: Tillett T11
+    ML dimension A is 325 internal, plus 2 x `seat_thickness`. Spec §40.3."""
 
-    **Nothing outside `cockpit.py` may read this.** The radiator's rake used to
-    be `seat_back_angle + radiator_rake_delta`, on the claim that the core sits
-    in the plane a second seat's back would occupy -- which spec §30 measured
-    false: the core rakes 45° from vertical and the shell's chord is 22°. Two
-    parts sharing one angle meant that fixing the seat would silently tip the
-    radiator, and no gate measures a rake. `radiator_rake` is now its own number.
-    """
+    seat_width_shoulders: float = 0.368
+    """Shell width **across the top of the back**, external. `sourced` +
+    `derived`: Tillett dimension B, 360 internal, plus 2 x `seat_thickness`.
 
-    seat_y: float = -0.060
-    """Seat center, rearward of the origin. This sets where the driver's mass
-    sits, and ARCHITECTURE.md §6 wants the center of mass slightly rearward."""
+    A real shell is 35 mm *wider* at the top than at the hips and one
+    `seat_width` cannot hold both -- `cockpit.SEAT_HALF_WIDTH` tapered to 0.812
+    of the hip width and built a shell 268 mm across the shoulders."""
 
-    seat_z: float = 0.075
-    seat_thickness: float = 0.008
-    """Fiberglass seat shell."""
+    seat_height: float = 0.335
+    """Back-top height above the shell's base plane. `sourced`: Tillett T11 ML
+    dimension E; the adult T11 range is 280-335. Was 0.290, 45 mm short."""
+
+    seat_shell_rake: float = 0.384
+    """Radians from vertical, 22 deg ±5 -- the **fiberglass chord's own line**,
+    not the driver's torso recline and not the radiator's core rake.
+
+    `derived` from Tillett C 460 and E 335: total horizontal run
+    sqrt(460² - 335²) = 315, less 150-200 mm of flat pan, so the back rises 335
+    over 115-165 of run, atan = 19-26 deg.
+
+    Replaces `seat_back_angle` 0.610 (35 deg), which sat between the shell's
+    chord and the driver's 40-45 deg recline and did double duty for both -- and
+    which the radiator's rake was *added to*. `radiator_rake` was decoupled first
+    (see its docstring) precisely so this change could land without tipping the
+    core 13 deg with no gate objecting."""
+
+    seat_y: float = -0.230
+    """Hip point, rearward of the origin. `derived`, spec §40.3: the rear axle's
+    front face is at y -500, Tillett's KZ "axle to driver's back" is 135 mm, so
+    the shell's rearmost point -- the **top** of a reclined back, not its base --
+    is at -365; the back's own horizontal run is 335 x tan(22 deg) = 135.3, which
+    puts the hip at -230.
+
+    Was -0.060, i.e. 170 mm too far forward, and that single error was most of
+    why the built cockpit did not fit a driver: it is what made issue #13's
+    hip-to-pedal reach 618.5 mm."""
+
+    seat_z: float = 0.032
+    """Base plane above the ground. `sourced` -> `derived`: Tillett's own seat
+    positioning note says *"5 mm is usually the maximum dimension that you can
+    set the base of the seat below the tubes"*, and the lowest tube is at
+    `ground_clearance` 35, so the band is 30 (proud below) to 35 (flush).
+    Was 0.075, 43 mm high."""
+
+    seat_thickness: float = 0.004
+    """Fiberglass seat shell. `sourced` material (Art. 4.8 permits composite),
+    `estimated` thickness: 4 mm is what a Tillett shell measures. Was 0.008,
+    which built a rim twice as heavy an edge as the real part."""
 
     # --- steering ----------------------------------------------------------
+    #
+    # Authored from the **welded end**. `steering_bore_y`/`_z` up in the front-end
+    # block is the lower bearing's bore, the bracket is welded and cannot move, so
+    # that is the datum; the column is a catalogue part of a known length at a
+    # measured rake; and the wheel centre is *derived*. That ordering is what makes
+    # the 37.46 mm gate-2 gap arithmetically impossible rather than merely fixed:
+    # `steering_bearing`'s bore centre and the column's journal centre are the same
+    # expression. Spec §40.2.
 
     wheel_diameter: float = 0.320
     """Steering wheel, outside diameter. `sourced` size, `derived` choice: kart
     wheels sell at 280/300/320/340 and the side-view trace scales to 306 mm,
     which picks 320 out of that list."""
 
-    wheel_rim_thickness: float = 0.024
-    wheel_angle: float = 0.470
-    """Radians from vertical, ~27 deg. `estimated`. Kart steering columns are
-    steeply laid back, and this angle is very visible from the cockpit. Spec §40
-    measures the column at 36° and owns the change."""
+    wheel_rim_thickness: float = 0.038
+    """Padded grip section, across the foam. `derived`: red-grip mask 21 px of
+    vertical chord corrected for the 40 deg axis lean = 44 mm raw, less a pixel
+    of soft edge each side, so 38 ±6. Was 0.024, 14 mm thin -- kart grips are
+    genuinely chunky."""
 
-    wheel_center_z: float = 0.480
-    wheel_center_y: float = 0.320
-    column_diameter: float = 0.018
-    """`sourced` floor: Art. 4.5.2 sets 18.0 mm as a minimum and this is built to
-    the floor. Spec §40 measures the real column at 20.0 mm."""
+    column_length: float = 0.490
+    """Overall column length, threaded tip to open top. `sourced`: OTK "38/50
+    Steering Column 470/490/510 mm" and Birel ART "STEERING COLUMN RACING L490".
+    490 is the middle of the senior range; 470 and 510 are the adjustment band a
+    tunable would sweep."""
+
+    column_rake: float = 0.628
+    """Radians from vertical, 36 deg. `derived`: measured on the column tube in
+    `tonykart_racer401T_product.png` and corrected for that image's 11%
+    anisotropy -- 119.3 mm forward per 165.9 mm of rise, atan = 35.7 deg, ±3.
+
+    Replaces `wheel_angle` 0.470 (27 deg): 9 deg of error, and it had
+    `wheel_center_y` 133 mm too far forward."""
+
+    column_diameter: float = 0.020
+    """`derived`: a 50.0 px shaft against the 25.5 px annotated 10 mm feature in
+    `birelart_kz_steering_column.jpg` is 19.6 mm, and every European support
+    block on the market is bored 20. **Art. 4.5.2's 18.0 mm is a floor** and this
+    field used to be built to the floor."""
+
+    hub_stack: float = 0.025
+    """Hub plus inclined spacer, measured along the column axis from the column's
+    top end to the wheel's rim plane. `derived`: the side view puts the rim centre
+    16.9 mm rearward and 17.5 mm above the column's top end, 24 mm back along the
+    axis; OTK sells it as a stack -- hub, spacer, inclined spacer.
+
+    Distinct from the wheel's **dish**, which is ~15 mm. `cockpit.WHEEL_DISH` was
+    0.048, conflating the two, and it is subtracted from the wheel centre to find
+    the column's top -- so it removed 33 mm of column as a side effect."""
+
+    wheel_incline_delta: float = 0.122
+    """Extra rake of the **wheel plane** over the column's, radians (7.0 deg).
+
+    `derived`: the edge-on rim trace measures 42.9 deg and the column tube 35.7 in
+    the same frame at the same scale. The difference is hardware, not measurement
+    error -- OTK sells an "INCLINED STEERING WHEEL HUB" and an "INCLINED SPACER
+    FOR STEERING" whose only purpose is to lay the wheel back further than its
+    column, and Art. 4.5 permits *"A spacer […] between the steering wheel and the
+    hub."*
+
+    Added to `column_rake` rather than authoring the wheel's absolute angle a
+    second time, which is how a wheel ends up skewed on its own column. The error
+    is invisible from every angle except a true side elevation, so a turntable
+    does not catch it."""
 
     # --- pedals ------------------------------------------------------------
+    #
+    # Organ type, **bottom pivot, transverse axis**, proved from part photographs
+    # rather than judged: OTK 0014.DC (throttle) and 0015.DC/DCA (brake) are forged
+    # arms with a bushed pivot eye at the *bottom* and the foot bar at the top.
+    # Spec §40.5.
 
-    pedal_y: float = 0.560
-    pedal_z: float = 0.090
-    pedal_width: float = 0.070
-    pedal_length: float = 0.120
-    pedal_separation: float = 0.150
+    pedal_pivot_y: float = 0.610
+    pedal_pivot_z: float = 0.050
+    """The pivot axis station, on `chassis_cross_pedal`. `estimated`: z is just
+    under the frame tube, which is where OTK 0014.D3's support plate hangs its
+    eye; y comes from the pedal-to-seat reach."""
+
+    pedal_arm_length: float = 0.180
+    """Pivot to foot-bar centre. `estimated`, and self-consistent at this scale:
+    the part photo's foot bar reads 0.44 of the arm's height, i.e. ~80 mm, which
+    is one boot. At 145 mm the bar would be 64 -- too narrow for a boot."""
+
+    pedal_arm_rake: float = 0.140
+    """Arm lean rearward from vertical, radians (8 deg). `estimated`: puts the bar
+    25 mm behind the pivot so the sole meets it square with the leg raised."""
+
+    pedal_z: float = 0.228
+    """Foot-bar centre height. **`derived`, not authored**:
+    `pedal_pivot_z + pedal_arm_length * cos(pedal_arm_rake)` = 50 + 180 x cos 8
+    = 228.2, and this field is the rounded figure the manifest publishes.
+
+    Was 0.090 -- 21 mm above the floor tray, which is a foot resting on the floor
+    and not a pedal. 138 mm of error, and it is the single number that made the
+    built pedal box a rental kart's."""
+
+    pedal_bar_diameter: float = 0.018
+    pedal_bar_length: float = 0.080
+    """The transverse foot bar: Ø18 x 80 round bar on a forged arm. `estimated`
+    from 0014.DC/0015.DCA proportions at the 180 mm arm scale; 80 mm is one boot.
+
+    Replaces `pedal_width` 0.070 and `pedal_length` 0.120, which described a flat
+    70 x 120 plate. **A plate is a rental-kart pedal.**"""
+
+    pedal_separation: float = 0.170
+    """Throttle to brake, so ±85. `estimated`; was 0.150, and the difference is
+    inside the estimate's own error."""
+
+    # The brake master cylinder's **22 mm** bore is `wheels.MASTER_BORE`, not a field
+    # here: §Running gear already sources it off three homologation forms and it is
+    # the same number in the same package. `notes_controls` §5 gave 19 mm, marked it
+    # `estimated` and said itself it was the figure to re-check before anything
+    # depended on it -- **a homologation form beats a catalogue inference**, so 19 is
+    # superseded rather than carried alongside. What changes with the bore is the
+    # displacement per circuit, 2.84 -> 3.80 cm3; the 3.2:1 pedal ratio and the 10 mm
+    # of piston travel are geometric and do not move.
+
+    # --- gear lever --------------------------------------------------------
+    #
+    # Issue #117, unanswered for a milestone. The pivot is beside the driver's
+    # **knee**, not his hip, and the reasoning is the answer: the only two shift
+    # rods anybody sells are 495 and 530 mm, both `sourced`, and a hip pivot at
+    # y ~ +100 needs a ~300 mm rod that does not exist. Spec §40.4.
+
+    shift_pivot_x: float = 0.312
+    shift_pivot_y: float = 0.335
+    shift_pivot_z: float = 0.075
+    """Lower end of the lever's own rod, in the bracket's two nylon bushes.
+    `estimated`.
+
+    §40.4 authors +330 and offers a cross-check -- *"the right main rail's centreline
+    at y +330 interpolates to x 323"* -- which is **false on this chassis**: §10 waisted
+    the frame, so the rail is at x 156 there and the bracket is 118 mm from it
+    (`joints.py` carries the number). The check is withdrawn rather than repaired.
+
+    +312 rather than +330 because the lever bows outboard to its kink and Art. 9.4.2's
+    upper side bar has to cross that station on its way to a 500 +-5 attachment pitch:
+    at +330 the two cleared by under a millimetre at low detail and *touched* at high,
+    which is the worst kind of pass. 18 mm inboard buys 10 mm of real clearance and
+    moves the knob 18 mm, which is inside the two-finger gap's own tolerance."""
+
+    shift_knob_x: float = 0.200
+    shift_knob_y: float = 0.300
+    shift_knob_z: float = 0.450
+    """Knob centre -- 414 mm above the seat pan and one two-finger gap off the
+    rim's rightmost point at (+160, +187, +496). `estimated`.
+    `cockpit.SHIFTER_KNOB` was (0.262, 0.104, 0.392), 200 mm rearward of this,
+    i.e. beside the hip: the placement §40.4 exists to correct."""
+
+    shift_kink: float = 0.960
+    """Angle between the lever's rod and its hand tube, radians (55 deg ±3).
+    `derived`: atan(150/104) over four samples along the upper axis of
+    `ctl_otk_0111.B0.webp`. Out-of-plane rotation in the product shot biases it
+    low and the ±3 covers it."""
+
+    shift_rod_length: float = 0.495
+    """Eye-to-eye length of the shift tie-rod. `sourced`: Righetti Ridolfi / IKP
+    hexagonal, 13 mm across the flats. The alternative is OTK 0114.BA at 530 mm,
+    also `sourced`; anything between the two is reachable on the turnbuckle and
+    **anything under 495 is not buildable from a part anybody sells**, which is
+    the constraint that placed the lever."""
+
+    # --- fuel tank ---------------------------------------------------------
+
+    tank_capacity: float = 0.0085
+    """Cubic meters. `sourced`: OTK 0073.EA "Fuel tank, KZ, 8.5 Litre"; KG
+    SER.003 and CKR also sell 8.5. Art. 9.3's minimum is **8 litres** and the kart
+    had no tank at all, so this is a compliance item and not a detail."""
+
+    tank_width: float = 0.255
+    tank_depth: float = 0.250
+    tank_height: float = 0.230
+    """Outer bounding size. `estimated`: 255 x 250 x 230 is 14.7 L of box of which
+    8.5 L is 58%, the right fraction for a body radiused on every edge and waisted
+    at the bottom front -- which is what the 0073.EA photo shows."""
+
+    tank_center_y: float = 0.225
+    tank_center_z: float = 0.184
+    """Centre, on the kart's centreline. **`derived`, and all three coordinates
+    are forced by Art. 4.7**, which does not permit a position but *mandates*
+    one: *"between the main tubes of the chassis frame, ahead of the seat and
+    behind the rotation axis of the front wheels."* So x 0; front face +350
+    against the front axis at +525, 175 mm clear; rear face +100 against the
+    seat's lip at +30, 70 mm clear; bottom on the tray at 69, so centre 184."""
 
     # --- engine, exhaust, radiator ----------------------------------------
 
@@ -885,19 +1076,109 @@ class KartParams:
     sprocket and the rear axle sprocket have to be coplanar and at compatible
     heights, and that is a statement about shaft centers."""
 
-    exhaust_length: float = 0.620
-    exhaust_max_diameter: float = 0.130
-    """Expansion chamber, at its widest. Visually distinctive and a big part of
-    a shifter kart's silhouette. Spec §30.6.2 sources the whole 15-cone table off
-    homologation form `041-EZ-75` and replaces both of these; §Powertrain owns
-    it."""
+    cylinder_lean: float = 0.4363
+    """Forward lean of the cylinder from vertical, radians (25 deg).
 
-    exhaust_pipe_diameter: float = 0.034
+    **`derived`, and it is forced rather than styled.** The exhaust port axis is
+    25 deg out of the plane perpendicular to the bore, tilted toward the crankcase
+    (`sourced`, two independent measurements off KZ-R1 HF p. 3, 1.7 deg apart).
+    With a *vertical* cylinder that points the pipe's inlet axis 25 deg **down**,
+    and a 674 mm chamber cannot be packaged from there: the drop happens before the
+    bend starts at s 134.7, so at the rear axle line the pipe has fallen to z 161.8
+    with a Ø70 section against an axle whose top is 172.5. Measured over 0-20 deg
+    of bend-plane roll the axle gap runs -62.7 to -51.1 mm -- always inside the
+    axle. Clearing it needs the inlet axis within ~12 deg of horizontal, and a
+    25 deg forward lean puts it at exactly 0.
+
+    Consequences §30.4 works out and this file carries: the deck plane inclines,
+    `AIRBOX_LO`/`_HI` rise 60 mm because the pipe occupies the old volume, and the
+    carburettor drops 12 mm because its cap fouled the pipe by 2."""
+
+    exhaust_developed_length: float = 0.6746
+    """Developed centreline length of the expansion chamber, port face to stinger
+    exit. `derived` from the 15-cone table in `powertrain.EXHAUST_CONES`, whose
+    every row is `sourced` off TM homologation forms 041-EZ-75 (KZ-R1) and
+    041-EZ-02 (KZ-R2) -- each carries both diameters and both slant lengths of all
+    15 cones, and Art. 9.15.1 makes the HF's pipe normative.
+
+    Replaces `exhaust_length` 0.620, which was 54 mm short."""
+
+    exhaust_max_diameter: float = 0.1365
+    """The belly, at its widest. `sourced`: cone 11's end diameter, `phi N` on both
+    forms. Was 0.130."""
+
+    exhaust_header_diameter: float = 0.0445
+    """Bore at the pipe's inlet face. `sourced`, `phi A`. Replaces
+    `exhaust_pipe_diameter` 0.034, which matched nothing on the real pipe."""
+
+    exhaust_baffle_diameter: float = 0.1145
+    """Where the first baffle cone ends and the long one starts, cone 13/14.
+    `sourced`, and it is the station the hanger's spring cradle grips."""
+
+    exhaust_stinger_diameter: float = 0.0263
+    """The stinger's exit bore. `sourced`, `phi R`."""
+
+    exhaust_wall: float = 0.0010
+    """Sheet thickness. `derived`: the wall that makes the summed frusta reproduce
+    the HFs' own stated internal volume (1.07 mm for R1, 1.29 for R2). Art. 5.10,
+    PDF p. 17: *"The exhaust must be made of magnetic steel in all categories.
+    Minimum sheet metal thickness is 0.75 mm if not otherwise specified in the
+    HF."* So 1.0 clears the regulation floor."""
+
     exhaust_segments: int = 16
     exhaust_segments_high: int = 32
 
-    radiator_width: float = 0.265
-    """Core width **across the kart**, laterally.
+    chain_x: float = 0.115
+    """The chain plane, and **the sign is the point.** Issue #112:
+    `powertrain.CHAIN_X` and `wheels.SPROCKET_X` were the same magnitude with
+    opposite signs and neither owned it. A KZ carries engine, chain and crown wheel
+    on the driver's **right** and the brake disc on the left; `wheels.py`'s
+    docstring reasoned to the right magnitude and then concluded *"a KZ drives the
+    left rear"*, which a locked rear axle makes meaningless.
+
+    `estimated` as a value -- it lands the crown wheel between `frame.py`'s centre
+    and outer bearing hangers -- and a chain plane out at x 300-330, which
+    `notes_exhaust.md` assumed when it worried about header interference, would put
+    the crown wheel outboard of its own bearing hanger at 185."""
+
+    chain_pitch: float = 0.0055626
+    """219 chain. `derived`: 0.219 in x 25.4 exactly.
+
+    **219 is not a KZ rule.** Art. 9.18.1, PDF p. 31: *"The chain and sprockets are
+    free."* It is compulsory in every OK class (9.18.2) and it is the universal
+    trade standard, which is a different kind of fact -- so the *choice* of 219
+    here is `estimated` practice. `CHAIN_PITCH`'s old docstring read as though the
+    class required it."""
+
+    sprocket_teeth_engine: int = 12
+    """Gearbox output sprocket. `estimated`: KZ fronts run 10-14, and 12 with 82
+    gives 6.83:1, the middle of KZ final drive."""
+
+    sprocket_teeth_axle: int = 82
+    """Crown wheel. `derived` from the built Ø145: `p / sin(pi/82)` = **145.23**,
+    so 145 *is* an 82-tooth 219 sprocket to 0.2 mm.
+
+    Pitch diameter is `p / sin(pi/N)` and **not** `p * N / pi`. The approximation
+    is harmless here (0.03%) and is 1.1% small at 12 teeth, which is exactly the
+    1.9 mm by which the chain was built inside the output shaft."""
+
+    radiator_width: float = 0.250
+    """Core width **across the kart**, laterally. `sourced`: the EM-Technology
+    EM-01 core is a catalogue part published at 250 x 435 x 40, and **a catalogue
+    part with a published dimension outranks any photograph.**
+
+    Was 0.265, the largest core in the KZ family (the range is 240/245/250/265/290),
+    chosen because it filled the gap between the seat edge and the side bar -- a fit
+    argument wearing a part dimension, which is the exact failure
+    `length_overall = 1830 mm max` was written up for. Both dead-on photographs agree
+    with 250: predicted outer edge 365 + 125 = 490 against 479 measured dead-front
+    and 481 dead-rear, where the 265 variant predicts 497.5.
+
+    **State the lateral extent once and read it from here:** x -240 to -490. It is
+    *not* `radiator_x ± radiator_thickness/2` -- the core's own frame puts +x along
+    the face normal, which points forward, so 385 is a plane 20 mm ahead of the core
+    and has nothing to do with how far outboard it reaches. `joints.py`'s pod waiver
+    was 105 mm short for exactly that reason.
 
     Read the three radiator dimensions against each other, because none of them
     is an axis-aligned extent and every earlier attempt at this block got one of
@@ -907,14 +1188,18 @@ class KartParams:
         height      up the **slant**, low edge forward, high edge rearward
         thickness   through the core, along the face's own normal
 
-    A New-Line core is 17 in by 9.5-11.4 in, so 432 mm by 241-290 mm. 265 mm is
-    the short dimension and it is the lateral one. It fits the gap it has to fit
-    almost exactly: the seat shell's right edge is at x 0.165 and the right side
-    bar's inner face at x 0.432, which is 267 mm. Spec §30.7 sources 250 mm off
-    the EM-01 core and §Powertrain owns the change."""
+    Read the three radiator dimensions against each other, because none of them is
+    an axis-aligned extent and every earlier attempt at this block got one wrong:
 
-    radiator_height: float = 0.432
-    """Core length **up the slant**, tanks included — 17 in.
+        width       across the kart, from the seat shell outward
+        height      up the **slant**, low edge forward, high edge rearward
+        thickness   through the core, along the face's own normal
+    """
+
+    radiator_height: float = 0.435
+    """Core length **up the slant**, tanks included. `sourced`: EM-01 and EM-02 are
+    both 435 (New-Line RS MAX 430). The old 0.432 was right for the wrong reason --
+    its docstring traced it to "17 in", which nobody sourced.
 
     Not a vertical height: raked back, 432 mm along the slant is 354 mm of rise
     and 248 mm of fore-and-aft run at this rake. The tanks are at the two ends
@@ -948,14 +1233,30 @@ class KartParams:
     far forward, which put it level with the driver's knees instead of the
     driver's hip."""
 
-    radiator_z: float = 0.320
-    """Center of the core, in the plane it is raked into. Chosen so the low edge
-    clears the floor tray's top and the high edge stays forward of the engine's
-    front face at y -0.145 — the radiator goes **beside the driver and ahead of
-    the engine**, which is the constraint that actually places it. Spec §30.7.2
-    derives 0.240 and §Powertrain owns the change."""
+    radiator_z: float = 0.240
+    """Centre of the core, in the plane it is raked into. `derived`, and the
+    derivation is two exact floors plus the raked core's true half-extent:
 
-    radiator_rake: float = 0.610
+        vertical half-extent = (height/2) cos(rake) + (thickness/2) sin(rake)
+                             = 217.5 x 0.7071 + 20 x 0.7071 = 167.9
+          the second term is the one an earlier solve omitted: the core is 40 mm
+          thick and raked, so its lowest point is a tank *corner*, 12 mm below its
+          centreline edge.
+        floors:  Art. 5.3.1 "above the chassis frame" -> rail top 65
+                 chassis_floor_tray top                        69   <- binding
+        radiator_z = 69 + 3 + 167.9 = 240
+
+    Was 0.320, which put the core's top at 497 -- **3 mm** under Art. 5.3.1's 500 mm
+    ceiling. At 240 the top is 407.9, with 92 mm of margin, and the low corner is
+    72.1: 3.1 mm above the tray.
+
+    Residual disagreement, recorded rather than hidden: the photogrammetric top edge
+    is 375 ±20 and 408 is 13 mm above that bar. The two floors and the regulation
+    win, because the photograph's vertical figure is dominated by camera elevation
+    and monotone in it (371 at 24 deg, 387 at 8) while the rail and tray tops are
+    arithmetic."""
+
+    radiator_rake: float = 0.7854
     """Radians from vertical, and **its own number**.
 
     This replaced `radiator_rake_delta`, which was *added to `seat_back_angle`*
@@ -966,11 +1267,10 @@ class KartParams:
     the seat would have tipped the radiator 13° with nothing objecting. Decoupling
     it and correcting the seat had to land together, and this is the decoupling.
 
-    The value here is the rake **as built** (0.610 = 34.95°), not §30.7's sourced
-    0.7854, deliberately: §Powertrain re-places the whole core -- `radiator_z`
-    0.320 -> 0.240, `radiator_width` 0.265 -> 0.250, the brackets onto the rail --
-    and tipping it 10° on its own would land in none of those positions. This
-    field is where that change goes, in one place, with the seat no longer in it.
+    45 deg from vertical is `derived` as the one value two ranges share: the
+    height-budget solve gives 40 ±5 from vertical, and sourced kart practice tunes
+    45-60 from *horizontal*, i.e. 30-45 from vertical. 45 is the top of the first
+    and the bottom of the second.
 
     Kart practice tunes the angle with ambient temperature -- 45° to horizontal
     below 20 °C, 55 at 20-30, up to 60 above -- in 5-degree steps, so
@@ -1308,19 +1608,13 @@ FIELD_COVERAGE_EXEMPT: dict[str, str] = {
         "cylinder stations are authored absolutely rather than off the engine's "
         "own datum."
     ),
-    "engine_z": (
-        "issue #111: powertrain.SPROCKET_Z = 0.150 is this field written out as a "
-        "literal, and its own comment says so -- *\"SPROCKET_Z is engine_z\"*. "
-        "Two copies of the crankshaft height with nothing comparing them."
-    ),
-    "exhaust_max_diameter": (
-        "powertrain.py folds it into a ratio constant (*\"3.824 is "
-        "exhaust_max_diameter / exhaust_pipe_diameter\"*) rather than reading it. "
-        "Spec §30.6.2 replaces both with the 15-cone table off form 041-EZ-75."
-    ),
-    "pedal_length": (
-        "cockpit.py restates it as PEDAL_ARM_LENGTH = 0.120. Spec §40.5 "
-        "respecifies the whole pedal box and owns the join."
+    "tank_capacity": (
+        "Art. 9.3's 8 litre minimum is what makes the tank exist, and 8.5 L is the "
+        "catalogue size that clears it -- but the mesh is built from tank_width/"
+        "_depth/_height, which the docstring shows is 14.7 L of bounding box at 58% "
+        "fill. Publishing the rated capacity in the manifest is the point; a "
+        "geometry module cannot read a volume. Delete this entry if a module ever "
+        "solves the shell to hit it."
     ),
     "driver_eye_z": (
         "issue #17: no driver module exists. Read in Godot off the manifest by "
@@ -1615,24 +1909,100 @@ def tray_top_z(p: KartParams) -> float:
     return tray_bottom_z(p) + p.tray_thickness
 
 
-def steering_column_base(p: KartParams) -> tuple[float, float, float]:
-    """Lower end of the steering column, at the front cross member.
+#: How far up the column axis the lower bearing's bore sits from the threaded tip.
+#: `derived`: the journal spans 14.5-30 mm from the tip, midpoint 22.3.
+COLUMN_JOURNAL_OFFSET: float = 0.022
 
-    Derived rather than authored so that it is consistent with `wheel_angle`:
-    the line from here to the steering wheel center is the column axis, and its
-    angle from vertical is `wheel_angle` by construction. Authoring both ends
-    and the angle independently is how a steering wheel ends up visibly not
-    square to its own column.
 
-    **The frame no longer reads this.** The lower steering support's bore is
-    `steering_bore_y`/`_z`, sourced off the column's own reference photograph,
-    and spec §40 moves the column onto it -- so this function describes the
-    column as built and the frame describes the support as specified. They are
-    99 mm apart today and that is `joints.py`'s waived gap, not a hidden one.
+def column_axis(p: KartParams) -> tuple[float, float, float]:
+    """Unit vector up the column, pointing up and rearward at the driver."""
+    return (0.0, -math.sin(p.column_rake), math.cos(p.column_rake))
+
+
+def lower_bore(p: KartParams) -> tuple[float, float, float]:
+    """The lower bearing's bore centre — **the authored end of the whole chain.**
+
+    The bracket is welded to the frame and cannot move, so this is the datum and
+    everything upstream of it is derived. The previous arrangement was inverted:
+    `steering_column_base` derived the column's *fixed* lower end from its *free*
+    upper end through a hardcoded 402 mm, so no expression anywhere in the build
+    mentioned the bracket that carries the column — which is why `joints.py`
+    measured `chassis_steering_hoop`/`steering_bearing` at 37.46 mm and the hoop
+    itself as touching nothing at all.
+
+    `steering_bearing`'s bore centre *is* this point and the column's journal
+    centre is the same expression, so their contact is identity and the only edit
+    that can open a gap is an edit to `steering_bore_y`/`_z` — which is exactly
+    the edit that should move the column.
     """
-    length = 0.402
+    return (0.0, p.steering_bore_y, p.steering_bore_z)
+
+
+def column_top(p: KartParams) -> tuple[float, float, float]:
+    """The column's open upper end, `column_length` up the axis from the tip."""
+    base = lower_bore(p)
+    axis = column_axis(p)
+    reach = p.column_length - COLUMN_JOURNAL_OFFSET
+    return tuple(base[i] + axis[i] * reach for i in range(3))
+
+
+def wheel_center(p: KartParams) -> tuple[float, float, float]:
+    """Steering wheel centre — **derived, never authored.**
+
+        axis = (0, -sin 36, +cos 36) = (0, -0.5878, +0.8090)
+        wheel_center = lower_bore + axis * (490 - 22 + 25)
+                     = (0, 477 - 289.8, 97 + 398.8)  ->  (0, +187, +496)
+
+    which is the centre measured independently off the side view at
+    (0, +187, +496): the chain is *closed*, not merely consistent. The upper
+    support's bore, 366 mm up the same axis, lands at (0, +262, +393) against a
+    measured (0, +263, +393) — 1 mm.
+
+    `wheel_center_y` 0.320 and `wheel_center_z` 0.480 were authored fields and are
+    deleted; the old pair was 133 mm too far forward.
+    """
+    base = lower_bore(p)
+    axis = column_axis(p)
+    reach = p.column_length - COLUMN_JOURNAL_OFFSET + p.hub_stack
+    return tuple(base[i] + axis[i] * reach for i in range(3))
+
+
+def wheel_rake(p: KartParams) -> float:
+    """Rake of the **wheel plane** from vertical: the column's plus the wedge's."""
+    return p.column_rake + p.wheel_incline_delta
+
+
+def seat_back_top(p: KartParams) -> tuple[float, float, float]:
+    """Rearmost, highest point of the shell's chord. `derived`, spec §40.3.
+
+    Checks against Tillett's published C = 460, a dimension the derivation never
+    used: lip (0, +30, 132) to here is sqrt(395² + 235²) = **459.6**. A published
+    figure nobody fed in coming back to 0.4 mm is the reason to believe the rest.
+    """
     return (
         0.0,
-        p.wheel_center_y + math.sin(p.wheel_angle) * length,
-        p.wheel_center_z - math.cos(p.wheel_angle) * length,
+        p.seat_y - p.seat_height * math.tan(p.seat_shell_rake),
+        p.seat_z + p.seat_height,
     )
+
+
+def pedal_bar_y(p: KartParams) -> float:
+    """Foot-bar station. `derived`: pivot less the arm's rearward lean,
+    610 - 180 sin 8 = 585.0."""
+    return p.pedal_pivot_y - p.pedal_arm_length * math.sin(p.pedal_arm_rake)
+
+
+def pedal_bar_z(p: KartParams) -> float:
+    """Foot-bar height, 50 + 180 cos 8 = 228.2. `pedal_z` is this rounded."""
+    return p.pedal_pivot_z + p.pedal_arm_length * math.cos(p.pedal_arm_rake)
+
+
+def sprocket_pitch_radius(pitch: float, teeth: int) -> float:
+    """`p / (2 sin(pi/N))`, and the exact form matters at low tooth counts.
+
+    The approximation `p*N/(2*pi)` is 0.03% small at 82 teeth and **1.1% small at
+    12**, which is 0.24 mm of radius — and that is the 1.9 mm by which the chain
+    was built inside a Ø18 output shaft. Not a field, so it takes its arguments
+    rather than the parameter block.
+    """
+    return pitch / (2.0 * math.sin(math.pi / teeth))
