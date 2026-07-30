@@ -119,8 +119,10 @@ class Defect:
 
     `gate` is `"overlap"`, `"gap"` or `"driver"`; `measured` is intersecting
     triangle pairs for the first and millimeters for the other two -- the
-    **worst** figure the entry covers, measured at high detail when the waiver
-    was written. For `"driver"` the millimeters are penetration depth into the
+    **worst** figure the entry covers, measured at LOW detail unless the row
+    says otherwise (the gates run at both densities since #209/ADR-0059, but
+    every figure seeded before that is a low figure, and the same finding can
+    differ by a bevel at high). For `"driver"` the millimeters are penetration depth into the
     driver volume (torso findings measured against the §60.1.1 rake-plane clip,
     ADR-0057), or the contact gap for a declared contact that does not touch;
     an occlusion-only finding carries the count of occluded sample points and
@@ -3025,11 +3027,14 @@ OPEN_DEFECTS: tuple[Defect, ...] = (
     # -- gate 3, #200: the first measured pass, seeded off the built mesh -----
     #
     # 48 findings, three causes, three tickets. Measured at the geometry
-    # stage's LOW detail -- which is the only detail level the gates run at:
-    # the high-poly bake source is built, renamed and never gate-checked, a
-    # coverage hole found by the #17 surface agent (its first high-detail run
-    # hit a gate-1 fatal the pipeline has never seen). This block first said
-    # "high detail" because the Defect docstring promises it; it was wrong.
+    # stage's LOW detail. When these were seeded that was the only detail
+    # level the gates ran at -- the high-poly bake source was built, renamed
+    # and never gate-checked, a coverage hole found by the #17 surface agent
+    # and closed by #209/ADR-0059: gates 1-3 now run at both densities, and a
+    # waiver is stale only when it fails at neither. These figures stay
+    # low-detail figures; the same finding can differ by a bevel at high.
+    # This block first said "high detail" because the Defect docstring
+    # promises it; it was wrong.
     # Depths are `genkart.driver_depth`'s figure -- torso rows measured against
     # the ADR-0057 rake-plane clip -- and the ADR-0055 seed table is NOT the
     # source:

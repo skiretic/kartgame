@@ -455,16 +455,23 @@ def _steering_support_lower(
     # an arm that descended on a straight line from the bore to the foot would
     # cross it -- measured, 84 intersecting triangle pairs. At bore height the arm
     # passes 8 mm above it.
-    mid_x = foot_x * 0.85
-    # 0.59, was 0.65. #201 moved the brake pedal to x -150 and its clevis's
-    # front face to y 581.7 (measured off the build), and at 0.65 the level
-    # arm passed through it. The arm cannot also clear the rear brake master's
-    # cap by blend alone -- the corridor between cap and clevis is narrower
-    # than the tube once fillets are counted, measured at both 0.58 and 0.61
-    # -- so the masters moved 20 mm outboard instead (wheels.py MASTER_*_X)
-    # and this blend only settles the clevis side: front face of the arm at
-    # x -165 comes to ~578 against the clevis at 581.7.
-    mid_y = bore_y + (foot_y - bore_y) * 0.59
+    # The left arm threads a 26.7 mm corridor: the rear brake master's body ends
+    # at y 555 and the clevis's rear face sits at 581.7, both across x -159..-165
+    # (#201 -- pedals at +-150, masters 20 mm outboard). The arm's LINE through
+    # that corridor is settled and must not rotate: it crosses x -162 at y 568,
+    # and the brake line's crossing at x -100 rides its upper surface. What #209
+    # found is that the CORNER cannot sit at x 170: the bend's crown bulges
+    # inboard-forward-down (the dive tilts the crown toward +y, -z, inboard x),
+    # measured at +6.9 mm over the straight surface at high detail -- 10
+    # triangle pairs into the clevis corner that the low build misses by 1.7 mm
+    # of x, which is why every low-only gate run was green over it. So the
+    # corner moves outboard of the clevis's x extent (178 against the clevis
+    # edge at 165) and clears it in x, where the margin is real, instead of in
+    # y, where there is none to spend. 0.618 is not a new opinion about the
+    # arm: it is the same line extended to x 178 (0.59 x 178/170 of the same
+    # rise), so the corridor crossing and the brake-line contact do not move.
+    mid_x = foot_x * 0.89
+    mid_y = bore_y + (foot_y - bore_y) * 0.618
     mid_z = bore_z
     _tube(
         context,
@@ -480,7 +487,13 @@ def _steering_support_lower(
         collection,
         material,
         root,
-        bend_radius=p.bend_radius * 0.7,
+        # 0.5 (30 mm CLR, ~1.9 x D on the 16 mm tube), was 0.7 (42 mm). At 42
+        # the fillet's tangent point lands at x -161, inboard of the clevis
+        # edge at -165, so the arc's deviation is already in play where the
+        # corridor is tightest; at 30 the tangent sits at -166 and the straight
+        # surface carries the clearance. `estimated`: a hydraulic bender does
+        # 2 x D, and this is a welded bracket tube, not a regulated bar run.
+        bend_radius=p.bend_radius * 0.5,
     )
 
 

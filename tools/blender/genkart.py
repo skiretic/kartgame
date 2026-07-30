@@ -429,7 +429,9 @@ def assembly_parts(context: build.BuildContext) -> list[Part]:
     return parts
 
 
-def check_interpenetration(parts: list[Part]) -> set[tuple[str, str]]:
+def check_interpenetration(
+    parts: list[Part], defer_stale: dict[str, set] | None = None
+) -> set[tuple[str, str]]:
     """Fail the build if any part is built inside another it does not join.
 
     The radiator was built through the gear lever, through the exhaust chamber and
@@ -509,20 +511,28 @@ def check_interpenetration(parts: list[Part]) -> set[tuple[str, str]]:
             % (len(fatal), listing)
         )
 
-    stale = joints.stale_waivers("overlap", names, failing)
-    if stale:
-        listing = "\n".join(
-            "      %-28s %-28s %s" % (defect.a, defect.b, defect.issue)
-            for defect in stale
-        )
-        raise SystemExit(
-            "error: %d overlap waiver(s) in joints.py no longer cover a failing "
-            "pair:\n%s\n"
-            "       This is fixed. Delete the waiver -- a waiver list that keeps "
-            "entries for\n"
-            "       faults that are gone stops being a list of what is broken."
-            % (len(stale), listing)
-        )
+    if defer_stale is not None:
+        # #209: staleness is adjudicated by the caller against the union of
+        # failing pairs across every detail this run gates. A pair the bevel
+        # moves in and out of overlap between densities must not strike its own
+        # waiver -- stale_waivers' docstring already grants exactly that for
+        # globs, and the union is the same grant across detail levels.
+        defer_stale["overlap"] |= failing
+    else:
+        stale = joints.stale_waivers("overlap", names, failing)
+        if stale:
+            listing = "\n".join(
+                "      %-28s %-28s %s" % (defect.a, defect.b, defect.issue)
+                for defect in stale
+            )
+            raise SystemExit(
+                "error: %d overlap waiver(s) in joints.py no longer cover a "
+                "failing pair:\n%s\n"
+                "       This is fixed. Delete the waiver -- a waiver list that "
+                "keeps entries for\n"
+                "       faults that are gone stops being a list of what is broken."
+                % (len(stale), listing)
+            )
 
     for pair, count, defect in excused:
         print(
@@ -579,7 +589,11 @@ def part_surface_gap(a: Part, b: Part, overlapping: set[tuple[str, str]]) -> flo
     return best
 
 
-def check_attachment(parts: list[Part], overlapping: set[tuple[str, str]]) -> None:
+def check_attachment(
+    parts: list[Part],
+    overlapping: set[tuple[str, str]],
+    defer_stale: dict[str, set] | None = None,
+) -> None:
     """Fail the build if a part touches nothing, or misses what it mounts to.
 
     `steering_column`'s lower bearing bottoms out 13.2 mm above the crown of
@@ -691,18 +705,21 @@ def check_attachment(parts: list[Part], overlapping: set[tuple[str, str]]) -> No
             % (len(broken), listing, tolerance * 1000.0)
         )
 
-    stale = joints.stale_waivers("gap", names, failing)
-    if stale:
-        listing = "\n".join(
-            "      %-26s %-26s %s" % (defect.a, defect.b, defect.issue)
-            for defect in stale
-        )
-        raise SystemExit(
-            "error: %d gap waiver(s) in joints.py no longer cover a failing "
-            "joint:\n%s\n"
-            "       This is fixed. Delete the waiver."
-            % (len(stale), listing)
-        )
+    if defer_stale is not None:
+        defer_stale["gap"] |= failing
+    else:
+        stale = joints.stale_waivers("gap", names, failing)
+        if stale:
+            listing = "\n".join(
+                "      %-26s %-26s %s" % (defect.a, defect.b, defect.issue)
+                for defect in stale
+            )
+            raise SystemExit(
+                "error: %d gap waiver(s) in joints.py no longer cover a failing "
+                "joint:\n%s\n"
+                "       This is fixed. Delete the waiver."
+                % (len(stale), listing)
+            )
 
     for name, other, gap, defect in excused_weak:
         print(
@@ -846,7 +863,9 @@ def occluded_samples(driver: Part, cover: Part) -> int:
     return count
 
 
-def check_driver_fit(everything: list[Part]) -> None:
+def check_driver_fit(
+    everything: list[Part], defer_stale: dict[str, set] | None = None
+) -> None:
     """Gate 3, #200: the volume the driver occupies is defended.
 
     Three assertions, over the same world-space trees as gates 1 and 2:
@@ -983,18 +1002,21 @@ def check_driver_fit(everything: list[Part]) -> None:
             % (len(fatal), listing)
         )
 
-    stale = joints.stale_waivers("driver", names, failing)
-    if stale:
-        listing = "\n".join(
-            "      %-26s %-26s %s" % (defect.a, defect.b, defect.issue)
-            for defect in stale
-        )
-        raise SystemExit(
-            "error: %d driver waiver(s) in joints.py no longer cover a failing "
-            "pair:\n%s\n"
-            "       This is fixed. Delete the waiver."
-            % (len(stale), listing)
-        )
+    if defer_stale is not None:
+        defer_stale["driver"] |= failing
+    else:
+        stale = joints.stale_waivers("driver", names, failing)
+        if stale:
+            listing = "\n".join(
+                "      %-26s %-26s %s" % (defect.a, defect.b, defect.issue)
+                for defect in stale
+            )
+            raise SystemExit(
+                "error: %d driver waiver(s) in joints.py no longer cover a "
+                "failing pair:\n%s\n"
+                "       This is fixed. Delete the waiver."
+                % (len(stale), listing)
+            )
 
     for pair, description, defect in excused:
         print(
@@ -1015,7 +1037,9 @@ def check_driver_fit(everything: list[Part]) -> None:
     )
 
 
-def check_assembly(context: build.BuildContext) -> None:
+def check_assembly(
+    context: build.BuildContext, defer_stale: dict[str, set] | None = None
+) -> list[str]:
     """All three gates, over one shared set of world-space trees.
 
     Called where `check_face_winding` is called and for the same reason: these are
@@ -1024,6 +1048,19 @@ def check_assembly(context: build.BuildContext) -> None:
     against a 1.7 s rebuild, which is inside the budget `--watch` has to keep, so
     no gate is skipped anywhere and there is no mode in which the kart is
     built without being checked.
+
+    **Both detail levels are gated, #209.** The main pipeline calls this on the
+    high-detail bake source too, before `suffix_pass` renames it -- the first
+    real high-detail run found `chassis_steering_hoop` 10 triangle pairs inside
+    `pedal_brake_clevis` while every low-detail run was green, and a defect in
+    the bake source bakes its normals onto the shipped low mesh. Fatal findings
+    apply at every gated detail; the detail is named in the failure. Waiver
+    STALENESS is the one judgment that spans details: with `defer_stale` the
+    gates record their failing pairs there instead of adjudicating, and the
+    caller runs `check_stale_waivers` once over the union -- a marginal pair
+    the bevel moves in and out of overlap between densities must not strike
+    its own waiver. A single-detail run (`rebuild`, `--watch`) adjudicates
+    immediately against the one detail it built, which is the old behavior.
 
     **`driver_*` parts are excluded from gates 1 and 2, by contract.** Spec
     §60.1.6 and ADR-0055: the driver is not a kart part. Gate 2's "every part is
@@ -1034,23 +1071,60 @@ def check_assembly(context: build.BuildContext) -> None:
     (`check_driver_fit`, #200), which owns both directions of that question. The
     partition is here rather than inside each gate so there is exactly one place
     that decides what each gate is about.
+
+    Returns the part names, because `check_stale_waivers` needs them to expand
+    waiver globs and they are already prepared here.
     """
     started = time.perf_counter()
     everything = assembly_parts(context)
     parts = [part for part in everything if not part.name.startswith("driver_")]
     prepared = (time.perf_counter() - started) * 1000.0
-    overlapping = check_interpenetration(parts)
-    check_attachment(parts, overlapping)
-    check_driver_fit(everything)
+    try:
+        overlapping = check_interpenetration(parts, defer_stale)
+        check_attachment(parts, overlapping, defer_stale)
+        check_driver_fit(everything, defer_stale)
+    except SystemExit as error:
+        # The two details' gate output is otherwise identical, and a fatal that
+        # does not say which build it measured sends the reader to the wrong
+        # mesh -- the hoop/clevis pair above failed at high detail only.
+        raise SystemExit(
+            "%s\n       (measured at %s detail)" % (error, context.detail.name)
+        ) from None
     skipped = len(everything) - len(parts)
     print(
-        "    assembly %d part(s) prepared in %.0f ms%s"
+        "    assembly %d part(s) at %s detail prepared in %.0f ms%s"
         % (
             len(parts),
+            context.detail.name,
             prepared,
             "" if skipped == 0 else "; %d driver part(s) owned by gate 3" % skipped,
         )
     )
+    return [part.name for part in everything]
+
+
+def check_stale_waivers(names: list[str], failing: dict[str, set]) -> None:
+    """The deferred half of the gates' waiver audit, once per run. #209.
+
+    `failing` is the union of undeclared-failing pairs over every detail level
+    the run gated. A waiver covering no failing pair at ANY gated detail is a
+    fixed fault still wearing its excuse, and that is fatal here for the same
+    reason it is fatal inline: a waiver list that keeps entries for faults that
+    are gone stops being a list of what is broken.
+    """
+    for gate in ("overlap", "gap", "driver"):
+        stale = joints.stale_waivers(gate, names, failing[gate])
+        if stale:
+            listing = "\n".join(
+                "      %-26s %-26s %s" % (defect.a, defect.b, defect.issue)
+                for defect in stale
+            )
+            raise SystemExit(
+                "error: %d %s waiver(s) in joints.py no longer cover a failing "
+                "pair at either detail:\n%s\n"
+                "       This is fixed. Delete the waiver."
+                % (len(stale), gate, listing)
+            )
 
 
 def suffix_pass(context: build.BuildContext, suffix: str) -> None:
@@ -1516,11 +1590,19 @@ def main() -> None:
     # high-poly pass is the expensive half of a run.
     high_suffix = "_high"
     high_context: build.BuildContext | None = None
+    # #209: waiver staleness is judged once, over both details -- each gate pass
+    # records its failing pairs here instead of adjudicating inline.
+    failing: dict[str, set] = {"overlap": set(), "gap": set(), "driver": set()}
     if "bake" in stages:
         print("==> geometry (high detail, bake source)")
         high_context = build_kart(
             parameters, build.Detail.high(parameters), scene, materials, out_directory
         )
+        # Gated before `suffix_pass` renames it, while the part names still
+        # match joints.py. #209: this pass was never gated, and the first run
+        # that did gate it found a fatal the low-only pipeline had been green
+        # over for its whole life.
+        check_assembly(high_context, failing)
         suffix_pass(high_context, high_suffix)
 
     print("==> geometry (%s detail)" % detail.name)
@@ -1529,7 +1611,8 @@ def main() -> None:
     check_face_winding(context)
     # Before the high-poly pass is paired in, and before any stage renames or
     # decimates anything: both gates measure the kart as it was built.
-    check_assembly(context)
+    names = check_assembly(context, failing)
+    check_stale_waivers(names, failing)
     if high_context is not None:
         context.high_poly = pair_high_poly(context, high_context, high_suffix)
 

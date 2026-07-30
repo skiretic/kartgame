@@ -3789,3 +3789,66 @@ contact row and §60.1.7's build row record it.
 **What would reopen this.** A photograph of a KZ driver wearing the protector
 over the suit — one line to flip `RIB_PROTECTOR_PROUD` back and re-measure both
 contacts.
+
+## ADR-0059 — The gates run at both detail levels, and staleness is judged across them
+
+**Status:** accepted, 2026-07-30. Extends ADR-0044's and ADR-0055's gate
+contract (#192, #200). Closes #209.
+
+**Context.** Every part is built twice — `Detail.low` for the shipped mesh,
+`Detail.high` as the #19 bake source — but `check_assembly` ran once, on the
+low context. The high pass was built, renamed out of the way, baked from, and
+never measured. Nothing in `verify.sh` or `--check` ever gated it. So every
+"measured at high detail" claim about gate output was wrong wherever it
+appeared (the `joints.py` seed comments and #200's closure comment both said
+it and were corrected), and the first deliberate high-detail gate run failed:
+`chassis_steering_hoop` 10 triangle pairs inside `pedal_brake_clevis`,
+reproduced on pristine `4267e03`, predating the driver work. Low detail was
+green over it for its whole life — the arm's bend crown bulges
+inboard-forward-down at high density (+6.9 mm over the straight surface) and
+the low tessellation misses the clevis corner by 1.7 mm of x.
+
+**Decision.** The honest option from #209, not the write-it-down-as-deliberate
+option: a defect that exists only in the bake source still bakes its normals
+onto the shipped low mesh, so the low-only scope was a hole, not a policy.
+
+1. **`check_assembly` runs on the high context** whenever a run builds one
+   (the bake stage), before `suffix_pass` renames it — the part names must
+   still match `joints.py`. Gates 1–3 all run; fatal findings are fatal at
+   either detail, and the failure names the detail it measured.
+2. **Waiver staleness is the one judgment made across details.** Each gate
+   pass records its undeclared-failing pairs; `check_stale_waivers` adjudicates
+   once, against the union over every detail the run gated. A waiver is stale
+   only when it covers no failing pair at *any* gated density — the bevel
+   moves marginal pairs in and out of overlap between densities, and
+   `stale_waivers` already grants exactly that tolerance to globs. Without the
+   union, gating high would have struck low-measured waivers as "fixed" and
+   demanded high-only waivers be deleted at low.
+3. **Single-detail runs keep the old contract.** `rebuild()` (`--watch`,
+   `--detail=high`) adjudicates staleness immediately against the one detail
+   it built. A watch loop is a shape-review loop; it does not owe the other
+   density a build.
+
+**The fix the first gated run forced.** The hoop's corner could not stay at
+x 170: the corridor between the rear master's body (ends y 555) and the
+clevis's rear face (581.7) is 26.7 mm for an 18.4 mm tube footprint, and the
+arm's line through it was already centered — moving the line rearward to
+clear the clevis (blend 0.55) put the straight arm 29 triangle pairs into
+`brake_master_rear` at low detail too. The line stays (0.618 is 0.59 extended
+to the new corner), the corner moves outboard of the clevis's x extent
+(`mid_x` 0.85 → 0.89 of the foot), and the bend radius drops 42 → 30 mm so
+the fillet tangent lands outboard of the clevis edge. Measured after:
+hoop/clevis gap 3.49 mm low, 3.24 mm high; hoop/`brake_master_rear` 3.59 mm
+low, 3.93 mm high; zero intersecting pairs at either density.
+
+**Cost measured, not estimated.** The high pass costs ~1.3 s total: parts
+prepared 280 ms, gate 1 199 ms, gate 2 737 ms, gate 3 34 ms — against a
+947 s full pipeline run. The first draft of this ADR blamed gate 3 for a
+ten-minute stall that was actually the high-detail geometry build itself,
+which runs gated or not. The gating is free at this scale.
+
+**One row already needed the union.** The first fully-gated run excuses 48
+driver findings at high against 47 at low: `drive_output_sprocket` reaches
+2.77 mm into the torso only at high density, while at low only the shaft
+member of #204's `drive_output_*` glob fails. A per-detail staleness judgment
+over separate runs would have argued about that row from both sides.

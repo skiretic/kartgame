@@ -582,6 +582,17 @@ reports them on every save. Known-outstanding defects are itemized waivers in
 `joints.py` carrying their measured number and an issue number; a waiver that
 stops failing is itself an error, so the list cannot rot.
 
+Gates 1–3 run at **both detail levels** when a run builds both (#209): the
+high-detail bake source is gated before it is renamed for the bake, because a
+defect that exists only at high density bakes its normals onto the shipped low
+mesh — the first gated high pass found a chassis tube 10 triangle pairs inside
+the brake clevis that every low-only run had been green over. A fatal names the
+detail it was measured at. Waiver staleness is the one judgment made across
+details: a waiver is stale only when it covers no failing pair at *any* detail
+the run gated, since a marginal pair can move in and out of overlap with the
+bevel density alone. Waiver figures in `joints.py` are measured at low detail
+unless the row says otherwise; the same finding may differ by a bevel at high.
+
 ## 8. Assemblies
 
 | § | assembly | section file |
