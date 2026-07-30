@@ -509,10 +509,18 @@ MASTER_BODY_DIAMETER: float = 0.032
 MASTER_BODY_LENGTH: float = 0.130
 MASTER_TOWER_DIAMETER: float = 0.028
 MASTER_TOWER_TOP_Z: float = 0.180
+#: Boxed in on both ends: forward of 0.490 the body's cap meets the steering
+#: hoop's level arm (which #201 pulled rearward for the clevis), and rearward
+#: of about 0.482 the body's tail meets the side bumper's upper-front socket
+#: riser at y 386..414. So y stays put and #201's clearance came from x: the
+#: whole package (both cylinders, bracket, upstand, distributor) went 20 mm
+#: outboard, because the pinch against the hoop was at the rear cylinder's
+#: INBOARD end -- the hoop's level arm dives away forward as |x| grows, so
+#: every millimeter outboard buys about 0.6 of clearance.
 MASTER_Y: float = 0.490
 MASTER_Z: float = 0.101
-MASTER_FRONT_X: float = -0.192
-MASTER_REAR_X: float = -0.155
+MASTER_FRONT_X: float = -0.212
+MASTER_REAR_X: float = -0.175
 """Two master cylinders on one bracket, on the kart's left at the pedal.
 
 **22 mm of bore is the one figure identical across all three homologation forms**
@@ -532,18 +540,22 @@ Art. 4.4 constrains only the **ordering**: *"The brake pedal must be placed in
 front of the master cylinder."* The pedal's plate reaches y +550 and the bodies end
 at +535, so it is satisfied by 15 mm and the fore-aft position is otherwise free.
 
-The front cylinder is the **inboard** one at -148 and the rear the outboard one at
--185. That is not arbitrary: the front circuit's line arrives from the distributor
-on the bracket's inboard upstand and the rear circuit's leaves rearward and
-outboard, so this ordering is the one where neither hose has to cross the other
-cylinder. 37 mm apart rather than spec §20.6.4's 45, because `pedal_mount_l` is a
-plate on edge at x -120..-130 and a Ø28 reservoir tower at -134 clears it by 4 mm."""
+The rear cylinder is the **inboard** one at -175 and the front the outboard one
+at -212, 37 mm apart rather than spec §20.6.4's 45. Both went 20 mm outboard with
+#201 -- the pedals moved to +-150 and the steering hoop's level arm then pinched
+against the rear cylinder's inboard end, and outboard is the direction in which
+the hoop dives away. (An earlier version of this paragraph said the *front*
+cylinder was the inboard one at -148; the constants below have said otherwise
+since before #201, and the pushrod reaches the outboard cylinder either way.)"""
 
-MASTER_BRACKET_SIZE: tuple[float, float, float] = (0.090, 0.090, 0.004)
-MASTER_BRACKET_X: float = -0.170
+#: 120 wide, was 90: the plate bolts to the tray edging at x -131 and the
+#: cylinders moved 20 mm outboard (#201), so a 90 plate could no longer span
+#: from the edging to under the front cylinder at -212. Same part, longer.
+MASTER_BRACKET_SIZE: tuple[float, float, float] = (0.120, 0.090, 0.004)
+MASTER_BRACKET_X: float = -0.190
 PEDAL_FACE_TILT: float = 0.260
-MASTER_BRACKET_UPSTAND_X: float = -0.215
-DISTRIBUTOR_X: float = -0.223
+MASTER_BRACKET_UPSTAND_X: float = -0.235
+DISTRIBUTOR_X: float = -0.243
 DISTRIBUTOR_SIZE: tuple[float, float, float] = (0.024, 0.030, 0.030)
 REGULATOR_Y: float = -0.150
 REGULATOR_X: float = -0.295
@@ -1997,11 +2009,20 @@ def _brake_lines(context: build.BuildContext, collection: bpy.types.Collection) 
             (caliper_x, caliper_y, 0.150),
         ],
         [
+            # The old route dove to z 92 and crossed the steering hoop's y band
+            # at x -150 -- fine while the brake pedal was at -85, inside the arm
+            # and the clevis once #201 moved it to -150. And there is no low
+            # road anymore: the hoop's level arm at z 89..105 and the pan
+            # edging at z 65..81 leave an 8 mm slot, so the line now crosses
+            # the hoop *high*, inboard at x -100 where the arm is furthest
+            # forward, then runs over both master bodies (tops at z 117) and
+            # outside both towers before dropping onto the distributor.
             (0.0, 0.755, crest_z),
-            (-0.060, 0.700, 0.100),
-            (-0.120, 0.640, 0.094),
-            (-0.150, 0.575, 0.092),
-            (-0.230, 0.545, 0.098),
+            (-0.060, 0.690, 0.106),
+            (-0.100, 0.600, 0.107),
+            (-0.100, 0.535, 0.108),
+            (-0.200, 0.512, 0.128),
+            (-0.230, 0.508, 0.124),
             (DISTRIBUTOR_X, MASTER_Y, MASTER_Z),
         ],
         [
@@ -2023,7 +2044,10 @@ def _brake_lines(context: build.BuildContext, collection: bpy.types.Collection) 
     # hose. It stays above the rail's tube top at z 65 and above the pan's at 69.
     rear_run = [
         (MASTER_REAR_X, MASTER_Y - 0.055, MASTER_Z),
-        (-0.140, 0.380, 0.092),
+        # -0.132, was -0.140: with the rear cylinder at -175 (#201) the first
+        # leg crossed y 400 at x -159, inside the side bumper socket's riser at
+        # -158..-186. Bending to -132 crosses at -150, 8 mm inboard of it.
+        (-0.132, 0.380, 0.092),
         (-0.170, 0.330, 0.078),
         (-0.210, 0.250, 0.077),
         (-0.245, 0.150, 0.076),

@@ -1005,9 +1005,25 @@ class KartParams:
     Replaces `pedal_width` 0.070 and `pedal_length` 0.120, which described a flat
     70 x 120 plate. **A plate is a rental-kart pedal.**"""
 
-    pedal_separation: float = 0.170
-    """Throttle to brake, so ±85. `estimated`; was 0.150, and the difference is
-    inside the estimate's own error."""
+    pedal_separation: float = 0.300
+    """Throttle to brake, center to center, so ±150. `estimated`, photogrammetric,
+    issue #201 -- measured, not guessed, and the anchors are stated:
+
+    `alessandro_giardelli_european_championship.jpg` (S3, dead-front, both boot
+    soles visible on the pedals; image-left is the kart's RIGHT per §00 §2, which
+    does not move a symmetric separation). Sole centers 413 px apart, read off
+    the Alpinestars logos and both toe edges. Two independent scales:
+    the OTK M7 front panel in the same frame, `sourced` 295 mm from form
+    012-BP-41, spans 381 px -> 320 mm; the front tire centers at the estimated
+    track (1240 - 135 = 1105 center-to-center) span 1570 px -> 291 mm. Both
+    subjects sit within 150 mm of the front axle plane in depth, so perspective
+    moves the read by under 2 percent at a telephoto distance. 300 is the middle
+    of 291..320; the sole width cross-checks at 98 mm against the boot's 96.
+
+    Caveat carried rather than hidden: the S3 kart is OK-class, not KZ -- same
+    chassis family, same pedal packaging. Was 0.150, then 0.170; both put the
+    feet against the steering column, and the photograph says the feet live
+    nearly twice as far out."""
 
     # The brake master cylinder's **22 mm** bore is `wheels.MASTER_BORE`, not a field
     # here: §Running gear already sources it off three homologation forms and it is
@@ -1553,37 +1569,60 @@ class KartParams:
     shows, and it is the sanity check on the whole chain."""
 
     driver_knee_x: float = 0.180
-    driver_knee_y: float = 0.123
-    driver_knee_z: float = 0.442
-    """Knee joint. y and z are `derived` by §60.1.4's two-link solve from the hip,
-    the ankle and the two sourced segment lengths, and close on the ankle exactly.
+    """Knee lateral. `estimated` and load-bearing: the one lateral figure in the
+    driver read off a photograph -- `exh_commons_buntschu_kz2.jpg`, a
+    three-quarter front-left action shot where the knees are splayed clearly
+    outboard of the wheel rim -- so it is a proportion against the front track,
+    not a measurement, which is why it is +-180 and not a decimal. Six of gate
+    3's first findings hang off it, and §60.1.6's rule is that a finding which
+    cannot be adjudicated against a sourced figure gets a waiver and a ticket
+    rather than a geometry change.
 
-    **`driver_knee_x` = 0.180 is `estimated` and it is load-bearing.** It is the
-    one lateral figure in the driver read off a photograph --
-    `exh_commons_buntschu_kz2.jpg`, a three-quarter front-left action shot where
-    the knees are splayed clearly outboard of the wheel rim -- so it is a
-    proportion against the front track, not a measurement, which is why it is
-    +-180 and not a decimal. Six of gate 3's first findings hang off it, and
-    §60.1.6's rule is that a finding which cannot be adjudicated against a sourced
-    figure gets a waiver and a ticket rather than a geometry change."""
+    The knee's y and z are **not fields**: `driver_knee()` solves the two-link
+    chain from the hip and the live ankle on every read. Issue #202 is why --
+    the ball of the foot was a field `sourced` from a pedal that had since been
+    re-authored 138 mm higher, and the citation stayed true as a sentence while
+    false as a number. A provenance tag records where a figure came from, not
+    whether it still agrees with it; a derivation cannot disagree."""
 
-    driver_ankle_x: float = 0.110
-    driver_ankle_y: float = 0.425
-    driver_ankle_z: float = 0.137
-    driver_heel_y: float = 0.370
-    driver_heel_z: float = 0.069
-    """Ankle joint and heel contact, `derived` in §60.1.4 from the pedal face:
-    heel 55 mm forward and 68 mm up to the ankle, ball of foot 190 mm ahead of the
-    heel. **§60.6 records that there is no floor tray under the heel** -- the tray
-    top is z 69 and the tray does not reach that station -- so the heel rests on
-    nothing and that is a real finding, not a rounding."""
+    driver_thigh_link: float = 0.428
+    driver_shank_link: float = 0.429
+    """Hip-to-knee and knee-to-ankle joint distances. `derived`, spec §60.1.2:
+    Drillis & Contini stature fractions, 0.245 x 1745 and 0.246 x 1745. They were
+    spec-only until #202 made the knee a live solve; now the solve and the spec
+    read the same numbers."""
 
-    driver_ball_x: float = 0.075
-    driver_ball_y: float = 0.560
-    driver_ball_z: float = 0.090
-    """Ball of the foot on the pedal pad. `sourced` from `pedal_y` / `pedal_z`,
-    and the lateral is `pedal_separation` 150 halved: throttle x +75 is the right
-    foot, brake x -75 the left."""
+    driver_foot_link: float = 0.191
+    """Heel contact to ball-of-foot contact, along the sole. `estimated`:
+    consistent with Drillis & Contini's foot length 0.152 x 1745 = 265 with the
+    ball at ~0.72 of it, and it is the length of the old flat-foot offset
+    (sqrt(190^2 + 21^2) = 191.2) so the boot the mesh already wears keeps its
+    size."""
+
+    driver_ankle_x: float = 0.150
+    driver_ankle_forward: float = 0.055
+    driver_ankle_rise: float = 0.068
+    """Ankle joint offset from the heel contact, **in the sole's own frame**:
+    55 mm along the sole toward the toe, 68 mm perpendicular to it. The rise is
+    `derived` -- Drillis & Contini ankle height, 0.039 x 1745 = 68 -- and the
+    55 is `estimated`. In the sole frame rather than global because the foot now
+    pitches ~54 deg to reach the bar (#202), and an unrotated offset would put
+    the ankle of a pitched foot in the wrong place by half its own size.
+
+    x is `estimated` at `pedal_separation`/2 -- the foot runs straight in plan,
+    which is what S3's dead-front soles show. The old 0.110 yawed the toes 35 mm
+    inboard, and that yaw was an artifact of the stale ball at ±75 (#201/#202),
+    not an observation. Not derived from the field because a one-piece boot may
+    yet want a deliberate splay; if #201's number moves again, move this with
+    it."""
+
+    driver_heel_plane_z: float = 0.069
+    """The plane the heel rests on: the floor tray's top face. `derived` from the
+    tray stack. **§60.6 records that there is no floor tray under the heel** --
+    the tray does not reach that station -- so the heel rests on nothing and that
+    is a real finding, not a rounding. The heel's y is **not a field**: the sole
+    is tangent to the live foot bar, so `driver_heel()` walks back from
+    `pedal_bar_y`/`pedal_bar_z` on every read. #202."""
 
     driver_upper_arm: float = 0.368
     driver_elbow_to_fist: float = 0.361
@@ -2169,6 +2208,95 @@ def pedal_bar_y(p: KartParams) -> float:
 def pedal_bar_z(p: KartParams) -> float:
     """Foot-bar height, 50 + 180 cos 8 = 228.2. `pedal_z` is this rounded."""
     return p.pedal_pivot_z + p.pedal_arm_length * math.cos(p.pedal_arm_rake)
+
+
+def driver_foot_pitch(p: KartParams) -> float:
+    """Sole angle above horizontal, radians. `derived`, spec §60.1.4 (#202).
+
+    The foot is posed by two contacts, neither of them authored: the heel rests
+    on the tray-top plane (`driver_heel_plane_z`) and the sole lies tangent to
+    the live foot bar's Ø18 cylinder. Heel-to-bar-center is then
+    `hypot(driver_foot_link, bar_radius)` -- the tangent length is exactly the
+    foot link -- and the pitch is the angle up to the bar center minus the
+    tangent's own half-angle. 53.7 deg at the built pedal, which is a driver
+    with the heel down and the toes up on an organ pedal, not a flat foot.
+    """
+    bar_radius = p.pedal_bar_diameter * 0.5
+    reach = math.hypot(p.driver_foot_link, bar_radius)
+    dz = pedal_bar_z(p) - p.driver_heel_plane_z
+    if dz >= reach:
+        raise SystemExit(
+            "params.py: the foot bar is %.1f mm above the heel plane and the "
+            "whole foot is only %.1f mm long -- the sole cannot reach it"
+            % (dz * 1000.0, reach * 1000.0)
+        )
+    return math.atan2(dz, math.sqrt(reach * reach - dz * dz)) - math.asin(
+        bar_radius / reach
+    )
+
+
+def driver_heel(p: KartParams) -> tuple[float, float, float]:
+    """Heel contact point. `derived`: on the tray-top plane, walked back from
+    the bar center so the sole's tangency works out; x is the ankle's, the foot
+    yaws about the heel toward the pedal at `pedal_separation`/2."""
+    bar_radius = p.pedal_bar_diameter * 0.5
+    reach = math.hypot(p.driver_foot_link, bar_radius)
+    dz = pedal_bar_z(p) - p.driver_heel_plane_z
+    heel_y = pedal_bar_y(p) - math.sqrt(reach * reach - dz * dz)
+    return (p.driver_ankle_x, heel_y, p.driver_heel_plane_z)
+
+
+def driver_ball(p: KartParams) -> tuple[float, float, float]:
+    """Ball-of-foot contact, ON the bar's surface rather than at its center.
+    `derived`: heel plus the foot link along the pitched sole. The lateral is
+    `pedal_separation`/2 -- throttle x + is the right foot, brake x - the left --
+    so #201 moving the pedals moves the feet with them. #202."""
+    pitch = driver_foot_pitch(p)
+    _, heel_y, heel_z = driver_heel(p)
+    return (
+        p.pedal_separation * 0.5,
+        heel_y + p.driver_foot_link * math.cos(pitch),
+        heel_z + p.driver_foot_link * math.sin(pitch),
+    )
+
+
+def driver_ankle(p: KartParams) -> tuple[float, float, float]:
+    """Ankle joint. `derived`: the (`driver_ankle_forward`, `driver_ankle_rise`)
+    offset applied in the sole's frame, rotated with the foot's pitch."""
+    pitch = driver_foot_pitch(p)
+    _, heel_y, heel_z = driver_heel(p)
+    cos_p, sin_p = math.cos(pitch), math.sin(pitch)
+    return (
+        p.driver_ankle_x,
+        heel_y + p.driver_ankle_forward * cos_p - p.driver_ankle_rise * sin_p,
+        heel_z + p.driver_ankle_forward * sin_p + p.driver_ankle_rise * cos_p,
+    )
+
+
+def driver_knee(p: KartParams) -> tuple[float, float, float]:
+    """Knee joint, the §60.1.4 two-link solve, live. `derived` from the hip, the
+    ankle and the Drillis & Contini thigh/shank links; the knee is the elbow of
+    that chain and bends up, above the hip-to-ankle line. Fatal if the chain
+    cannot close -- a pedal moved out of leg reach is a cockpit that does not
+    fit, not a knee to fudge."""
+    _, ankle_y, ankle_z = driver_ankle(p)
+    dy, dz = ankle_y - p.driver_hip_y, ankle_z - p.driver_hip_z
+    d = math.hypot(dy, dz)
+    thigh, shank = p.driver_thigh_link, p.driver_shank_link
+    if not (abs(thigh - shank) < d < thigh + shank):
+        raise SystemExit(
+            "params.py: hip-to-ankle is %.1f mm and the leg links are %.0f + "
+            "%.0f -- the two-link chain cannot close"
+            % (d * 1000.0, thigh * 1000.0, shank * 1000.0)
+        )
+    along = (thigh * thigh + d * d - shank * shank) / (2.0 * d)
+    lift = math.sqrt(thigh * thigh - along * along)
+    unit_y, unit_z = dy / d, dz / d
+    return (
+        p.driver_knee_x,
+        p.driver_hip_y + along * unit_y - lift * unit_z,
+        p.driver_hip_z + along * unit_z + lift * unit_y,
+    )
 
 
 def sprocket_pitch_radius(pitch: float, teeth: int) -> float:

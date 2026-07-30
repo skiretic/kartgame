@@ -3695,3 +3695,56 @@ against 9.5.5.1 and 4.11, which is where it already was.
 KZ running 9.5.5.2 covers. That is a `sourced` fact this project does not have, and
 the deviation is recorded precisely so that finding one is a one-line change rather
 than an archaeology exercise.
+
+---
+
+## ADR-0057 — Gate 3 clips the torso on the §60.1.1 rake plane, and the rib protector gets its own contact row
+
+**Status:** accepted, 2026-07-29. Settles the two items ADR-0055's amendment left
+open, which blocked issue #200.
+
+**Context.** ADR-0055's amendment established that gate 3's driver volume cannot be
+bare capsules — §60.1.4 publishes no fore-aft half-depth, both measuring agents
+invented one from a lateral breadth, and an unclipped capsule swallows the seat
+under either radius (84.4–99.32 mm). What the gate needs is the **clip**: of the
+three numbers taken across the upper-hose fix, only the capsule-intersected-with-
+the-half-space-forward-of-the-seat-back changed sign. Two things had to be settled
+before the gate could be written.
+
+**Decision 1 — the clip surface is the §60.1.1 rake plane, by formula.** The torso
+volume is clipped to the half-space forward of
+
+    y(z) = -365 + 0.404 * (365 - z)        # §60.1.1, tan 22°, `derived`
+
+and not to the built `seat_shell` triangles. The two disagree by up to 11.1 mm and
+not uniformly — at z 350 they are 1 mm apart, at z 300 the plane is 11.1 mm
+*rearward* of the mesh, which is the shell's molded pan-to-back transition — and
+the plane is the conservative choice there: it concedes less driver volume to the
+seat, so a part that clears gate 3 clears it against the larger driver. The plane
+is also analytic, which a gate wants: it cannot change when a bevel does. Whichever
+number gate 3 reports for a torso finding, the surface it was clipped on is this
+formula, named.
+
+**Decision 2 — `driver_rib_protector`/`seat_shell` is a declared `sits_on`
+contact, and the torso keeps its own row.** The contradiction was real: §60.1.6
+put the protector *over* the torso at z 250–450 while `DRIVER_CONTACTS` declared
+only the torso against the shell, which makes the protector's presence inside the
+shell an undeclared overlap — a gate-3 failure on day one. But the two rows are
+not redundant, because they touch in different places: the protector bears on the
+shell across its z 250–450 band, and the torso — at 25° against the shell's 22° —
+touches at the shell's **top edge**, above where the protector ends. Both contacts
+are physically real and both are declared.
+
+The torso's rear surface remains the seat's 22° chord as built (§60.1.6's own
+derivation, 0.04 mm at the shell). The honest layering — flesh-plus-overalls at
+~60 mm rear half-depth with the protector owning the outer 18 — is **surface**
+work and belongs to #17's surface half, not to this contract: re-insetting the
+torso moves no hard point and changes no contact, so the gate does not wait for
+it. Until then the protector overlaps the shell by roughly its own thickness, and
+the new contact row is what makes that overlap declared rather than waived.
+
+**What would reopen this.** A sourced torso fore-aft depth (a real seated-depth
+table read for the 50th-percentile male) would let the volume stop borrowing its
+forward half-depth from judgment; and #17's surface pass, when it re-insets the
+torso, should re-measure both contacts and delete this ADR's "until then"
+paragraph from §60.1.6.

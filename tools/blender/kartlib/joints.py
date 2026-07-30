@@ -2630,16 +2630,18 @@ DRIVER_CONTACTS: tuple[Contact, ...] = (
         a="driver_boot_l",
         b="pedal_brake_pad",
         kind="presses",
-        why="the brake is the left foot at x -75, which is `pedal_separation` 150 "
-        "halved. Named per side rather than globbed because a mirrored pedal "
-        "assignment is exactly the bug a glob would hide",
+        why="the brake is the left foot, at -`pedal_separation`/2 because #202 "
+        "made the ball of the foot a derivation off the live pedal rather than a "
+        "field that could drift 140.8 mm from it. Named per side rather than "
+        "globbed because a mirrored pedal assignment is exactly the bug a glob "
+        "would hide",
     ),
     Contact(
         a="driver_boot_r",
         b="pedal_throttle_pad",
         kind="presses",
-        why="the throttle is the right foot at x +75, the other half of the same "
-        "pair",
+        why="the throttle is the right foot at +`pedal_separation`/2, the other "
+        "half of the same pair",
     ),
 )
 
@@ -2725,18 +2727,11 @@ OPEN_DEFECTS: tuple[Defect, ...] = (
     # Every entry below was measured on the built mesh after §30 and §40 landed, and
     # each names the pair that has to move rather than the one that did. They are
     # waivers and not declarations because none of them is a joint.
-    Defect(
-        a="bodywork_front_panel",
-        b="pedal_*_pad",
-        gate="overlap",
-        measured=27,
-        issue="#190",
-        why="the front panel hangs to `front_panel_bottom_z` 190 and §40.5 raised the pedal "
-        "face from z 90 to **228** -- 138 mm of correction, because 90 put the sole "
-        "21 mm above the floor tray. The panel and the pads now occupy the same z "
-        "band. Art. 9.5.3 fixes the panel between the fairing and the top-of-wheel "
-        "plane, so it is the panel's lower edge that has to come up; §Bodywork owns it",
-    ),
+    # Two #190 waivers deleted here by #201, and by accident rather than by aim:
+    # `bodywork_front_panel`/`pedal_*_pad` (was 27 pairs) and
+    # `chassis_floor_tray`/`pedal_*` (was 72) both cleared when the pedals moved
+    # from x +-85 to +-150 -- outboard of the panel's edge and of the tray's y
+    # band at that x. The stale-waiver check is what noticed.
     Defect(
         a="bodywork_front_panel_bar",
         b="steering_bearing_upper",
@@ -2938,23 +2933,6 @@ OPEN_DEFECTS: tuple[Defect, ...] = (
         why="the right rear socket post against the starter. The two clear "
         "windows on this rail are y > +240 and y < -345, and a 500 mm pitch does "
         "not fit between them",
-    ),
-    Defect(
-        a="chassis_floor_tray",
-        b="pedal_*",
-        gate="overlap",
-        measured=72,
-        issue="#190",
-        why="Art. 4.6 puts the floor tray *"
-        "from the central strut to the front of "
-        "the chassis frame"
-        "*, i.e. y +40..+760 -- so it is now under the pedals "
-        "instead of under the engine, and both pedal plates and both pads pass "
-        "through it. §40.5 saw this coming and says so: a pivot at z +50 is "
-        "19..44 mm **below** the pan's top surface, and Art. 4.6 forbids ribs and "
-        "wants a single element, so the pan cannot simply be notched. It "
-        "respecifies the pedal box at `pedal_z` 228 on a new `chassis_cross_pedal` "
-        "at y +610, which puts the pads above the pan. §Cockpit owns it",
     ),
     # -- gate 2: declared joints that do not touch ---------------------------
     Defect(

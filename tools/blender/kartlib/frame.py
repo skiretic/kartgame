@@ -456,7 +456,15 @@ def _steering_support_lower(
     # cross it -- measured, 84 intersecting triangle pairs. At bore height the arm
     # passes 8 mm above it.
     mid_x = foot_x * 0.85
-    mid_y = bore_y + (foot_y - bore_y) * 0.65
+    # 0.59, was 0.65. #201 moved the brake pedal to x -150 and its clevis's
+    # front face to y 581.7 (measured off the build), and at 0.65 the level
+    # arm passed through it. The arm cannot also clear the rear brake master's
+    # cap by blend alone -- the corridor between cap and clevis is narrower
+    # than the tube once fillets are counted, measured at both 0.58 and 0.61
+    # -- so the masters moved 20 mm outboard instead (wheels.py MASTER_*_X)
+    # and this blend only settles the clevis side: front face of the arm at
+    # x -165 comes to ~578 against the clevis at 581.7.
+    mid_y = bore_y + (foot_y - bore_y) * 0.59
     mid_z = bore_z
     _tube(
         context,

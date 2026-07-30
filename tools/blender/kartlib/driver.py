@@ -49,12 +49,14 @@ What is honest rather than pretty
 ---------------------------------
 
 The arms are built at whatever elbow angle actually closes and the legs are built
-where `params.py` puts them. `driver_ball_z` is 0.090 and the live foot bar is at
-`P.pedal_bar_z` = 0.228 — 138 mm apart — because that field's docstring sources it
-from a `pedal_y`/`pedal_z` pair that no longer exists at those values. This module
-does not quietly move a sourced endpoint to make a render look better: it builds
-the driver the parameter block describes and prints the divergence as a number on
-every run. Same rule as the locked-straight-arm case §60.1.6 argues for.
+where `params.py` puts them. The foot chain is no longer a place where those two
+things can differ: `driver_ball_z` was a field reading 0.090 while the live foot
+bar sat at `P.pedal_bar_z` = 0.228 — 138 mm apart, a citation still true as a
+sentence and false as a number — and #202 replaced the fields with
+`P.driver_heel/ball/ankle/knee`, solved off the live pedal on every read. This
+module still does not quietly move a sourced endpoint to make a render look
+better; the change is that the endpoint now cannot be stale. Same rule as the
+locked-straight-arm case §60.1.6 argues for.
 
 Coordinates: +X kart right, +Y forward, +Z up; origin on the ground at
 mid-wheelbase. Built on the right and mirrored, because authoring both halves is
@@ -666,37 +668,32 @@ def _mirror(
 def _report_divergence(p: P.KartParams) -> None:
     """Print where the driver block and the live cockpit disagree, in millimeters.
 
-    Both `presses` contacts and the whole reach are joins between two parameter
-    blocks that were authored in different waves, and §60.1.6's rule is that a
-    finding which cannot be adjudicated against a sourced figure gets a waiver and
-    a ticket rather than a geometry change. This is the waiver's measurement, taken
-    on every build so it cannot rot: the moment somebody corrects either side, the
-    line goes quiet.
+    The reach is a join between two parameter blocks that were authored in
+    different waves, and §60.1.6's rule is that a finding which cannot be
+    adjudicated against a sourced figure gets a waiver and a ticket rather than a
+    geometry change. This is the waiver's measurement, taken on every build so it
+    cannot rot: the moment somebody corrects either side, the line goes quiet.
 
-    `driver_ball_*`'s docstring calls itself `sourced` from `pedal_y` / `pedal_z`.
-    Those fields are gone: the pedal box was re-authored as an organ pedal on a
-    bottom pivot, `pedal_z` is now the *derived* foot-bar height 0.228, and
-    `pedal_separation` moved 150 -> 170. So the boots are built where the driver
-    block says and the pedals are 138 mm above them.
+    The foot no longer appears here. It was this function's other line -- 140.8 mm
+    from `driver_ball_*` to the live bar, #202 -- and the fix was not to close the
+    number but to delete the field: `P.driver_ball` is solved off the live pedal,
+    so the sole's tangency is true by construction. What is still worth printing
+    is the pose that solve actually lands on, because a pitch that walks toward
+    vertical is a pedal drifting out of the foot's reach and the fatal check in
+    `P.driver_foot_pitch` fires only at the absurd end of that walk.
     """
-    bar_y = P.pedal_bar_y(p)
-    bar_z = P.pedal_bar_z(p)
-    bar_x = p.pedal_separation * 0.5
-    ball_gap = math.dist(
-        (p.driver_ball_x, p.driver_ball_y, p.driver_ball_z), (bar_x, bar_y, bar_z)
+    ball = Vector(P.driver_ball(p))
+    bar_center = Vector(
+        (p.pedal_separation * 0.5, P.pedal_bar_y(p), P.pedal_bar_z(p))
     )
-    if ball_gap > 0.002:
-        print(
-            "    driver   warning: driver_ball_* is %.1f mm from the live foot bar "
-            "(dx %+.1f, dy %+.1f, dz %+.1f) -- both `presses` contacts fail by "
-            "that much; #17 report"
-            % (
-                ball_gap * 1000.0,
-                (p.driver_ball_x - bar_x) * 1000.0,
-                (p.driver_ball_y - bar_y) * 1000.0,
-                (p.driver_ball_z - bar_z) * 1000.0,
-            )
+    print(
+        "    driver   foot pitch %.1f deg; ball of foot %.2f mm off the bar "
+        "surface (0 is tangent)"
+        % (
+            math.degrees(P.driver_foot_pitch(p)),
+            ((ball - bar_center).length - p.pedal_bar_diameter * 0.5) * 1000.0,
         )
+    )
 
     # The reach, against the rim the cockpit actually builds rather than §60.2.1's
     # tabulated one. This one is *good* news and is printed for the same reason.
@@ -1456,10 +1453,10 @@ def _legs(
     steps = max(1, detail.bend_segments // 2)
 
     hip = Vector((p.driver_hip_x, p.driver_hip_y, p.driver_hip_z))
-    knee = Vector((p.driver_knee_x, p.driver_knee_y, p.driver_knee_z))
-    ankle = Vector((p.driver_ankle_x, p.driver_ankle_y, p.driver_ankle_z))
-    heel = Vector((p.driver_ankle_x, p.driver_heel_y, p.driver_heel_z))
-    ball = Vector((p.driver_ball_x, p.driver_ball_y, p.driver_ball_z))
+    knee = Vector(P.driver_knee(p))
+    ankle = Vector(P.driver_ankle(p))
+    heel = Vector(P.driver_heel(p))
+    ball = Vector(P.driver_ball(p))
 
     # Thigh. The hip end is `derived`: two thighs fill `driver_hip_breadth`.
     thigh_root = p.driver_hip_breadth * 0.5
@@ -1505,8 +1502,8 @@ def _legs(
     for side, label in ((+1.0, "r"), (-1.0, "l")):
         for name, position in (
             ("hip", Vector((side * p.driver_hip_x, p.driver_hip_y, p.driver_hip_z))),
-            ("knee", Vector((side * p.driver_knee_x, p.driver_knee_y, p.driver_knee_z))),
-            ("ankle", Vector((side * p.driver_ankle_x, p.driver_ankle_y, p.driver_ankle_z))),
+            ("knee", Vector((side * knee.x, knee.y, knee.z))),
+            ("ankle", Vector((side * ankle.x, ankle.y, ankle.z))),
         ):
             pivot = build.empty(
                 "driver_%s_%s" % (name, label),

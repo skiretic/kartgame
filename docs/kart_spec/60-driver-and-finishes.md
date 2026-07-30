@@ -99,11 +99,15 @@ So: **hip joint at (±85, −170, 130).**
 
 **And it is corroborated.** The §40 Cockpit agent measured hip-to-pedal-face at
 **735 mm** from a completely different direction. This spec's hip and
-`params.py`'s pedal give
+`params.py`'s pedal — *as both stood then* — gave
 
     sqrt((560 + 170)^2 + (90 - 130)^2) = sqrt(730^2 + 40^2) = 731.1 mm
 
-which agrees to **4 mm, 0.5%**. Two chains, one answer; the hip is solid.
+which agrees to **4 mm, 0.5%**. Two chains, one answer; the hip is solid. (The
+pedal has since been re-authored and #202 moved the ball of the foot with it —
+hip to the live ball is now 767.7 mm. Both 735 and 731.1 were reads of the *old*
+pedal face, so the corroboration stands as evidence about the hip, which did not
+move; neither figure is a current pedal measurement.)
 
 ### 60.1.4 The hard points
 
@@ -120,10 +124,39 @@ table's sitting heights minus the 95 mm hip rise.
 | vertex, bare head | 0 | −496 | 829 | `derived` | 866−95 = 771 along torso |
 | helmet center | 0 | **−454** | **738** | `derived` | 100 mm below the vertex along the head axis |
 | helmet crown, outer | 0 | −511 | **860** | `derived` | vertex + 35 mm of liner and shell |
-| knee joint | ±180 | **+123** | **442** | `derived` | two-link solve, below |
-| ankle joint | ±110 | +425 | 137 | `derived` | heel + 55 forward + 68 up |
-| heel contact | ±110 | +370 | **69** | `derived` | ball of foot 190 back; tray top is z 69 — **see §60.6, there is no tray there** |
-| ball of foot / pedal contact | ±75 | +560 | +90 | `sourced` (`pedal_y`, `pedal_z`) | throttle x +75, brake x −75 from `pedal_separation` 150 |
+| knee joint | ±180 | **+131.7** | **433.5** | `derived` | two-link solve, below |
+| ankle joint | ±150 | +456.8 | 153.6 | `derived` | heel + (55, 68) rotated with the sole; lateral moved with #201, the foot runs straight in plan |
+| heel contact | ±150 | +479.0 | **69** | `derived` | walked back from the bar so the sole's tangency closes; tray top is z 69 — **see §60.6, there is no tray there** |
+| ball of foot / pedal contact | ±150 | +592.1 | +222.9 | `derived` (`P.driver_ball`) | on the bar's Ø18 **surface**; lateral is `pedal_separation`/2 (#201's measured 300) — throttle x +150 right foot, brake x −150 left |
+
+**The whole foot chain is a live derivation since #202, not a set of fields.**
+The old table had the ball at (±75, 560, 90), tagged `sourced` from `pedal_y` /
+`pedal_z` — and those fields had since been re-authored 138 mm higher, so the
+citation stayed true as a sentence while false as a number, both `presses`
+contacts failed by 54.8 mm, and 24 of gate 3's first 64 findings were boots in
+the pedal linkage. A provenance tag records where a figure came from, not
+whether it still agrees with it. `P.driver_heel/ball/ankle/knee` now solve off
+`pedal_bar_y` / `pedal_bar_z` / `pedal_separation` on every read, so the numbers
+in this table are the solve's output, printed for reading rather than authored.
+
+The foot's pose, `derived`, `P.driver_foot_pitch`: heel on the tray-top plane
+z 69, sole tangent to the foot bar's Ø18 cylinder, heel-to-ball 191 along the
+sole (`driver_foot_link`, `estimated` — consistent with Drillis & Contini's
+foot 0.152 × 1745 = 265 with the ball at ~0.72 of it, and it is the old flat
+offset's length, √(190² + 21²) = 191.2).
+
+    bar center (584.9, 228.2);  r = 9;  heel plane z 69
+    heel-to-bar-center = √(191² + 9²) = 191.2
+    heel_y  = 584.9 − √(191.2² − 159.2²) = 584.9 − 105.9 = 479.0
+    pitch   = atan2(159.2, 105.9) − asin(9/191.2) = 56.4° − 2.7° = **53.7°**
+    ball    = heel + 191·(cos, sin) = (592.1, 222.9)   — on the bar surface
+    ankle   = heel + 55·(cos, sin) + 68·(−sin, cos) = (456.8, 153.6)
+
+A 53.7° pitch is a driver with the heel down and the toes up on an organ pedal.
+The ankle offset (55 along the sole, 68 perpendicular — the 68 is Drillis &
+Contini ankle height, 0.039 × 1745) rotates with the foot; the old table applied
+it unrotated, which was tolerable at the flat foot's 6.3° and would be wrong by
+half the offset's own size at 53.7°.
 
 Overall seated height, helmeted: **860 mm** above the asphalt. `derived`. That is
 210 mm above Art. 9.1.1's 650 mm chassis ceiling, which is what every photograph
@@ -133,11 +166,12 @@ Shoulder span: `driver_shoulder_span = 400` is **biacromial breadth and is
 correct**; the 455 bideltoid is the flesh, 27 mm wider per side. Both are wanted —
 400 places the joints for the reach solve, 455 sizes the mesh.
 
-Knee, two-link solve. Hip (−170, 130) to ankle (425, 137), d = 595.0.
+Knee, two-link solve (`P.driver_knee`, live). Hip (−170, 130) to ankle
+(456.8, 153.6), d = 627.3.
 
-    a = (428^2 + 595^2 - 429^2) / (2 x 595) = 353168 / 1190 = 296.8
-    h = sqrt(428^2 - 296.8^2) = sqrt(95094)              = 308.4
-    knee = hip + 296.8 * along + 308.4 * perpendicular   = (123.2, 441.9)
+    a = (428^2 + 627.3^2 - 429^2) / (2 x 627.3) = 392591 / 1254.5 = 312.9
+    h = sqrt(428^2 - 312.9^2) = sqrt(85278)                       = 292.0
+    knee = hip + 312.9 * along + 292.0 * perpendicular = (131.7, 433.5)
 
 Knee lateral **±180**, `estimated` from `exh_commons_buntschu_kz2.jpg`: the driver's
 knees are splayed clearly *outboard* of the steering wheel rim with the front panel
@@ -170,7 +204,7 @@ Art. 7 preamble, verbatim, PDF p. 19:
 | helmet | 7 preamble + **7.1** | 19 | *"homologated full-face helmet"*; Snell-FIA / FIA 8859-2024 / 8860-2018 families; for under-15s *"the weight of the helmet must not exceed 1,500g including paint, visor and all accessories"*. *"Helmets must have an efficient and unbreakable visor for the eye opening."* | full-face shell + visor aperture. Outer 250 wide × **340 long** × 300 tall; center (0, −454, 738). `driver_helmet_radius = 125` is right laterally and 90 mm short fore-aft — a helmet is an ellipsoid, not a sphere. Visor aperture centered on the eye point (±32, −462, 757), ~95 mm tall × 200 wide, `estimated`. |
 | overalls | **7.2** | 19–20 | *"Fabric overalls must have either: i) a «Level 2» CIK-FIA homologation … or ii) be Grade 1 or Grade 2 Karting Overalls complying with FIA Standard 8877-2022."* Karting overalls to 8877-2022 *"are mandatory from 01.01.2030"* | a single close-fitting layer over the whole body, collar to wrist to ankle. 6–8 mm of thickness over the torso, `estimated`. |
 | gloves | **7.3** | 20 | *"Gloves must completely cover the hands and wrists or must comply with FIA Standard 8877-2022."* 8877-2022 mandatory for FIA Championships and anything on the International Sporting Calendar. | hands + wrists covered; the cuff overlaps the sleeve. Grip axis at the wheel rim. |
-| boots | **7.4 Shoes** | 20 | *"Shoes must cover the feet and protect the ankles or must comply with FIA Standard 8877-2022."* | above-ankle boot; sole contacts the pedal at the ball of the foot, (±75, 560, 90). |
+| boots | **7.4 Shoes** | 20 | *"Shoes must cover the feet and protect the ankles or must comply with FIA Standard 8877-2022."* | above-ankle boot; sole contacts the pedal at the ball of the foot, (±150, 592.1, 222.9) — §60.1.4's live solve. |
 | rib protector | **7.5 Karting body protection** | 20 | *"The use of karting body protection complying with FIA Standard 8870-2018, and of the correct size in relation to the driver's height - or up to one size lower - will be mandatory …"* | a rigid shell over the ribs, front and back, roughly z 250–450 in the torso frame. Adds 12–18 mm per side over the overalls and is the reason a driver fills a 325 mm hip / 360 mm shoulder seat. `estimated`. |
 | neck brace | **none** | — | **The 2026 TR does not require one.** No neck collar, brace or support appears anywhere in Art. 7, and the preamble's ban on *"a scarf, muff, or any loose clothes around the neck"* points the other way. Art. 7.1's note that *"the M6 anchorages cannot be used in karting for safety reasons"* explicitly rules out FHR/HANS. `exh_commons_buntschu_kz2.jpg` shows a KZ2 driver mid-corner with no collar. | not modeled. If one is wanted it is a styling choice and must not be labeled as a regulation. |
 
@@ -229,9 +263,9 @@ carries reasoning on every one it has to estimate.
 | `driver_upper_arm_l` / `_r` | shoulder → elbow | (±200, −393, 608) → elbow, arm 368 | `overalls_fabric` |
 | `driver_forearm_l` / `_r` | elbow → fist center | elbow → grip, elbow-to-fist 361 | `overalls_fabric` |
 | `driver_glove_l` / `_r` | fist at the rim, cuff overlapping the sleeve | on the rim, §60.2.1 | `glove_leather` |
-| `driver_thigh_l` / `_r` | hip → knee | (±85, −170, 130) → (±180, +123, 442) | `overalls_fabric` |
-| `driver_shank_l` / `_r` | knee → ankle | (±180, +123, 442) → (±110, +425, 137) | `overalls_fabric` |
-| `driver_boot_l` / `_r` | ankle → ball of foot, above-ankle | (±110, +425, 137) → (±75, +560, 90) | `boot_leather` |
+| `driver_thigh_l` / `_r` | hip → knee | (±85, −170, 130) → (±180, +131.7, 433.5) | `overalls_fabric` |
+| `driver_shank_l` / `_r` | knee → ankle | (±180, +131.7, 433.5) → (±150, +456.8, 153.6) | `overalls_fabric` |
+| `driver_boot_l` / `_r` | ankle → ball of foot, above-ankle | (±150, +456.8, 153.6) → (±150, +592.1, 222.9) | `boot_leather` |
 
 The elbow is **not** a hard point in §60.1.4 and must not be invented as one. It
 is the solution of the two-link reach with the upper arm 368 and elbow-to-fist
@@ -268,9 +302,10 @@ own three-word vocabulary:
 | `driver_pelvis` | `seat_shell` | `sits_on` | the H-point is 95 mm above the pan; this pair is where 78 kg enters the chassis |
 | `driver_torso` | `seat_shell` | `sits_on` | the back bears on the shell at the 22° rake §60.1.1 sources |
 | `driver_thigh_l` / `_r` | `seat_shell` | `sits_on` | the pan's front lip at y −50 carries the thighs |
+| `driver_rib_protector` | `seat_shell` | `sits_on` | ADR-0057: the protector is worn *between* torso and shell over z 250–450, so it — not the torso — is what bears on the shell there. The torso's own row is the contact at the shell's **top edge**, above the protector's band, where the 25° torso leaves the 22° shell. Until #17's surface pass re-insets the torso by the protector's thickness, the protector overlaps the shell by roughly its own 12–18 mm; this row is what makes that overlap declared rather than waived. |
 | `driver_glove_l` / `_r` | `steering_rim` | `grips` | §60.2.1's rim, straight-ahead |
-| `driver_boot_l` | `pedal_brake_pad` | `presses` | brake is the left foot, x −75 per `pedal_separation` |
-| `driver_boot_r` | `pedal_throttle_pad` | `presses` | throttle is the right foot, x +75 |
+| `driver_boot_l` | `pedal_brake_pad` | `presses` | brake is the left foot, x −150 per `pedal_separation` (#201) |
+| `driver_boot_r` | `pedal_throttle_pad` | `presses` | throttle is the right foot, x +150 |
 
 **The gear lever is deliberately absent from that table.** A KZ is shifted with the
 right hand off the wheel, so `shifter_lever` is a *momentary* contact and a
@@ -300,6 +335,15 @@ reports it on every save.
   depth in millimeters** and an issue number, and an entry that no longer fails is
   fatal. The waiver list is seeded so the gate is green on its first run and every
   later fix is a waiver deleted.
+- **The gate tests mesh against mesh, and the torso's rear boundary is the
+  §60.1.1 rake plane, not the shell's triangles.** ADR-0057, settling ADR-0055's
+  amendment: §60.1.4 publishes no torso fore-aft half-depth, an unclipped capsule
+  swallows the seat under any radius yet invented (84.4–99.32 mm), and the one
+  number that changed sign across the upper-hose fix was the **clipped** one. So
+  any torso-region depth gate 3 reports is measured on the driver volume
+  intersected with the half-space forward of `y(z) = −365 + 0.404·(365 − z)` —
+  the plane and the built shell disagree by up to 11.1 mm at the pan transition,
+  the plane is the conservative side, and it cannot move when a bevel does.
 
 **A finding that cannot be adjudicated against a sourced figure gets a waiver and
 a ticket, not a geometry change.** The knee splay of ±180 is `estimated` off one
@@ -535,6 +579,8 @@ intersecting pairs across 34 distinct kart parts**, none of them fixed here:
 §60.1.6's rule is that a finding which cannot be adjudicated against a sourced
 figure gets a waiver and a ticket, and the leg path hangs off `driver_knee_x` = ±180
 and `driver_ball_z` = 0.090, one `estimated` off a photograph and one stale.
+(#202 has since deleted the stale half: the ball is `P.driver_ball`, solved off
+the live pedal, and the leg rows below are due their re-measure.)
 
 Grouped by cause, because thirty-four parts is not thirty-four problems:
 
@@ -618,11 +664,13 @@ That is a **130 mm move rearward** and it is the dominant error. But it cannot b
 made alone, and this is the interesting part:
 
 - **At the current 320 the knees are clear.** The rim's rearmost point is
-  y = 177.3 and the knee joint is at y = +123, so the wheel is entirely ahead of
-  the knees with 54 mm to spare. No conflict, and no reach either.
-- **At 190 the rim's lower arc runs through the knee sweep.** At the knee's y = 123
-  the rim passes `x = ±141, z = 446`; the knee joint is at `(±180, 123, 442)`, so
-  the rim's lower arc lies **39 mm inboard of the knee joint and 4 mm above it**.
+  y = 177.3 and the knee joint is at y = +131.7 (#202 moved it 8.7 forward), so
+  the wheel is entirely ahead of the knees with 45.6 mm to spare. No conflict,
+  and no reach either.
+- **At 190 the rim's lower arc runs through the knee sweep.** At the knee's
+  y = 131.7 the rim passes `x = ±146, z = 450`; the knee joint is at
+  `(±180, 131.7, 433.5)`, so the rim's lower arc lies **34 mm inboard of the knee
+  joint and 17 mm above it**.
   It works only because the knees straddle the column — which is precisely what
   `exh_commons_buntschu_kz2.jpg` shows, and precisely why that ±180 is the number
   the geometry is most sensitive to and the least well sourced.
@@ -642,11 +690,11 @@ parameter edit. It is also the wrong reach *before* the arm segments are correct
 
 ### 60.2.4 The pedals — these close, comfortably
 
-Hip (−170, 130) to the ankle at (425, 137): **595.0 mm** required.
+Hip (−170, 130) to the ankle at (456.8, 153.6): **627.3 mm** required.
 Available thigh + shank: 428 + 429 = **857 mm**.
 
-    slack             = 857 - 595 = 262 mm
-    leg extension     = 595 / 857 = 69%
+    slack             = 857 - 627 = 230 mm
+    leg extension     = 627 / 857 = 73%
 
 **The pedals reach with 262 mm to spare.** If anything they are *close*: 69% is a
 deeply folded leg, and a driving-position convention of 80–85% extension would put
@@ -743,6 +791,18 @@ heel and knee arithmetic. It is not made here because `params.py` is single-owne
 the driver block is §60.1.4's, not #17's. `driver.py` prints the divergence in
 millimeters on **every build** so the waiver cannot rot.
 
+**Resolved, #202 — and by deletion rather than by closing the number.** The
+`driver_ball_*` / `driver_ankle_*` / `driver_heel_*` / `driver_knee_y/z` fields
+are gone from `params.py`; `P.driver_heel/ball/ankle/knee` solve the whole chain
+off `pedal_bar_y` / `pedal_bar_z` / `pedal_separation` on every read (§60.1.4 has
+the arithmetic), so the citation-true-but-number-false failure has no field left
+to live in. Re-measured off the built mesh: `driver_boot_l`/`pedal_brake_pad`
+and `driver_boot_r`/`pedal_throttle_pad` each at **0.20 mm** (was 56.84), the
+residual being mesh discretization of an exact sole-to-bar tangency — both
+`presses` contacts in contact within `CONTACT_TOLERANCE` 2.0. The divergence
+print is replaced by a pose print: foot pitch 53.7°, ball 0.00 mm off the bar
+surface.
+
 ---
 
 ## 60.3 Finishes, per part group
@@ -803,7 +863,7 @@ brighter than any metal on the kart and reading as a *coating*, not as aluminum.
 | roughness | **0.85** | `estimated` from the granular texture; `tray_aluminium`'s 0.58 is a metal's number |
 | metalness | **0.0** | it is a coating over aluminum, and it does not read as metal |
 | decoration | a printed decal zone, chassis-brand and pinstripes; see §60.5 | `sourced`, p01 |
-| wear | heel scuffs wearing the grain smooth in two ovals, plus chain-oil fling along the right-hand edge | `estimated`, **and see §60.6 — on this kart the heels land 190 mm ahead of the tray's front edge, so this wear cannot happen where it should** |
+| wear | heel scuffs wearing the grain smooth in two ovals, plus chain-oil fling along the right-hand edge | `estimated`, **and see §60.6 — on this kart the heels land 299 mm ahead of the tray's front edge (#202), so this wear cannot happen where it should** |
 
 `tray_aluminium`'s comment argues the value down because a bright metal slab
 "swamps the frame it is bolted to". That instinct was right and the diagnosis was
@@ -1326,8 +1386,11 @@ point to use.
 **5. `params.py`: the floor tray stops 190 mm behind the driver's heels.**
 
     tray_front_y = 0.180   tray_length = 0.760   ->  tray spans y -580 .. +180
-    heel contact        y = +370         190 mm ahead of the tray's front edge
-    pedal face          y = +560         380 mm ahead of the tray's front edge
+    heel contact        y = +479         299 mm ahead of the tray's front edge
+    foot bar            y = +585         405 mm ahead of the tray's front edge
+
+(Written at heel y +370 against the old pedal face at +560; #202's live solve
+moved both and the gap *grew*. The finding is the same, only worse.)
 
 There is no floor under the driver's feet, which is why §60.3.2's heel-scuff wear
 cannot be placed on this kart and why the heel's `z = 69` is a hypothetical. A real

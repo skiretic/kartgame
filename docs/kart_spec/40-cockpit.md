@@ -719,11 +719,11 @@ at y ≥ +875; the foot bar reaches y ≈ +635 at full travel, so **240 mm clear
 
 | dimension | field | value | prov | basis |
 | --- | --- | --- | --- | --- |
-| pivot, throttle / brake | `pedal_pivot` | (+85, +610, +50) / (-85, +610, +50), axis along X | `estimated` | throttle right, brake left (`sourced`, Art. 4.4 names only the two). y from the pedal-to-seat relationship below; z just under the frame's front tube, which is where 0014.D3's plate hangs its eye. |
-| separation | `pedal_separation` | 170 | `estimated` | ±85. Was 0.150; the difference is inside the estimate's own error and is not worth defending on its own. |
+| pivot, throttle / brake | `pedal_pivot` | (+150, +610, +50) / (-150, +610, +50), axis along X | `estimated` | throttle right, brake left (`sourced`, Art. 4.4 names only the two). y from the pedal-to-seat relationship below; z just under the frame's front tube, which is where 0014.D3's plate hangs its eye. |
+| separation | `pedal_separation` | **300** | `estimated` | ±150, photogrammetric, issue #201: sole centers on S3's dead-front frame, 413 px, against two anchors — the sourced OTK M7 front panel (295 mm → 320) and the front tire centers (1105 mm → 291). 300 is the middle. Was 0.170 and before that 0.150, both of which put the feet against the steering column. |
 | arm length, pivot to bar centre | `pedal_arm_length` | 180 | `estimated` | the part photo's proportions are self-consistent at this scale: the foot bar reads 0.44 of the arm's height, i.e. ~80 mm, which is one boot. At 145 mm the bar would be 64 mm — too narrow for a boot — and at 210 it would be 92. |
 | arm rake, rearward from vertical | `pedal_arm_rake` | 0.140 rad (8°) | `estimated` | puts the bar 25 mm behind the pivot so the sole meets it square with the leg raised. |
-| **foot bar centre** | derived | (±85, **+585**, **+228**) | `derived` | y = 610 - 180 sin 8° = 585.0; z = 50 + 180 cos 8° = **228.2**. `notes_controls` states 220 for this; 220 - 50 = 170 = 180 cos 19.2°, which contradicts its own 8° rake. 228 is what the note's own inputs give. |
+| **foot bar centre** | derived | (±150, **+585**, **+228**) | `derived` | y = 610 - 180 sin 8° = 585.0; z = 50 + 180 cos 8° = **228.2**. `notes_controls` states 220 for this; 220 - 50 = 170 = 180 cos 19.2°, which contradicts its own 8° rake. 228 is what the note's own inputs give. |
 | **`pedal_z`, corrected** | `pedal_z` | 0.228 | `derived` | **was 0.090** — 21 mm above the floor tray, which is a foot resting on the floor and not a pedal. 138 mm of error. |
 | arm section | — | 22 x 8 at the pivot boss tapering to 16 x 6 | `estimated` | forged-arm proportions off 0014.DC. |
 | brake pushrod clevis, height above the pivot | — | 56 | `derived` | the slotted plate's centre reads 160 px above the pivot bush on a 510 px pivot-to-bar span: 160/510 x 180. Absolute (-85, +602, +105). |
@@ -758,8 +758,8 @@ manufacturer — so the mounts are part of the chassis product, not a bolt-on.
 
 | dimension | field | value | prov | basis |
 | --- | --- | --- | --- | --- |
-| cross tube | `PEDAL_TUBE_DIAMETER` | Ø16, x -140…+140 at (y +610, z +50) | `estimated` | the pivot shaft both pedals swing on. Diameter unpublished. |
-| mount plates | `PEDAL_MOUNT_X` | x ±125 | `derived` | outboard of both pedals (±85) and inboard of the tube's ends (±140), so the arms swing free. |
+| cross tube | `PEDAL_TUBE_DIAMETER` | Ø16, x -186…+186 at (y +610, z +50) | `estimated` | the pivot shaft both pedals swing on. Diameter unpublished. Span follows #201's pedals at ±150; 186 rather than more because the steering hoop's dive crosses this y-z plane at x 190. |
+| mount plates | `PEDAL_MOUNT_X` | x ±180 | `derived` | outboard of both pedals (±150, #201) and inboard of the tube's ends (±186), so the arms swing free. |
 | plate shape | — | bore for the frame tube at the top, pivot eye 25 mm below | `sourced` (shape) | 0014.D3. |
 
 **Demand on §Chassis, and one unresolved conflict.** The pedal mounts currently
@@ -818,7 +818,7 @@ rather than left in prose.
 | --- | --- | --- | --- |
 | seat pan front lip | y +30 | `derived` | §40.3. `notes_controls` assumes y ≈ +90 for this from `seat_y = -0.060`; the corrected seat puts it 60 mm further back, which lengthens every reach below rather than shortening it. |
 | lip to foot bar | 555 | `derived` | 585 - 30. |
-| **hip point to foot bar** | **836** | `derived` | hip (0, -230, +36) to bar (±85, +585, +228): sqrt(815² + 192²). |
+| **hip point to foot bar** | **836** | `derived` | hip (0, -230, +36) to bar (±150, +585, +228): sqrt(815² + 192²), the y-z planar figure; the lateral is #201's and does not enter it. |
 | adjustment available on a real kart | 180 mm in ten holes | `sourced` | IPK/Praga "Driver position set-up": adjustable pedalboard, "18 cm" of foot movement over ten positions. So 836 sits in a band from about 660 to 1010 and is not at either end. |
 
 **This is the number `cockpit.py`'s own docstring says it cannot fix.** Criterion
@@ -990,7 +990,7 @@ tolerance, not by a nudge.
     pedal_arm_length    = 0.180                 # new
     pedal_arm_rake      = 0.140                 # new
     pedal_z             = 0.228                 # was 0.090, derived not authored
-    pedal_separation    = 0.170                 # was 0.150
+    pedal_separation    = 0.300                 # was 0.170, then #201 measured it
     pedal_bar_diameter  = 0.018                 # replaces pedal_width 0.070
     pedal_bar_length    = 0.080                 # replaces pedal_length 0.120
 

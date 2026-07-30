@@ -425,9 +425,13 @@ PEDAL_ARM_TIP_SECTION = (0.016, 0.006)
 PEDAL_CLEVIS_RISE = 0.056
 
 #: Pedal pivot cross tube: diameter and half-length, and where its mounting plates
-#: sit laterally. The plates are outboard of both pedals (±85) and inboard of the
-#: tube's ends (±140) so the arms swing free; `PEDAL_MOUNT_BORE_X` is where the
-#: plate's bore has to straddle the frame to touch it at 0 mm.
+#: sit laterally. The plates are outboard of both pedals (±150 since #201 measured
+#: the separation off S3's boot soles) and inboard of the tube's ends (±186) so
+#: the arms swing free; `PEDAL_MOUNT_BORE_X` is where the plate's bore has to
+#: straddle the frame to touch it at 0 mm. The 186 is not slack: the steering
+#: hoop's dive segment crosses the tube's y-z plane at x 190 with under 1 mm to
+#: spare, and at 185 the clearance is 8 mm -- the pedals moving out (#201) spent
+#: what used to be free lateral room.
 #:
 #: **That last number is the whole content of the 104.97 mm gate-2 failure.** The
 #: mounts used to aim at `(0, front_axle_y, rail_z + 0.025)`, a straight cross member
@@ -437,8 +441,8 @@ PEDAL_CLEVIS_RISE = 0.056
 #: loop's leg centreline passes (±259, +560, +50), so a plate whose bore straddles
 #: x ±259 at z +50 contacts the tube.
 PEDAL_TUBE_DIAMETER = 0.016
-PEDAL_TUBE_HALF_SPAN = 0.140
-PEDAL_MOUNT_X = 0.125
+PEDAL_TUBE_HALF_SPAN = 0.186
+PEDAL_MOUNT_X = 0.180
 PEDAL_MOUNT_BORE_X = 0.259
 PEDAL_MOUNT_BORE_Y = 0.560
 
@@ -1769,10 +1773,14 @@ def _pedal_mounts(
         _extruded_polygon(
             bm,
             [
-                (-0.020, 0.019),
+                # 14 mm past the bore, was 20: the frame tube is Ø32, so 14
+                # still wraps 87% of it -- and with #201's eye at 180 the
+                # plate's angle swings the old 20 mm tip into the upper bumper
+                # socket's riser at x 275, measured at 32 triangle pairs.
+                (-0.014, 0.019),
                 (reach + 0.014, 0.013),
                 (reach + 0.014, -0.013),
-                (-0.020, -0.019),
+                (-0.014, -0.019),
             ],
             bore,
             along,

@@ -308,7 +308,11 @@ FRONT_PANEL_SWEEP: tuple[tuple[float, float], ...] = (
 #: because that is where the loop *is*: its leg centerline passes (+-250, +572) and
 #: at the panel's own x +-110 the loop is 175 mm further forward, at y +760.
 FRONT_PANEL_STAY_X: float = 0.135
-FRONT_PANEL_STAY_MID: tuple[float, float, float] = (0.175, 0.578, 0.145)
+#: Was (0.175, 0.578, 0.145). #201 steepened the brake pushrod's diagonal (the
+#: masters went 20 mm outboard), and the stay's lower leg crossed the pushrod's
+#: z 112 plane at x -201 where the rod passes y 564 -- zero clearance. This mid
+#: moves the crossing to x -207 where the rod is at y 560 and the stay at 584.
+FRONT_PANEL_STAY_MID: tuple[float, float, float] = (0.180, 0.592, 0.150)
 FRONT_PANEL_STAY_FRAME_X: float = 0.250
 FRONT_PANEL_STAY_DIAMETER: float = 0.016
 
