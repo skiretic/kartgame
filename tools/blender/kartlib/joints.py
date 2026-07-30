@@ -117,11 +117,15 @@ class Joint:
 class Defect:
     """A known-failing pair, waived to a warning until its issue is closed.
 
-    `gate` is `"overlap"` or `"gap"`; `measured` is intersecting triangle pairs
-    for the first and millimeters for the second -- the **worst** figure the entry
-    covers, measured at high detail when the waiver was written. The number is
-    here so that a waiver whose fault got *worse* is visible in a diff rather
-    than being covered by the same one line.
+    `gate` is `"overlap"`, `"gap"` or `"driver"`; `measured` is intersecting
+    triangle pairs for the first and millimeters for the other two -- the
+    **worst** figure the entry covers, measured at high detail when the waiver
+    was written. For `"driver"` the millimeters are penetration depth into the
+    driver volume (torso findings measured against the §60.1.1 rake-plane clip,
+    ADR-0057), or the contact gap for a declared contact that does not touch;
+    an occlusion-only finding carries the count of occluded sample points and
+    its `why` says so. The number is here so that a waiver whose fault got
+    *worse* is visible in a diff rather than being covered by the same one line.
     """
 
     a: str
@@ -2610,6 +2614,19 @@ DRIVER_CONTACTS: tuple[Contact, ...] = (
         "shell ends -- so the two touch at the shell's top edge",
     ),
     Contact(
+        a="driver_rib_protector",
+        b="seat_shell",
+        kind="sits_on",
+        why="ADR-0057: the protector is worn *between* torso and shell over its "
+        "z 250-450 band, so it -- not the torso -- is what bears on the shell "
+        "there. The torso's own row above is the contact at the shell's top "
+        "edge, where the 25 deg torso leaves the 22 deg shell; both contacts "
+        "are physically real and they touch in different places. Until #17's "
+        "surface pass re-insets the torso by the protector's thickness, the "
+        "protector overlaps the shell by roughly its own 12-18 mm, and this "
+        "row is what makes that overlap declared rather than waived",
+    ),
+    Contact(
         a="driver_thigh_?",
         b="seat_shell",
         kind="sits_on",
@@ -3005,6 +3022,243 @@ OPEN_DEFECTS: tuple[Defect, ...] = (
         "crankcase's own y band. 12.85 mm, and it wants the strap bracket lengthened "
         "rather than the battery moved",
     ),
+    # -- gate 3, #200: the first measured pass, seeded off the built mesh -----
+    #
+    # 48 findings at high detail, three causes, three tickets. Depths are
+    # `genkart.driver_depth`'s figure -- torso rows measured against the
+    # ADR-0057 rake-plane clip -- and the ADR-0055 seed table is NOT the source:
+    # its leg and boot rows predate #201's 300 mm pedal separation and #202's
+    # live foot chain, and 24 of its findings no longer exist.
+    #
+    # #204 -- the drive cluster at x 100-112 is inboard of the seat's own +-184
+    # flank. A kart-geometry fault: the pelvis is where the sourced H-point
+    # puts it, and a chain run belongs outboard of the seat.
+    Defect(
+        a="drive_chain*",
+        b="driver_pelvis",
+        gate="driver",
+        measured=17.64,
+        issue="#204",
+        why="chain 5.77 mm and chain guard 17.64 mm inside the pelvis block; #200 "
+        "flagged this cluster as suspicious before the gate could measure it",
+    ),
+    Defect(
+        a="drive_chain*",
+        b="driver_torso",
+        gate="driver",
+        measured=16.04,
+        issue="#204",
+        why="the same run higher up: guard 16.04 mm into the torso's clipped volume",
+    ),
+    Defect(
+        a="drive_output_*",
+        b="driver_pelvis",
+        gate="driver",
+        measured=5.58,
+        issue="#204",
+        why="output shaft 5.58 mm and sprocket 3.82 mm into the pelvis -- the "
+        "sprocket at x 112 is what puts the whole chain line inboard",
+    ),
+    Defect(
+        a="drive_output_*",
+        b="driver_torso",
+        gate="driver",
+        measured=2.25,
+        issue="#204",
+        why="shaft and sprocket graze the torso's lower flank, 2.25 and 0.73 mm",
+    ),
+    # #205 -- Art. 9.5.3 says the front panel must not cover any part of the
+    # feet, and as built it does. The boots are where #202's live pedal
+    # derivation puts them, so the panel is the part that is wrong.
+    Defect(
+        a="bodywork_front_panel",
+        b="driver_boot_?",
+        gate="driver",
+        measured=29.07,
+        issue="#205",
+        why="the panel's lower edge is 29.07/28.13 mm into the boots and occludes "
+        "17/16 of their sample points from straight above -- the gate's ray-up "
+        "form of Art. 9.5.3's 'cover any part of the feet'",
+    ),
+    Defect(
+        a="bodywork_front_panel_stay_?",
+        b="driver_boot_?",
+        gate="driver",
+        measured=16.42,
+        issue="#205",
+        why="both panel stays run 16.42 mm through the foot box on their way down "
+        "to the pedal mounts",
+    ),
+    # #206 -- the limb paths. The leg hangs off an estimated +-180 knee splay
+    # read from one photograph and the arm pose is the two-link solve that
+    # closes the reach, so none of these can be adjudicated against a sourced
+    # figure. Real shins do straddle the tank and pass by the side bars; which
+    # of these is the mesh being honest about a tight cockpit and which is the
+    # estimate being wrong is exactly what the ticket is for.
+    Defect(
+        a="chassis_side_bar_upper_?",
+        b="driver_shank_?",
+        gate="driver",
+        measured=24.80,
+        issue="#206",
+        why="the shins cross the upper side bars symmetrically, 24.80 mm each side",
+    ),
+    Defect(
+        a="chassis_side_bar_upper_?",
+        b="driver_boot_?",
+        gate="driver",
+        measured=30.37,
+        issue="#206",
+        why="the boots sit across the same bars ahead of the shins, 29.72/30.37 mm",
+    ),
+    Defect(
+        a="chassis_bumper_socket_side_upper_front_?",
+        b="driver_shank_?",
+        gate="driver",
+        measured=30.01,
+        issue="#206",
+        why="the front upper bumper sockets are in the shin line, 30.00/30.01 mm",
+    ),
+    Defect(
+        a="chassis_bumper_socket_side_upper_front_?",
+        b="driver_boot_?",
+        gate="driver",
+        measured=33.67,
+        issue="#206",
+        why="and in the boot line just below, 33.67/33.53 mm -- the deepest "
+        "single limb finding of the pass",
+    ),
+    Defect(
+        a="chassis_tray_edge_?",
+        b="driver_boot_?",
+        gate="driver",
+        measured=4.14,
+        issue="#206",
+        why="the boot soles clip the floor tray's turned edges, 0.00/4.14 mm",
+    ),
+    Defect(
+        a="brake_*",
+        b="driver_boot_l",
+        gate="driver",
+        measured=29.27,
+        issue="#206",
+        why="the rear master (29.27 mm), its bracket (8.82) and both brake lines "
+        "(0.00/1.93) share the left foot's corridor -- #201's pedal package "
+        "moved outboard into the same space the masters did",
+    ),
+    Defect(
+        a="brake_master_rear",
+        b="driver_shank_l",
+        gate="driver",
+        measured=3.25,
+        issue="#206",
+        why="the same master grazes the left shin above the boot, 3.25 mm",
+    ),
+    Defect(
+        a="pedal_brake",
+        b="driver_boot_l",
+        gate="driver",
+        measured=6.30,
+        issue="#206",
+        why="the sole wraps 6.30 mm over the pedal arm above the declared pad "
+        "contact. Named per side like the contacts, because a mirrored pedal "
+        "assignment is exactly the bug a glob would hide",
+    ),
+    Defect(
+        a="pedal_throttle",
+        b="driver_boot_r",
+        gate="driver",
+        measured=6.30,
+        issue="#206",
+        why="the right sole does the same over the throttle arm, 6.30 mm",
+    ),
+    Defect(
+        a="tierod_?",
+        b="driver_boot_?",
+        gate="driver",
+        measured=6.85,
+        issue="#206",
+        why="the tie rods pass 6.77/6.85 mm through the boot tops",
+    ),
+    Defect(
+        a="tierod_?",
+        b="driver_shank_?",
+        gate="driver",
+        measured=26.38,
+        issue="#206",
+        why="and 26.38/25.68 mm through the shins behind them",
+    ),
+    Defect(
+        a="fuel_tank*",
+        b="driver_shank_?",
+        gate="driver",
+        measured=22.70,
+        issue="#206",
+        why="the shins straddle the tank -- which real legs genuinely do -- at "
+        "14.41 mm into the tank and 22.70 into its front strap",
+    ),
+    Defect(
+        a="steering_rim",
+        b="driver_shank_?",
+        gate="driver",
+        measured=14.14,
+        issue="#206",
+        why="the rim's lower arc crosses both shins 14.14 mm where they rise to "
+        "the knees",
+    ),
+    Defect(
+        a="steering_clutch_lever",
+        b="driver_shank_l",
+        gate="driver",
+        measured=8.11,
+        issue="#206",
+        why="the clutch lever reaches 8.11 mm into the left shin's lane",
+    ),
+    Defect(
+        a="steering_rim",
+        b="driver_thigh_?",
+        gate="driver",
+        measured=11.74,
+        issue="#206",
+        why="the rim also sits 6.91/11.74 mm into the thighs -- the wheel-to-leg "
+        "relationship #199 says cannot be judged against nobody",
+    ),
+    Defect(
+        a="steering_rim",
+        b="driver_forearm_?",
+        gate="driver",
+        measured=18.30,
+        issue="#206",
+        why="the fist center is *on* the rim by §60.2.1, so the wrist end of each "
+        "forearm clips it by construction, 16.79/18.30 mm",
+    ),
+    Defect(
+        a="steering_spokes",
+        b="driver_glove_?",
+        gate="driver",
+        measured=7.96,
+        issue="#206",
+        why="the gloves close around the rim at 3 and 9 o'clock and their "
+        "fingertips reach 7.96 mm into the spoke plate",
+    ),
+    Defect(
+        a="engine_head",
+        b="driver_upper_arm_r",
+        gate="driver",
+        measured=2.36,
+        issue="#206",
+        why="the right upper arm hangs at the 108.7 deg elbow the reach solve "
+        "produced and grazes the head 2.36 mm",
+    ),
+    Defect(
+        a="radiator_hose_upper",
+        b="driver_upper_arm_r",
+        gate="driver",
+        measured=14.31,
+        issue="#206",
+        why="the rerouted upper hose cleared the chest (ADR-0055's worked "
+        "example) and now passes 14.31 mm through the drooped right upper arm",
+    ),
 )
 
 
@@ -3029,10 +3283,10 @@ def _check_vocabulary() -> None:
         if not joint.why.strip():
             raise SystemExit("joints.py: %s/%s has no why" % (joint.a, joint.b))
     for defect in OPEN_DEFECTS:
-        if defect.gate not in ("overlap", "gap"):
+        if defect.gate not in ("overlap", "gap", "driver"):
             raise SystemExit(
-                "joints.py: %s/%s waives gate %r; the gates are overlap and gap"
-                % (defect.a, defect.b, defect.gate)
+                "joints.py: %s/%s waives gate %r; the gates are overlap, gap "
+                "and driver" % (defect.a, defect.b, defect.gate)
             )
         if not defect.issue.startswith("#"):
             raise SystemExit(
@@ -3152,6 +3406,28 @@ def declared(names: list[str]) -> dict[tuple[str, str], Joint]:
                     % (pair[0], pair[1], first.a, first.b, joint.a, joint.b)
                 )
             out[pair] = joint
+    return out
+
+
+def contacts(names: list[str]) -> dict[tuple[str, str], Contact]:
+    """Every concrete pair `DRIVER_CONTACTS` declares, with its entry.
+
+    Gate 3's analogue of `declared()`: it asks whether a driver/kart overlap is
+    permitted and walks every pair to require the contact. Call it only when the
+    driver is built -- on a `--driver=false` kart every pattern here matches
+    nothing, which `_expand_or_die` treats as the declaration rot it usually is.
+    """
+    out: dict[tuple[str, str], Contact] = {}
+    for contact in DRIVER_CONTACTS:
+        for pair in _expand_or_die("contact", contact.a, contact.b, names):
+            if pair in out:
+                first = out[pair]
+                raise SystemExit(
+                    "joints.py: contact %s/%s is covered by two entries -- "
+                    "%r/%r and %r/%r. One of the two whys is wrong."
+                    % (pair[0], pair[1], first.a, first.b, contact.a, contact.b)
+                )
+            out[pair] = contact
     return out
 
 

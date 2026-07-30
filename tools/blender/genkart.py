@@ -544,6 +544,41 @@ def check_interpenetration(parts: list[Part]) -> set[tuple[str, str]]:
     return overlapping
 
 
+def part_surface_gap(a: Part, b: Part, overlapping: set[tuple[str, str]]) -> float:
+    """Upper bound on the true surface gap between two parts, refined.
+
+    Extracted from gate 2 so gate 3 measures a declared driver contact with the
+    same arithmetic a declared joint is measured with -- two gates disagreeing
+    on what "touching" means would be a bug factory. Sample points on A, nearest
+    surface point on B, then alternate the projection from the best seeds; the
+    refinement is what makes the figure agree between detail levels.
+    """
+    if (a.name, b.name) in overlapping or (b.name, a.name) in overlapping:
+        return 0.0
+    seeds: list[tuple[float, Vector, bool]] = []
+    for source, target, forward in ((a, b, True), (b, a, False)):
+        hits = []
+        for point in source.samples:
+            location, _normal, _index, distance = target.tree.find_nearest(point)
+            if location is not None:
+                hits.append((distance, point, forward))
+        hits.sort(key=lambda hit: hit[0])
+        seeds.extend(hits[:GAP_SEEDS])
+
+    best = float("inf")
+    for _distance, point, forward in seeds:
+        here, there = (a.tree, b.tree) if forward else (b.tree, a.tree)
+        current = point
+        for _step in range(GAP_REFINE):
+            location, _normal, _index, distance = there.find_nearest(current)
+            if location is None:
+                break
+            best = min(best, distance)
+            current = location
+            here, there = there, here
+    return best
+
+
 def check_attachment(parts: list[Part], overlapping: set[tuple[str, str]]) -> None:
     """Fail the build if a part touches nothing, or misses what it mounts to.
 
@@ -579,30 +614,7 @@ def check_attachment(parts: list[Part], overlapping: set[tuple[str, str]]) -> No
     tolerance = joints.CONTACT_TOLERANCE
 
     def surface_gap(a: Part, b: Part) -> float:
-        if (a.name, b.name) in overlapping or (b.name, a.name) in overlapping:
-            return 0.0
-        seeds: list[tuple[float, Vector, bool]] = []
-        for source, target, forward in ((a, b, True), (b, a, False)):
-            hits = []
-            for point in source.samples:
-                location, _normal, _index, distance = target.tree.find_nearest(point)
-                if location is not None:
-                    hits.append((distance, point, forward))
-            hits.sort(key=lambda hit: hit[0])
-            seeds.extend(hits[:GAP_SEEDS])
-
-        best = float("inf")
-        for _distance, point, forward in seeds:
-            here, there = (a.tree, b.tree) if forward else (b.tree, a.tree)
-            current = point
-            for _step in range(GAP_REFINE):
-                location, _normal, _index, distance = there.find_nearest(current)
-                if location is None:
-                    break
-                best = min(best, distance)
-                current = location
-                here, there = there, here
-        return best
+        return part_surface_gap(a, b, overlapping)
 
     # --- weak: is anything floating? ---
     floating: list[tuple[str, str, float]] = []
@@ -722,24 +734,306 @@ def check_attachment(parts: list[Part], overlapping: set[tuple[str, str]]) -> No
     )
 
 
+# ADR-0057: gate 3's torso boundary is §60.1.1's seat-back rake plane, by
+# formula -- y(z) = -365 + 0.404 * (365 - z) in millimeters, tan 22 deg. Named
+# and analytic on purpose: the plane and the built `seat_shell` disagree by up
+# to 11.1 mm at the shell's molded pan transition, the plane is the conservative
+# side there (it concedes less driver volume to the seat), and a formula cannot
+# move when a bevel does. Meters here because `Part` is in meters.
+RAKE_PLANE_ANCHOR: float = 0.365
+RAKE_PLANE_SLOPE: float = 0.404
+_RAKE_PLANE_NORM: float = (1.0 + RAKE_PLANE_SLOPE * RAKE_PLANE_SLOPE) ** 0.5
+
+
+def rake_clearance(point: Vector) -> float:
+    """Signed distance forward of the §60.1.1 rake plane, meters.
+
+    Positive is the driver's side. Anything behind the plane is conceded to the
+    seat and is not driver volume, whatever the torso mesh does there — ADR-0055
+    measured the same hose at −35.71 mm unclipped and +18.63 mm clipped after a
+    fix that demonstrably put it behind the seat back, so the clip is the part
+    of the measurement that carries the sign.
+    """
+    plane_y = -RAKE_PLANE_ANCHOR + RAKE_PLANE_SLOPE * (RAKE_PLANE_ANCHOR - point.z)
+    return (point.y - plane_y) / _RAKE_PLANE_NORM
+
+
+_PARITY_RAY = Vector((0.0, 0.0, 1.0))
+_PARITY_STEP = 1e-6
+
+
+def _inside(tree: BVHTree, point: Vector) -> bool:
+    """Point-in-volume by ray-crossing parity, straight up.
+
+    Not the nearest-surface normal sign: `find_nearest` lands on an edge or a
+    vertex for any point that is not facing a triangle squarely, the returned
+    normal is then whichever single face the library picked, and the sign is
+    noise — measured as a shank "446.71 mm deep" inside a Ø20 tube it merely
+    crosses, because a far sample point matched an end-cap edge whose face
+    normal pointed away. Parity is exact for the watertight parts, which is
+    every driver part by construction (§60.1.6 keeps even the visor closed).
+    """
+    origin = point
+    crossings = 0
+    for _step in range(64):
+        location, _normal, _index, _distance = tree.ray_cast(origin, _PARITY_RAY)
+        if location is None:
+            break
+        crossings += 1
+        origin = location + _PARITY_RAY * _PARITY_STEP
+    return crossings % 2 == 1
+
+
+def driver_depth(driver: Part, kart: Part) -> float:
+    """Deepest measured penetration between a driver part and a kart part, meters.
+
+    Sampled at the shared `Part.samples` net, so it is a lower bound on the true
+    depth and deterministic per build — the waiver list is seeded from exactly
+    this figure. "Inside" is ray-crossing parity (`_inside`), and depth is the
+    inside point's distance to the other surface.
+
+    For `driver_torso` the volume is the mesh intersected with the half-space
+    forward of the rake plane (ADR-0057): a kart sample behind the plane is not
+    inside the driver at all, and depth is capped by the distance to the plane
+    because the plane is part of the clipped volume's boundary.
+    """
+    torso = driver.name == "driver_torso"
+    deepest = 0.0
+    for point in kart.samples:
+        forward = rake_clearance(point) if torso else float("inf")
+        if forward <= 0.0:
+            continue
+        if not _inside(driver.tree, point):
+            continue
+        _location, _normal, _index, distance = driver.tree.find_nearest(point)
+        deepest = max(deepest, min(distance, forward))
+    for point in driver.samples:
+        if torso and rake_clearance(point) <= 0.0:
+            continue
+        if not _inside(kart.tree, point):
+            continue
+        _location, _normal, _index, distance = kart.tree.find_nearest(point)
+        deepest = max(deepest, distance)
+    return deepest
+
+
+def occluded_samples(driver: Part, cover: Part) -> int:
+    """How many of a driver part's samples a bodywork part covers from above.
+
+    Art. 9.5.4's *"no part of the side bodywork may cover any part of the
+    driver"* and Art. 9.5.3's *"[the front panel must not] cover any part of the
+    feet"*, as one assertion: a ray cast straight up from a point on the driver
+    must not hit bodywork. A scrutineer looks down; so does this.
+    """
+    if cover.high.z <= driver.low.z:
+        return 0
+    if (
+        driver.low.x > cover.high.x
+        or driver.high.x < cover.low.x
+        or driver.low.y > cover.high.y
+        or driver.high.y < cover.low.y
+    ):
+        return 0
+    up = Vector((0.0, 0.0, 1.0))
+    torso = driver.name == "driver_torso"
+    count = 0
+    for point in driver.samples:
+        if torso and rake_clearance(point) <= 0.0:
+            continue
+        location, _normal, _index, _distance = cover.tree.ray_cast(point, up)
+        if location is not None:
+            count += 1
+    return count
+
+
+def check_driver_fit(everything: list[Part]) -> None:
+    """Gate 3, #200: the volume the driver occupies is defended.
+
+    Three assertions, over the same world-space trees as gates 1 and 2:
+
+    - **No kart part reaches inside a `driver_*` part** unless
+      `joints.DRIVER_CONTACTS` declares the pair. `radiator_hose_upper` crossed
+      the driver's chest 79.4 mm deep with both other gates green, because the
+      volume it crossed did not exist in the build.
+    - **Every declared contact touches** within `joints.CONTACT_TOLERANCE`,
+      measured with gate 2's own gap arithmetic — a glove 40 mm off the rim
+      fails as loudly as a hose through the spine.
+    - **No `bodywork_*` part covers a driver part from above** — Art. 9.5.4 and
+      the feet half of Art. 9.5.3 as an assertion rather than prose.
+
+    Intra-driver pairs are skipped outright: one articulated body authored as
+    eighteen segments interpenetrates at every anatomical joint by construction.
+    Torso findings are measured against the §60.1.1 rake-plane clip (ADR-0057);
+    a torso overlap that lies entirely behind the plane is not a finding at all,
+    because that volume is the seat's.
+
+    The rule that has to survive review (#200): a finding that cannot be
+    adjudicated against a sourced figure gets a waiver and a ticket, not a
+    geometry change. The knee splay the whole leg path hangs off is `estimated`
+    from one photograph; spending a regulated clearance to fix a leg whose
+    position is a guess is how a real constraint gets consumed by a modeling
+    error.
+    """
+    started = time.perf_counter()
+    driver = [part for part in everything if part.name.startswith("driver_")]
+    kart = [part for part in everything if not part.name.startswith("driver_")]
+    if not driver:
+        print("    driver   no driver_* parts built (--driver=false); gate 3 skipped")
+        return
+    names = [part.name for part in everything]
+    by_name = {part.name: part for part in everything}
+    contacts = joints.contacts(names)
+    waived = joints.waived("driver", names)
+    tolerance = joints.CONTACT_TOLERANCE
+
+    # --- nothing reaches inside the driver ---
+    findings: dict[tuple[str, str], tuple[float, str]] = {}
+    overlapping: set[tuple[str, str]] = set()
+    for d in driver:
+        for k in kart:
+            if d.bounds_gap(k) > 0.0:
+                continue
+            if not d.tree.overlap(k.tree):
+                continue
+            pair = (min(d.name, k.name), max(d.name, k.name))
+            overlapping.add(pair)
+            if pair in contacts:
+                continue
+            depth = driver_depth(d, k)
+            if d.name == "driver_torso" and depth <= 0.0:
+                # The triangles cross only behind the rake plane; that volume
+                # belongs to the seat, not the driver (ADR-0057).
+                continue
+            findings[pair] = (depth * 1000.0, "%.2f mm deep" % (depth * 1000.0))
+
+    # --- nothing covers him from above ---
+    for d in driver:
+        for cover in kart:
+            if not cover.name.startswith("bodywork_"):
+                continue
+            count = occluded_samples(d, cover)
+            if count == 0:
+                continue
+            pair = (min(d.name, cover.name), max(d.name, cover.name))
+            if pair in contacts:
+                continue
+            if pair in findings:
+                measure, description = findings[pair]
+                findings[pair] = (
+                    measure,
+                    "%s, occludes %d sample(s) from above" % (description, count),
+                )
+            else:
+                findings[pair] = (
+                    float(count),
+                    "occludes %d sample(s) from above" % count,
+                )
+
+    # --- every declared contact touches ---
+    contact_gaps: dict[tuple[str, str], float] = {}
+    in_touch = 0
+    for pair in sorted(contacts):
+        gap = part_surface_gap(by_name[pair[0]], by_name[pair[1]], overlapping)
+        if gap <= tolerance:
+            in_touch += 1
+            continue
+        contact_gaps[pair] = gap
+
+    failing = set(findings) | set(contact_gaps)
+    fatal: list[tuple[tuple[str, str], str]] = []
+    excused: list[tuple[tuple[str, str], str, joints.Defect]] = []
+    for pair in sorted(findings):
+        _measure, description = findings[pair]
+        defect = waived.get(pair)
+        if defect is None:
+            fatal.append((pair, description))
+        else:
+            excused.append((pair, description, defect))
+    for pair in sorted(contact_gaps):
+        description = "declared %s contact, %.2f mm apart" % (
+            contacts[pair].kind,
+            contact_gaps[pair] * 1000.0,
+        )
+        defect = waived.get(pair)
+        if defect is None:
+            fatal.append((pair, description))
+        else:
+            excused.append((pair, description, defect))
+
+    if fatal:
+        listing = "\n".join(
+            "      %-26s %-26s %s" % (pair[0], pair[1], description)
+            for pair, description in fatal
+        )
+        raise SystemExit(
+            "error: gate 3 -- %d driver finding(s):\n%s\n"
+            "       Either the kart part really does cross the driver -- move "
+            "it, and no\n"
+            "       render will show you the problem -- or the driver genuinely "
+            "touches it,\n"
+            "       in which case declare the contact in "
+            "joints.DRIVER_CONTACTS. A finding\n"
+            "       that cannot be adjudicated against a sourced figure gets a "
+            "waiver and a\n"
+            "       ticket, not a geometry change (ADR-0055): the leg path "
+            "hangs off an\n"
+            "       estimated knee splay, and spending a regulated clearance to "
+            "fix a guess\n"
+            "       is how a real constraint gets consumed by a modeling error."
+            % (len(fatal), listing)
+        )
+
+    stale = joints.stale_waivers("driver", names, failing)
+    if stale:
+        listing = "\n".join(
+            "      %-26s %-26s %s" % (defect.a, defect.b, defect.issue)
+            for defect in stale
+        )
+        raise SystemExit(
+            "error: %d driver waiver(s) in joints.py no longer cover a failing "
+            "pair:\n%s\n"
+            "       This is fixed. Delete the waiver."
+            % (len(stale), listing)
+        )
+
+    for pair, description, defect in excused:
+        print(
+            "    warning: %s and %s -- %s -- known, %s"
+            % (pair[0], pair[1], description, defect.issue)
+        )
+    print(
+        "    driver   %d driver part(s) against %d kart part(s): "
+        "%d/%d contact(s) in touch, %d finding(s) known-open, %.0f ms"
+        % (
+            len(driver),
+            len(kart),
+            in_touch,
+            len(contacts),
+            len(excused),
+            (time.perf_counter() - started) * 1000.0,
+        )
+    )
+
+
 def check_assembly(context: build.BuildContext) -> None:
-    """Both #192 gates, over one shared set of world-space trees.
+    """All three gates, over one shared set of world-space trees.
 
     Called where `check_face_winding` is called and for the same reason: these are
     invariants a render cannot show you, so they are asserted on every build
-    rather than reviewed. Measured at 0.34 s for the two of them at high detail
+    rather than reviewed. Measured at 0.34 s for gates 1 and 2 at high detail
     against a 1.7 s rebuild, which is inside the budget `--watch` has to keep, so
-    neither half is skipped anywhere and there is no mode in which the kart is
+    no gate is skipped anywhere and there is no mode in which the kart is
     built without being checked.
 
-    **`driver_*` parts are excluded from both, by contract.** Spec §60.1.6 and
-    ADR-0055: the driver is not a kart part. Gate 2's "every part is within 2 mm of
-    a neighbor" is meaningless for a body that is not mounted to anything, and gate
-    1's overlap rule would fire on the six `joints.DRIVER_CONTACTS` rows — a driver
-    who is *not* overlapping the seat he sits in is the defect, not the pass. Every
-    pair involving a driver part belongs to gate 3 (#200), which owns both
-    directions of that question. The filter is here rather than inside each gate so
-    there is exactly one place that decides what these two gates are about.
+    **`driver_*` parts are excluded from gates 1 and 2, by contract.** Spec
+    §60.1.6 and ADR-0055: the driver is not a kart part. Gate 2's "every part is
+    within 2 mm of a neighbor" is meaningless for a body that is not mounted to
+    anything, and gate 1's overlap rule would fire on the `joints.DRIVER_CONTACTS`
+    rows — a driver who is *not* overlapping the seat he sits in is the defect,
+    not the pass. Every pair involving a driver part belongs to gate 3
+    (`check_driver_fit`, #200), which owns both directions of that question. The
+    partition is here rather than inside each gate so there is exactly one place
+    that decides what each gate is about.
     """
     started = time.perf_counter()
     everything = assembly_parts(context)
@@ -747,13 +1041,14 @@ def check_assembly(context: build.BuildContext) -> None:
     prepared = (time.perf_counter() - started) * 1000.0
     overlapping = check_interpenetration(parts)
     check_attachment(parts, overlapping)
+    check_driver_fit(everything)
     skipped = len(everything) - len(parts)
     print(
         "    assembly %d part(s) prepared in %.0f ms%s"
         % (
             len(parts),
             prepared,
-            "" if skipped == 0 else "; %d driver part(s) deferred to gate 3" % skipped,
+            "" if skipped == 0 else "; %d driver part(s) owned by gate 3" % skipped,
         )
     )
 

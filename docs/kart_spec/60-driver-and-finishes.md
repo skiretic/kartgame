@@ -352,6 +352,30 @@ regulated clearance to fix a leg whose position is a guess is how a real
 constraint gets consumed by a modeling error. Six of the first measured findings
 are in exactly that category.
 
+**As built (2026-07-29, #200 closed).** `genkart.check_driver_fit`, running in
+the geometry stage beside gates 1 and 2 (28 ms at high detail). Three
+assertions: no kart part inside a `driver_*` part without a `DRIVER_CONTACTS`
+row; every declared contact in touch within `CONTACT_TOLERANCE`, measured with
+gate 2's own gap arithmetic; and no `bodywork_*` triangle straight above a
+driver sample point — the ray-up reading of Art. 9.5.4 and the *feet* half of
+Art. 9.5.3. Penetration is measured by ray-crossing parity, **not** the
+nearest-surface normal sign, which lands on edge and vertex features whose
+face normal points anywhere (measured: a shank "446.71 mm deep" in a Ø20 tube
+it merely crosses). The first pass found 48 findings; all are itemized
+`gate="driver"` waivers in `joints.py` under three tickets — #204 (the chain
+run is inboard of the seat flank), #205 (the front panel covers the feet,
+which found Art. 9.5.3 violated as built on day one), #206 (limb paths hang
+off the estimated knee splay and the reach solve). The declared
+`driver_rib_protector`/`seat_shell` contact absorbed the protector's expected
+overlap exactly as ADR-0057 intended — it is not among the findings. The
+pedal-*sweep* half of Art. 9.5.3 is **not** asserted: `params.py` carries no
+pedal travel angle and a sweep built on an invented one would be an estimate
+wearing the vocabulary of a limit — #207 is the record of the missing half.
+`tools/verify/driver_fit.py` re-measures every contact and every waived pair
+off the exported glb with no Blender in the loop (ADR-0055 item 6); the glb is
+the low-detail export, so its figures may differ from the gate's by a bevel,
+and what must agree is the sign and the order of magnitude.
+
 #### The switch, and why it is not optional
 
 `driver.py` is wired into `MODULES` behind a flag that builds the bare kart. Every
@@ -573,7 +597,16 @@ So, in §60.3's four-tuple form `(hex, luminance, roughness, metallic)`:
 
 ### 60.1.9 What the driver is built inside, measured — gate 3's seed list
 
-Issue #200's waiver list, measured off the built mesh at high detail with a
+**Superseded as a seed, kept as the record of why re-measuring was required.**
+Gate 3 was seeded on 2026-07-29 from a fresh pass over the built mesh — 48
+findings, waived in `joints.py` under #204, #205 and #206 (§60.1.6's as-built
+note) — and **not** from this table: its leg and boot rows predate #201's
+300 mm pedal separation and #202's live foot chain, and 24 of its findings no
+longer existed by the time the gate ran. The prediction two paragraphs down
+that "most of this list disappears when `driver_ball_*` tracks the live foot
+bar" is exactly what happened.
+
+Issue #200's waiver list as first measured, off the built mesh at high detail with a
 triangle-overlap test and a ray-crossing depth probe in both directions. **64
 intersecting pairs across 34 distinct kart parts**, none of them fixed here:
 §60.1.6's rule is that a finding which cannot be adjudicated against a sourced

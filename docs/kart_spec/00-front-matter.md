@@ -571,6 +571,7 @@ labels, and none of them is optional.
 | winding | every watertight part encloses positive volume | a mesh wound inside out, which no render shows because materials export `doubleSided` |
 | **gate 1 — interpenetration** | no part is built inside another, except at a **declared joint** | world-space triangle overlap between two parts with no `Joint` between them |
 | **gate 2 — attachment** | every part touches something within 2.0 mm, and every declared joint's two parts touch within 2.0 mm | a floater, or a part resting on the wrong neighbor |
+| **gate 3 — driver fit** | no kart part reaches inside the driver except at a declared `DRIVER_CONTACTS` row, every declared contact touches, and no bodywork covers him from above (§60.1.6) | a hose through the spine, a glove off the rim, a panel over the feet |
 | `genkart.sh --check` | the whole build is deterministic | any nondeterminism in reporting order or geometry |
 
 Both new gates are fatal and both run in the geometry stage, so `--watch`
