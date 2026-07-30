@@ -7,6 +7,11 @@
 #     tools/blender/genkart.sh --stages=geometry,export  # skip the bake
 #     tools/blender/genkart.sh --set=track_rear=1.38     # parameter sweep
 #     tools/blender/genkart.sh --check                   # determinism gate
+#     tools/blender/genkart.sh --check --stages=geometry,export
+#                                  # the fast gate (~2 min), for generator-logic
+#                                  # changes only: it proves nothing about uv, lod
+#                                  # or the bake, and its hashes must never be
+#                                  # compared to another stage set's. #208.
 #     tools/blender/genkart.sh --watch                   # windowed live rebuild
 #     tools/blender/genkart.sh --watch --detail=high     # ...at export density
 #
@@ -131,6 +136,17 @@ if [ "$CHECK" = "1" ]; then
 	# directory pass 2 would overwrite pass 1's and the texture would go unchecked.
 	# The bake is a Monte Carlo render, so it is the output most likely to be
 	# non-reproducible and the least excusable to leave uncompared.
+	# A geometry,export mesh and a full-pipeline mesh differ by construction --
+	# uv and lod run in between -- so a hash that does not name its stage set
+	# invites comparing the incomparable. It cost a session-close warning
+	# paragraph the first time. #208.
+	STAGE_SET="full pipeline"
+	for argument in ${FORWARDED[@]+"${FORWARDED[@]}"}; do
+		case "$argument" in
+			--stages=*) STAGE_SET="stages: ${argument#--stages=}" ;;
+		esac
+	done
+
 	echo "==> Determinism check: generating twice"
 	for pass in 1 2; do
 		mkdir -p "$SCRATCH/pass$pass"
@@ -141,13 +157,18 @@ if [ "$CHECK" = "1" ]; then
 			tail -30 "$SCRATCH/log$pass.txt" >&2
 			exit 1
 		fi
-		printf '    pass %d  %s\n' "$pass" \
-			"$(shasum -a 256 "$SCRATCH/pass$pass/kart.glb" | awk '{print $1}')"
+		printf '    pass %d  %s  (%s)\n' "$pass" \
+			"$(shasum -a 256 "$SCRATCH/pass$pass/kart.glb" | awk '{print $1}')" \
+			"$STAGE_SET"
 	done
 
 	FAILED=0
+	SKIPPED=0
 	for artifact in kart.glb kart_normal.png; do
 		if [ ! -e "$SCRATCH/pass1/$artifact" ]; then
+			# Silent would read as proven. Say what this run cannot know. #208.
+			printf '    %-16s not produced by this stage set; UNPROVEN\n' "$artifact"
+			SKIPPED=1
 			continue
 		fi
 		if cmp -s "$SCRATCH/pass1/$artifact" "$SCRATCH/pass2/$artifact"; then
@@ -166,7 +187,12 @@ if [ "$CHECK" = "1" ]; then
 		echo "       and that denoising is still off." >&2
 		exit 1
 	fi
-	echo "==> Identical. Determinism holds."
+	if [ "$SKIPPED" = "1" ]; then
+		echo "==> Identical within this stage set. The bake is UNPROVEN -- a change"
+		echo "    that can reach uv, lod or the bake still owes a full --check."
+	else
+		echo "==> Identical. Determinism holds."
+	fi
 
 	# The manifests are text, so when the binaries differ this is the readable
 	# half of the diff. Compared second because a hash mismatch is the failure
