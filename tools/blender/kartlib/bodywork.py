@@ -384,16 +384,39 @@ SIDEPOD_HEIGHT_FRACTION: tuple[tuple[float, float], ...] = (
     (1.00, 0.910),
 )
 
-#: Top and bottom of the pod's widest *band*, not a single widest point, so both
-#: side bars fit inside the C. Art. 9.5.4 requires the side bodywork to be
-#: *"securely attached to the side bumpers"*, and with the face out at the article's
-#: own datum both bars now run inside the section rather than outboard of it -- the
-#: lower at (500, z 80) and the upper at (560, z 175).
-SIDEPOD_BULGE_TOP_Z: tuple[tuple[float, float], ...] = (
-    (0.00, 0.142),
-    (0.50, 0.140),
-    (1.00, 0.140),
+#: How far the shoulder crease sits **below the pod's top edge**, against
+#: normalized station. Issue #199.
+#:
+#: This replaces `SIDEPOD_BULGE_TOP_Z`, which authored the widest point as an
+#: absolute z of about 140 -- the middle of a section running 48 to 228. A widest
+#: point at mid-height with a smooth curve above and below it is the definition of
+#: a pontoon, and it is what made 180 mm of legal height read as bulk. On a real
+#: pod the widest point is **just under the crease**, high up, and the surface
+#: below it falls away nearly vertically.
+#:
+#: 34 mm at the widest station, so the crease lands at z 194 with the top edge at
+#: 228: the deck is the top 34 mm of the section and the flank is the other 146.
+#: `estimated` off `crg_roadrebel_kz_detail11.webp`, where the crease reads at
+#: roughly a fifth of the pod's depth below its top edge. Slightly deeper at the
+#: two ends, because the deck narrows there as the plan taper pulls the outer face
+#: inboard and the crease has to go somewhere.
+SIDEPOD_SHOULDER_DROP: tuple[tuple[float, float], ...] = (
+    (0.00, 0.042),
+    (0.25, 0.036),
+    (0.55, 0.034),
+    (0.80, 0.036),
+    (1.00, 0.044),
 )
+
+#: Bottom of the flank's near-vertical run, where it starts tucking back inboard.
+#: Art. 9.5.4 requires the side bodywork be *"securely attached to the side
+#: bumpers"*, and with the face out at the article's own datum both bars run inside
+#: the section rather than outboard of it -- the lower at (500, z 80) under this
+#: tuck, the upper at (560, z 175) under the deck.
+#:
+#: Unchanged from when this was the bottom of the widest *band*: the flank has
+#: always turned in at about this height, and what changed above it is that there
+#: is no longer a matching turn *outward* on the way up.
 SIDEPOD_BULGE_BOTTOM_Z: tuple[tuple[float, float], ...] = (
     (0.00, 0.092),
     (0.50, 0.096),
@@ -1311,11 +1334,44 @@ def _sidepod_face_x(p: P.KartParams, y: float, t: float) -> float:
 def _sidepod_section(p: P.KartParams, t: float, steps: int) -> list[Vector]:
     """One (x, z) C-section of the right side pod at normalized station `t`.
 
-    Seven control points from the top free edge, outboard and down around the
-    flank, to the bottom free edge. The C is the whole point: with the face out at
-    Art. 9.5.4's datum, **both** side bars now run inside it -- the lower at
-    (500, z 80) and the upper at (560, z 175) -- which is what *"securely attached
-    to the side bumpers"* means geometrically.
+    **A shallow scoop with a hard shoulder, not a rounded pontoon.** Issue #199:
+    every regulated dimension of this pod was already correct -- outer face, top
+    edge, ground clearance, both wheel gaps -- and it still read as a sealed
+    torpedo that merged with the fairing at some angles. Right size, right place,
+    right angle, wrong *kind of object*.
+
+    The cause was this control list, and it was not the mouth: the pod has been a
+    genuine C, open from z 48 to z 216 at x 505, the whole time. It was that the
+    seven points described **one continuous curve with no crease in it**, over a
+    section 147 mm wide by 171 tall -- so close to round that a specular highlight
+    wraps unbroken from the inboard lip over the top and down the flank, which is
+    what a hull does and what a scoop does not. A pod's height then reads as
+    bulk: 180 mm of legal height spent as a full-depth radius.
+
+    What the references show, and all four were read rather than recalled --
+    `crg_roadrebel_kz_bodywork.webp`, `_side.webp`, `_detail11.webp` and
+    `tonykart_racer401T_p05.jpg`:
+
+        a broad, near-flat top deck tilting gently outboard-down
+        a HARD fore-aft crease where the deck turns over into the flank
+        a near-vertical outer flank below that crease, slightly hollow
+        the deck's inboard edge returning up into its rolled lip
+        a bottom edge tucking back inboard rather than continuing the round
+
+    So the widest point moves **up**, to just below the crease, and the surface
+    between the crease and the deck is short and tight instead of being a
+    79 mm quarter-round. Two control points sit close together at the shoulder
+    because `_catmull_rom` has no crease of its own: a tight pair is how you get
+    one, and the radius it leaves is 8-10 mm, which clears Art. 4.10.2's 5 mm
+    minimum rather than defeating it.
+
+    **Nothing regulated moves.** `out_x` is still Art. 9.5.4's tapering datum via
+    `_sidepod_face_x`, `mouth_x` is still 505 and still clears the radiator's
+    outboard extremity at 489, `bottom_z` still bottoms at 48 inside the 25-60
+    band, and both side bars still run inside the C -- the lower at (500, z 80)
+    under the bottom tuck, the upper at (560, z 175) under the deck with 20 mm of
+    daylight, which is what *"securely attached to the side bumpers"* means
+    geometrically.
     """
     y = p.sidepod_front_y - t * p.sidepod_length
 
@@ -1323,19 +1379,50 @@ def _sidepod_section(p: P.KartParams, t: float, steps: int) -> list[Vector]:
     mouth_x = p.sidepod_mouth_x
     bottom_z = _table(SIDEPOD_BOTTOM_Z, t)
     top_z = bottom_z + p.sidepod_height * _table(SIDEPOD_HEIGHT_FRACTION, t)
-    bulge_top_z = _table(SIDEPOD_BULGE_TOP_Z, t)
+    shoulder_z = top_z - _table(SIDEPOD_SHOULDER_DROP, t)
     bulge_bottom_z = _table(SIDEPOD_BULGE_BOTTOM_Z, t)
 
-    controls = [
+    # **Two splines meeting at a corner vertex, not one spline through a tight
+    # pair, and the reason is a property of the curve rather than a taste.**
+    #
+    # `_catmull_rom` is C1 continuous and is then resampled uniformly, so the
+    # tangent never jumps: consecutive mesh edges turn by roughly (arc step /
+    # radius), a few degrees each. `object_from_bmesh`'s `smooth_angle` marks an
+    # edge sharp only above **40 degrees**. So a crease authored as closely-spaced
+    # control points is smoothed away twice over -- once by the spline and once by
+    # the shading -- and the first attempt at this section proved it: an 83 degree
+    # turn spread over three control points 20-26 mm apart produced a 24 mm fillet
+    # that rendered as exactly the pontoon it was meant to replace. Nothing was
+    # wrong with the numbers; the mechanism could not express the feature.
+    #
+    # Sampling the deck and the flank as **separate** splines and concatenating
+    # them puts a genuine tangent discontinuity at the shared vertex. The deck
+    # arrives there at about -43 degrees and the flank leaves at about -95, so the
+    # dihedral is ~52 and the edge is marked sharp -- which is what makes a crease
+    # a crease and not a highlight gradient.
+    deck = [
+        # The inboard free edge and its returned lip, rolling up off the deck.
         Vector((mouth_x, y, top_z)),
-        Vector((mouth_x + 0.052, y, top_z + 0.003)),
-        Vector((out_x - 0.014, y, top_z - 0.032)),
-        Vector((out_x, y, bulge_top_z)),
-        Vector((out_x - 0.002, y, bulge_bottom_z)),
-        Vector((mouth_x + 0.038, y, bottom_z + 0.007)),
+        Vector((mouth_x + 0.040, y, top_z + 0.005)),
+        Vector((mouth_x + 0.090, y, top_z + 0.001)),
+        # Near-flat across most of the deck's width: this is the surface that was
+        # missing, and it is most of the fix.
+        Vector((out_x - 0.030, y, top_z - 0.007)),
+        # The crease.
+        Vector((out_x, y, shoulder_z)),
+    ]
+    flank = [
+        # Same point as the deck's last, dropped on concatenation below.
+        Vector((out_x, y, shoulder_z)),
+        # Near-vertical and very slightly hollow.
+        Vector((out_x - 0.003, y, shoulder_z - 0.035)),
+        Vector((out_x - 0.006, y, bulge_bottom_z)),
+        # The bottom tuck, turning back inboard under the lower side bar.
+        Vector((out_x - 0.034, y, bottom_z + 0.016)),
+        Vector((mouth_x + 0.038, y, bottom_z + 0.005)),
         Vector((mouth_x, y, bottom_z)),
     ]
-    return _catmull_rom(controls, steps)
+    return _catmull_rom(deck, steps) + _catmull_rom(flank, steps)[1:]
 
 
 def _sidepods(

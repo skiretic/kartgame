@@ -467,7 +467,13 @@ unsourced and mislabeled. 1,920 is the honest center of the same range.
 
 ## 5a. The cooling envelope — Art. 5.3, and it is harder than the bodywork's
 
-KZ is **Group 2**. Art. 5.3.1 *Radiator*, PDF page 15, verbatim, Groups 1 & 2:
+KZ is **Group 1** — §2b and ADR-0054. This line said Group 2 and was one of the
+four instances `99-recheck.md` catalogued as false; it is the last one still
+standing, and it survived because **nothing downstream moves**: Art. 5.3.1 is
+headed *"In Groups 1 & 2"* and applies either way. That is exactly why it lasted,
+and it is why it is corrected rather than left as harmless.
+
+Art. 5.3.1 *Radiator*, PDF page 15, verbatim, Groups 1 & 2:
 
 > Radiators must be placed above the chassis frame at a maximum height of 500 mm
 > from the ground and within an area situated between 550mm and 10mm ahead of the

@@ -2424,3 +2424,151 @@ finish and layout.
 4. **CRG originals above 900×600.** The site serves resized thumbnails;
    the originals are not reachable. Good enough for shape and finish, not
    for texture work.
+
+## The seated driver, the front panel and the side bodywork — `KART_SPEC` §60, issue #200
+
+`docs/kart_spec/60-driver-and-finishes.md` §60.1.4 places the driver from two
+sourced chains — the Tillett T11 ML seat chart and a NASA 50th-percentile male
+anthropometric table — and that arithmetic is good. What it has never had is a
+photograph of anybody sitting in a kart. **The whole V set above contains no
+seated driver at all**, and the only cockpit image in this document is H5, a
+stationary kart shot from behind the seat. So three of §60's figures are
+`estimated` with nothing photographic under them, and one of the three — the
+knee splay `driver_knee_x` = ±180 — carries the entire leg path and six of issue
+#200's gate-3 findings.
+
+This section is that fetch. Files in `refs/kart-driver/` (gitignored, like every
+other `refs/` image directory) with `sources.txt` carrying URL, license, author
+and SHA-256 for each. **The two homologation forms turned out to be worth more
+than any of the photographs**, and the most useful photograph was already in the
+repo.
+
+Everything here is reference only: nothing traced, nothing redistributed, nothing
+shipped. Every lateral claim below names its viewpoint, per §00 §2 — the rule
+that exists because V3's caption was written from a dead-rear photograph without
+mirroring it and put the radiator on the wrong side of the kart.
+
+### Documents and photographs
+
+| Ref | Subject | Source |
+| --- | --- | --- |
+| S1 | **CIK-FIA Homologation Form 012-BP-41, *CARROSSERIE / BODYWORK — PANNEAU FRONTAL / FRONT PANEL*, OTK M7, Groups 1 & 2 ("Toutes / All"), 3 pp., 2017.** The first **`sourced` front panel dimensions this project has ever had.** Page 2's technical drawing, *"dimensions d'encombrement / main external dimensions"*, gives exactly two: **765** along the panel's long axis and **295** across it. The drawing is an embedded raster — `pdftotext` returns only the word `PHOTO`, so the figures were read off a 400 dpi render | fiakarting.com, `homologated/Hom.Forms BR-CA-CH (2018-2021)/OTK-OTK-012-BP-41.pdf` |
+| S2 | **CIK-FIA Homologation Form 012-BS-77, *CARROSSERIE LATERALE / SIDE BODYWORK*, OTK M8, 4 pp., 2019 — but category GROUP 3, which is Mini.** Dimensioned: pod **558** long, **170** high, **118** deep; support bracket span **360**; support tube *"Acier / Steel ø 20x1,5"*; bodywork **650 g ±10%** and support **800 g ±5%**, per side. **These are not KZ pod dimensions** and must never be lifted as such — recorded because the form *type* exists and is dimensioned, which is what §50.10 needed to know | fiakarting.com, `homologated/Hom.Forms BR-CA-CH (2020-2023) Mini Only/OTK/OTK 012-BS-77.pdf` |
+| S3 | **Alessandro Giardelli, Karting European Championship 2016, Belgium — the dead-front frame, 4242×2828.** Two karts mid-corner, near-dead-front, low camera, driver in the normal driving position with both hands on the wheel. Tony Kart, number 235, so **OK/KF class and not a KZ**; same chassis and seat family, different engine. Shows the front panel head-on, both boots on the pedals either side of it, one leg clearly outboard of the panel, shoulders far above the pod top edge, both pod mouths, and the twin-lobe fairing below the panel | Commons, CC BY-SA 4.0, Passionadrenaline111 |
+| S4 | **Alessio Lorandi, WSK Champions Cup 2014, La Conca — the torso and seat frame, 3888×2592.** Tony Kart with a TM engine, again **OK/KF and not a KZ**, viewed from the left-front with the torso close to profile. **Both arms are raised off the wheel**, which is the point: nothing occludes the torso, seat, tank or legs. It also means the arm, elbow and shoulder-to-grip geometry in this frame is *not* the normal driving position and must not be used for §60.2 | Commons, CC BY 4.0, Alessiolorandi37 |
+| S5 | **2024 AAMC Karting Championship, KZ Round 2 Final — the only declared-KZ seated driver in the corpus, and it was already here.** Three seated drivers on a KZ grid at three different angles; the nearest, an orange CRG, is close to a side view of a driver with both hands on the wheel. **The full-resolution file has been in the repo since the visual sweep as `exh_commons_aamc_kz.jpg` (3520×1980) and no section had ever cited it for the driver.** Shot from a grandstand through a fence, so elevated and oblique. A `(cropped)` 1922×1173 variant is also held | Commons, CC0, RealSuperlemon |
+| S6 | **CIK-FIA Karting Homologation Regulations 2025, v1.2.** Fetched to answer one question and it answers it in the negative — see *What could not be sourced* below | fiakarting.com, `2025-05/2025 Karting Homologation Regulations_v1.2_Clean WEB_Full.pdf` |
+| S7 | Supporting seated-driver frames, all corroboration only and none of them KZ: `largada_stock125` (Brazilian Stock 125 race start, PD, 3543×2362), `yamaha_cup_second_start_vihti_2010` (CC BY-SA 3.0), `kart_start` (Rotax Max Grand Finals grid, CC BY-SA 4.0) | Commons |
+| S8 | **`KZ PREGRID`, CIK-FIA KZ World Karting Championship 2015, Le Mans — 660×330.** The only KZ World Championship image found anywhere. Kept for the provenance and **not** for the pixels: each kart is about 40 px wide and nothing on a driver is measurable. Worth re-fetching if a larger copy of this frame ever surfaces | Commons, CC BY-SA 4.0 |
+| S9 | **Negative control, kept so nobody re-fetches it:** `giuseppe_gnazzo_kart_driver` (CC0, 4096×2560) is a sharp, low-angle, front-quarter shot of a seated driver with a knee, a boot on the pedal and the whole torso visible — **and it is a rental Sodi SR.** The tells are the wraparound bodywork skirt with an integral bumper, the moulded plastic pedals, the seat with integral shoulder wings and *"Sodi"* on the panel. A rental kart sits far more reclined behind far higher bodywork, so every §60 figure read off it would be wrong in the same direction. Also `klara_kowalczyk` (CC BY-SA 4.0), no kart in frame, kept only as an overalls reference | Commons |
+
+### What the references settled
+
+1. **A front panel homologation form exists, and the front panel is 295 mm wide,
+   `sourced`.** S1. Art. 9.5.3 sets *"Width: 250.0 mm minimum and 300.0 mm
+   maximum"* and the OTK M7 is built at 295, 5 mm under the ceiling. Every front
+   panel figure in §50 had been fitted to a chassis tube; there is now a
+   published number to fit to instead, and a second independent one bounding it.
+2. **The panel is not a flat wall, and the form's own drawings say what it is.**
+   S1's front view is a slender blade with a **twin-crest top and a deep central
+   longitudinal channel** clearing the steering column; its side view shows the
+   top edge **rolled over** into a lip; two support legs descend from the lower
+   end and a **flat strap support** bolts off the rear face at mid height. That
+   last pair is Art. 9.5.3's *"lower section … attached to the front part of the
+   chassis frame … upper part … attached to the steering column support with one
+   or more independent bars"*, drawn. **The number plate is a separate curved
+   plate fastened over the panel's waist at its four corners, not printed on the
+   panel** — which is a livery fact as much as a geometry one.
+   S3 photographs the same twin-crest, central-channel front view on a different
+   manufacturer's panel, so the shape is the class's and not OTK's.
+3. **The radiator is on the kart's left, and S3 is the second witness.** S3 is a
+   **front** view — the easy mirroring direction — so image-left is the kart's
+   right. The finned radiator core with its header tank sits at image-**right** =
+   the kart's **left**; the engine, its cylinder and the exhaust sit at
+   image-**left** = the kart's **right**. Both agree with §00 §2 and against V3's
+   caption (#193). A front view was what this fact needed, because the error came
+   from a rear one.
+4. **A side bodywork form exists and is dimensioned, but only for Mini.** S2. The
+   form gives a pod's length, height, lateral depth, its bracket span, its tube
+   spec and two masses — so that is exactly the list a Groups 1 & 2 form would
+   give if one were reachable, and §50.10 now knows what it is asking for. The
+   Group 3 numbers bracket a KZ pod and do not set it.
+5. **A driver's shoulders stand well clear of the pod top edge, in every frame
+   that shows both.** S3, S4, S5, S7. Art. 9.5.4's *"No part of the side bodywork
+   may cover any part of the driver seated in the normal driving position"* is
+   comfortably satisfied on real karts and is not a tight constraint — useful,
+   because §60.1.6 turns that clause into a gate-3 assertion.
+6. **The knees are high and the legs fold hard.** S4 puts the near knee at
+   roughly the height of the seat's own rolled top lip; §60.1.4 has the knee at
+   z 442 against a seat back top at z 365, i.e. 77 mm above it, which is
+   consistent. §60.2.4's observation that a KZ driver runs 69% leg extension with
+   his knees up around the wheel is what the photographs show.
+7. **The knees straddle the front panel, and the panel is 250–300 mm wide.** S3,
+   S4, S5, S7. Combined with S1 that is a **`sourced` one-sided bound** on the
+   splay that §60 did not have: each knee's inner face lies outboard of the
+   panel's edge, so `|driver_knee_x|` > 125–150 mm. ±180 is consistent with it.
+   It is a bound, **not** a measurement — see below.
+8. **The fuel tank sits between the shins under the column, photographed.** S4.
+   §60.3.12 and §40 had this from studio chassis shots with no driver in them;
+   S4 shows the relationship with legs either side of the tank.
+
+### What could not be sourced, and it is the point of this section
+
+1. **`driver_knee_x` = ±180 is still `estimated`, and no image found can move
+   it.** This was the figure the whole fetch was for. Not one frame shows both
+   knees from a viewpoint that resolves lateral position: the side-on frames (S4,
+   S5) hide the legs behind the front panel and the pod, and in the one good
+   dead-front frame (S3) **the driver's right leg is occluded by the engine and
+   the exhaust.** Per §60.1.6, a finding that cannot be adjudicated against a
+   sourced figure gets a waiver and a ticket, not a geometry change — so the six
+   gate-3 leg-region findings stay waived and #200 keeps the splay open.
+   What would fix it, in order: a dead-front photograph of a KZ with the driver
+   seated and both legs unoccluded, taken from about hub height; or one straight
+   down into an occupied cockpit; at any resolution above about 1500 px across
+   the kart.
+2. **Hip 95 mm above the pan and 100 mm forward of the back contact are still
+   `estimated`.** Both are corroborated in the weak sense that S4 and S5 show the
+   hip low in the shell with the shoulders above its top lip, and neither can be
+   measured: the hip joint is inside a driver wearing a rib protector and is not
+   a visible landmark in any photograph. §60.1.3's own cross-check against the
+   §40 pedal chain — 731.1 mm against 735 mm, agreeing to 0.5% — remains the
+   better evidence, and it is arithmetic rather than an image.
+3. **Torso recline 25° is still `estimated`, and the photographs bracket rather
+   than measure it.** S5's orange CRG is the closest thing to a side view of a
+   driver actually driving, and it is shot from a grandstand at an oblique angle,
+   which biases any angle read off it. S4 is closer to profile but the driver has
+   **both arms raised**, which straightens the spine and under-reads the recline.
+   Anchoring on a scale would not help — the quantity is an angle, and what it
+   needs is a true side-on viewpoint, which nothing here provides. §00 §5's own
+   lesson is that careless photogrammetry produced a 1,195 mm wheelbase against a
+   1,070 mm limit, and inventing a degree figure from an oblique frame is the
+   same mistake in a smaller hat.
+4. **There is no driver template anywhere in the homologation process.** S6. The
+   words *driver* / *pilote* occur four times in the whole Homologation
+   Regulations and never dimensionally; there is no manikin, no seated template,
+   and *"gabarit"* appears only as the manufacturing jigs a constructor must own.
+   Art. 22, *Bodywork and bumpers*, sets finish and material rules and no driver
+   datum. **So Art. 9.5.4 is scrutineered against a real human and no published
+   figure exists behind it** — which means §60's `estimated` tags on the driver
+   placement are the correct answer rather than an unfinished one, and no amount
+   of further searching converts them.
+5. **No side bodywork or front panel form for Groups 1 & 2, except S1.** The
+   Group 2 technical list (V15) names them — OTK M10 `012-BS-05`, KG 507
+   `003-BS-36`, Freeline Aero `007-BS-20`, Eurostar Dynamica `017-BS-06`,
+   Righetti XTR22 `005-BS-20`, and front panels `012-BP-70`, `003-BP-02`,
+   `003-BP-11`, `003-BP-78`, `017-BP-12`. Every one was probed against the three
+   form directory layouts now known to exist on fiakarting.com and every one
+   404s. **The forms the site serves are a sparse historical subset, not the
+   current list**, so the absence of a form is not evidence the part is
+   undimensioned.
+6. **No cockpit-from-above with a driver in it, and no front panel in true
+   profile.** The repo's only top-down remains `tonykart_racer401T_p05.jpg`, an
+   empty studio chassis. S1's side view is now the best evidence for the panel's
+   rake and its rolled top edge, and it is a CAD render rather than a photograph.
+7. **Wikimedia Commons is close to exhausted on this subject.** Nineteen searches
+   and four category walks are listed with their yields in
+   `refs/kart-driver/sources.txt`. `karting KZ2 driver seat`, `karting sidepod`,
+   `kart cockpit`, `kart onboard`, `karting Genk` and
+   `karting championship KZ2 final` returned nothing usable at all. Per
+   CLAUDE.md's Conventions the honest move at this point is to ask: two pasted
+   reference photographs would settle in seconds what this sweep could not.

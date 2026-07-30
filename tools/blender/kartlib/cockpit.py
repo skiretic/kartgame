@@ -28,13 +28,16 @@ order of how much each one costs to get wrong:
     inclined spacer to do exactly that, and Art. 4.5 permits *"A spacer […] between
     the steering wheel and the hub."* The error is invisible from every angle
     except a true side elevation, so a turntable does not catch it.
-3.  **The wheel is a flat-bottomed butterfly, not a car wheel.** Three spokes, a
-    visible dished boss, and a chord across the bottom so the driver's thighs
-    clear it. A circular rim makes a kart look like a toy car immediately.
-    Measured on the built rim: 319.7 mm wide, 243.7 mm tall, a 39.8 mm dip
-    between the horns and a 135.6 mm flat across the bottom. The dip is the
-    feature that has to survive being looked at from 0.55 m, and the first
-    version's 13.3 mm did not — see `WHEEL_OUTLINE`.
+3.  **The wheel is round, with a slight flat across the bottom, and a flat
+    three-arm plate.** This item used to say the opposite — *"a flat-bottomed
+    butterfly, not a car wheel [...] a circular rim makes a kart look like a toy
+    car immediately"* — and it was wrong, sourced nowhere, and had the top dip
+    deliberately deepened to 39.8 mm to defend itself. Issue #199 reported the
+    result as reading like a clover, which is what a 319.7 × 243.7 mm rim with two
+    tall horns does. Two primary references in this repo both show a round rim,
+    and `tonykart_racer401T_p05.jpg` shows why the mistake was easy: its four red
+    grip pads on a circular rim photograph as lobes. `WHEEL_OUTLINE` carries the
+    whole correction. What survives is the dished boss and the three arms.
 4.  **The shifter and the clutch lever are the whole KZ silhouette.** §6.3: hand
     shifter on the driver's right, clutch lever on the wheel. Issue #15's
     silhouette test is "reads as a shifter kart rather than a single-speed", and
@@ -234,52 +237,98 @@ SEAT_PLATE_THICKNESS = 0.0016
 #: scales it so the built rim's overall width is exactly `wheel_diameter`, which
 #: makes the widest control point 1.000 by definition.
 #:
-#: The two features that have to read from the cockpit camera are the dip at the
-#: top between the horns and the chord across the bottom. **The dip was measured
-#: and it was too shallow to see**: 13.3 mm on a 293 mm rim, 4.5% of the width,
-#: which subtends 1.4 degrees at the ~0.55 m the driver's eye sits from the rim
-#: and is why the M2 turntable read as a plain three-spoke wheel. It is 39.8 mm
-#: here, 12.5% of the width, which is what a real KZ butterfly rim runs and what
-#: separates it from a round wheel at a glance.
+#: **Round, with a slight flat across the bottom. It was a butterfly, and the
+#: butterfly was read off a two-tone grip.** Issue #199, and the correction is
+#: worth writing out because the old shape was not a slip -- it was deliberately
+#: tuned toward something the repo's own photographs do not show.
 #:
-#: Art. 4.5.1 permits the shape: *"The upper and lower thirds of the circumference
-#: may be straight or of a different radius to the rest of the wheel"*, and the rim
-#: is continuous with no obtuse angles, which is the rest of that article.
+#: What this table used to say, and why it was wrong:
 #:
-#: The horn tips reach 169.8 mm from the wheel center against a half-width of
-#: 159.8, so a butterfly rim is *not* contained by a circle of `wheel_diameter`.
-#: That is the shape being what it is rather than a mistake, and it is written
-#: down because "diameter" invites the opposite assumption.
+#:   * *"The wheel is a flat-bottomed butterfly, not a car wheel [...] A circular
+#:     rim makes a kart look like a toy car immediately."* That claim was sourced
+#:     nowhere. `refs/kart-visual/notes_controls.md` dimensions the wheel as
+#:     Ø320 at (0, 320, 480) with the column raked 27 deg and says nothing about
+#:     the outline; there is no steering wheel among the OTK homologation part
+#:     images. Art. 4.5.1 *permits* a shaped rim -- *"The upper and lower thirds
+#:     of the circumference may be straight or of a different radius to the rest
+#:     of the wheel"* -- and the old docstring cited that permission as though it
+#:     were evidence. It is not: the article allows the shape, it does not report
+#:     one.
+#:   * The top dip was *deepened* from 13.3 mm to 39.8 mm, 12.5% of the width,
+#:     on the reasoning that at 13.3 mm "the M2 turntable read as a plain
+#:     three-spoke wheel". The turntable was right. It is a plain three-spoke
+#:     wheel.
+#:   * The built result measured 319.7 wide by 243.7 tall with two tall horns and
+#:     a 135.6 mm bottom flat -- wide and squat -- which is what reads as a
+#:     clover from three-quarters, and that is exactly how #199 reported it.
+#:
+#: Two independent primary references, both in this repo, both showing a round
+#: rim:
+#:
+#:   `crg_roadrebel_steering.webp`   three-quarter, close. One continuous smooth
+#:                                   arc over the top -- no dip, no horns -- with
+#:                                   a slight flattening across the bottom. Three
+#:                                   broad flat arms, teardrop cutouts, dished.
+#:   `tonykart_racer401T_p05.jpg`    top-down. The rim is a clean **circle**; the
+#:                                   four red segments that read as lobes are
+#:                                   **grip pads on a round rim**, with bare rim
+#:                                   between them. Four arms here rather than
+#:                                   three, so the arm count varies between
+#:                                   manufacturers and the roundness does not.
+#:
+#: That second image is almost certainly where the butterfly came from. A two-tone
+#: padded grip photographs as a lobed outline, and nothing in the old table
+#: recorded which image it was read off -- so there was no way to notice.
+#:
+#: `estimated`, from those two photographs. Height/width lands at 0.975: the flat
+#: is real but slight, 0.950 units at the bottom center against 1.000 at the top,
+#: and a circle would be 1.000. The rim is continuous with no obtuse angles, which
+#: is the rest of Art. 4.5.1 and the one part of the old note that still holds.
 WHEEL_OUTLINE: tuple[tuple[float, float], ...] = (
-    (0.000, 0.610),
-    (0.150, 0.672),
-    (0.320, 0.820),
-    (0.470, 0.880),
-    (0.640, 0.836),
-    (0.820, 0.688),
-    (0.940, 0.440),
-    (1.000, 0.150),
-    (0.985, -0.140),
-    (0.880, -0.390),
-    (0.700, -0.525),
-    (0.460, -0.588),
-    (0.220, -0.606),
-    (0.000, -0.610),
+    (0.000, 1.000),
+    (0.342, 0.940),
+    (0.643, 0.766),
+    (0.866, 0.500),
+    (0.966, 0.259),
+    (1.000, 0.000),
+    (0.966, -0.259),
+    (0.866, -0.500),
+    (0.700, -0.714),
+    (0.560, -0.828),
+    (0.380, -0.925),
+    (0.190, -0.945),
+    (0.000, -0.950),
 )
 
-#: Where the three spokes meet the rim, as an angle in the wheel plane measured
-#: from the wheel's own +X (right) toward +Y (up). Two up at the shoulders of the
-#: butterfly and one straight down to the flat bottom.
+#: Where the three arms meet the rim, as an angle in the wheel plane measured from
+#: the wheel's own +X (right) toward +Y (up). Two upper and one straight down,
+#: which is the layout `crg_roadrebel_steering.webp` shows. `tonykart_racer401T_
+#: p05.jpg` has four arms in a cross, so the count is a manufacturer's choice and
+#: three is CRG's; the shape of the outline is not a choice and is round in both.
 WHEEL_SPOKE_ANGLES: tuple[float, float, float] = (
     math.radians(25.0),
     math.radians(155.0),
     math.radians(270.0),
 )
 
-#: Spoke plate thickness, and its width at the boss and at the rim.
+#: Arm plate thickness, and its width at the boss and at the rim.
+#:
+#: **The outer width was 20 mm and that is what made three arms read as three
+#: sticks.** Both references show one flat plate whose arms meet the rim over a
+#: *broad tangent* -- the CRG arm is roughly as wide where it lands on the rim as
+#: it is at the boss, with the material removed as interior cutouts rather than by
+#: tapering the arm to a point. So the taper is now slight and the arms are wide.
+#: `estimated` off `crg_roadrebel_steering.webp`, where an arm's width at the rim
+#: is about 0.42 of the boss diameter.
+#:
+#: The teardrop cutouts themselves are **not modeled**, and that is a stated
+#: omission rather than an oversight: they are interior holes in a 8 mm plate,
+#: they need the plate authored as a boundary with islands, and at the ~0.55 m the
+#: cockpit camera sits from the rim the arm *width* is the difference that reads.
+#: Issue #199 carries it.
 WHEEL_SPOKE_THICKNESS = 0.008
-WHEEL_SPOKE_WIDTH_INNER = 0.032
-WHEEL_SPOKE_WIDTH_OUTER = 0.020
+WHEEL_SPOKE_WIDTH_INNER = 0.052
+WHEEL_SPOKE_WIDTH_OUTER = 0.044
 
 #: How far forward of the rim plane the boss sits — the wheel's dish.
 #:
@@ -1141,12 +1190,15 @@ def _wheel_spokes(
     pivot: bpy.types.Object,
     outline: list[Vector],
 ) -> None:
-    """Three flat plates from the boss out to the rim.
+    """Three flat arms from the boss out to the rim.
 
-    Each plate's outer end is snapped to the sampled rim point nearest its target
-    angle rather than to the angle itself, so a spoke always lands *on* the rim
-    however the butterfly outline is retuned — including on the flat bottom,
-    where the rim's radius is barely half what it is at the top.
+    Each arm's outer end is snapped to the sampled rim point nearest its target
+    angle rather than to the angle itself, so an arm always lands *on* the rim
+    however the outline is retuned. That mattered more when the outline was a
+    butterfly whose radius at the bottom was barely half its radius at the top;
+    with the round outline #199 corrected it to, the radius varies by 5% and the
+    snap is nearly a no-op. It stays because it is the property that makes the
+    outline and the arm layout independent decisions.
     """
     p = context.params
     center, axis, right, up = _wheel_frame(p)

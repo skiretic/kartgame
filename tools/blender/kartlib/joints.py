@@ -2234,8 +2234,11 @@ JOINTS: tuple[Joint, ...] = (
         a="engine_head",
         b="radiator_hose_upper",
         kind="routed",
-        why="the top hose leaves the outlet elbow, which is a boss on this casting, "
-        "so the hose's first bend is against the head",
+        why="the top hose meets the outlet elbow, which is a boss on this casting, "
+        "so the hose's **last** bend is against the head. This said *first* and "
+        "pointed a reader at the wrong end of the pipe: both routes are authored "
+        "radiator-first and have been consumed that way since #190 wave 3b, so the "
+        "head is where the run ends",
     ),
     Joint(
         a="fuel_tank",

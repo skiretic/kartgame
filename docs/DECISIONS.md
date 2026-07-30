@@ -3593,6 +3593,60 @@ because it was phrased as a limit.
   arms is the honest output of a cockpit that does not fit — far more useful than one
   whose arms were quietly lengthened to suit. The residual is reported as a number.
 
+**Amendment, same day: the 79.4 mm figure above is a guess at a number this spec
+does not publish, and the *clip* is the load-bearing part of it.** Two agents
+measured the hose against the driver and got 79.4 and 94.8 mm at the same point.
+Neither is wrong and the reconciliation is worth writing down, because #200's gate
+is about to be built on one of them.
+
+Both models put the torso axis in the same place — the two anchors differ by 4 mm —
+so essentially the whole 15 mm spread is the **radius**: 162 against 173. And
+**§60.1.4 publishes no fore-aft half-depth at all.** It publishes half-*breadths*,
+which are lateral: 162 at the hip, 180 at the shoulder, ±227 at the shoulder's
+outer surface. Both models substitute a lateral figure for a fore-aft one and
+differ only in which lateral figure they picked. So the honest statement is not
+"two valid approximations" — it is that every capsule depth quoted in this ADR is a
+missing dimension being invented, and the next agent to pick a third radius will
+report a fourth depth.
+
+**A circular section is not merely imprecise, it is wrong, and it swallows the
+seat.** Spending a 162-180 mm half-breadth fore-aft as well gives a ~346 mm chest.
+Measured on the built mesh, `seat_shell` sits **99.32 mm inside** such a capsule at
+(0, −362, 368); under this ADR's own radii the same point is 84.4 mm inside. So the
+unclipped capsule fails the seat under either radius, which means it is not a model
+of a driver — it is a model of a driver merged with his own seat.
+
+The section is an **off-center ellipse**: lateral half-width from the breadths,
+rearward half-depth bounded by the surface he leans on, forward half-depth free.
+
+**What gate 3 actually needs from this ADR is the clip, not the radius.** Of the
+three numbers taken across the hose fix, only the clipped one changed sign —
+capsule intersected with the half-space forward of the seat back went **−35.71 mm
+to +18.63 mm**, while both bare-capsule figures stayed negative for a hose that is
+now demonstrably behind the seat back. A gate built on the bare capsule would have
+reported the fixed hose as still failing.
+
+Two further facts #200 must not rediscover:
+
+1. **§60.1.1's rake plane and the built `seat_shell` disagree by up to 11.1 mm**, and
+   not uniformly: at z 350 the formula gives y −358.9 against the mesh's −357.9, but
+   at z 300 it gives −338.7 against −327.6. A gate 3 clipped on the *plane* and a
+   gate 1 testing the *triangles* will disagree low down, with the plane the more
+   conservative. Whichever surface a half-depth is measured from has to be named.
+2. **§60.1.6's part list contradicts its own contact table, and this is a defect in
+   the contract rather than in any build.** `DRIVER_CONTACTS` declares
+   `driver_torso`/`seat_shell` and declares **no** `driver_rib_protector`/`seat_shell`
+   row — so the torso is contractually the part that must reach the shell within
+   `CONTACT_TOLERANCE`, which forces its rear half-depth to the full 78 mm. But the
+   same subsection puts `driver_rib_protector` *over* the torso at z 250–450, which
+   puts the protector behind the shell's surface, inside the seat, with nothing
+   declared. That is a gate-3 failure or a waiver on day one. It is a decision about
+   the part list — whether `driver_torso` is the clothed outer surface at 78 mm, or
+   flesh-plus-overalls at ~60 with the protector owning the last 18 — and it needs
+   settling before #200 is written. The 78 mm itself is the seat back **surface**,
+   `derived` from §60.1.1's 22° rake and carrying **no** clothing allowance;
+   §60.1.5's 6–8 mm of overalls and 12–18 mm of protector are 18–26 mm of it.
+
 ---
 
 ## ADR-0056 — This kart runs the plain rear wheel protection, which is the KZ2 part

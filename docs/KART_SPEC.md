@@ -470,7 +470,13 @@ unsourced and mislabeled. 1,920 is the honest center of the same range.
 
 ## 5a. The cooling envelope — Art. 5.3, and it is harder than the bodywork's
 
-KZ is **Group 2**. Art. 5.3.1 *Radiator*, PDF page 15, verbatim, Groups 1 & 2:
+KZ is **Group 1** — §2b and ADR-0054. This line said Group 2 and was one of the
+four instances `99-recheck.md` catalogued as false; it is the last one still
+standing, and it survived because **nothing downstream moves**: Art. 5.3.1 is
+headed *"In Groups 1 & 2"* and applies either way. That is exactly why it lasted,
+and it is why it is corrected rather than left as harmless.
+
+Art. 5.3.1 *Radiator*, PDF page 15, verbatim, Groups 1 & 2:
 
 > Radiators must be placed above the chassis frame at a maximum height of 500 mm
 > from the ground and within an area situated between 550mm and 10mm ahead of the
@@ -3823,16 +3829,16 @@ The upper rod clears the left rear seat stay by 39 mm, `derived`.
 
 ### `radiator_hose_upper`, `radiator_hose_lower`, `cooling_hose_pump_engine`
 **Status:** upper and lower built and **re-routed**; the pump-to-engine hose is **new**
-**Attaches to:** upper: `radiator_tank_high` (routed) and `engine_water_outlet` (routed). Lower: `radiator_tank_low` and `radiator_end_inboard` (routed) and `cooling_pump_body` (routed). Pump-to-engine: `cooling_pump_body` and `engine_water_inlet` (routed).
+**Attaches to:** upper: `radiator_tank_high`, `radiator_core`, `radiator_end_inboard`, `engine_head` and `engine_water_outlet` (all routed) -- **five, not two.** Front matter §6 says this column *becomes* the `Joint` rows, so a row short here is a joint missing from `joints.py`; these three were declared when the hose's waivers were retired and the spec was not updated with them. Lower: `radiator_tank_low` and `radiator_end_inboard` (routed) and `cooling_pump_body` (routed). Pump-to-engine: `cooling_pump_body` and `engine_water_inlet` (routed).
 **Envelope:** Art. 5.3.1, §5a — *"All tubing must be made of a material designed to withstand heat (150 °C) and pressure (10 bar)."*
-**Verification:** gate 1 — three waivers today, 33 + 15 + 58 pairs — and gate 2
+**Verification:** gate 1 and gate 2. **There are no `radiator_hose` waivers.** This line said *"three waivers today, 33 + 15 + 58 pairs"*; all three became declared `routed` joints, and `OPEN_DEFECTS` has carried no `radiator_hose` entry since. A stale waiver count in a spec reads as an open defect that nobody needs to fix
 
 | dimension | value | prov | basis |
 | --- | --- | --- | --- |
 | bore | **20 ID** (3/4 in) | `sourced` | FTP silicone kart radiator hose; 3/4 in is the trade standard |
 | outer diameter | **28** | `derived` | 20 + 2 × 4 mm three-ply silicone wall. A photo reading gives 33, which is protective sleeving and must not be modelled as bare hose |
 | rating | 150 °C, 10 bar | `sourced` | Art. 5.3.1, §5a |
-| upper route | (295, −190, 360) → (150, −300, 375) → (0, −400, 390) → (−330, −378, 383) | `estimated` | hot water enters the **high** tank so the core drains downward, which New-Line's *"curved top tank inlet designed to evenly distribute water"* confirms is the inlet end. It crosses **behind the seat back**, which is the shorter run from a head outlet and stays above the axle |
+| upper route, **radiator-first** | (−170, −410, 388) → (220, −404, 376) → (232, −228, 382) | `estimated` | hot water enters the **high** tank so the core drains downward, which New-Line's *"curved top tank inlet designed to evenly distribute water"* confirms is the inlet end. **Three corrections, all of them the kind that get built.** (1) The old row claimed the run *"crosses behind the seat back"* and it did not: its second waypoint pulled the crossing 65 mm forward of the shell's top edge and the hose passed 79 mm through the driver's chest, which no gate could see because the driver was not a part. Issue #200, ADR-0055. The route above stays at y ≤ −404 until it is 220 mm outboard, then climbs the head's *inboard* flank; measured, 26.36 mm to `seat_shell` against 1.67 before. (2) The old row was written **engine-first** while `_cooling` has consumed both routes **radiator-first** since #190 wave 3b — so anyone implementing from this spec would reproduce the exact `reversed()` bug 6938909 fixed. Direction is now in the row's own label. (3) Its last point (−330, −378, 383) was never a waypoint: that end is the tank fitting the code derives from `HOSE_UPPER_LOCAL`, at (−258.8, −381.1, 386.1) |
 | lower route | (−250, −92, 100) → (−215, −200, 102) → (−215, −350, 105) → (0, −440, 95) → (140, −400, 110) | `estimated` | cold return is the low run by construction: bottom tank out, pump in, and the pump is at axle height. The x −215 leg is **inboard of both radiator brackets** — 19 mm from the lower rod's surface, 17 mm from the seat shell — which is what fixes the 58-pair overlap; the crossing at z 95 passes 28 mm under the chain's lower strand and 26 above the tray |
 | pump-to-engine | (160, −386, 140) → (240, −300, 175), ~180 mm | `estimated` | the pump's outlet to the crankcase inlet boss. Short by design |
 | what the routing must clear | the seat shell, the driver's hips and elbows, and the **spinning rear axle** | `derived` | a hose cannot cross the axle plane, so the upper run goes above and behind it and the lower run stays forward of it |
@@ -6081,11 +6087,248 @@ are in exactly that category.
 
 #### The switch, and why it is not optional
 
-`driver.py` is wired into `MODULES` behind `--set=driver=false`, which builds the
-bare kart. Every §6.4 driving figure, every `drive.sh` scenario and every
-published still predates the driver, and each one has to stay reproducible from
-the command that made it — the rule `shots/` is held to. A turntable of the kart
-*with* a driver is a new still, not a redefinition of an old one.
+`driver.py` is wired into `MODULES` behind a flag that builds the bare kart. Every
+§6.4 driving figure, every `drive.sh` scenario and every published still predates
+the driver, and each one has to stay reproducible from the command that made it —
+the rule `shots/` is held to. A turntable of the kart *with* a driver is a new
+still, not a redefinition of an old one.
+
+**The spelling is `--driver=false`, not `--set=driver=false`, and that is a
+correction.** `--set` is typed against `KartParams`' fields by
+`genkart.parameters_from`, which raises `SystemExit("no such parameter 'driver'")`
+before any module runs — so the spelling this subsection originally carried cannot
+work without a `params.py` field, and `params.py` is single-owner. `driver.py`
+reads `--driver=` off `sys.argv` instead, exactly as `build.selected_livery` reads
+`--livery=` and for the same reason: `genkart.sh` forwards every unrecognized
+argument verbatim and `genkart.py`'s parser collects unknown keys without
+complaining.
+
+### 60.1.7 The cross-sections, as built — issue #17
+
+`tools/blender/kartlib/driver.py`. Every number here is the building module's, per
+§60.1.6's rule that the cross-sections are not specified in the contract; every one
+carries a tag and the estimates carry their reasoning. Millimeters.
+
+**Eighteen parts, not nineteen.** §60.1.6 says nineteen and its own table
+enumerates twelve rows — six singles and six left/right pairs — which is 18. The
+built set is exactly those eighteen names and none was renamed. The count in the
+prose is the error, not the table.
+
+| quantity | value | prov | basis |
+| --- | --- | --- | --- |
+| pelvis width | **325** | `derived` | `driver_hip_breadth`, unchanged. |
+| pelvis depth | **200** | `derived` | 2 × §60.1.3's 100 mm hip-forward-of-back-contact, which that subsection calls "roughly half the pelvis depth". |
+| pelvis height | **188** | `derived` | `2 × (driver_hip_z − (seat_z + seat_thickness))` = 2 × (130 − 36). Expressed that way rather than as a constant so the block's underside *is* the pan whatever the seat does — measured at 36.00 against a pan of 36.00, 0.00 mm. |
+| pelvis / boot superellipse exponent | 3.0 | `estimated` | squarer than an ellipse, rounder than a box. A pelvis in a shell and a boot sole both read that way. |
+| torso rear face | the seat's own 22° chord | `derived` | the plane through 100 mm behind the H-point at `p.seat_shell_rake`. Reproduces §60.1.1's published back surface to 1 mm, §60.1.3's hip derivation exactly, and gives the acromion 70.2 mm of rearward half-depth. **A rigid 25° torso box instead stands 33 mm proud of the shell's top edge** — measured — because 3° over 280 mm of shell is 15 mm on top of the 16 mm it starts at. |
+| torso width, three stations | **325 / 360 / 455** | `derived` / `derived` / `sourced` | §60.1.1's own taper: `driver_hip_breadth` at the H-point, `driver_seated_shoulder_breadth` where the shell ends, `driver_bideltoid` at the acromion. Nothing styled. **These are lateral half-widths only** — see the section table below. |
+| torso depth at the hip | 200 | `derived` | = the pelvis depth. |
+| torso depth at the chest | **215** | `estimated` | the derived 200 plus 7.5%. The chest is the deepest station; the rib protector is a separate part, so this is flesh and overalls only and is not double-counting the shell. |
+| torso depth at the acromion | **210** | `estimated`, arithmetic shown | the back plane at `driver_shoulder_z` sits 70.2 mm behind `driver_shoulder_y`; a shoulder joint is about one third of the chest depth forward of the back, so 3 × 70.2 = 211 → 210. The one-third is the estimate; the 70.2 is derived from two sourced positions. |
+
+**The torso section is an off-center ellipse about the spine, not a circle, and the
+breadths are never spent fore-aft.** A circular section spends the 455 bideltoid as
+a 227 mm radius, i.e. a 455 mm chest depth, and the resulting volume reaches back
+*through* the seat — and gate 3 would not catch it, because
+`joints.DRIVER_CONTACTS` declares `driver_torso`/`seat_shell` as `sits_on` and a
+declared contact **permits** interpenetration. Same shape of failure as the inverted
+winding: invisible because the thing that would show it is switched off by design.
+So the rear half-depth is not an estimate at all — it is bounded by the sourced 22°
+back plane, which is the surface he leans on.
+
+| station | z | spine y | rear face y | **rear half-depth** | **forward half-depth** | half-width |
+| --- | --- | --- | --- | --- | --- | --- |
+| hip / H-point | 130.0 | −170.0 | −270.0 | **100.0** | **100.0** | 162.5 |
+| shell top | 367.0 | −280.5 | −365.8 | **85.2** | **129.8** | 180.0 |
+| acromion | 608.0 | −392.9 | −463.1 | **70.2** | **139.8** | 227.5 |
+| shoulder cap | 632.0 | −404.1 | −472.8 | **68.8** | **121.2** | 215.0 |
+
+Rear half-depths are `derived` (the sourced back plane against the spine axis);
+forward half-depths are the `estimated` total depth less the rear; half-widths are
+§60.1.1's breadths halved. Symmetric only at the hip, which is right — §60.1.3's
+100 mm *is* half the pelvis depth.
+
+**Measured on the built mesh**, rear surface to `seat_shell`:
+
+| part | nearest rear-face vertex to `seat_shell` | at |
+| --- | --- | --- |
+| `driver_torso` | **0.04 mm** | (45.3, −309.4, 231.6) |
+| `driver_pelvis` | **0.02 mm** | (0.0, −275.0, 143.4) |
+| `driver_rib_protector` | **0.37 mm** | (0.0, −361.6, 356.6) |
+
+which is what `sits_on` is supposed to mean. **The deep overlaps with `seat_shell`
+are lateral and low, not fore-aft**: the worst `seat_shell` vertex inside
+`driver_torso` is 61.92 mm in at **(86.8, −213.2, 191.9)** and inside
+`driver_pelvis` 74.59 mm at **(86.0, −185.7, 136.6)** — both well inboard of the
+shell's 162.5 mm inner half-width and above the pan, so they are the built shell's
+own pan-to-back transition wrapping the hips rather than a driver sunk into his
+seat back. That distinction is the whole point of measuring the rear face
+separately.
+
+**ADR-0055's 79.4 mm is model-dependent and the built mesh supersedes it.** That
+figure came from a constant-radius capsule union at chest r 162; a tapered capsule
+reads 94.8 at the same point and a circular-section solid reads 99.32. Against the
+**built** `driver_torso`, ADR-0055's probe point (0, −362, 368) is **3.86 mm** from
+the surface — the rear face at that height is y −366.2, exactly on the sourced back
+plane. So none of the three capsule numbers describes this part, and the one to
+quote from here on is the mesh's.
+| shoulder cap, above the acromion | 430 wide × 190 deep over 24 of rise | `estimated` | the deltoid is widest *at* the acromion and rolls over above it. |
+| torso exponents | 2.6 hip, 2.3 chest and up | `estimated` | close to elliptical, rounder as it rises out of the shell. |
+| rib protector, along-torso stations | **250 → 450** | reading of §60.1.5 | §60.1.5's "z 250–450 in the torso frame" read as distance along the 25° axis, which is world z **357–538** — the ribs, with the acromion at 527 along. The alternative reading, world z, would put a rib protector across the lumbar spine. |
+| rib protector build | a closed band, outer face 1 mm proud of the torso, 15 mm inward | `estimated` placement | the real part is a front shell and a back shell strapped at the sides; a closed band is the simplification, and it is chosen because it is **watertight** and therefore checkable by the winding gate. The 15 mm goes *inward* because 325 and 360 are already the breadths of a driver wearing one — that is what `driver_protector_thickness`'s docstring means by "they are what makes the seat fit" — so putting it outside counts it twice. |
+| neck | **120** diameter, flared 1.15× at the base | `derived` from an `estimated` | bare 106 (`estimated`, a little under half `driver_helmet_width`) plus 2 × `driver_overalls_thickness`. Art. 7's preamble bans "a scarf, muff, or any loose clothes around the neck", so the collar is the overalls and nothing else. |
+| upper arm | **109** at the root → 86 at the elbow | `estimated`, arithmetic shown | `(driver_bideltoid − driver_seated_shoulder_breadth) / 2` = 47.5 is the deltoid's outboard stand-off; doubled as a diameter is 95, plus 2 × 7 of overalls is 109. The two breadths are measured at different heights, so this is a proportion and not a derivation, and it is tagged accordingly. |
+| forearm | 96 at the elbow → 70 at the wrist | `estimated` | slimmer than the upper arm at the elbow, tapering hard. |
+| glove, along the rim | **105** | `derived` | the NASA table's `hand length` 191 × 0.55 for a closed fist. |
+| glove, across and through | 96 × 86 | `estimated` | hand breadth is not in §60.1.2's table. |
+| thigh at the hip | **162.5** | `derived` | two thighs fill `driver_hip_breadth`, so each is half of it. Computed from the field. |
+| thigh at the knee | 128 | `estimated` | a clothed knee measures about that across. |
+| shank | 124 at the knee → 94 at the ankle | `estimated` | |
+| boot shaft | **108** diameter, 90 of rise above the ankle | `derived` / `estimated` | the cuff goes over the overalls, so 94 + 2 × 7. The 90 mm rise is `estimated` against Art. 7.4's *"protect the ankles"*. |
+| boot foot | half-widths 42 / 48 / 38, half-heights 48 / 40 / 30, toe 45 past the ball | `estimated` | 96 across the ball sits between two figures that *are* written down: `pedal_bar_length` 0.080 is documented in `params.py` as "one boot", and a 50th-percentile male foot breadth is about 100. |
+| visor aperture | 200 × 95 | `estimated`, §60.1.5 | checked against `driver_eye_x` rather than trusted: an aperture narrower than 2 × 32 plus a margin is a driver who cannot see out, and the module widens it and says so if that ever happens. |
+| visor standoff / thickness | 1 / 4 | `estimated` | a polycarbonate visor is 2–3 mm in a rebate; 4 at a 1 mm standoff is the same read with no rebate. **The helmet's eye port is not cut open** — §60.1.6 specifies an ellipsoid, a closed ellipsoid is watertight and therefore checkable, and an aperture cut at two densities would not be the same shape at both. |
+| elbow swivel | **down, with a quarter of it outboard** | `estimated`, read off two photographs | `exh_commons_buntschu_kz2.jpg` and `exh_commons_panfilov_kz2.jpg` both show the elbows *tucked* — below the shoulder and barely outside the torso line, forearms angling up and inboard to the rim. It matters here: at the reach this cockpit actually has the elbow is **212.4 mm** off the shoulder-to-grip line, so unlike a locked arm the swivel is a real choice. Built, the right elbow lands at **(234.4, −133.9, 349.0)** — 34 mm outboard of the shoulder and 259 mm below it. An earlier armchair 45° guess put it at (331.7, −116.6, 403.9), 132 mm outboard, out over the sidepod, and 30 mm into `engine_plug_lead`; neither photograph supports it and the interference went away when the photograph did the choosing. |
+
+**Three inconsistencies in §60.1's own numbers, found by building them.** None is
+patched in geometry; all three are decisions above this module's pay grade.
+
+1. **The neck's two endpoints are the only §60.1.6 coordinates with no `params.py`
+   field**, so they are the one pair of literals in `driver.py`. They are **3.9 mm
+   and 4.1 mm rearward** of the 25° torso axis at their own heights — measured. Small
+   and consistent, so probably rounding in §60.1.6's own derivation, but it means the
+   neck is the one part not on a published datum.
+2. **The helmet cannot be both "300 tall × 340 long" and crowned at
+   `(0, −511, 860)`.** §60.1.4 derives that crown 135 mm from the centre *along the
+   raked head axis*; an **axis-aligned** 300 mm ellipsoid centred at z 738 crowns at
+   **888**, 28 mm higher, at y −454 rather than −511. `driver.py` builds it
+   axis-aligned, because `_width` / `_length` / `_height` are world words and a shell
+   raked 25° is neither 340 long nor 300 tall — and because a raked shell puts the
+   visor 27–107 mm *above* the eye and the face 25° skyward, measured. So the
+   contract's three dimensions win and §60.1.4's crown row is the casualty.
+3. **§60.1.4 puts the eye point on the helmet's own fore-aft mid-plane**, because it
+   walks sitting eye height along the torso axis and the helmet centre is derived
+   along the same axis. Built, the eye is **178 mm behind the shell's front face**;
+   real eyes sit near the front of the skull, roughly 100 mm behind a helmet's front.
+   The driver looks out of the middle of his own head. This is the same field
+   `kartview.gd`'s cockpit camera and `engine_voice_rig.gd`'s listener read, so it is
+   a §60.1.4 decision with runtime consequences and not a mesh tweak.
+
+**Density and cost.** Eighteen parts: **1,352 verts / 2,628 tris at low** and
+**7,944 / 15,812 at high**. Ring counts come from `detail.tube_segments` (12 / 32)
+and station counts from `detail.bend_segments // 2` (3 / 7); interpolation between
+authored stations is **linear**, so both densities lie on the same surface rather
+than on two surfaces, which is what `Detail`'s contract requires for #19's bake. No
+part is beveled: `build.bevel_object`'s 4 mm high-detail offset would chamfer most
+of the protector's 15 mm wall away, and a smooth-shaded body has no hard edges for a
+bevel to earn its vertices on.
+
+**"Same shape at two densities" is measured rather than claimed.** Every low-detail
+vertex against the high-detail surface of its own twin: **worst 1.165 mm**
+(`driver_helmet`), and eleven of the eighteen parts are under 0.4 mm — `driver_torso`
+0.815, `driver_rib_protector` 0.756, `driver_pelvis` 0.597, `driver_glove_?` 0.361,
+`driver_thigh_?` 0.353, `driver_helmet_visor` 0.297, `driver_neck` 0.295,
+`driver_shank_?` 0.265, `driver_boot_?` 0.245, `driver_upper_arm_?` 0.233,
+`driver_forearm_?` 0.205. The whole spread is chord error of an inscribed polygon: a
+12-gon on the helmet's 125 mm radius sits `r(1 − cos 15°)` = 4.3 mm inside the true
+ellipse and a 32-gon `r(1 − cos 5.6°)` = 0.6 mm, so about a millimeter between them
+is exactly what two densities of the *same* surface look like. Nothing here is a
+second shape, which is the smeared bake #19's acceptance criteria calls out.
+
+**All eighteen are watertight and enclose positive volume**, so every one is checked
+by the winding gate rather than skipped by it. That drove three construction
+choices: the rib protector is a closed band, the boot is two closed lofts in one
+mesh rather than one loft round a 90° corner, and the visor is a closed lens with
+four rim strips whose windings are derived in comments rather than tried.
+
+### 60.1.8 The six driver finishes, measured — and what the photographs said about the pose
+
+§60.1.6 fixes six material names and leaves their values to the building module.
+Sampled off **`exh_commons_buntschu_kz2.jpg`** — a KZ2 driver mid-corner, and the
+only photograph in this repo of a driver *in* a kart — with a 16-level modal sample
+plus a mean per region, and cross-read against
+**`exh_commons_panfilov_kz2.jpg`**. It is an overcast outdoor frame, so whites carry
+a blue sky cast and dark surfaces are the trustworthy hues.
+
+| region | modal sample | mean | measured linear luminance |
+| --- | --- | --- | --- |
+| overalls, navy sleeve | **#182848** | #2a364d | 0.037 |
+| overalls, white chest panel | #d8e8f8 | #c1d3ea | 0.639 |
+| glove | #181818 | #3b3d41 | 0.046 |
+| boot | #282838 | #2f383c | 0.038 |
+| helmet shell, white | #d8e8f8 | #b1bed3 | 0.509 |
+| visor | **#083858** | #265173 | 0.075 |
+| radiator core, for scale | #a8b8c8 | #849ba6 | 0.311 |
+| asphalt, for scale | #989898 | #909091 | 0.279 |
+
+So, in §60.3's four-tuple form `(hex, luminance, roughness, metallic)`:
+
+| material | four-tuple | notes |
+| --- | --- | --- |
+| `overalls_fabric` | **`("#1c2c4c", 0.060, 0.65, 0.0)`** | hex `derived` from the #182848 mode warmed toward the mean. **`build.py`'s existing `suit_fabric` is `#16305c` at 0.055 — within a hue step and 0.005 of luminance, which is corroboration and not coincidence.** The luminance is deliberately above the measured ratio: 0.037 against a 0.311 radiator scales to 0.029 on this project's `radiator_alu` 0.240, and a cockpit-camera-distance surface at 0.029 with no albedo texture is a black hole. Same reasoning `engine_cast` is held at 0.175. |
+| `protector_shell` | **`("#232326", 0.032, 0.50, 0.0)`** | all `estimated` — **no photograph in this repo shows a rib protector at all**, see below. Placed darker than the overalls and lighter than the tires so it separates from both. |
+| `helmet_shell` | **`("#f0ece6", 0.640, 0.14, 0.0)`** — **unchanged** | already in `FIXED_FINISHES` and the measurement supports it: the shell is by far the brightest thing on the driver in both frames, and roughness 0.14 is right for an Arai's clear coat. Reported as confirmed rather than re-tuned. |
+| `visor_tint` | **`("#123a5c", 0.055, 0.08, 0.0)`** | hex `derived` from #083858. Roughness **0.08** makes it the smoothest surface on the kart, level with `tube_chrome` and glossier than the wrap's 0.16 — which is true of a real visor. Metallic 0.0: it is tinted polycarbonate, not a mirror. Luminance below the measured 0.075 on purpose, because most of that read *is* the sky reflection a roughness-0.08 material will generate for itself. |
+| `glove_leather` | **`("#242428", 0.030, 0.55, 0.0)`** | hex `derived` from #181818/#3b3d41. Roughness 0.55: perforated suede, matte, and definitely not `rubber_gloss`'s 0.40, which is what it is standing in as. |
+| `boot_leather` | **`("#26262c", 0.034, 0.38, 0.0)`** | hex `derived` from #282838. Glossier than a glove — a karting boot is smooth coated leather. |
+
+**Three findings from those photographs, all outside this module's geometry.**
+
+1. **§60.3.8's claim that the suit is the brightest thing on the kart is half right
+   and the wrong half is load-bearing.** It says the radiator is *"the brightest
+   object on the kart besides the driver's suit"*. Measured, the suit's **navy body
+   is 0.037** and its **white chest panel is 0.639**, against a radiator at 0.311.
+   The bright thing is a panel, not the garment. A race suit is a multi-panel livery
+   object — navy body, white chest, fluorescent yellow-green shoulder and sleeve
+   stripes, sponsor blocks — and `overalls_fabric` is one material, so the panels are
+   a texture this pipeline cannot write. Same standing as `ZONES`' owed glyph: the
+   material is the navy body and the rest is owed, said plainly rather than left to
+   be discovered in a render.
+2. **Neither driver wears a visible rib protector.** In both frames the torso is
+   plain overalls with no external shell, which means the protection is worn
+   *under* the suit. §60.1.5 says *"Adds 12–18 mm per side over the overalls"* and
+   `driver.py` builds it 1 mm proud accordingly, so the built part is a vest *over*
+   the suit. Both products exist and 8870-2018 covers both, but the photographic
+   evidence in this repo is for under, and under makes `driver_rib_protector` an
+   invisible part — which §60.1.6 argues against on its own terms. Flagged as a
+   decision, not changed.
+3. **The head is upright and the elbows are tucked.** Both drivers hold the helmet
+   vertical with the face pointing where the kart is going, which is the independent
+   support for building the shell axis-aligned rather than raked with the torso
+   (§60.1.7 item 2). Both hold the elbows *below the shoulder and barely outside the
+   torso line*, forearms angling up and inboard to the rim — which is why
+   `ELBOW_SWIVEL` is down with a quarter of that outboard rather than the 45° wing an
+   armchair guess produced. And both grip at roughly **10 and 2 o'clock**, not
+   §60.2.1's 3 and 9. Three-and-nine is kept because it is the straight-ahead datum
+   the whole reach table is built on, but it is not where a driver's hands are, and
+   10-and-2 is the *harder* reach — it is 30° of the lock sweep §60.2.5 tabulates,
+   at 644 mm instead of 592.
+
+### 60.1.9 What the driver is built inside, measured — gate 3's seed list
+
+Issue #200's waiver list, measured off the built mesh at high detail with a
+triangle-overlap test and a ray-crossing depth probe in both directions. **64
+intersecting pairs across 34 distinct kart parts**, none of them fixed here:
+§60.1.6's rule is that a finding which cannot be adjudicated against a sourced
+figure gets a waiver and a ticket, and the leg path hangs off `driver_knee_x` = ±180
+and `driver_ball_z` = 0.090, one `estimated` off a photograph and one stale.
+
+Grouped by cause, because thirty-four parts is not thirty-four problems:
+
+| cause | pairs | depths | disposition |
+| --- | --- | --- | --- |
+| **the six declared contacts** — `seat_shell` wrapping the hips and torso, `steering_rim` inside both gloves | 7 | up to 74.6 (`seat_shell` in `driver_pelvis`), 42.5 (`steering_rim` in a glove) | **correct, not defects.** A `sits_on` and a `grips` row permit exactly this. |
+| **the boots 138 mm below the pedals** — `pedal_throttle` 61.5, `pedal_brake` 34.3, `pedal_brake_clevis` 11.5, `brake_pushrod` 9.0, `brake_line_rear` 7.2, `brake_pushrod_link` 6.5, `brake_master_rear` 3.4, `brake_master_bracket` 2.2, `steering_pitman` 1.4, `chassis_steering_hoop` 1.1, `tierod_?` 2.2, `tierod_end_?_inner` 0.8, `chassis_floor_tray` 0.0 | 24 | 0.0 – 61.5 | **one parameter fix, §60.2.5.** Most of this list disappears when `driver_ball_*` tracks the live foot bar. |
+| **the wheel in the knees** — `steering_rim` in `driver_shank_?` 17.5 and `driver_thigh_?` 10.7 | 4 | 10.7 – 17.5 | **§60.2.3 predicted it to the millimeter** at a wheel centre near 190; the live centre is 187.3. Rests on `driver_knee_x` ±180, `estimated`. Waiver. |
+| **the fuel tank between the shins** — `fuel_tank_strap_front` 52.3, `fuel_tank` 36.9 in the shanks and 23.4 in the boots, `fuel_tank_strap_rear` 0.8 | 8 | 0.8 – 52.3 | a KZ tank does live between the legs, but not 52 mm into them. Real, and it is a tank-placement question. |
+| **the chain run through the right hip** — `drive_chain_guard` 20.4 / 18.8, `drive_chain` 9.9 / 7.0, `drive_output_sprocket` 6.3 / 3.4, `drive_output_shaft` 5.5 / 3.3 | 8 | 3.3 – 20.4 | real. The pelvis is 325 wide and the output end is inside that. |
+| **the upper radiator hose through the driver again** — `radiator_hose_upper` in `driver_rib_protector` 13.7, `driver_torso` 33.6, `driver_upper_arm_r` 9.0 | 3 | 9.0 – 33.6 | **measured against the two-point `HOSE_UPPER_ROUTE` that was in this worktree**, `((0, −0.4, 0.39), (0.15, −0.3, 0.375))`. A three-point reroute behind the seat back has since landed elsewhere and is *not* in these numbers — re-measure after the merge. This is the same class of defect ADR-0055 cites as the reason the driver exists at all. |
+| **the front bumper sockets and side bars at the ankles** — `chassis_bumper_socket_side_upper_front_?` 14.4 / 7.3, `chassis_side_bar_upper_?` 3.4, `chassis_tray_edge_?` 5.6, `chassis_steering_support_upper` 9.3, `steering_clutch_lever` 7.0 | 9 | 3.4 – 14.4 | mostly a consequence of the boots being low; re-measure after the `driver_ball_*` fix. |
+| **the engine on the driver's right** — `engine_head` 4.5 in `driver_upper_arm_r` | 1 | 4.5 | real but marginal. An earlier 45° elbow swivel put the arm 30 mm into `engine_plug_lead`; the photograph-corrected swivel (§60.1.8) removed that pair entirely. |
+
+**Two of the eight groups are single parameter edits, not geometry work**, and both
+are named in §60.2.5. That is the useful shape of this list: it is not sixty-four
+independent faults.
 
 ---
 
@@ -6201,6 +6444,81 @@ about 115 mm forward of where a real T11 ML's does — consistent with
 sourced 335 and that the shell is built as a single-width box. The hip agreeing to
 4 mm while the lip disagrees by 116 says the *seat* is the part that is wrong, not
 the driver and not the pedals.
+
+### 60.2.5 The cockpit moved. Everything above §60.2.4 is measured against a wheel and a pedal box that no longer exist
+
+Issue #17, measured off the built mesh. **§60.2.1 through §60.2.4 are stale at the
+premise, and the answer changes sign.**
+
+Every number in §60.2.1 comes from `wheel_angle` 0.470 and an authored
+`wheel_center_y` 0.320 / `wheel_center_z` 0.480. **All three fields are deleted from
+`params.py`.** The steering is now authored from the welded end: `column_rake` is
+0.628 (36.0°, measured on the column tube in `tonykart_racer401T_product.png` and
+corrected for that image's 11% anisotropy), `wheel_incline_delta` adds 7.0° of
+inclined-hub wedge, and `P.wheel_center` *derives* the centre from the lower bore.
+That field's own docstring says it: *"the old pair was 133 mm too far forward."*
+
+| | §60.2 as written | live, `P.wheel_center` / `P.wheel_rake` |
+| --- | --- | --- |
+| wheel centre | (0, **320**, 480) | **(0, 187.3, 495.9)** |
+| wheel plane rake from vertical | 26.93° | **42.97°** |
+| right-hand grip, 3 o'clock | (160, 320, 480) | **(160, 187.3, 495.9)** |
+
+So the reach, re-measured with the *same* sourced segment lengths:
+
+| | required | available 368 + 361 | verdict |
+| --- | --- | --- | --- |
+| straight ahead | **592.4** | 729.0 | closes, **136.6 mm of fold**, elbow at **108.71°** |
+| 30° of lock | 644.4 | 729.0 | 84.6 mm spare |
+| 60° of lock | 692.4 | 729.0 | 36.6 mm spare |
+| 90° of lock, hand at the top of the rim | 725.5 | 729.0 | 3.5 mm spare, elbow locked |
+
+**§60.2.2's verdict is reversed and §60.2.3's fix has already been applied.**
+§60.2.3 solved for the `wheel_center_y` that puts the straight-ahead grip at a
+110° elbow and got **190**; the live derived centre is **187.3**, and the built elbow
+comes out at **108.71°** — within 1.3° of the comfort target that section named,
+from a chain that never used it. Two independent derivations landing 2.7 mm apart is
+the strongest corroboration in this section.
+
+**And §60.2.3's warning about the knees was right to the millimeter.** It predicted
+that at a wheel centre near 190 the rim's lower arc would pass "39 mm inboard of the
+knee joint and 4 mm above it", and that it works only because the knees straddle the
+column. Built and measured: `driver_thigh_l/r` and `driver_shank_l/r` each intersect
+`steering_rim`, by **8.5 mm** and **17.5 mm** respectively. The knees do straddle the
+column and they graze the rim doing it. That interference rests entirely on
+`driver_knee_x` = ±180, which is `estimated` off one three-quarter action
+photograph, so per §60.1.6 it is a waiver and a ticket rather than a geometry change.
+
+**The pedals, by contrast, have gone the other way and this one is a defect.**
+`driver_ball_*`'s docstring calls itself `sourced` from `pedal_y` / `pedal_z`. Those
+fields no longer hold those values: the pedal box was re-authored as an organ pedal
+on a bottom pivot, so `pedal_z` is the **derived** foot-bar height 0.228 (its own
+docstring: *"Was 0.090 — 21 mm above the floor tray, which is a foot resting on the
+floor and not a pedal. 138 mm of error"*), `P.pedal_bar_y` is 0.585, and
+`pedal_separation` moved 150 → **170**.
+
+| | driver block | live cockpit | Δ |
+| --- | --- | --- | --- |
+| ball of foot, x | ±75 | ±85 | 10 |
+| ball of foot, y | 560 | 585.0 | 24.9 |
+| ball of foot, z | **90** | **228.2** | **138.2** |
+
+Total 140.8 mm. So `driver.py` builds the boots where the driver block says, and the
+result is measured at **56.84 mm** of gap from each `pedal_*_pad` while the boot
+passes *through* `pedal_brake` / `pedal_throttle` — the arm — by 9.1 mm and through
+`pedal_brake_clevis` by 11.2 mm. Both `presses` contacts in
+`joints.DRIVER_CONTACTS` therefore fail by 54.8 mm against `CONTACT_TOLERANCE`, and
+about a third of the driver's interference list is boots down in the pedal linkage
+where a foot 138 mm lower than the pedal has to be. The whole leg chain hangs off it:
+`driver_ankle_*` and `driver_heel_*` are derived from that ball, and
+`driver_knee_*`'s two-link solve closes on that ankle.
+
+**This is the one finding here that is a straight parameter fix rather than a
+decision.** `driver_ball_x` → `pedal_separation / 2`, `driver_ball_y` →
+`P.pedal_bar_y`, `driver_ball_z` → `P.pedal_bar_z`, then re-run §60.1.4's ankle,
+heel and knee arithmetic. It is not made here because `params.py` is single-owner and
+the driver block is §60.1.4's, not #17's. `driver.py` prints the divergence in
+millimeters on **every build** so the waiver cannot rot.
 
 ---
 
@@ -6547,8 +6865,10 @@ of them is a real trap:
    clear around the glyph on every side. There is no second color.
 4. **The font is specified and the note omitted it.** *"black, in an Arial
    font"*. That is a hard constraint on the texture, not a suggestion.
-5. **The 220 mm rear plate is Group 4, not KZ.** KZ is Group 2. Anyone lifting
-   "220 mm sides" into this kart would be building a superkart's plate.
+5. **The 220 mm rear plate is Group 4, not KZ.** KZ is **Group 1** (§00 §2b,
+   ADR-0054); this line said Group 2, which is KZ2. The point is unaffected —
+   neither group is Group 4 — but anyone lifting "220 mm sides" into this kart
+   would be building a superkart's plate.
 
 ### 60.4.3 What those figures mean geometrically
 

@@ -712,9 +712,100 @@ tubing at 150 C and 10 bar."""
 HOSE_UPPER_LOCAL: tuple[float, float, float] = (0.0, 0.85, 0.95)
 HOSE_LOWER_LOCAL: tuple[float, float, float] = (0.0, 0.85, -0.95)
 HOSE_UPPER_ROUTE: tuple[tuple[float, float, float], ...] = (
-    (0.0, -0.400, 0.390),
-    (0.150, -0.300, 0.375),
+    (-0.170, -0.410, 0.388),
+    (0.220, -0.404, 0.376),
+    (0.232, -0.228, 0.382),
 )
+"""**This route was built through the driver's chest, and the driver is the datum
+that caught it.** `estimated` as a route, like the lower one.
+
+The route was two waypoints, `(0, -400, 390)` and `(150, -300, 375)`. The first is
+where it still is; the second pulled the crossing **65 mm forward of the seat
+back's top edge** and the run then stayed forward all the way to the head, so the
+pipe went diagonally across the lumbar spine and out over the lower right flank
+about 200 mm above the hip joint. The shell it was supposed to be behind was
+**1.67 mm** away, which is a graze and not a clearance.
+
+**The driver volume is measured two ways, and only one of them means anything
+behind the seat.** The hard points are
+`docs/kart_spec/60-driver-and-finishes.md` §60.1.4's: hip joint (0, -170, 130) to
+shoulder joint (0, -393, 608), half-breadth 162 rising to 180. A tapered capsule
+on those is **circular in cross-section**, so it spends a *lateral* half-breadth
+in the fore-aft direction too -- 173 mm at the height this hose crosses, i.e. a
+346 mm chest -- and it reaches back past the seat: the built `seat_shell` measures
+**99.3 mm inside that capsule** at (0, -362, 368). A model that puts the seat
+inside the driver cannot adjudicate a hose behind the seat, so the figure to fix
+against is the capsule **intersected with the half-space forward of the seat
+back** -- §60.1.1's `y = -365 + 0.404*(365 - z)`, which is where his back is,
+because it is what he leans on. Both, old route then new:
+
+    capsule n forward of the seat back    -35.71 at (73, -336, 388)   ->  +18.63
+    bare capsule                          -94.83 at ( 9, -380, 397)   ->  -78.81
+
+The second row stays negative and stays negative for the seat as well; that says
+the instrument is wrong, not that the hose still is. ADR-0055's **79.4 mm at
+(8, -379, 394)** is this same defect on its own capsule union, and is quoted here
+rather than reconciled -- three capsule models, three depths, one hose through a
+man.
+
+**Nothing here failed. That is the point.** Gates 1 and 2 have no opinion about
+the volume a seated human occupies because that volume is not in the build, so
+this was green for a milestone and was found by a human turning a viewport. The
+sibling defect on the lower hose -- the `reversed()` in `_cooling` -- was fixed in
+#190 wave 3b and **nobody re-checked the upper route afterward, because there was
+nothing to check it against.** §60.1.4 publishes the hard points and §60.1.6
+explains why the man is a datum; issue #200's gate 3 is what will assert this
+without a viewport. Note that `HOSE_LOWER_ROUTE`'s note below says the upper
+route's *"two points swapped with no change to the pipe it builds"* -- true of
+that wave, and those are the two points this docstring is about.
+
+Three waypoints now, and what each one is against:
+
+    (-170, -410, 388)   straight back off the high tank's fitting and over the
+                        core's top edge rather than around it: 3.19 mm to
+                        `radiator_fin_17`'s rear-top corner, which the old route
+                        cleared by 3.03, so the fin is no worse for the extra
+                        29 mm of rearward set. y -410 is 8.7 mm behind
+                        `radiator_tank_high`'s own rear face at -401.3
+    ( 220, -404, 376)   **the crossing, and it stays behind the seat back the
+                        whole way across.** The shell's rear face is at y -358 at
+                        z 350 and its top edge is z 378, so the tube runs 26.4 mm
+                        clear of `seat_shell` and 18.6 mm clear of the driver
+                        volume above. x 220 is 36 mm outboard of the shell's
+                        +-184 flank and ~49 mm outboard of the torso's own
+                        half-breadth at this height, which is what lets the turn
+                        forward happen here and not sooner
+    ( 232, -228, 382)   up the head's **inboard** flank. `engine_cylinder` is a
+                        leaned can of radius 64 whose deck is at z 361 and
+                        `engine_head` is radius 53 on top of it; x 232 is 87 mm
+                        inboard of their common axis at x 319, so the climb
+                        happens in free air -- 14.06 mm to the cylinder against
+                        the old route's 5.52 -- and the last 107 mm drop onto the
+                        boss over the deck rather than through it. It also keeps
+                        `engine_head_nut_2` and `_3` at 7.87 and 8.11 rather than
+                        under a millimeter, which is what a straighter dive at
+                        this corner costs
+
+Measured on the built tube, surface to surface, at `Detail.high`, after the 50 mm
+bend radius has had its say -- the fillet is why these are not the authored
+offsets:
+
+    seat_shell                 26.36     engine_head_nut_3           8.11
+    driver, clipped capsule    18.63     engine_head_nut_2           7.87
+    engine_cylinder            14.06     radiator_fin_17             3.19
+    engine_plug_boss           15.24     radiator_curtain            9.75
+    engine_plug_lead           67.12     chassis_seat_strut_rear_r  56.78
+    engine_airbox              61.60     engine_intake_boot         51.43
+    engine_airbox_duct_0       90.28     drive_chain               162.81
+    axle_rear                 220.66     axle_sprocket             174.11
+    cooling_pump_bracket      274.86     radiator_bracket_upper     95.13
+
+`radiator_tank_high`, `radiator_core`, `radiator_end_inboard`, `engine_head` and
+`engine_water_outlet` are the five declared `routed` joints and all five still
+overlap, which is what gate 2 requires of a declared joint.
+
+**A hose cannot cross the spinning axle plane**, so this run stays above and
+behind it: 220.7 mm to `axle_rear` and 174.1 to the crown wheel."""
 HOSE_LOWER_ROUTE: tuple[tuple[float, float, float], ...] = (
     (-0.213, -0.150, 0.115),
     (-0.213, -0.370, 0.100),
@@ -779,12 +870,21 @@ WATER_OUTLET_LOCAL: tuple[float, float, float] = (0.299, -0.207, 0.376)
 end; the cold return is the low run by construction, because the pump is at axle
 height. Both `estimated` as routes.
 
-The upper run crosses **behind the seat back**, which is the shorter way across
-from a head outlet and stays above the axle. The lower run's geometry and every
-clearance on it are in `HOSE_LOWER_ROUTE`'s own note, because #190 wave 3b moved it
-and a clearance quoted in two places is a clearance that will disagree with itself.
+**This docstring used to assert that the upper run crosses "behind the seat back,
+which is the shorter way across from a head outlet and stays above the axle", and
+for a milestone that sentence was false.** It was true of the axle and false of the
+seat: the run crossed 65 mm *forward* of the shell's top edge and 94.8 mm inside the
+driver's chest, and the sentence is exactly why nobody looked -- a comment that
+states the constraint as satisfied reads like the check. It is now a property of
+the route rather than a claim about it, and the two numbers that make it one are in
+`HOSE_UPPER_ROUTE`'s own note: 26.4 mm to `seat_shell` and 18.6 mm to the torso
+volume §60.1.4 defines. The lower run's geometry and every clearance on it are in
+`HOSE_LOWER_ROUTE`'s note for the same reason -- a clearance quoted in two places is
+a clearance that will disagree with itself.
+
 **A hose cannot cross the spinning axle plane**, so the upper goes above and behind
-it and the lower stays forward of it."""
+it and the lower stays forward of it. That half was always true and is still
+measured: 220.7 mm to `axle_rear`."""
 
 WATER_INLET_BOSS: tuple[float, float, float] = (0.240, -0.330, 0.165)
 """A **new** cast boss on the crankcase's inboard face, low. Art. 9.10.1

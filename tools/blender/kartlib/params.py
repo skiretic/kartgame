@@ -1789,64 +1789,19 @@ FIELD_COVERAGE_EXEMPT: dict[str, str] = {
     ),
     # --- the driver -------------------------------------------------------
     #
-    # `tools/blender/kartlib/driver.py` does not exist yet: issue #17 builds it
-    # against spec §60.1.6's part set, which is the contract this block's fields
-    # were written to serve. Until it lands, no module reads any of them, so every
-    # field is exempt with the same reason.
+    # **Empty, and that is the point.** `tools/blender/kartlib/driver.py` landed for
+    # issue #17 and reads all thirty-four fields of the driver block, so all
+    # thirty-four exemptions are gone. An exemption that outlives the module reading
+    # it is a field nobody reads wearing a note that says otherwise, and
+    # `check_field_coverage` is fatal on it.
     #
-    # **The driver module owns these entries and deletes each one as it reads the
-    # field.** That is the only part of this file it may touch -- `params.py` is
-    # single-owner and the driver block above was written by the main thread for
-    # exactly that reason. An exemption that outlives the module reading it is a
-    # field nobody reads wearing a note that says otherwise, so the list has to
-    # shrink to nothing.
-    #
-    # Two of them are read *in Godot*, off the manifest, and stay exempt from the
-    # Python-side check regardless: scripts/look/kartview.gd's cockpit camera and
-    # scripts/look/lookdev.gd both take `driver_eye_z`, and kartview.gd derives the
-    # camera's recline from `driver_shoulder_z`.
-    "driver_hip_x": "issue #17: driver.py is not written yet.",
-    "driver_hip_y": "issue #17: driver.py is not written yet.",
-    "driver_hip_z": "issue #17: driver.py is not written yet.",
-    "driver_torso_recline_deg": "issue #17: driver.py is not written yet.",
-    "driver_shoulder_x": "issue #17: driver.py is not written yet.",
-    "driver_shoulder_y": "issue #17: driver.py is not written yet.",
-    "driver_shoulder_z": (
-        "issue #17: driver.py is not written yet. Read in Godot off the manifest "
-        "by scripts/look/kartview.gd, which derives the cockpit camera's recline "
-        "from it, so this entry stays after the module lands."
-    ),
-    "driver_eye_x": "issue #17: driver.py is not written yet.",
-    "driver_eye_y": "issue #17: driver.py is not written yet.",
-    "driver_eye_z": (
-        "issue #17: driver.py is not written yet. Read in Godot off the manifest "
-        "by kartview.gd's cockpit camera and by lookdev.gd, so this entry stays "
-        "after the module lands."
-    ),
-    "driver_helmet_y": "issue #17: driver.py is not written yet.",
-    "driver_helmet_z": "issue #17: driver.py is not written yet.",
-    "driver_helmet_width": "issue #17: driver.py is not written yet.",
-    "driver_helmet_length": "issue #17: driver.py is not written yet.",
-    "driver_helmet_height": "issue #17: driver.py is not written yet.",
-    "driver_knee_x": "issue #17: driver.py is not written yet.",
-    "driver_knee_y": "issue #17: driver.py is not written yet.",
-    "driver_knee_z": "issue #17: driver.py is not written yet.",
-    "driver_ankle_x": "issue #17: driver.py is not written yet.",
-    "driver_ankle_y": "issue #17: driver.py is not written yet.",
-    "driver_ankle_z": "issue #17: driver.py is not written yet.",
-    "driver_heel_y": "issue #17: driver.py is not written yet.",
-    "driver_heel_z": "issue #17: driver.py is not written yet.",
-    "driver_ball_x": "issue #17: driver.py is not written yet.",
-    "driver_ball_y": "issue #17: driver.py is not written yet.",
-    "driver_ball_z": "issue #17: driver.py is not written yet.",
-    "driver_upper_arm": "issue #17: driver.py is not written yet.",
-    "driver_elbow_to_fist": "issue #17: driver.py is not written yet.",
-    "driver_shoulder_span": "issue #17: driver.py is not written yet.",
-    "driver_bideltoid": "issue #17: driver.py is not written yet.",
-    "driver_hip_breadth": "issue #17: driver.py is not written yet.",
-    "driver_seated_shoulder_breadth": "issue #17: driver.py is not written yet.",
-    "driver_overalls_thickness": "issue #17: driver.py is not written yet.",
-    "driver_protector_thickness": "issue #17: driver.py is not written yet.",
+    # That includes `driver_shoulder_z` and `driver_eye_z`, whose entries said they
+    # would stay because scripts/look/kartview.gd and scripts/look/lookdev.gd read
+    # them in Godot off the manifest. **They still do, and the exemptions still had
+    # to go**: this gate asks whether a *Python module in this package* reads a
+    # field, `write_manifest` publishes every field of `KartParams` unconditionally
+    # so a Godot reader was never what kept one off the fatal list, and leaving those
+    # two behind fails the build outright through `covered_but_exempt`. #17 report.
 }
 
 #: How a module reads a parameter. `p.foo`, `params.foo`, `context.params.foo`,
