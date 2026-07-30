@@ -3748,3 +3748,44 @@ table read for the 50th-percentile male) would let the volume stop borrowing its
 forward half-depth from judgment; and #17's surface pass, when it re-insets the
 torso, should re-measure both contacts and delete this ADR's "until then"
 paragraph from §60.1.6.
+
+---
+
+## ADR-0058 — The rib protector is worn under the suit, and the torso never re-inset
+
+**Status:** accepted, 2026-07-29. Resolves the "until then" paragraph ADR-0057
+left open, the opposite way ADR-0057 predicted.
+
+**Context.** ADR-0057 expected #17's surface pass to re-inset the torso by the
+protector's 12–18 mm, leaving the protector as the outermost layer over its
+z 250–450 band. §60.1.8's measurement pass then read both driver photographs in
+the repo — buntschu and panfilov — and neither shows a rib protector at all: the
+torso is plain overalls in both frames, so the protection is worn **under** the
+suit. Both under- and over-suit products exist and FIA 8870-2018 covers both,
+but the photographic evidence this project has is for under, and §5 item 10 says
+the photograph decides.
+
+**Decision.** The protector recesses; the torso does not move. The torso's rear
+face stays the seat's 22° chord (it is a declared contact at 0.02 mm and the
+gate-3 rake plane clips there). `driver_rib_protector`'s outer face moves from
+1 mm proud of the torso surface to ~1 mm inside it over its band, rear face
+0.3 mm forward of the rake plane.
+
+**Why the contact row survives.** The protector still bears on the shell —
+through suit fabric compressed by the driver's weight, which is what physically
+happens in a seat. Measured after the change: `driver_rib_protector`/`seat_shell`
+gap **0.09 mm**, inside the 2.0 mm tolerance, so ADR-0057's declared `sits_on`
+row stands unchanged. The protector's 12–18 mm overlap with the shell is gone —
+gate 3 confirms zero findings for the pair — and containment is measured, not
+assumed: 0 of 240 (low) / 0 of 1408 (high) protector vertices outside the torso,
+minimum inset 0.26/0.28 mm.
+
+**Consequence accepted deliberately:** `driver_rib_protector` never renders. It
+stays a built, materialed (`protector_shell`), watertight, gate-checked part —
+§60.1.6 argued an invisible part is half-pointless, and the answer is that this
+one's job is the contact contract and Art. 7.5 compliance, not pixels. §60.1.6's
+contact row and §60.1.7's build row record it.
+
+**What would reopen this.** A photograph of a KZ driver wearing the protector
+over the suit — one line to flip `RIB_PROTECTOR_PROUD` back and re-measure both
+contacts.

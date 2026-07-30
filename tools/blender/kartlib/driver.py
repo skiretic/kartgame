@@ -70,7 +70,7 @@ import sys
 
 import bmesh
 import bpy
-from mathutils import Matrix, Vector
+from mathutils import Vector
 
 from . import build
 from . import params as P
@@ -115,12 +115,12 @@ def _enabled(argv: list[str] | None = None) -> bool:
 
 # --- materials -------------------------------------------------------------
 
-#: §60.1.6 fixes six material names and this module owns their values. Five of the
-#: six do not exist in `build.FIXED_FINISHES` yet and **`build.py` is not this
-#: module's file**, so each falls back to the nearest existing finish until the
-#: four-tuples land. The fallback is announced on every build rather than being
-#: silent, because a stand-in nobody mentions is how `engine_alloy` came to hold
-#: 116 parts.
+#: §60.1.6 fixes six material names and this module owns their values. All six
+#: now live in `build.FIXED_FINISHES` (§60.1.8's group), so the fallback below is
+#: a mechanism that no longer fires — kept because the next renamed or deleted
+#: finish should stand in loudly rather than crash, and a stand-in nobody
+#: mentions is how `engine_alloy` came to hold 116 parts. `_materials` announces
+#: any row that falls back, on every build.
 #:
 #: **Nothing here may take a livery role.** A suit is not bodywork: `bodywork_wrap`,
 #: `bodywork_contrast`, `livery_accent`, `frame_powdercoat` and `rim_magnesium` are
@@ -222,6 +222,26 @@ TORSO_CAP_RISE: float = 0.024
 TORSO_EXPONENT_HIP: float = 2.6
 TORSO_EXPONENT_CHEST: float = 2.3
 
+#: The waist, halfway between the H-point and the shell top. All `estimated`,
+#: read off `look_lorandi.png` (S4, the one torso-in-profile frame): the suit
+#: pinches visibly between the hip and the chest even with the protector worn
+#: under it. Width 316 against the stations' linear 343 — 13 mm per side; depth
+#: 202 against a linear 208, the smaller front pinch of a seated belly (the rear
+#: face is the rake plane and never moves). Exponent between the hip's 2.6 and
+#: the chest's 2.3 so the roundness ramp stays monotonic through the new station.
+TORSO_WIDTH_WAIST: float = 0.316
+TORSO_DEPTH_WAIST: float = 0.202
+TORSO_EXPONENT_WAIST: float = 2.45
+
+#: The lat flare, 52% of the way from the shell top to the acromion. `estimated`,
+#: read off `look_giardelli.png` (S3, dead front): the torso widens well below
+#: the shoulder caps rather than tapering straight from the shell to the
+#: bideltoid. Width 428 against the stations' linear 409 — 9.5 mm per side, kept
+#: modest because the upper arms hang at ±200 and a louder flare merges into
+#: them. Depth 213 sits on the chest-to-acromion line; the flare is lateral.
+TORSO_WIDTH_LAT: float = 0.428
+TORSO_DEPTH_LAT: float = 0.213
+
 #: Art. 7.5's body protection, as along-torso stations from the H-point.
 #: §60.1.5 says "roughly z 250-450 in the torso frame"; read as distance along the
 #: 25 deg torso axis, which puts it over world z 357-538 — the ribs, with the
@@ -230,13 +250,28 @@ TORSO_EXPONENT_CHEST: float = 2.3
 RIB_PROTECTOR_LOW: float = 0.250
 RIB_PROTECTOR_HIGH: float = 0.450
 
-#: How far proud of the torso surface the protector's outer face sits. `estimated`:
-#: 1 mm, purely so the two parts read as two parts. The shell's thickness goes
-#: *inward* from there, because `driver_hip_breadth` 325 and
-#: `driver_seated_shoulder_breadth` 360 are the breadths of a driver *wearing* it —
-#: that is what `driver_protector_thickness`'s docstring means by "they are what
-#: makes the seat fit" — so putting 15 mm outside the torso would count it twice.
-RIB_PROTECTOR_PROUD: float = 0.001
+#: How far *inside* the torso surface the protector's outer face sits, front and
+#: sides. `estimated`: 1 mm — enough that the two surfaces cannot z-fight, small
+#: enough that the part still fills the band it protects. **Recessed, not proud,
+#: per §60.1.8 finding 2**: both reference frames (`exh_commons_buntschu_kz2.jpg`,
+#: `exh_commons_panfilov_kz2.jpg`) show plain overalls with no external shell, so
+#: the protection is worn *under* the suit and the built part never renders. It
+#: stays built, materialed and watertight because it is a declared `sits_on`
+#: contact and #194's mass lumps read it. The 15 mm of
+#: `driver_protector_thickness` still goes inward from the outer face, because
+#: `driver_hip_breadth` 325 and `driver_seated_shoulder_breadth` 360 are the
+#: breadths of a driver *wearing* it — counting it outside would count it twice.
+RIB_PROTECTOR_RECESS: float = 0.001
+
+#: How far forward of the torso's rear face (the §60.1.1 rake plane) the
+#: protector's rear face sits. `estimated`: 0.3 mm. It cannot be zero — the torso's
+#: rear face is authored on the same plane, and two coincident faces z-fight — and
+#: it cannot be the full 1 mm recess either, because the shell's back is what the
+#: `driver_rib_protector`/`seat_shell` `sits_on` contact bears on: the built shell
+#: sits ~0.4 mm behind the plane at the band's foot, so 0.3 keeps the measured gap
+#: well inside `CONTACT_TOLERANCE`'s 2 mm. The physical story is the same one
+#: ADR-0057 tells: one layer of compressed suit fabric between shell and seat.
+RIB_PROTECTOR_REAR_INSET: float = 0.0003
 
 #: Bare neck diameter. `estimated`: half the helmet's `driver_helmet_width` 250 is
 #: 125, and a neck is a little narrower than that. The built diameter adds
@@ -259,26 +294,121 @@ NECK_TOP: tuple[float, float, float] = (0.0, -0.437, 0.694)
 VISOR_APERTURE_WIDTH: float = 0.200
 VISOR_APERTURE_HEIGHT: float = 0.095
 
-#: How far the visor stands off the shell, and how thick it is. `estimated`: a
-#: polycarbonate visor is 2-3 mm and sits in a rebate; 4 mm at a 1 mm standoff is
-#: the same read at this scale and needs no rebate. **The helmet's eye port is not
-#: cut open** — §60.1.6 specifies an ellipsoid, a closed ellipsoid is watertight and
-#: therefore checkable by the winding gate, and an aperture cut at two densities
-#: would not be the same shape at both, which `Detail`'s contract forbids.
-VISOR_STANDOFF: float = 0.001
+#: The helmet shell's profile: horizontal rings, bottom to crown, each row
+#: `(z, half_width, half_depth, center_y, exponent, recess)` in helmet-local
+#: meters (z from the §60.1.4 center, `center_y` the ring's fore-aft offset from
+#: it, `recess` the fraction of `VISOR_RECESS_DEPTH` active at that height).
+#:
+#: **The contract box is carried by four rows and the two end caps, exactly.**
+#: §60.1.6 fixes 250 wide x 340 long x 300 tall about the §60.1.4 center, and
+#: the extremes are authored so a vertex lands on each of them at both detail
+#: densities: width 250 at the eye row (`half_width` 0.125, ring angles 0 and pi
+#: are sampled at 12 and at 32 segments), rear -170 at the same row (`center_y -
+#: half_depth`, angle 3pi/2 sampled likewise), front +170 at the chin-bar row
+#: (`center_y + half_depth`, angle pi/2, below the recess band), and the caps at
+#: z = -150 / +150. Every other row stays strictly inside all three, and the
+#: recess only ever moves the surface inward, so the built bounding box is the
+#: contract box to the float and not to a tolerance.
+#:
+#: The shape between the extremes is `estimated`, read off two photographs and
+#: not from memory: the buntschu three-quarter frame
+#: (`refs/kart-visual/exh_commons_buntschu_kz2.jpg`, an Arai in a KZ2 kart) for
+#: the brow step over a recessed visor, the chin bar standing proud below the
+#: aperture and the jaw sweeping back to the neck; `look_giardelli.png` (S3,
+#: dead front) for the temple width running nearly full to the brow and the
+#: chin bar's width. Row by row:
+#:
+#:   -150  bottom cap, 96 x 120 — the neck aperture's underside, flat and
+#:         hidden by the neck and collar. A full-face shell's bottom is a rim,
+#:         not a dome, and the cap plane is what puts the 300 mm height on a
+#:         surface that exists.
+#:    -95  jaw tuck: the shell sweeps in toward the neck below the chin bar.
+#:    -55  the chin bar, front +170 — the fore-aft extreme of a full-face
+#:         helmet is the chin, not the forehead. Both crops show it.
+#:  -28.5  aperture bottom edge, full shell: the chin bar's top ledge. The
+#:         6 mm step from the recess floor above reads as the visor's lower
+#:         edge sitting on the bar.
+#:  -22.5  recess floor, lower ramp knot (values interpolated on the
+#:         -28.5..+19 line so the ramp is a feature of the recess alone).
+#:    +19  the eye row (`driver_eye_z` - `driver_helmet_z`): width and rear
+#:         extremes, and the visor aperture's own center height.
+#:  +60.5  recess floor, upper ramp knot (interpolated on the +19..+66.5 line).
+#:  +66.5  aperture top edge, full shell — the brow. The 6 mm step over 6 mm of
+#:         rise is authored at 45 deg so `smooth_angle`'s 40 deg threshold
+#:         marks it sharp and the brow line survives smooth shading (#199's
+#:         sidepod trap, applied in advance).
+#:    +95, +125, +140  the dome, sagging slightly inside the ellipse through
+#:         the width extreme so the crown reads round rather than conic.
+#:   +150  crown cap, 20 x 22 — small enough to shade as the top of a dome.
+HELMET_PROFILE: tuple[tuple[float, float, float, float, float, float], ...] = (
+    (-0.1500, 0.048, 0.060, -0.005, 2.00, 0.0),
+    (-0.0950, 0.088, 0.119, 0.001, 2.20, 0.0),
+    (-0.0550, 0.108, 0.155, 0.015, 2.30, 0.0),
+    (-0.0285, 0.118, 0.152, 0.006, 2.20, 0.0),
+    (-0.0225, 0.1189, 0.1533, 0.0043, 2.19, 1.0),
+    (0.0190, 0.125, 0.1625, -0.0075, 2.15, 1.0),
+    (0.0605, 0.1189, 0.1455, -0.0123, 2.11, 1.0),
+    (0.0665, 0.118, 0.143, -0.013, 2.10, 0.0),
+    (0.0950, 0.098, 0.113, -0.014, 2.05, 0.0),
+    (0.1250, 0.062, 0.075, -0.014, 2.00, 0.0),
+    (0.1400, 0.046, 0.055, -0.013, 2.00, 0.0),
+    (0.1500, 0.010, 0.011, -0.012, 2.00, 0.0),
+)
+
+#: How deep the visor recess sinks below the surrounding shell. `estimated`:
+#: 6 mm is a visor's thickness plus its rebate, read off the buntschu crop where
+#: the glass clearly sits below the brow and cheek surfaces.
+VISOR_RECESS_DEPTH: float = 0.006
+
+#: The recess's angular window, degrees away from dead front in ring parameter.
+#: Full depth inside 55 (the 200 mm aperture needs 52 at the eye row's width),
+#: fading smoothly to nothing by 72 — short of the ring angles 0 and pi, so the
+#: 250 mm width extreme is untouched by construction.
+RECESS_FULL_DEG: float = 55.0
+RECESS_ZERO_DEG: float = 72.0
+
+#: The glass. `estimated`: its outer face rides 1 mm below the un-recessed
+#: shell line (`VISOR_GLASS_DROP - VISOR_THICKNESS`), i.e. 5 mm proud of the
+#: recess floor — a visor over its rebate — and its upper and lower edges run
+#: into the recess ramps and bury themselves inside the shell, so no open rim
+#: faces the camera. **The eye port is still not cut open**: the shell stays a
+#: closed loft, watertight and therefore checkable by the winding gate, and an
+#: aperture cut at two densities would not be the same shape at both, which
+#: `Detail`'s contract forbids.
+VISOR_GLASS_DROP: float = 0.005
 VISOR_THICKNESS: float = 0.004
 
 #: Corner squareness of the visor aperture. `estimated`: 6 gives a rounded rectangle
 #: with short flats top and bottom, which is what a full-face aperture looks like.
 VISOR_CORNER_EXPONENT: float = 6.0
 
-#: Upper arm, root to elbow. `estimated`, arithmetic shown: `driver_bideltoid` 455
-#: less `driver_seated_shoulder_breadth` 360, halved, is the 47.5 mm the deltoid
-#: stands outboard of the shell's shoulder line; doubled as a diameter is 95, plus
-#: 2 x `driver_overalls_thickness` is 109. The two breadths are measured at
+#: Upper arm, root to elbow, three stations so the deltoid reads as a muscle
+#: cap rather than the top of a cone. The deltoid diameter is `estimated`,
+#: arithmetic shown: `driver_bideltoid` 455 less `driver_seated_shoulder_breadth`
+#: 360, halved, is the 47.5 mm the deltoid stands outboard of the shell's
+#: shoulder line; doubled as a diameter is 95, plus 2 x
+#: `driver_overalls_thickness` is 109. The two breadths are measured at
 #: different heights, so this is a proportion and not a derivation, and it is
-#: labeled accordingly.
-UPPER_ARM_DIAMETER_ROOT: float = 0.109
+#: labeled accordingly. The root is `estimated` slimmer — that end is the joint,
+#: buried inside the torso's shoulder cap — and the bulge sits a quarter of the
+#: way down the arm, where S3's dead-front frame shows the sleeve widening just
+#: below the shoulder seam before the long taper to the elbow.
+#: The deltoid bulge is asymmetric on purpose: its station lifts by
+#: `UPPER_ARM_DELTOID_LIFT` along the loft's up direction, so the muscle sits on
+#: *top* of the arm — which is where a deltoid is — and no other surface of the
+#: arm moves outward at all. Gate 3 forced that discipline before the
+#: photograph could justify it, twice: a symmetric 109 mm bulge a quarter of
+#: the way down put the underside 0.11 mm into `engine_head_nut_3`, and even a
+#: lifted 107 grazed it (0.00 mm) because starting the elbow taper lower makes
+#: the mid-arm ~0.3 mm fatter — the old cone clears that nut by less than that.
+#: So the deltoid diameter is held a shade *under* the old cone's own value at
+#: its station (109 - 23 x 0.15 = 105.6) and the whole bulge is the 5 mm lift;
+#: a regulated clearance is not spent on a styling bulge (the arm's own
+#: `engine_head` waiver under #206 is the reach solve's, not this cap's).
+UPPER_ARM_DIAMETER_ROOT: float = 0.098
+UPPER_ARM_DIAMETER_DELTOID: float = 0.105
+UPPER_ARM_DELTOID_AT: float = 0.15
+UPPER_ARM_DELTOID_LIFT: float = 0.005
 UPPER_ARM_DIAMETER_ELBOW: float = 0.086
 
 #: Forearm, elbow to the wrist end of the sleeve. `estimated`: a forearm is a little
@@ -286,24 +416,104 @@ UPPER_ARM_DIAMETER_ELBOW: float = 0.086
 FOREARM_DIAMETER_ELBOW: float = 0.096
 FOREARM_DIAMETER_WRIST: float = 0.070
 
-#: The closed fist, at the rim. The long axis runs **along the rim tangent**,
-#: because that is the way fingers wrap a tube.
+#: The gloved hand, closed around the rim tube. Not a block: a mitt is three
+#: closed solids in one mesh — the palm-and-fingers band wrapped around the
+#: tube, the thumb wrapped the other way, and a cuff over the sleeve — the same
+#: several-solids-one-part construction the boot uses and for the same
+#: watertightness reason. Both reference frames (`look_giardelli.png`,
+#: `exh_commons_buntschu_kz2.jpg`'s glove) show exactly this: fingers over the
+#: far side of the tube, knuckles standing proud outboard, thumb closing the
+#: near side, cuff riding over the sleeve.
 #:
-#: `GLOVE_ALONG_RIM` is `derived`: the NASA table's `hand length` is 191 mm, and a
-#: closed fist is about 0.55 of it — 105. The other two are `estimated`; hand
-#: breadth is not in §60.1.2's table.
+#: `GLOVE_ALONG_RIM` is `derived`: the NASA table's `hand length` is 191 mm and
+#: four gloved fingers stack to about 0.55 of it — 105 along the rim tangent.
+#: Everything else is `estimated`; hand breadth is not in §60.1.2's table.
 GLOVE_ALONG_RIM: float = 0.105
-GLOVE_ACROSS: float = 0.096
-GLOVE_THROUGH: float = 0.086
+
+#: Inner radius of both wraps around the rim tube (`wheel_rim_thickness`/2 is
+#: 19). `estimated` at 4 mm *inside* the tube surface: fingers squeeze a foam
+#: grip, and the overlap is also what keeps the declared `grips` contact
+#: measuring zero rather than riding `CONTACT_TOLERANCE`'s 2 mm edge.
+GLOVE_WRAP_INNER: float = 0.015
+
+#: The palm-and-fingers band, as knots of `(wrap angle deg, outer radius)`.
+#: Angle 0 is outboard on the rim's cross-section, positive toward the driver's
+#: side of the wheel plane. Knots ascend because `_wrap_loft`'s winding proof
+#: assumes the sweep runs with +phi: the band starts at the fingertips tucked
+#: behind the far side (-115, where a fingertip is barely thicker than the
+#: glove), comes over the outboard knuckles (+20, the thickest station — tube 19
+#: plus ~23 of hand, glove and padding), and ends at the palm heel on the
+#: driver's side (+100). All `estimated` against a 25-30 mm deep gloved hand.
+GLOVE_FINGER_KNOTS: tuple[tuple[float, float], ...] = (
+    (-115.0, 0.026),
+    (-75.0, 0.032),
+    (-30.0, 0.038),
+    (20.0, 0.042),
+    (60.0, 0.040),
+    (100.0, 0.036),
+)
+
+#: The thumb, wrapping the driver's side of the tube toward the fingertips —
+#: the opposite sense to the fingers, which is what "closed around" means. Its
+#: knots start inside the palm heel's arc so base and heel read as one mass.
+#: `half length` is along the rim tangent; the offset shifts the whole thumb
+#: toward the 12 o'clock end of the hand, where a thumb lives on a 3 o'clock
+#: grip. All `estimated`.
+GLOVE_THUMB_KNOTS: tuple[tuple[float, float], ...] = (
+    (95.0, 0.028),
+    (170.0, 0.030),
+    (235.0, 0.022),
+)
+GLOVE_THUMB_HALF_LENGTH: float = 0.017
+GLOVE_THUMB_OFFSET: float = 0.033
+
+#: The cuff: Art. 7.3 wants the wrist covered, and §60.1.6's row says the cuff
+#: overlaps the sleeve. 55 mm up the forearm from the grip at radius 40 — the
+#: sleeve ends at 35 — flaring 8% at the open end. `estimated`.
+GLOVE_CUFF_LENGTH: float = 0.055
+GLOVE_CUFF_RADIUS: float = 0.040
+GLOVE_CUFF_FLARE: float = 1.08
+
+#: Cross-section squareness of the wraps. `estimated`: a row of fingers is
+#: flatter than an ellipse.
+GLOVE_EXPONENT: float = 2.5
 
 #: Thigh at the hip. `derived`: two thighs fill `driver_hip_breadth`, so each is
-#: half of it. Computed from the field rather than written out here.
+#: half of it — and that figure is the thigh's *width*. Computed from the field
+#: rather than written out here.
 #: The knee end is `estimated` — a clothed knee measures about 128 across.
 THIGH_DIAMETER_KNEE: float = 0.128
 
-#: Shank. `estimated`: just under the knee it is a little slimmer than the knee
-#: itself, and at the ankle it is the boot's shaft rather than the leg.
+#: The thigh's height as a fraction of its width. `estimated`: a seated thigh
+#: carrying a driver's weight spreads against the pan — wider than tall — and
+#: S4's profile shows the leg's top line running low over the seat lip rather
+#: than the half-cylinder a circular section draws. Applied to both stations so
+#: the taper stays straight.
+THIGH_FLATTEN: float = 0.87
+
+#: Shank, four stations: the calf is a bulge on the *rear* of the leg, not a
+#: swelling of its axis. Knee and ankle ends `estimated` as before — just under
+#: the knee the leg is a little slimmer than the knee itself, and at the ankle
+#: it is the boot's shaft rather than the leg.
+#:
+#: The calf sits at 45% rather than S4's upper-third read, and the guard
+#: station above it is pinned exactly on the straight knee-to-ankle line, both
+#: because of one measured fact: `chassis_steering_support_upper`'s shoulder
+#: knee at (±150, 150, 335) passes **67.3 mm** from the shank's axis at 19% of
+#: the way down, where the old straight taper's own surface plus the Ø16 tube
+#: leaves a clearance under a millimeter. Two calf attempts up there measured
+#: 4.86 and then 5.33 mm inside the tube (gate 3; the rear shift moved *toward*
+#: the knee of the support, which sits below-rear of the upper shank). So the
+#: upper fifth of the shank is not this module's to style, the guard station
+#: says so in geometry, and the bulge lives at mid-shank where the nearest
+#: support segment is 136 mm out. Diameter and the 4 mm rearward shift are
+#: `estimated`; the shin line stays within ~2 mm of straight, which is also
+#: what S4 shows.
 SHANK_DIAMETER_KNEE: float = 0.124
+SHANK_GUARD_AT: float = 0.20
+SHANK_DIAMETER_CALF: float = 0.120
+SHANK_CALF_AT: float = 0.45
+SHANK_CALF_REARWARD: float = 0.004
 SHANK_DIAMETER_ANKLE: float = 0.094
 
 #: The boot. Art. 7.4 wants shoes that "cover the feet and protect the ankles", so
@@ -573,59 +783,6 @@ def _band(
         )
 
 
-def _ellipsoid(
-    bm: bmesh.types.BMesh,
-    center: Vector,
-    basis: Matrix,
-    semi: Vector,
-    segments: int,
-    stacks: int,
-) -> None:
-    """A closed ellipsoid, `semi` along the three columns of `basis`.
-
-    Rings run around the third basis column and poles collapse to a single vertex,
-    the same way `build.lathe` handles a profile point at radius zero. `basis` must
-    be a rotation — a reflection would invert every face, which is the mirrored
-    sprocket failure in a different costume.
-    """
-    rings: list[list[bmesh.types.BMVert] | bmesh.types.BMVert] = []
-    for stack in range(stacks + 1):
-        elevation = -0.5 * math.pi + math.pi * stack / stacks
-        if stack in (0, stacks):
-            local = Vector((0.0, 0.0, semi.z * math.sin(elevation)))
-            rings.append(bm.verts.new(center + basis @ local))
-            continue
-        ring: list[bmesh.types.BMVert] = []
-        for step in range(segments):
-            azimuth = 2.0 * math.pi * step / segments
-            local = Vector(
-                (
-                    semi.x * math.cos(elevation) * math.cos(azimuth),
-                    semi.y * math.cos(elevation) * math.sin(azimuth),
-                    semi.z * math.sin(elevation),
-                )
-            )
-            ring.append(bm.verts.new(center + basis @ local))
-        rings.append(ring)
-
-    for index in range(len(rings) - 1):
-        lower, upper = rings[index], rings[index + 1]
-        if isinstance(lower, bmesh.types.BMVert):
-            for step in range(segments):
-                following = (step + 1) % segments
-                bm.faces.new((lower, upper[following], upper[step]))
-        elif isinstance(upper, bmesh.types.BMVert):
-            for step in range(segments):
-                following = (step + 1) % segments
-                bm.faces.new((lower[step], lower[following], upper))
-        else:
-            for step in range(segments):
-                following = (step + 1) % segments
-                bm.faces.new(
-                    (lower[step], lower[following], upper[following], upper[step])
-                )
-
-
 def _part(
     context: build.BuildContext,
     name: str,
@@ -818,14 +975,36 @@ def _torso_stations(p: P.KartParams) -> list[Station]:
         rear = _back_plane_y(p, z)
         return (Vector((0.0, rear + depth * 0.5, z)), width * 0.5, depth * 0.5, exponent)
 
+    # The two intermediate stations are this module's own (§60.1.6: the shape
+    # *between* the contract stations is the building module's), and both were
+    # read off photographs rather than styled from memory: `look_lorandi.png`
+    # (S4, the torso-in-profile frame) shows the suit pinch between the hip and
+    # the chest, and both it and `look_giardelli.png` (S3, dead front) show the
+    # lat flare running wide well below the shoulder line rather than a straight
+    # taper from the shell top. Neither number is a contract value; the three
+    # §60.1.7 breadths (325 / 360 / 455) still land exactly on their stations.
+    waist_z = 0.5 * (p.driver_hip_z + shell_top_z)
+    lat_z = shell_top_z + 0.52 * (p.driver_shoulder_z - shell_top_z)
     return [
         station(p.driver_hip_z, p.driver_hip_breadth, PELVIS_DEPTH, TORSO_EXPONENT_HIP),
+        # The waist. `estimated`: 316 against a linear 343 at this height — a
+        # 13 mm pinch per side, which is what the suit shows in S4 with the rib
+        # protector worn under it, and deliberately shallower than a bare-torso
+        # waist because the protector band starting 109 mm above must still fit
+        # inside (its own recess check knots on this station's neighbors).
+        station(waist_z, TORSO_WIDTH_WAIST, TORSO_DEPTH_WAIST, TORSO_EXPONENT_WAIST),
         station(
             shell_top_z,
             p.driver_seated_shoulder_breadth,
             TORSO_DEPTH_CHEST,
             TORSO_EXPONENT_CHEST,
         ),
+        # The lats. `estimated`: 428 against a linear 409 at this height — the
+        # V-taper bulging outboard of the straight hip-to-shoulder line, read
+        # off S3's dead front where the torso visibly widens well below the
+        # shoulder caps. 8.5 mm per side is deliberately modest: the arms hang
+        # at ±200 and a louder flare merges the torso into them.
+        station(lat_z, TORSO_WIDTH_LAT, TORSO_DEPTH_LAT, TORSO_EXPONENT_CHEST),
         station(
             p.driver_shoulder_z,
             p.driver_bideltoid,
@@ -878,13 +1057,23 @@ def _rib_protector(
     segments: int,
     steps: int,
 ) -> None:
-    """Art. 7.5's body protection, as a band over the torso's rib stations.
+    """Art. 7.5's body protection, worn under the suit — a band inside the torso.
 
-    Its outer face is the torso's surface plus `RIB_PROTECTOR_PROUD`, and the
-    15 mm of `driver_protector_thickness` goes *inward* from there. Putting it
-    outward would count it twice: `driver_hip_breadth` 325 and
-    `driver_seated_shoulder_breadth` 360 are already the breadths of a driver
-    wearing one, which is what makes him fill a 333 mm shell.
+    Its outer face is the torso's surface *minus* `RIB_PROTECTOR_RECESS` on the
+    front and sides (§60.1.8 finding 2: both reference frames show plain
+    overalls, so the protection is under the suit and this part never renders),
+    with the rear face `RIB_PROTECTOR_REAR_INSET` forward of the rake plane the
+    torso's own rear face sits on. The 15 mm of `driver_protector_thickness`
+    goes *inward* from there. Putting it outward would count it twice:
+    `driver_hip_breadth` 325 and `driver_seated_shoulder_breadth` 360 are
+    already the breadths of a driver wearing one, which is what makes him fill
+    a 333 mm shell.
+
+    The station arithmetic keeps the rear face at `rear + REAR_INSET` exactly:
+    the fore-aft half-shrink is the mean of the rear inset and the front
+    recess, and the center moves forward by half their difference, so both
+    faces land where their constants say rather than where a symmetric shrink
+    happens to put them.
     """
     p = context.params
     axis = _torso_axis(p)
@@ -893,15 +1082,26 @@ def _rib_protector(
     high_z = (hip + axis * RIB_PROTECTOR_HIGH).z
 
     stations = _torso_stations(p)
+    # Knot the band at every torso station inside its span, not just at its own
+    # edges: the torso's width is piecewise linear with kinks at its stations
+    # (the shell top sits inside the 357-538 band), and a band interpolated
+    # straight across a kink pokes back out through the surface it is supposed
+    # to hide under — measured at 0.13 mm over the shell-top station before
+    # these knots existed.
+    knots = sorted(
+        {low_z, high_z}
+        | {station[0].z for station in stations if low_z < station[0].z < high_z}
+    )
     banded: list[Station] = []
-    for z in (low_z, 0.5 * (low_z + high_z), high_z):
+    for z in knots:
         half_u, half_v, exponent = _torso_section(stations, z)
         rear = _back_plane_y(p, z)
+        half_depth = half_v - 0.5 * (RIB_PROTECTOR_RECESS + RIB_PROTECTOR_REAR_INSET)
         banded.append(
             (
-                Vector((0.0, rear + half_v + RIB_PROTECTOR_PROUD, z)),
-                half_u + RIB_PROTECTOR_PROUD,
-                half_v + RIB_PROTECTOR_PROUD,
+                Vector((0.0, rear + RIB_PROTECTOR_REAR_INSET + half_depth, z)),
+                half_u - RIB_PROTECTOR_RECESS,
+                half_depth,
                 exponent,
             )
         )
@@ -971,57 +1171,52 @@ def _neck(
 # --- head ------------------------------------------------------------------
 
 
-def _head_basis(p: P.KartParams) -> Matrix:
-    """Helmet axes: X lateral, Y the way the face points, Z up. **Not raked.**
-
-    §60.1.6 spells the helmet "250 wide x 340 long x 300 tall" and `params.py` names
-    the three fields `_width` / `_length` / `_height`. Those are world words: a
-    helmet raked back 25 degrees is not 300 mm tall and is not 340 mm long, so the
-    contract's own dimensions only mean what they say on an axis-aligned ellipsoid.
-    Built axis-aligned for that reason, and it is the reading that puts the visor at
-    the eye's own height and the face pointing where the kart is going.
-
-    **It costs two documented inconsistencies rather than hiding them**, and both are
-    §60.1.4's rather than this module's:
-
-    * §60.1.4's helmet crown `(0, -511, 860)` is derived 135 mm from the centre
-      *along the raked head axis*. An axis-aligned 300 mm ellipsoid centred at
-      z 738 crowns at **888**, 28 mm higher, and its crown is at y -454 rather than
-      -511. The two figures are only compatible if the shell is raked, and then the
-      three outer dimensions stop being width, length and height.
-    * §60.1.4 derives the eye by walking sitting eye height **along the torso
-      axis**, which puts the eye point exactly on the helmet's own fore-aft
-      mid-plane — so the driver looks out of the middle of his head and the visor
-      lands 176 mm in front of his eyes. Real eyes sit near the *front* of the
-      skull, roughly 100 mm forward of the head's axis. Fixing that moves the eye
-      point, which the cockpit camera and the audio listener both read, so it is a
-      §60.1.4 decision. Reported, not patched.
-
-    `p` is taken and unused so the signature does not change if the rake question
-    is ever settled the other way.
-    """
-    del p
-    return Matrix.Identity(3)
-
-
 def _helmet_center(p: P.KartParams) -> Vector:
     return Vector((0.0, p.driver_helmet_y, p.driver_helmet_z))
 
 
-def _helmet_semi(p: P.KartParams) -> Vector:
-    """Semi-axes in helmet-local order: lateral, fore-aft, vertical.
+def _helmet_section(z: float) -> tuple[float, float, float, float, float]:
+    """`(half_width, half_depth, center_y, exponent, recess fraction)` at a height.
 
-    `driver_helmet_length` 340 is the whole point of the field set — the deleted
-    `driver_helmet_radius` 125 was right laterally and 90 mm short fore-aft, and a
-    sphere is the one shape a full-face helmet is not.
+    Piecewise linear over `HELMET_PROFILE`'s authored rows, clamped at the caps —
+    the same lookup discipline as `_torso_section` and for the same reason: the
+    shell loft and the visor both read this one function, so the glass cannot
+    drift off the shell it sits in. Linear interpolation is also what keeps the
+    low and the high build on one surface: every intermediate ring lies on the
+    straight line between the rows that bracket it.
     """
-    return Vector(
-        (
-            p.driver_helmet_width * 0.5,
-            p.driver_helmet_length * 0.5,
-            p.driver_helmet_height * 0.5,
-        )
+    rows = HELMET_PROFILE
+    if z <= rows[0][0]:
+        return rows[0][1:]
+    for index in range(len(rows) - 1):
+        low, high = rows[index], rows[index + 1]
+        if low[0] <= z <= high[0]:
+            span = high[0] - low[0]
+            t = 0.0 if span <= 1.0e-9 else (z - low[0]) / span
+            return tuple(
+                low[k] + (high[k] - low[k]) * t for k in range(1, 6)
+            )  # type: ignore[return-value]
+    return rows[-1][1:]
+
+
+def _recess_weight(angle: float) -> float:
+    """The recess's angular falloff, 1 dead ahead to 0 outside `RECESS_ZERO_DEG`.
+
+    `angle` is the ring parameter in radians; distance is measured from the
+    front (pi/2) the short way around. Smoothstep between the two authored
+    degrees, so the recess wall in the horizontal direction is a slope rather
+    than a step — the hard edges of the recess are its top and bottom ramps,
+    where the visor's own edges hide them.
+    """
+    front = math.degrees(
+        abs((angle - 0.5 * math.pi + math.pi) % (2.0 * math.pi) - math.pi)
     )
+    if front <= RECESS_FULL_DEG:
+        return 1.0
+    if front >= RECESS_ZERO_DEG:
+        return 0.0
+    s = (RECESS_ZERO_DEG - front) / (RECESS_ZERO_DEG - RECESS_FULL_DEG)
+    return s * s * (3.0 - 2.0 * s)
 
 
 def _head(
@@ -1030,20 +1225,103 @@ def _head(
     materials: dict[str, bpy.types.Material],
     root: bpy.types.Object,
 ) -> None:
+    """The shell, lofted from `HELMET_PROFILE`. Axes world-aligned, **not raked.**
+
+    §60.1.6 spells the helmet "250 wide x 340 long x 300 tall" and `params.py`
+    names the three fields `_width` / `_length` / `_height`. Those are world
+    words: a helmet raked back 25 degrees is not 300 mm tall and is not 340 mm
+    long, so the contract's own dimensions only mean what they say on an
+    axis-aligned shell. Built that way for that reason — and §60.1.8 finding 3
+    is the photographic support: both reference drivers hold the head upright
+    with the face pointing where the kart is going. The two documented §60.1.4
+    inconsistencies this costs (the raked crown row at (0, -511, 860), and the
+    eye point landing on the shell's own fore-aft mid-plane so the driver looks
+    out of the middle of his head) are §60.1.4's to settle and are reported by
+    the build print below rather than patched here.
+
+    Watertightness is the same argument as the rib protector's band: a closed
+    loft with two planar caps is checkable by the winding gate, and the visor
+    recess is a displacement *of* the loft's rings rather than a hole cut
+    through them, so the checkable property survives the styling.
+    """
     p = context.params
     detail = context.detail
     segments = detail.tube_segments
-    stacks = max(4, detail.tube_segments // 2)
+    steps = max(1, detail.bend_segments // 2)
+
+    # The contract box lives in `params.py`'s three fields and the profile is
+    # authored in meters, so the two could drift apart in silence — the exact
+    # failure the parameter-coverage gate exists for. Asserted instead of
+    # assumed, the same discipline as `driver_shoulder_span` against
+    # `driver_shoulder_x`: the profile's own extremes must *be* the fields.
+    width = 2.0 * max(row[1] for row in HELMET_PROFILE)
+    length = max(row[3] + row[2] for row in HELMET_PROFILE) - min(
+        row[3] - row[2] for row in HELMET_PROFILE
+    )
+    height = HELMET_PROFILE[-1][0] - HELMET_PROFILE[0][0]
+    for label, built, field in (
+        ("width", width, p.driver_helmet_width),
+        ("length", length, p.driver_helmet_length),
+        ("height", height, p.driver_helmet_height),
+    ):
+        if abs(built - field) > 1.0e-9:
+            raise SystemExit(
+                "driver.py: HELMET_PROFILE's %s is %.4f m against "
+                "driver_helmet_%s = %.4f m. The profile's extremes are the "
+                "contract box (spec 60.1.6) and may not drift from the fields "
+                "that publish it."
+                % (label, built, label, field)
+            )
 
     center = _helmet_center(p)
-    basis = _head_basis(p)
-    semi = _helmet_semi(p)
+    u = Vector((1.0, 0.0, 0.0))
+    v = Vector((0.0, 1.0, 0.0))
+
+    # Ring heights: the authored rows plus `steps` subdivisions per span, the
+    # same densification rule as `_loft`'s. Every value a ring needs is linear
+    # in z between rows, so both densities sample one surface.
+    heights: list[float] = []
+    for index in range(len(HELMET_PROFILE) - 1):
+        low_z = HELMET_PROFILE[index][0]
+        high_z = HELMET_PROFILE[index + 1][0]
+        for step in range(steps):
+            heights.append(low_z + (high_z - low_z) * step / steps)
+    heights.append(HELMET_PROFILE[-1][0])
 
     bm = bmesh.new()
-    _ellipsoid(bm, center, basis, semi, segments, stacks)
+    rings: list[list[bmesh.types.BMVert]] = []
+    for z in heights:
+        half_u, half_v, offset_y, exponent, recess_fraction = _helmet_section(z)
+        ring_center = center + Vector((0.0, offset_y, z))
+        power = 2.0 / exponent
+        ring: list[bmesh.types.BMVert] = []
+        for step in range(segments):
+            angle = 2.0 * math.pi * step / segments
+            cosine, sine = math.cos(angle), math.sin(angle)
+            x = math.copysign(abs(cosine) ** power, cosine) * half_u
+            y = math.copysign(abs(sine) ** power, sine) * half_v
+            radial = u * x + v * y
+            length = radial.length
+            depth = VISOR_RECESS_DEPTH * recess_fraction * _recess_weight(angle)
+            if depth > 0.0 and length > 1.0e-9:
+                radial *= (length - depth) / length
+            ring.append(bm.verts.new(ring_center + radial))
+        rings.append(ring)
+
+    # Quads in ring order: u x v is +Z, the loft direction, so this is exactly
+    # `_loft`'s winding and the faces come out outward for the same reason.
+    for index in range(len(rings) - 1):
+        lower, upper = rings[index], rings[index + 1]
+        for step in range(segments):
+            following = (step + 1) % segments
+            bm.faces.new(
+                (lower[step], lower[following], upper[following], upper[step])
+            )
+    bm.faces.new(tuple(reversed(rings[0])))
+    bm.faces.new(tuple(rings[-1]))
     _part(context, "driver_helmet", bm, collection, materials["helmet_shell"], root)
 
-    _visor(context, collection, materials, root, segments, stacks)
+    _visor(context, collection, materials, root, segments, steps)
 
     head = build.empty(
         "driver_head",
@@ -1061,43 +1339,51 @@ def _visor(
     materials: dict[str, bpy.types.Material],
     root: bpy.types.Object,
     segments: int,
-    stacks: int,
+    steps: int,
 ) -> None:
-    """A lens over the eye port, closed so the winding gate can see it.
+    """A lens in the shell's recess, closed so the winding gate can see it.
 
-    Built as two sheets of the helmet's own ellipsoid — one at `VISOR_STANDOFF`
-    and one `VISOR_THICKNESS` further out along the surface normal — joined by four
-    rim strips. Every one of those five windings is derived in the comments below
-    rather than tried; a rim wound inward is invisible in a render and would leave
-    the part enclosing a negative volume.
+    Built as two sheets riding the helmet's **un-recessed** profile — the outer
+    at `VISOR_GLASS_DROP - VISOR_THICKNESS` below it, the inner at
+    `VISOR_GLASS_DROP` — joined by four rim strips. Following the smooth profile
+    rather than the recessed shell keeps the glass unkinked; its top and bottom
+    edges then run into the recess's 6 mm ramps and bury themselves inside the
+    shell, which is what a visor disappearing under its brow looks like. Every
+    one of the five windings is derived in the comments below rather than tried;
+    a rim wound inward is invisible in a render and would leave the part
+    enclosing a negative volume.
     """
     p = context.params
     center = _helmet_center(p)
-    basis = _head_basis(p)
-    semi = _helmet_semi(p)
 
     # The eye point in helmet-local coordinates. Only its **height** places the
     # aperture: the visor sits on the shell's *front surface* at the eye's own
     # height, and where the eye sits fore-aft along the shell is §60.1.4's business,
     # measured and reported rather than compensated for. A helmet's front face is
-    # about 100 mm ahead of a real eye; this one prints 178, because §60.1.4 walks
-    # sitting eye height along the torso axis and so lands the eye on the shell's own
-    # fore-aft mid-plane. `driver_eye_x` is the interocular half-distance, so the
-    # aperture is centred on x = 0 and merely has to be wide enough to clear both.
+    # about 100 mm ahead of a real eye; this one prints 159, because §60.1.4 walks
+    # sitting eye height along the torso axis and so lands the eye near the shell's
+    # own fore-aft mid-plane. `driver_eye_x` is the interocular half-distance, so
+    # the aperture is centred on x = 0 and merely has to be wide enough to clear
+    # both.
     eye_local = Vector(
         (p.driver_eye_x, p.driver_eye_y - center.y, p.driver_eye_z - center.z)
     )
     local_eye_z = eye_local.z
-    occupancy = (
-        (eye_local.x / semi.x) ** 2
-        + (eye_local.y / semi.y) ** 2
-        + (eye_local.z / semi.z) ** 2
-    )
-    if occupancy >= 1.0:
+
+    def profile_y(local_x: float, local_z: float) -> float:
+        """The un-recessed shell's front surface at (x, z), helmet-local."""
+        half_u, half_v, offset_y, exponent, _recess = _helmet_section(local_z)
+        residual = 1.0 - abs(local_x / half_u) ** exponent
+        if residual <= 0.0:
+            return offset_y
+        return offset_y + half_v * residual ** (1.0 / exponent)
+
+    front_at_eye = profile_y(eye_local.x, eye_local.z)
+    if front_at_eye <= eye_local.y:
         raise SystemExit(
             "driver.py: the eye point (%.0f, %.0f, %.0f) is outside the helmet "
             "shell, so there is nothing for a visor to sit in front of. Check "
-            "driver_eye_* against driver_helmet_*."
+            "driver_eye_* against driver_helmet_* and HELMET_PROFILE."
             % (
                 p.driver_eye_x * 1000.0,
                 p.driver_eye_y * 1000.0,
@@ -1108,7 +1394,7 @@ def _visor(
         "    driver   eye is %.0f mm behind the shell's front face and %.0f mm "
         "above its centre; visor aperture %.0f x %.0f mm"
         % (
-            (semi.y - eye_local.y) * 1000.0,
+            (front_at_eye - eye_local.y) * 1000.0,
             local_eye_z * 1000.0,
             VISOR_APERTURE_WIDTH * 1000.0,
             VISOR_APERTURE_HEIGHT * 1000.0,
@@ -1124,25 +1410,31 @@ def _visor(
         )
     half_height = VISOR_APERTURE_HEIGHT * 0.5
 
-    rows = max(4, stacks)
+    rows = max(4, 2 * steps)
     columns = max(6, segments // 2)
 
-    def surface(local_x: float, local_z: float, offset: float) -> Vector:
-        """A point offset along the ellipsoid's outward normal, in world space."""
-        # Solve the +Y intersection of the ellipsoid at this (x, z).
-        residual = 1.0 - (local_x / semi.x) ** 2 - (local_z / semi.z) ** 2
-        local_y = semi.y * math.sqrt(max(0.0, residual))
-        point = Vector((local_x, local_y, local_z))
-        normal = Vector(
-            (
-                point.x / (semi.x * semi.x),
-                point.y / (semi.y * semi.y),
-                point.z / (semi.z * semi.z),
-            )
+    def surface(local_x: float, local_z: float, drop: float) -> Vector:
+        """A point `drop` below the un-recessed profile, along its outward normal.
+
+        The normal comes from central differences of `profile_y` rather than an
+        analytic derivative: the profile is piecewise linear in z, so its exact
+        derivative jumps at every authored row, and a face that straddles a row
+        would take its normal from whichever side the float landed on. A fixed
+        1 mm difference is deterministic and reads the mean slope, which is what
+        a 4 mm glass sheet spanning the row actually follows.
+        """
+        eps = 0.001
+        y = profile_y(local_x, local_z)
+        dy_dx = (profile_y(local_x + eps, local_z) - profile_y(local_x - eps, local_z)) / (
+            2.0 * eps
         )
-        if normal.length < 1.0e-9:
-            normal = Vector((0.0, 1.0, 0.0))
-        return center + basis @ (point + normal.normalized() * offset)
+        dy_dz = (profile_y(local_x, local_z + eps) - profile_y(local_x, local_z - eps)) / (
+            2.0 * eps
+        )
+        # Tangents (1, dy/dx, 0) and (0, dy/dz, 1); their cross product with +Y
+        # orientation is the outward normal of a front surface.
+        normal = Vector((-dy_dx, 1.0, -dy_dz)).normalized()
+        return center + Vector((local_x, y, local_z)) - normal * drop
 
     inner: list[list[bmesh.types.BMVert]] = []
     outer: list[list[bmesh.types.BMVert]] = []
@@ -1164,11 +1456,13 @@ def _visor(
             s = column / columns
             local_x = row_half_width * (2.0 * s - 1.0)
             inner_row.append(
-                bm.verts.new(surface(local_x, local_z, VISOR_STANDOFF))
+                bm.verts.new(surface(local_x, local_z, VISOR_GLASS_DROP))
             )
             outer_row.append(
                 bm.verts.new(
-                    surface(local_x, local_z, VISOR_STANDOFF + VISOR_THICKNESS)
+                    surface(
+                        local_x, local_z, VISOR_GLASS_DROP - VISOR_THICKNESS
+                    )
                 )
             )
         inner.append(inner_row)
@@ -1319,19 +1613,26 @@ def _arms(
     detail = context.detail
     segments = detail.tube_segments
     steps = max(1, detail.bend_segments // 2)
-    stacks = max(4, detail.tube_segments // 2)
-
     shoulder = Vector((p.driver_shoulder_x, p.driver_shoulder_y, p.driver_shoulder_z))
     elbow = _elbow(p, +1.0)
     grip = _grip(p, +1.0)
 
-    # Upper arm.
+    # Upper arm, with the deltoid cap near the root, lifted onto the arm's top
+    # side (the constants' own comment holds the derivation, the photograph and
+    # the gate-3 measurement that forced the lift).
     u, v = _frame(elbow - shoulder, Vector((0.0, 0.0, 1.0)))
+    deltoid = shoulder.lerp(elbow, UPPER_ARM_DELTOID_AT) + v * UPPER_ARM_DELTOID_LIFT
     bm = bmesh.new()
     _loft(
         bm,
         [
             (shoulder, UPPER_ARM_DIAMETER_ROOT * 0.5, UPPER_ARM_DIAMETER_ROOT * 0.5, 2.0),
+            (
+                deltoid,
+                UPPER_ARM_DIAMETER_DELTOID * 0.5,
+                UPPER_ARM_DIAMETER_DELTOID * 0.5,
+                2.0,
+            ),
             (elbow, UPPER_ARM_DIAMETER_ELBOW * 0.5, UPPER_ARM_DIAMETER_ELBOW * 0.5, 2.0),
         ],
         u,
@@ -1365,7 +1666,7 @@ def _arms(
     )
     _mirror(context, right, "driver_forearm_l", collection, root)
 
-    _glove(context, collection, materials, root, segments, stacks)
+    _glove(context, collection, materials, root, segments, steps)
 
     for side, label in ((+1.0, "r"), (-1.0, "l")):
         for name, position in (
@@ -1383,54 +1684,158 @@ def _arms(
             context.publish("driver_%s_%s" % (name, label), pivot)
 
 
+def _wrap_loft(
+    bm: bmesh.types.BMesh,
+    tube_center: Vector,
+    radial: Vector,
+    axial: Vector,
+    tangent: Vector,
+    knots: tuple[tuple[float, float], ...],
+    half_length: float,
+    t_offset: float,
+    segments: int,
+    steps: int,
+) -> None:
+    """One closed solid wrapped part-way around the rim tube.
+
+    Stations sweep an arc around `tube_center`: at wrap angle phi the ring's
+    plane is spanned by `d(phi) = cos phi * radial + sin phi * axial` (through
+    the tube's cross-section) and the rim `tangent`. The ring is a superellipse
+    from `GLOVE_WRAP_INNER` to that station's outer radius, so the solid is a
+    curved slab hugging the tube — fingers — rather than a box near it.
+
+    Winding: `d(phi) x tangent` is exactly `dd/dphi` (verified by expanding the
+    cross products: `radial x tangent = axial` and `axial x tangent = -radial`),
+    so each ring's `u x v` points along the sweep just as `_loft` requires, the
+    same quad pattern winds outward, and the caps close it watertight. Ring
+    parameters are linear in phi between knots and the rings sample a single
+    analytic swept surface, so the two densities are one shape — the helmet's
+    argument, bent around a tube.
+    """
+    stations: list[tuple[float, float, float]] = []
+    for index in range(len(knots) - 1):
+        low, high = knots[index], knots[index + 1]
+        for step in range(steps):
+            t = step / steps
+            stations.append(
+                (
+                    low[0] + (high[0] - low[0]) * t,
+                    low[1] + (high[1] - low[1]) * t,
+                    half_length,
+                )
+            )
+    stations.append((knots[-1][0], knots[-1][1], half_length))
+
+    rings: list[list[bmesh.types.BMVert]] = []
+    for angle_deg, outer, half_t in stations:
+        angle = math.radians(angle_deg)
+        direction = radial * math.cos(angle) + axial * math.sin(angle)
+        mid = 0.5 * (GLOVE_WRAP_INNER + outer)
+        ring_center = tube_center + direction * mid + tangent * t_offset
+        rings.append(
+            _ring(
+                bm,
+                ring_center,
+                direction,
+                tangent,
+                0.5 * (outer - GLOVE_WRAP_INNER),
+                half_t,
+                GLOVE_EXPONENT,
+                segments,
+            )
+        )
+    for index in range(len(rings) - 1):
+        lower, upper = rings[index], rings[index + 1]
+        for step in range(segments):
+            following = (step + 1) % segments
+            bm.faces.new(
+                (lower[step], lower[following], upper[following], upper[step])
+            )
+    bm.faces.new(tuple(reversed(rings[0])))
+    bm.faces.new(tuple(rings[-1]))
+
+
 def _glove(
     context: build.BuildContext,
     collection: bpy.types.Collection,
     materials: dict[str, bpy.types.Material],
     root: bpy.types.Object,
     segments: int,
-    stacks: int,
+    steps: int,
 ) -> None:
-    """The fist closed on the rim, long axis along the rim's own tangent.
+    """A mitt closed around the rim tube, thumb wrapping the other way.
 
     The rim tangent at 3 o'clock is the wheel plane's in-plane "up",
-    `(0, cos rake, sin rake)` -- differentiate §60.2.1's `rim(phi)` and evaluate at
-    90 degrees. So a fist is oriented by the wheel, which is why the glove reads
-    correctly when the column rake changes and would not if it were axis-aligned.
+    `(0, cos rake, sin rake)` -- differentiate §60.2.1's `rim(phi)` and evaluate
+    at 90 degrees -- and the tube's cross-section plane is spanned by the lateral
+    direction and the wheel plane's own normal. So the whole hand is oriented by
+    the wheel and follows a column rake change, which an axis-aligned fist would
+    not.
 
-    The grip point is the rim's *centerline*, so the glove encloses the tube. That
-    is what a hand does, and `joints.DRIVER_CONTACTS` permits it: a `grips` row
-    permits the overlap and requires contact, and a fist wrapped round a rim is
-    zero millimeters from it.
+    The wraps enclose the tube (`GLOVE_WRAP_INNER` is inside its surface), which
+    is what a hand does and what `joints.DRIVER_CONTACTS`' `grips` row permits
+    and requires: a fist wrapped round a rim is zero millimeters from it. The
+    tube's centerline at 3 o'clock is half a `wheel_rim_thickness` inboard of
+    the §60.2.1 grip point, because that point is the rim's outer extreme —
+    where the *outline* is normalized to `wheel_diameter` — and the hand wraps
+    the tube, not the extreme.
     """
     p = context.params
     rake = P.wheel_rake(p)
     tangent = Vector((0.0, math.cos(rake), math.sin(rake))).normalized()
+    axial = Vector((0.0, -math.sin(rake), math.cos(rake))).normalized()
+    radial = Vector((1.0, 0.0, 0.0))
     grip = _grip(p, +1.0)
     elbow = _elbow(p, +1.0)
-
-    # Local Z along the rim, local X along the forearm (projected off the rim), and
-    # local Y completing a right-handed basis so the ellipsoid stays outward-wound.
-    along_arm = grip - elbow
-    across = along_arm - tangent * along_arm.dot(tangent)
-    if across.length < 1.0e-9:
-        across = Vector((1.0, 0.0, 0.0))
-    across.normalize()
-    third = tangent.cross(across)
-    basis = Matrix((
-        (across.x, third.x, tangent.x),
-        (across.y, third.y, tangent.y),
-        (across.z, third.z, tangent.z),
-    ))
+    tube_center = grip - radial * (p.wheel_rim_thickness * 0.5)
 
     bm = bmesh.new()
-    _ellipsoid(
+    # Palm and fingers, fingertips behind the far side to the heel on the
+    # driver's side.
+    _wrap_loft(
         bm,
-        grip,
-        basis,
-        Vector((GLOVE_ACROSS * 0.5, GLOVE_THROUGH * 0.5, GLOVE_ALONG_RIM * 0.5)),
+        tube_center,
+        radial,
+        axial,
+        tangent,
+        GLOVE_FINGER_KNOTS,
+        GLOVE_ALONG_RIM * 0.5,
+        0.0,
         segments,
-        stacks,
+        steps,
+    )
+    # The thumb, wrapping the opposite sense, shifted toward 12 o'clock.
+    _wrap_loft(
+        bm,
+        tube_center,
+        radial,
+        axial,
+        tangent,
+        GLOVE_THUMB_KNOTS,
+        GLOVE_THUMB_HALF_LENGTH,
+        GLOVE_THUMB_OFFSET,
+        segments,
+        steps,
+    )
+    # The cuff, up the forearm's own axis so it swallows the sleeve end.
+    toward_elbow = (elbow - grip).normalized()
+    cuff_end = grip + toward_elbow * GLOVE_CUFF_LENGTH
+    u, v = _frame(cuff_end - grip, Vector((0.0, 0.0, 1.0)))
+    _loft(
+        bm,
+        [
+            (grip, GLOVE_CUFF_RADIUS, GLOVE_CUFF_RADIUS, 2.0),
+            (
+                cuff_end,
+                GLOVE_CUFF_RADIUS * GLOVE_CUFF_FLARE,
+                GLOVE_CUFF_RADIUS * GLOVE_CUFF_FLARE,
+                2.0,
+            ),
+        ],
+        u,
+        v,
+        segments,
+        steps,
     )
     right = _part(
         context, "driver_glove_r", bm, collection, materials["glove_leather"], root
@@ -1458,15 +1863,23 @@ def _legs(
     heel = Vector(P.driver_heel(p))
     ball = Vector(P.driver_ball(p))
 
-    # Thigh. The hip end is `derived`: two thighs fill `driver_hip_breadth`.
+    # Thigh. The hip end's width is `derived`: two thighs fill
+    # `driver_hip_breadth`. The section is flattened by `THIGH_FLATTEN` — the
+    # loft's v is the near-vertical frame direction, so the flatten lands on the
+    # height and the width stays the derived figure.
     thigh_root = p.driver_hip_breadth * 0.5
     u, v = _frame(knee - hip, Vector((0.0, 0.0, 1.0)))
     bm = bmesh.new()
     _loft(
         bm,
         [
-            (hip, thigh_root * 0.5, thigh_root * 0.5, 2.2),
-            (knee, THIGH_DIAMETER_KNEE * 0.5, THIGH_DIAMETER_KNEE * 0.5, 2.2),
+            (hip, thigh_root * 0.5, thigh_root * 0.5 * THIGH_FLATTEN, 2.3),
+            (
+                knee,
+                THIGH_DIAMETER_KNEE * 0.5,
+                THIGH_DIAMETER_KNEE * 0.5 * THIGH_FLATTEN,
+                2.3,
+            ),
         ],
         u,
         v,
@@ -1478,13 +1891,30 @@ def _legs(
     )
     _mirror(context, right, "driver_thigh_l", collection, root)
 
-    # Shank.
+    # Shank. The guard station's diameter is *computed* on the knee-to-ankle
+    # line, so the upper fifth cannot grow whatever the calf constants say —
+    # that band belongs to `chassis_steering_support_upper`, measured (the
+    # constants' comment has the figures). The shank axis runs forward-down to
+    # the pedals, so the frame's v — the up-ish perpendicular — leans forward;
+    # shifting the calf station by -v puts the bulge on the back of the leg,
+    # which is where a calf is.
     u, v = _frame(ankle - knee, Vector((0.0, 0.0, 1.0)))
+    guard_diameter = SHANK_DIAMETER_KNEE + (
+        SHANK_DIAMETER_ANKLE - SHANK_DIAMETER_KNEE
+    ) * SHANK_GUARD_AT
+    calf = knee.lerp(ankle, SHANK_CALF_AT) - v * SHANK_CALF_REARWARD
     bm = bmesh.new()
     _loft(
         bm,
         [
             (knee, SHANK_DIAMETER_KNEE * 0.5, SHANK_DIAMETER_KNEE * 0.5, 2.0),
+            (
+                knee.lerp(ankle, SHANK_GUARD_AT),
+                guard_diameter * 0.5,
+                guard_diameter * 0.5,
+                2.0,
+            ),
+            (calf, SHANK_DIAMETER_CALF * 0.5, SHANK_DIAMETER_CALF * 0.5, 2.0),
             (ankle, SHANK_DIAMETER_ANKLE * 0.5, SHANK_DIAMETER_ANKLE * 0.5, 2.0),
         ],
         u,

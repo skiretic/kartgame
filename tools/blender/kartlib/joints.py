@@ -3024,9 +3024,15 @@ OPEN_DEFECTS: tuple[Defect, ...] = (
     ),
     # -- gate 3, #200: the first measured pass, seeded off the built mesh -----
     #
-    # 48 findings at high detail, three causes, three tickets. Depths are
-    # `genkart.driver_depth`'s figure -- torso rows measured against the
-    # ADR-0057 rake-plane clip -- and the ADR-0055 seed table is NOT the source:
+    # 48 findings, three causes, three tickets. Measured at the geometry
+    # stage's LOW detail -- which is the only detail level the gates run at:
+    # the high-poly bake source is built, renamed and never gate-checked, a
+    # coverage hole found by the #17 surface agent (its first high-detail run
+    # hit a gate-1 fatal the pipeline has never seen). This block first said
+    # "high detail" because the Defect docstring promises it; it was wrong.
+    # Depths are `genkart.driver_depth`'s figure -- torso rows measured against
+    # the ADR-0057 rake-plane clip -- and the ADR-0055 seed table is NOT the
+    # source:
     # its leg and boot rows predate #201's 300 mm pedal separation and #202's
     # live foot chain, and 24 of its findings no longer exist.
     #
@@ -3144,7 +3150,10 @@ OPEN_DEFECTS: tuple[Defect, ...] = (
         issue="#206",
         why="the rear master (29.27 mm), its bracket (8.82) and both brake lines "
         "(0.00/1.93) share the left foot's corridor -- #201's pedal package "
-        "moved outboard into the same space the masters did",
+        "moved outboard into the same space the masters did. NOTE the glob is "
+        "quietly widening: the #17 surface pass brought brake_master_front and "
+        "brake_pushrod* under it at 0.00 mm, pairs that did not exist at "
+        "seeding. Split per part when #206 is worked",
     ),
     Defect(
         a="brake_master_rear",

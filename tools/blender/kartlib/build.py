@@ -943,9 +943,39 @@ FIXED_FINISHES: dict[str, Finish] = {
     # flexible opaque plastic and carries no clear laminate (Art. 3.7), and it has
     # to stay legible off-axis.
     "number_yellow": ("#ecd44c", 0.330, 0.45, 0.0),
-    # --- driver package, built by nothing yet (§60.1: there is no driver mesh) ---
+    # --- driver package (§60.1.6; driver.py builds it, #17) ------------------
     "suit_fabric": ("#16305c", 0.055, 0.68, 0.0),
     "helmet_shell": ("#f0ece6", 0.640, 0.14, 0.0),
+    # --- §60.1.8 the driver's finishes, #17 ------------------------------
+    # Sampled off exh_commons_buntschu_kz2.jpg — a KZ2 driver mid-corner, the
+    # only photograph in this repo of a driver in a kart — 16-level modal sample
+    # per region, cross-read against exh_commons_panfilov_kz2.jpg. `helmet_shell`
+    # above was confirmed by the same pass and is not restated. §60.1.8 holds the
+    # measured samples and the reasoning for every luminance that sits above its
+    # measured ratio.
+    # Navy fabric, hex `derived` from the #182848 mode warmed toward the mean.
+    # `suit_fabric` above is within a hue step and 0.005 of luminance, which is
+    # corroboration. Luminance held above the measured 0.029-equivalent because a
+    # textureless surface at that value is a black hole — same reasoning as
+    # `engine_cast`'s 0.175.
+    "overalls_fabric": ("#1c2c4c", 0.060, 0.65, 0.0),
+    # Art. 7.5's rigid shell to FIA 8870-2018, moulded. All `estimated`: no
+    # photograph in this repo shows a rib protector at all (§60.1.8 finding 2 —
+    # it is worn under the suit). Darker than the overalls, lighter than the
+    # tires, so it separates from both if it ever shows.
+    "protector_shell": ("#232326", 0.032, 0.50, 0.0),
+    # Hex `derived` from the #083858 visor mode. Roughness 0.08 is the smoothest
+    # surface on the kart, level with `tube_chrome` — true of a real visor.
+    # Metallic 0.0: tinted polycarbonate, not a mirror. Luminance below the
+    # measured 0.075 on purpose; most of that read is the sky reflection a
+    # roughness-0.08 material generates for itself.
+    "visor_tint": ("#123a5c", 0.055, 0.08, 0.0),
+    # Hex `derived` from #181818/#3b3d41. Roughness 0.55: perforated suede,
+    # matte — not `rubber_gloss`'s 0.40, which is what it was standing in as.
+    "glove_leather": ("#242428", 0.030, 0.55, 0.0),
+    # Hex `derived` from #282838. Glossier than a glove — a karting boot is
+    # smooth coated leather.
+    "boot_leather": ("#26262c", 0.034, 0.38, 0.0),
 }
 
 #: The three livery variants of §60.5, as role -> (hex, luminance).

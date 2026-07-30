@@ -240,7 +240,8 @@ part set.
 
 #### The parts
 
-Nineteen parts, all prefixed `driver_`, built by `tools/blender/kartlib/driver.py`
+Eighteen parts (this prose said nineteen against its own twelve-row table for a
+session; §60.1.7 records the catch), all prefixed `driver_`, built by `tools/blender/kartlib/driver.py`
 into the `driver` collection group — which `build.GROUPS` already carries, as
 `genkart.MODULES` already carries `("driver", "#17 driver with IK-ready arms")`.
 
@@ -258,7 +259,7 @@ carries reasoning on every one it has to estimate.
 | `driver_torso` | hip → shoulder, along the 25° torso axis | (0, −170, 130) → (0, −393, 608) | `overalls_fabric` |
 | `driver_rib_protector` | over the torso, z 250–450 in the torso frame | Art. 7.5, §60.1.5 | `protector_shell` |
 | `driver_neck` | shoulder line → helmet underside | (0, −400, 615) → (0, −437, 694) | `overalls_fabric` |
-| `driver_helmet` | ellipsoid, 250 wide × 340 long × 300 tall | center (0, −454, 738) | `helmet_shell` |
+| `driver_helmet` | closed shell, 250 wide × 340 long × 300 tall — the box is the contract, the shape inside it is the building module's (§60.1.7; was "ellipsoid" until the #17 surface pass) | center (0, −454, 738) | `helmet_shell` |
 | `driver_helmet_visor` | aperture on the eye point, ~200 × 95 | (±32, −462, 757) | `visor_tint` |
 | `driver_upper_arm_l` / `_r` | shoulder → elbow | (±200, −393, 608) → elbow, arm 368 | `overalls_fabric` |
 | `driver_forearm_l` / `_r` | elbow → fist center | elbow → grip, elbow-to-fist 361 | `overalls_fabric` |
@@ -302,7 +303,7 @@ own three-word vocabulary:
 | `driver_pelvis` | `seat_shell` | `sits_on` | the H-point is 95 mm above the pan; this pair is where 78 kg enters the chassis |
 | `driver_torso` | `seat_shell` | `sits_on` | the back bears on the shell at the 22° rake §60.1.1 sources |
 | `driver_thigh_l` / `_r` | `seat_shell` | `sits_on` | the pan's front lip at y −50 carries the thighs |
-| `driver_rib_protector` | `seat_shell` | `sits_on` | ADR-0057: the protector is worn *between* torso and shell over z 250–450, so it — not the torso — is what bears on the shell there. The torso's own row is the contact at the shell's **top edge**, above the protector's band, where the 25° torso leaves the 22° shell. Until #17's surface pass re-insets the torso by the protector's thickness, the protector overlaps the shell by roughly its own 12–18 mm; this row is what makes that overlap declared rather than waived. |
+| `driver_rib_protector` | `seat_shell` | `sits_on` | ADR-0057: the protector is worn *between* torso and shell over z 250–450, so it — not the torso — is what bears on the shell there. The torso's own row is the contact at the shell's **top edge**, above the protector's band, where the 25° torso leaves the 22° shell. ADR-0058 resolved ADR-0057's "until then" the other way around: the protector is worn **under the suit** (§60.1.8 finding 2, both reference frames) and is recessed ~1 mm inside the torso surface, rear face 0.3 mm forward of the rake plane — so it never renders, its shell overlap is gone, and this contact holds at 0.09 mm through the compressed suit. |
 | `driver_glove_l` / `_r` | `steering_rim` | `grips` | §60.2.1's rim, straight-ahead |
 | `driver_boot_l` | `pedal_brake_pad` | `presses` | brake is the left foot, x −150 per `pedal_separation` (#201) |
 | `driver_boot_r` | `pedal_throttle_pad` | `presses` | throttle is the right foot, x +150 |
@@ -466,19 +467,21 @@ quote from here on is the mesh's.
 | shoulder cap, above the acromion | 430 wide × 190 deep over 24 of rise | `estimated` | the deltoid is widest *at* the acromion and rolls over above it. |
 | torso exponents | 2.6 hip, 2.3 chest and up | `estimated` | close to elliptical, rounder as it rises out of the shell. |
 | rib protector, along-torso stations | **250 → 450** | reading of §60.1.5 | §60.1.5's "z 250–450 in the torso frame" read as distance along the 25° axis, which is world z **357–538** — the ribs, with the acromion at 527 along. The alternative reading, world z, would put a rib protector across the lumbar spine. |
-| rib protector build | a closed band, outer face 1 mm proud of the torso, 15 mm inward | `estimated` placement | the real part is a front shell and a back shell strapped at the sides; a closed band is the simplification, and it is chosen because it is **watertight** and therefore checkable by the winding gate. The 15 mm goes *inward* because 325 and 360 are already the breadths of a driver wearing one — that is what `driver_protector_thickness`'s docstring means by "they are what makes the seat fit" — so putting it outside counts it twice. |
+| rib protector build | a closed band, outer face 1 mm **inside** the torso front/sides, rear face 0.3 mm forward of the rake plane, 15 mm inward | `estimated` placement; under-suit per ADR-0058 | the real part is a front shell and a back shell strapped at the sides; a closed band is the simplification, chosen because it is **watertight** and therefore checkable by the winding gate. Worn **under the suit** — §60.1.8 finding 2, both reference frames — so it never renders: containment measured 0 vertices outside the torso at both densities, minimum inset 0.26/0.28 mm, and the `seat_shell` contact holds at 0.09 mm through the compressed suit. The 15 mm goes *inward* because 325 and 360 are already the breadths of a driver wearing one. Was "1 mm proud" until the #17 surface pass. |
 | neck | **120** diameter, flared 1.15× at the base | `derived` from an `estimated` | bare 106 (`estimated`, a little under half `driver_helmet_width`) plus 2 × `driver_overalls_thickness`. Art. 7's preamble bans "a scarf, muff, or any loose clothes around the neck", so the collar is the overalls and nothing else. |
-| upper arm | **109** at the root → 86 at the elbow | `estimated`, arithmetic shown | `(driver_bideltoid − driver_seated_shoulder_breadth) / 2` = 47.5 is the deltoid's outboard stand-off; doubled as a diameter is 95, plus 2 × 7 of overalls is 109. The two breadths are measured at different heights, so this is a proportion and not a derivation, and it is tagged accordingly. |
+| upper arm | **98** at the root, **105** deltoid cap at 15% lifted 5 mm dorsally, 86 at the elbow | `estimated`, arithmetic shown | `(driver_bideltoid − driver_seated_shoulder_breadth) / 2` = 47.5 is the deltoid's outboard stand-off; doubled as a diameter is 95, plus 2 × 7 of overalls is 109, which **bounds the cap**. The bulge is entirely dorsal — the arm's underside never grows — because a symmetric bulge put the right arm 0.11 mm into `engine_head_nut_3` and gate 3 said so. The two breadths are measured at different heights, so this is a proportion and not a derivation, and it is tagged accordingly. |
 | forearm | 96 at the elbow → 70 at the wrist | `estimated` | slimmer than the upper arm at the elbow, tapering hard. |
 | glove, along the rim | **105** | `derived` | the NASA table's `hand length` 191 × 0.55 for a closed fist. |
-| glove, across and through | 96 × 86 | `estimated` | hand breadth is not in §60.1.2's table. |
+| glove build | a wrap, not a block: inner radius 15 inside the Ø38 rim tube, knuckles 42, fingertips 26, thumb wrapping 95–235° offset 33 toward 12 o'clock, cuff Ø80 × 55 over the sleeve | `estimated`, read off S3's gloves (PIL crop) | grip centers stay on the rim — the declared `grips` contacts measure 0.00 mm. Replaced the 96 × 86 superellipse block. |
 | thigh at the hip | **162.5** | `derived` | two thighs fill `driver_hip_breadth`, so each is half of it. Computed from the field. |
-| thigh at the knee | 128 | `estimated` | a clothed knee measures about that across. |
-| shank | 124 at the knee → 94 at the ankle | `estimated` | |
+| thigh at the knee | 128 | `estimated` | a clothed knee measures about that across. Section height is **0.87 × width** — flattened against the pan, per the seated frames. |
+| shank | 124 at the knee, guard station on the line at 20%, calf **120** at 45% shifted 4 mm rearward, 94 at the ankle | `estimated` | the guard station exists because `chassis_steering_support_upper` passes **67.3 mm** from the shank axis at t = 0.19 and the first calf attempt grew into it 5.33 mm — gate 3 caught it, and the calf moved rather than a waiver being written. |
 | boot shaft | **108** diameter, 90 of rise above the ankle | `derived` / `estimated` | the cuff goes over the overalls, so 94 + 2 × 7. The 90 mm rise is `estimated` against Art. 7.4's *"protect the ankles"*. |
 | boot foot | half-widths 42 / 48 / 38, half-heights 48 / 40 / 30, toe 45 past the ball | `estimated` | 96 across the ball sits between two figures that *are* written down: `pedal_bar_length` 0.080 is documented in `params.py` as "one boot", and a 50th-percentile male foot breadth is about 100. |
 | visor aperture | 200 × 95 | `estimated`, §60.1.5 | checked against `driver_eye_x` rather than trusted: an aperture narrower than 2 × 32 plus a margin is a driver who cannot see out, and the module widens it and says so if that ever happens. |
-| visor standoff / thickness | 1 / 4 | `estimated` | a polycarbonate visor is 2–3 mm in a rebate; 4 at a 1 mm standoff is the same read with no rebate. **The helmet's eye port is not cut open** — §60.1.6 specifies an ellipsoid, a closed ellipsoid is watertight and therefore checkable, and an aperture cut at two densities would not be the same shape at both. |
+| visor recess / glass / thickness | 6 deep / 5 below the smooth profile / 4 | `estimated` | the shell carries a 6 mm visor recess over the aperture band (z eye ± 47.5, ±55°→72°); the glass sits 1 mm below the un-recessed line, 5 mm proud of the recess floor, edges buried in the ramps. **The helmet's eye port is still not cut open** — the shell is a closed watertight loft and an aperture cut at two densities would not be the same shape at both. Was "standoff 1 / thickness 4" on the ellipsoid. |
+| helmet build | profile loft, 12 authored rows: brow step, visor recess, chin bar carrying the +170 fore-aft extreme at z −55, jaw tuck, flat caps at ±150 | `estimated`, read off the buntschu helmet (PIL crop) | bbox measured **250.000 × 340.000 × 300.000** at both densities, center exact; crease dihedrals measured on the built mesh (the #199 rule): brow 71.1°/73.5°, chin ledge 42.5°/44.2° — all above `smooth_angle`'s 40°, so both survive smooth shading. |
+| torso stations added by the surface pass | waist **316 × 202** at z 248.5; lat **428 × 213** at z 492.3 | `estimated` | read off S4 (torso profile) and S3 (dead-front shoulders); both sit between contract stations, whose 325/360/455 widths are untouched. |
 | elbow swivel | **down, with a quarter of it outboard** | `estimated`, read off two photographs | `exh_commons_buntschu_kz2.jpg` and `exh_commons_panfilov_kz2.jpg` both show the elbows *tucked* — below the shoulder and barely outside the torso line, forearms angling up and inboard to the rim. It matters here: at the reach this cockpit actually has the elbow is **212.4 mm** off the shoulder-to-grip line, so unlike a locked arm the swivel is a real choice. Built, the right elbow lands at **(234.4, −133.9, 349.0)** — 34 mm outboard of the shoulder and 259 mm below it. An earlier armchair 45° guess put it at (331.7, −116.6, 403.9), 132 mm outboard, out over the sidepod, and 30 mm into `engine_plug_lead`; neither photograph supports it and the interference went away when the photograph did the choosing. |
 
 **Three inconsistencies in §60.1's own numbers, found by building them.** None is
@@ -499,32 +502,33 @@ patched in geometry; all three are decisions above this module's pay grade.
    contract's three dimensions win and §60.1.4's crown row is the casualty.
 3. **§60.1.4 puts the eye point on the helmet's own fore-aft mid-plane**, because it
    walks sitting eye height along the torso axis and the helmet centre is derived
-   along the same axis. Built, the eye is **178 mm behind the shell's front face**;
+   along the same axis. Built, the eye is **159 mm behind the shell's front face**
+   (was 178 on the ellipsoid; the chin bar moved the front face, the argument stands);
    real eyes sit near the front of the skull, roughly 100 mm behind a helmet's front.
    The driver looks out of the middle of his own head. This is the same field
    `kartview.gd`'s cockpit camera and `engine_voice_rig.gd`'s listener read, so it is
    a §60.1.4 decision with runtime consequences and not a mesh tweak.
 
-**Density and cost.** Eighteen parts: **1,352 verts / 2,628 tris at low** and
-**7,944 / 15,812 at high**. Ring counts come from `detail.tube_segments` (12 / 32)
-and station counts from `detail.bend_segments // 2` (3 / 7); interpolation between
-authored stations is **linear**, so both densities lie on the same surface rather
-than on two surfaces, which is what `Detail`'s contract requires for #19's bake. No
-part is beveled: `build.bevel_object`'s 4 mm high-detail offset would chamfer most
-of the protector's 15 mm wall away, and a smooth-shaded body has no hard edges for a
-bevel to earn its vertices on.
+**Density and cost.** Eighteen parts, re-measured after the #17 surface pass:
+**2,582 verts / 5,072 tris at low** and **14,942 / 29,792 at high** (was
+1,352 / 2,628 and 7,944 / 15,812 as blockout). Ring counts come from
+`detail.tube_segments` (12 / 32) and station counts from
+`detail.bend_segments // 2` (3 / 7); interpolation between authored stations is
+**linear**, so both densities lie on the same surface rather than on two
+surfaces, which is what `Detail`'s contract requires for #19's bake. No part is
+beveled: `build.bevel_object`'s 4 mm high-detail offset would chamfer most of
+the protector's 15 mm wall away, and a smooth-shaded body has no hard edges for
+a bevel to earn its vertices on.
 
-**"Same shape at two densities" is measured rather than claimed.** Every low-detail
-vertex against the high-detail surface of its own twin: **worst 1.165 mm**
-(`driver_helmet`), and eleven of the eighteen parts are under 0.4 mm — `driver_torso`
-0.815, `driver_rib_protector` 0.756, `driver_pelvis` 0.597, `driver_glove_?` 0.361,
-`driver_thigh_?` 0.353, `driver_helmet_visor` 0.297, `driver_neck` 0.295,
-`driver_shank_?` 0.265, `driver_boot_?` 0.245, `driver_upper_arm_?` 0.233,
-`driver_forearm_?` 0.205. The whole spread is chord error of an inscribed polygon: a
-12-gon on the helmet's 125 mm radius sits `r(1 − cos 15°)` = 4.3 mm inside the true
-ellipse and a 32-gon `r(1 − cos 5.6°)` = 0.6 mm, so about a millimeter between them
-is exactly what two densities of the *same* surface look like. Nothing here is a
-second shape, which is the smeared bake #19's acceptance criteria calls out.
+**"Same shape at two densities" is measured rather than claimed.** Every
+low-detail vertex against the high-detail surface of its own twin, re-measured
+after the surface pass: **worst 0.781 mm** (`driver_torso`; was 1.165 on the
+blockout, and the helmet itself improved 1.165 → 0.659 despite gaining a chin
+bar). The spread is chord error of an inscribed polygon — a 12-gon on a 125 mm
+radius sits `r(1 − cos 15°)` = 4.3 mm inside the true curve and a 32-gon 0.6 mm
+— so under a millimeter between densities is what two samplings of the *same*
+surface look like. Nothing here is a second shape, which is the smeared bake
+#19's acceptance criteria calls out.
 
 **All eighteen are watertight and enclose positive volume**, so every one is checked
 by the winding gate rather than skipped by it. That drove three construction
