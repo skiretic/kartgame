@@ -6365,10 +6365,11 @@ So, in §60.3's four-tuple form `(hex, luminance, roughness, metallic)`:
    is 0.037** and its **white chest panel is 0.639**, against a radiator at 0.311.
    The bright thing is a panel, not the garment. A race suit is a multi-panel livery
    object — navy body, white chest, fluorescent yellow-green shoulder and sleeve
-   stripes, sponsor blocks — and `overalls_fabric` is one material, so the panels are
-   a texture this pipeline cannot write. Same standing as `ZONES`' owed glyph: the
-   material is the navy body and the rest is owed, said plainly rather than left to
-   be discovered in a render.
+   stripes, sponsor blocks — and `overalls_fabric` is one material, so the panels
+   were a texture this pipeline could not write. The albedo stage writes it now
+   (ADR-0060, §60.5.6): the chest panel and the sleeve stripes are painted, and
+   what remains owed is the finer panel work — sponsor blocks, seams, the stripe
+   over the shoulder blades.
 2. **Neither driver wears a visible rib protector.** In both frames the torso is
    plain overalls with no external shell, which means the protection is worn
    *under* the suit. §60.1.5 says *"Adds 12–18 mm per side over the overalls"* and
@@ -7091,6 +7092,23 @@ hovered flat.
 
 Geometry is not this section's. These are palettes: named relationships, with hex,
 and every hex tagged.
+
+### 60.5.6 The albedo stage, built
+
+ADR-0060 implemented: `kartlib/albedo_stage.py` rasterizes livery art into the
+same atlas the uv stage lays out, between uv and bake. World-space art
+functions — a stripe is a z-band, the chest panel is a box with a facing test —
+walked into each face's UV triangle barycentrically, numpy-vectorized,
+sRGB-encoded on write (`image.pixels` maps 1:1 to PNG bytes at alpha 1,
+measured with a ramp probe after the first atlas shipped one gamma dark and
+the whole kart rendered grey). Four materials carry it: `bodywork_wrap` (base
+plus the twin pinstripe, accent over contrast at z 146–174), `bodywork_contrast`
+and `livery_accent` (base fill), `overalls_fabric` (navy plus the §60.3.8 chest
+white and fluoro sleeve bands). The export gate parses the glb's own JSON
+chunk and fails if a wired texture did not survive (#210); the manifest hashes
+every texture beside the glb. Still owed here: sponsor blocks, the pod name
+zone (Art. 3.7's driver name), per-livery stripe geometry rather than one
+band, and the suit's remaining panels.
 
 ### 60.5.1 The one color here that is genuinely sourced
 

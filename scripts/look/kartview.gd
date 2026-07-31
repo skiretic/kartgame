@@ -529,6 +529,19 @@ func _mesh_line() -> String:
 		line += "\nSTALE IMPORT — %d tris on screen, manifest says %d. Re-run without SKIP_IMPORT=1." % [
 			built, triangles,
 		]
+
+	# The texture half of the same trap, from the other direction: a
+	# `--stages=...` iteration run that skips the bake exports a glb with zero
+	# images over the full artifact, and the triangle count matches exactly —
+	# so the caption above stays clean while every material lost its maps.
+	# #210 measured it. The manifest records which textures the run produced;
+	# if it names any and the loaded materials carry none, say so.
+	var manifest_textures: Variant = _manifest.get("textures", {})
+	if manifest_textures is Dictionary and not (manifest_textures as Dictionary).is_empty():
+		if _textured_materials_in_scene() == 0:
+			line += "\nTEXTURELESS GLB — manifest names %d texture(s), loaded materials carry none. Last writer skipped the bake (--stages without bake?)." % [
+				(manifest_textures as Dictionary).size(),
+			]
 	return line
 
 
@@ -541,6 +554,25 @@ func _mesh_line() -> String:
 ## exporter triangulates, and Godot's importer neither adds nor removes any at
 ## LOD 0 — so it is the one number that must agree, which is what makes a
 ## disagreement unambiguous rather than a tolerance question.
+## Materials in the loaded kart that carry any image texture. Zero with a
+## texture-bearing manifest means the artifact and the manifest disagree.
+func _textured_materials_in_scene() -> int:
+	if _kart == null:
+		return 0
+	var count := 0
+	for node in _walk(_kart):
+		var instance := node as MeshInstance3D
+		if instance == null or instance.mesh == null:
+			continue
+		for surface in instance.mesh.get_surface_count():
+			var material := instance.mesh.surface_get_material(surface) as BaseMaterial3D
+			if material == null:
+				continue
+			if material.albedo_texture != null or material.normal_texture != null:
+				count += 1
+	return count
+
+
 func _triangles_in_scene() -> int:
 	if _kart == null:
 		return 0

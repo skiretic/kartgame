@@ -47,6 +47,7 @@ import dataclasses
 import hashlib
 import importlib
 import json
+import struct
 import os
 import sys
 import time
@@ -79,7 +80,7 @@ MODULES: tuple[tuple[str, str], ...] = (
     ("driver", "#17 driver with IK-ready arms"),
 )
 
-STAGES: tuple[str, ...] = ("geometry", "finish", "uv", "bake", "lod", "export")
+STAGES: tuple[str, ...] = ("geometry", "finish", "uv", "albedo", "bake", "lod", "export")
 
 BLENDER_REQUIRED: tuple[int, int] = (5, 2)
 
@@ -1254,6 +1255,82 @@ def export_gltf(context: build.BuildContext, path: str) -> None:
     )
 
 
+def check_gltf_textures(context: build.BuildContext, path: str) -> None:
+    """The #210 gate: what the materials carry must survive into the glb.
+
+    Measured on the artifact rather than trusted from the node graphs, because
+    that is exactly the seam that failed: `_attach_normal_map` wired every
+    material and the exported glb still held zero images, and no gate looked.
+    Parses the glb's own JSON chunk -- the same command that found #210, run
+    every export instead of once.
+    """
+    with open(path, "rb") as handle:
+        data = handle.read()
+    json_length, chunk_type = struct.unpack_from("<II", data, 12)
+    if chunk_type != 0x4E4F534A:  # 'JSON'
+        raise SystemExit("error: glb first chunk is not JSON: %s" % path)
+    doc = json.loads(data[20 : 20 + json_length])
+    materials = doc.get("materials", [])
+    images = len(doc.get("images", []))
+    with_base = sum(
+        1
+        for m in materials
+        if "baseColorTexture" in m.get("pbrMetallicRoughness", {})
+    )
+    with_normal = sum(1 for m in materials if "normalTexture" in m)
+
+    # Only materials an exported object actually references: the exporter
+    # rightly drops a material no mesh uses, and counting it as "wired" makes
+    # this gate fail a healthy export (measured: 45 wired, 44 in the glb).
+    used = set()
+    for obj in exportable(context):
+        if obj.type != "MESH":
+            continue
+        for slot in obj.material_slots:
+            if slot.material is not None:
+                used.add(slot.material.name)
+
+    def wired(label: str, names) -> int:
+        count = 0
+        for name in names:
+            material = context.materials.get(name)
+            if material is None or name not in used:
+                continue
+            if any(
+                node.type == "TEX_IMAGE" and node.label == label
+                for node in material.node_tree.nodes
+            ):
+                count += 1
+        return count
+
+    expected_albedo = wired(
+        "kart_albedo",
+        ("bodywork_wrap", "bodywork_contrast", "livery_accent", "overalls_fabric"),
+    )
+    expected_normal = wired("kart_normal", sorted(context.materials))
+
+    print(
+        "    glb carries %d image(s); baseColorTexture %d/%d expected, normalTexture %d/%d expected"
+        % (images, with_base, expected_albedo, with_normal, expected_normal)
+    )
+    problems = []
+    if with_base < expected_albedo:
+        problems.append(
+            "baseColorTexture on %d material(s), %d wired" % (with_base, expected_albedo)
+        )
+    if with_normal < expected_normal:
+        problems.append(
+            "normalTexture on %d material(s), %d wired" % (with_normal, expected_normal)
+        )
+    if (expected_albedo or expected_normal) and images == 0:
+        problems.append("zero images embedded while textures were wired")
+    if problems:
+        raise SystemExit(
+            "error: the export dropped textures the materials carry (#210): "
+            + "; ".join(problems)
+        )
+
+
 def build_totals(context: build.BuildContext) -> dict[str, int]:
     """Object, mesh, vertex and triangle counts for the scene as it stands.
 
@@ -1310,12 +1387,24 @@ def write_manifest(
         with open(gltf_path, "rb") as handle:
             digest = hashlib.sha256(handle.read()).hexdigest()
 
+    # ADR-0060: every texture beside the glb is hashed too. #210 is the reason:
+    # the glb shipped with zero images for months and the manifest could not
+    # see it, because it hashed the glb alone and nothing recorded what the
+    # textures were supposed to be.
+    textures = {}
+    for name in sorted(("kart_normal.png", "kart_albedo.png")):
+        texture_path = os.path.join(os.path.dirname(os.path.abspath(gltf_path)), name)
+        if os.path.exists(texture_path):
+            with open(texture_path, "rb") as handle:
+                textures[name] = hashlib.sha256(handle.read()).hexdigest()
+
     manifest = {
         "generator": "tools/blender/genkart.py",
         "blender": ".".join(str(number) for number in bpy.app.version),
         "detail": context.detail.name,
         "gltf": os.path.relpath(gltf_path, _project_root()),
         "sha256": digest,
+        "textures": textures,
         # Deliberately no timing here. Build duration was in this dict first, and
         # `genkart.sh --check` immediately flagged the manifests as differing
         # between two otherwise byte-identical runs -- correctly, because a
@@ -1616,7 +1705,10 @@ def main() -> None:
     if high_context is not None:
         context.high_poly = pair_high_poly(context, high_context, high_suffix)
 
-    for stage in ("uv", "bake", "lod"):
+    # "albedo" between uv and bake: ADR-0060 -- it reads the atlas layout and
+    # nothing from the bake, and the bake's active-node bookkeeping must run
+    # after the albedo's TexImage nodes exist so the bake target stays active.
+    for stage in ("uv", "albedo", "bake", "lod"):
         if stage in stages:
             runner = _optional_stage(stage)
             if runner is None:
@@ -1631,6 +1723,7 @@ def main() -> None:
     if "export" in stages:
         print("==> export")
         export_gltf(context, out)
+        check_gltf_textures(context, out)
 
     blend = arguments.get("blend")
     if blend:

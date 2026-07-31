@@ -164,7 +164,7 @@ if [ "$CHECK" = "1" ]; then
 
 	FAILED=0
 	SKIPPED=0
-	for artifact in kart.glb kart_normal.png; do
+	for artifact in kart.glb kart_normal.png kart_albedo.png; do
 		if [ ! -e "$SCRATCH/pass1/$artifact" ]; then
 			# Silent would read as proven. Say what this run cannot know. #208.
 			printf '    %-16s not produced by this stage set; UNPROVEN\n' "$artifact"
