@@ -3852,3 +3852,60 @@ driver findings at high against 47 at low: `drive_output_sprocket` reaches
 2.77 mm into the torso only at high density, while at low only the shaft
 member of #204's `drive_output_*` glob fails. A per-detail staleness judgment
 over separate runs would have argued about that row from both sides.
+
+
+## ADR-0060 — Livery art is rasterized into the existing UV atlas, in world space, by a new albedo stage
+
+**Status:** accepted, 2026-07-31. The design for #189's last livery checkbox
+(the V13-style wrap art); folds in the fix for #210. Implementation is the
+next session's work — this records the decisions so the build starts from a
+contract rather than a debate.
+
+**Context.** The pipeline has a normal bake and no albedo path: 44 materials
+carry plain base colors, the zones (`build.ZONES`) are face-level second
+material slots, and the racing numbers landed as die-cut *geometry* (spec
+§60.4.6) precisely because no stage could write a texture. The wrap art —
+per-panel die-cut layouts, pinstripes, the pod name zone, sponsor blocks, the
+suit's multi-panel colors — cannot be geometry, and #210 measured that the one
+texture the pipeline does produce never reaches Godot: the exported glb has
+zero images and no `normalTexture` on any material, so the export seam has to
+be rebuilt for one map or two, and it should be two at once.
+
+**Decision, in five parts.**
+
+1. **No new UV machinery.** The art is authored as functions of *world
+   position and part identity* — a stripe is a plane, a panel field is a box,
+   a die-cut edge is a distance from a section curve — and rasterized into the
+   existing smart-project atlas by walking each face's UV triangle with
+   barycentric world interpolation. `uv_stage`'s single-layer rule and refusal
+   of UV2 stand. The alternative — authored per-panel UV islands — rebuilds
+   the unwrap for a layout problem the art functions do not have: V13's art is
+   flat *in panel space*, and panel space is reachable from world space.
+2. **numpy, from the pinned Blender's own bundle.** `build.checker_image`'s
+   pixel-list write is unusable at 4096². numpy 2.3.4 ships inside Blender 5.2
+   and is deterministic for this use; it stays inside the albedo stage rather
+   than leaking into geometry modules.
+3. **Stage order `geometry, uv, albedo, bake, lod, export`**, output
+   `kart_albedo.png` beside `kart_normal.png`. The albedo is a fact about the
+   art tables and the atlas alone, so it does not read the bake and the bake
+   does not read it.
+4. **The manifest hashes every texture, and the export embeds them.** #210's
+   observability gap is that `kart.json` hashes the glb alone, so a glb with
+   zero images passed every gate. The manifest grows a per-texture sha256 and
+   the determinism gate compares them; the export stage is required to leave
+   `normalTexture` (and now `baseColorTexture`) on the materials that earned
+   them, verified by parsing the glb's own JSON chunk — the #210 acceptance
+   command, run as a gate rather than a one-off.
+5. **Art tables live with the livery tables in `build.py`**, keyed by the same
+   roles `LIVERIES` already uses, so `--livery=` reaches the wrap art through
+   the path that already reaches the base colors — and a livery still is
+   reproducible from its command, which is the rule that makes renders
+   evidence.
+
+**Consequences.** The zones stay authoritative for *where* regulated fields
+sit (they are measured face sets); the albedo paints within them rather than
+replacing them. The suit's multi-panel colors (§60.3.8 finding 1) ride the
+same stage. The numbers stay geometry — a film with thickness photographs as
+one, and nothing about an albedo stage argues for flattening a part that
+already works. `SKIP_IMPORT=1` gains a second stale-texture trap, which the
+existing `STALE IMPORT` guard in `kartview.gd` should be extended to cover.
