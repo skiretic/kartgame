@@ -5532,16 +5532,19 @@ displacement about this hook line, so M3's contact displacement rotates about it
 | standoff from the tubes | — | 1.0 | `sourced` | Art. 9.5.2, quoted above |
 | lateral position | — | ±90 | `derived` | on the tubes |
 
-## 50.9 Front panel — entirely absent today
+## 50.9 Front panel
 
 ### `bodywork_front_panel`
 
-The nassau panel. Art. 4.10.1 requires it, Art. 9.5.3 dimensions it, and this
-kart has no such part. **Its 50 mm gap is to the steering wheel** — a hands
-clearance — and not to the front road wheel; front matter §4 says so because it
-was misread once.
+The nassau panel. Art. 4.10.1 requires it, Art. 9.5.3 dimensions it. **Its
+50 mm gap is to the steering wheel** — a hands clearance — and not to the front
+road wheel; front matter §4 says so because it was misread once.
 
-**Status:** new.
+**Status:** built — raked rebuild (#205), then the 2026-07-31 photo-match
+sculpt: violin outline, S face profile, stadium head, rolled top deck. The
+sculpt's ratios were **measured off a gridded crop** of
+`liv_travisanutto_kr_rosberg.jpg` rather than eyeballed, because the eyeballed
+first pass (waist 0.845) read as the same flat strip it replaced.
 **Attaches to:** `bodywork_front_panel_stay_l` / `_r` (bolted),
 `bodywork_front_panel_bar` (bolted).
 **Envelope:** Art. 9.5.3, Art. 4.10.2.
@@ -5550,18 +5553,24 @@ the five 9.5.3 rows of the compliance table.
 
 | dimension | `params.py` field | value | prov | basis |
 | --- | --- | --- | --- | --- |
-| width | `front_panel_width` | 275 | `derived` | midpoint of Art. 9.5.3's 250–300, so ±25 either way |
+| width | `front_panel_width` | 275 | `derived` | midpoint of Art. 9.5.3's 250–300, so ±25 either way. The widest stations are the base flare and the plate head, both at the full 275 |
 | top edge | `front_panel_top_z` | 500 | `derived` | 52.5 under the steering wheel's top. That top is z **552.5**, itself `derived`: `wheel_center_z` 480 plus `wheel_diameter`/2 × sin(`wheel_angle`) = 160 × sin(0.470) = 72.5, because a wheel raked 26.9° from vertical has its highest rim point leaning *forward*, at y +462.6 |
-| bottom edge | `front_panel_bottom_z` | 190 | `estimated` | above the pedal pads at `pedal_z` 90, so the panel *"must not impede the normal functioning of the pedals or cover any part of the feet"* is satisfied by there being no panel at foot height at all |
-| top edge, fore-aft | — | y +620 | `derived` | gap to the steering wheel's nearest point (y +462.6, z 552.5) is hypot(157.4, 52.5) = **166 mm**, against the 50 mm minimum |
-| bottom edge, fore-aft | — | y +585 | `estimated` | 6.4° of forward lean going up, which is what opens the hands gap; a vertical panel at y +585 would still clear 50 but by 68 mm |
-| height | — | 310 | `derived` | 500 − 190 |
+| bottom edge | `front_panel_bottom_z` | 240 | `estimated` | #205: foot tucked just behind the fairing's rear top edge (spine z 267, 27 mm below it, zero overlap). The pre-rake row said 190 and went stale when the rebuild landed without a spec pass |
+| top edge, fore-aft | — | y +578 | `estimated` as rake, `derived` as clearance | 32.2° of rake (was 28.6°; all three front-on refs lie the plate back harder). Gap to the wheel's nearest point (y +462.6, z 552.5): hypot(115.4, 52.5) = **126 mm**; the roll deck's trailing edge (y +554, z 493) clears by **109 mm**, both against the 50 minimum |
+| bottom edge, fore-aft | — | y +742 | `derived` | on the fairing's rear-lip plane, 27 mm under its top skin |
+| height | — | 260 | `derived` | 500 − 240 |
+| width profile | `FRONT_PANEL_WIDTH` (bodywork.py) | waist **0.615** at t 0.38, plate 1.00 at t 0.82, top 0.80 | `estimated` | measured off the gridded KR crop: head ~245 px, waist ~145, base ~230 — waist/head 0.59, base/head 0.94. Eight face controls (`FRONT_PANEL_FACE_T`); the outline has three inflections and five points hold one |
+| head rounding | `FRONT_PANEL_CROWN` | corner drop 100 max | `estimated` | stadium top, corner radius ~40% of plate width on the same crop; the old 34 mm was a tombstone with clipped corners |
+| face profile | `FRONT_PANEL_BULGE`, `FRONT_PANEL_BOW` | S: belly 14, waist hollow 6, plate 16; × (1 − 0.65·a²) | `estimated` | the KR pod's side highlight. Belly zeroed below t 0.12 — a 12 mm belly there was 8 triangle pairs inside the fairing, gate 1, measured |
+| edge sweep | `FRONT_PANEL_SWEEP` | max 88 rearward, knee at 0.80 | `estimated` | side returns wrap toward the column; the old flat 55 mm ramp read as an arc that stops |
+| top roll | `FRONT_PANEL_ROLL_DEPTH/_DROP` | deck 30 rearward, 7 drop, ~60° dihedral | `estimated` | #199 crease pattern, two spline runs at a shared vertex — the top is a fold, not a cut, in every front-on |
 | wall thickness | `panel_thickness` | 3.8 | `derived` | §50.6 |
 | free-edge return radius | — | 5.0 | `sourced` | Art. 4.10.2 |
-| number zone | — | 240 × 190, centered (0, y 602, z 345) | `derived` | Art. 9.5.3 *"A space for racing numbers must be provided on the front panel"*, sized by Art. 3.7 (PDF p. 5): 150 mm digits with a ≥10 mm yellow border is 170 mm minimum, and short-circuit stroke is 20 mm |
+| number zone | — | **flagged for the livery wave** | `derived`, stale | Art. 9.5.3 *"A space for racing numbers must be provided on the front panel"*. The pre-sculpt row put 240 × 190 at (0, y 602, z 345) — that station is now the waist, 173 mm wide, and the zone does not fit there. The usable flat is the plate head, ~275 × 150 with the crown falloff, which holds a two-digit marking per §60's reading but not 240 × 190. Zone layout is albedo work and deferred with the livery pick; the geometry constraint it must satisfy is recorded here |
 
-Not protruding beyond the front fairing, Art. 9.5.3: the panel's frontmost point
-is y +620 against the fairing's rear lip at +742 and its apex at +1029, and its
+Not protruding beyond the front fairing, Art. 9.5.3: the panel's frontmost
+points are the foot at y +742, exactly on the fairing's rear-lip plane, and the
+belly's peak at y ~+715 — both behind the fairing's apex at +1029 — and its
 half-width 137.5 against the fairing's 545. Inside on both axes.
 
 ### `bodywork_front_panel_stay_l`, `bodywork_front_panel_stay_r`

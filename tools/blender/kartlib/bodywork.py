@@ -287,22 +287,29 @@ KIT_LINK_DIAMETER: float = 0.010
 #: the whole nose -- dimensionally compliant and visually not a kart.
 #:
 #: Foot at y +742, tucked just behind the fairing's rear top edge (spine z 267,
-#: foot z 240 -- 27 mm below it, zero overlap); top at y +600, raked back 28.6
-#: degrees. Art. 9.5.3's hands clearance off the built numbers: top edge
-#: (0, +600, +500) to the wheel's nearest rim point (0, +463, +552) is
-#: hypot(137, 52) = 146 mm against the 50 mm minimum. `estimated` as shape
-#: (V8/V12), `derived` as clearance.
-FRONT_PANEL_TOP_Y: float = 0.600
+#: foot z 240 -- 27 mm below it, zero overlap); top at y +578, raked back 32.2
+#: degrees. Every front-on in the visual haul -- `liv_travisanutto_kr_rosberg`,
+#: `liv_ivanov_crg_kz`, `liv_estep_praga_grid` -- shows the panel lying back
+#: harder than the first raked build's 28.6; the number plate reads at maybe
+#: half from vertical in all three. Art. 9.5.3's hands clearance off the built
+#: numbers: top edge (0, +578, +500) to the wheel's nearest rim point
+#: (0, +463, +552) is hypot(115, 52) = 126 mm against the 50 mm minimum, and
+#: the rolled deck's trailing edge (0, +554, +493) still clears by 109 mm.
+#: `estimated` as shape, `derived` as clearance.
+FRONT_PANEL_TOP_Y: float = 0.578
 FRONT_PANEL_BOTTOM_Y: float = 0.742
 
 #: How far the panel's ends sweep rearward, against |x| / half-width.
-#: `estimated` off V9's plan view: the panel nests into the V between the
-#: fairing's lobes, so its edges pull back harder than the old 32 mm -- the
-#: bow is what makes the nose read as one mass from three-quarter front.
+#: `estimated` off the front-ons above: the panel nests into the V between the
+#: fairing's lobes and its side edges do not stop at a plane -- they keep
+#: turning rearward, a return wrapping toward the column. The knee at 0.80 is
+#: what separates a bowed face (inside it) from a wrap (outside it); the old
+#: table's flat 55 mm ramp read as a gentle arc with no return at all.
 FRONT_PANEL_SWEEP: tuple[tuple[float, float], ...] = (
     (0.00, 0.000),
-    (0.55, 0.018),
-    (1.00, 0.055),
+    (0.50, 0.014),
+    (0.80, 0.040),
+    (1.00, 0.088),
 )
 
 #: Where the panel's two lower stays land on the front loop, and the one upper bar
@@ -1299,68 +1306,141 @@ def _fairing_kit(
 # --- the front panel -------------------------------------------------------
 
 
-#: How much the panel narrows going up, as the x multiplier at the top edge.
-#: `estimated` off V12: the PN509 panel is visibly a teardrop, wide at the
-#: fairing and narrowing to the number zone. 0.82 keeps the regulated 250-300
-#: width where Art. 9.5.3 measures it, at the widest point.
-FRONT_PANEL_TOP_TAPER: float = 0.82
+#: Panel width against height, as the x multiplier at fraction t up the face.
+#: Replaces the linear `FRONT_PANEL_TOP_TAPER = 0.82`, which drew a trapezoid.
+#: `estimated` by MEASUREMENT off `liv_travisanutto_kr_rosberg` (gridded at
+#: 800 px crop width): number-plate head ~245 px across, waist ~145, base
+#: flare ~230 -- waist/head = 0.59, base/head = 0.94, waist centered about 30%
+#: up the pod. The first sculpt pass guessed 0.845 for the waist and read as
+#: the same flat strip; the violin IS the ~0.6 pinch. The head is the widest
+#: station at the full `front_panel_width`, where Art. 9.5.3's 250-300 is
+#: measured; the base holds 1.000 too because the stays clamp the bottom edge
+#: at |x| 135 and a narrowed base would put them in air.
+#: Sampled at `FRONT_PANEL_FACE_T`'s stations -- a table point between two
+#: control stations is invisible, which is why both share one t list.
+FRONT_PANEL_WIDTH: tuple[tuple[float, float], ...] = (
+    (0.00, 1.000),
+    (0.12, 0.930),
+    (0.25, 0.720),
+    (0.38, 0.615),
+    (0.52, 0.700),
+    (0.66, 0.920),
+    (0.82, 1.000),
+    (1.00, 0.800),
+)
 
-#: Top-edge drop against |x| / half-width at the TOP (post-taper). What rounds
-#: the top corners: a dead-straight top edge is most of what read as a
-#: tombstone in the first raked build. `estimated` as shape.
+#: Where the face's Catmull-Rom control points sit, as fractions of the height.
+#: Eight, not five: the waist-flare-head outline has three inflections and a
+#: five-point column cannot hold more than one.
+FRONT_PANEL_FACE_T: tuple[float, ...] = (
+    0.00, 0.12, 0.25, 0.38, 0.52, 0.66, 0.82, 1.00,
+)
+
+#: Forward bulge of the face against fraction t up it, in meters at the
+#: centerline. Scaled by `1 - FRONT_PANEL_BOW * a^2` across the width, so the
+#: center bows forward of the swept-back edges and a horizontal cut through
+#: the panel is convex. The profile is an S read off the KR pod's side
+#: highlight: a belly rolling forward onto the nose at the base, a hollow at
+#: the waist, the plate standing proud above it. `estimated` as shape.
+FRONT_PANEL_BULGE: tuple[tuple[float, float], ...] = (
+    # Zero through t 0.12: the fairing's top skin crosses z ~267 right at the
+    # panel's t 0.10, and a 12 mm belly there was 8 triangle pairs inside the
+    # fairing (gate 1, measured). The belly starts above the skin.
+    (0.00, 0.000),
+    (0.12, 0.003),
+    (0.25, 0.014),
+    (0.38, 0.006),
+    (0.52, 0.008),
+    (0.66, 0.014),
+    (0.82, 0.016),
+    (1.00, 0.008),
+)
+FRONT_PANEL_BOW: float = 0.65
+
+#: The rolled top edge, as a short deck running rearward off the face's top.
+#: A crease spline in the #199 pattern -- the deck is its own Catmull-Rom run
+#: concatenated at a shared vertex, so the built dihedral (about 60 degrees)
+#: clears `smooth_angle`'s 40 and the roll reads as an edge rather than
+#: blending away. All three front-ons show it: the panel's top is not a cut
+#: edge, it is a fold, and the highlight breaks along it. Depth `estimated`
+#: off `liv_ivanov_crg_kz` against its 275 mm plate width.
+FRONT_PANEL_ROLL_DEPTH: float = 0.030
+FRONT_PANEL_ROLL_DROP: float = 0.007
+
+#: Top-edge drop against |x| / half-width at the TOP (post-width-table). What
+#: rounds the head: the KR pod's plate is stadium-topped, corner radius on the
+#: order of 40% of the plate width, and the old 34 mm maximum drop left a
+#: near-straight edge with clipped corners. 100 mm at the extreme corner, on a
+#: head 220 wide at the top station, is what makes the plate read as an oval
+#: rather than a tombstone. `estimated` off the same gridded measurement as
+#: `FRONT_PANEL_WIDTH`.
 FRONT_PANEL_CROWN: tuple[tuple[float, float], ...] = (
     (0.00, 0.000),
-    (0.55, 0.006),
-    (0.80, 0.016),
-    (1.00, 0.034),
+    (0.50, 0.010),
+    (0.75, 0.032),
+    (0.90, 0.065),
+    (1.00, 0.100),
 )
 
 
 def _front_panel_section(p: P.KartParams, s: float, steps: int) -> list[Vector]:
     """One (y, z) section of the nassau panel at lateral fraction `s` in [-1, 1].
 
-    Five control points from the bottom free edge up the leaning face to the top
-    free edge. The lean is the regulated dimension: Art. 9.5.3 wants *"a gap of at
-    least 50.0 mm between the panel and the steering wheel"*, which is a hands
-    clearance and not a clearance to the front road wheel -- front matter §4 says
-    so because it was misread once.
+    Two spline runs sharing a vertex: eight control points (`FRONT_PANEL_FACE_T`)
+    from the bottom free edge up the leaning face, then three more rolling
+    rearward over the top -- the #199 crease pattern, so the fold reads hard. The lean is the regulated
+    dimension: Art. 9.5.3 wants *"a gap of at least 50.0 mm between the panel
+    and the steering wheel"*, which is a hands clearance and not a clearance to
+    the front road wheel -- front matter §4 says so because it was misread once.
 
-    The strip leans inboard going up (`FRONT_PANEL_TOP_TAPER`), its top corner
-    drops (`FRONT_PANEL_CROWN`), and the face carries a slight forward bulge --
-    the first raked build was flat with a hint of dish and photographed as a
-    grey slab where V8/V12 show a shaped shell.
+    The width follows `FRONT_PANEL_WIDTH`'s waist, the top corner drops
+    (`FRONT_PANEL_CROWN`), and the face bows forward at the center and not at
+    the edges (`FRONT_PANEL_BULGE` x the `FRONT_PANEL_BOW` falloff) -- the
+    first raked build was flat with a hint of dish and photographed as a grey
+    slab where every front-on in the haul shows a crowned shell.
     """
     a = abs(s)
-    x_bottom = s * p.front_panel_width * 0.5
+    half = p.front_panel_width * 0.5
     sweep = _table(FRONT_PANEL_SWEEP, a)
     crown = _table(FRONT_PANEL_CROWN, a)
-    bottom = Vector((x_bottom, FRONT_PANEL_BOTTOM_Y - sweep, p.front_panel_bottom_z))
-    top = Vector(
-        (
-            x_bottom * FRONT_PANEL_TOP_TAPER,
-            FRONT_PANEL_TOP_Y - sweep,
-            p.front_panel_top_z - crown,
-        )
-    )
-    height = top.z - bottom.z
+    z_bottom = p.front_panel_bottom_z
+    height = (p.front_panel_top_z - crown) - z_bottom
+    bow = 1.0 - FRONT_PANEL_BOW * a * a
 
-    def between(t: float, bulge: float) -> Vector:
+    def at(t: float) -> Vector:
         return Vector(
             (
-                bottom.x + (top.x - bottom.x) * t,
-                bottom.y + (top.y - bottom.y) * t + bulge,
-                bottom.z + height * t,
+                s * half * _table(FRONT_PANEL_WIDTH, t),
+                FRONT_PANEL_BOTTOM_Y
+                + (FRONT_PANEL_TOP_Y - FRONT_PANEL_BOTTOM_Y) * t
+                - sweep
+                + _table(FRONT_PANEL_BULGE, t) * bow,
+                z_bottom + height * t,
             )
         )
 
-    controls = [
-        bottom,
-        between(0.25, 0.006),
-        between(0.50, 0.010),
-        between(0.75, 0.006),
+    face = [at(t) for t in FRONT_PANEL_FACE_T]
+    top = face[-1]
+    roll = [
         top,
+        Vector(
+            (
+                top.x,
+                top.y - FRONT_PANEL_ROLL_DEPTH * 0.55,
+                top.z - FRONT_PANEL_ROLL_DROP * 0.25,
+            )
+        ),
+        # The deck's trailing edge pulls 1% inboard so the returned lip's fold
+        # cannot graze the face below it at the corners.
+        Vector(
+            (
+                top.x * 0.99,
+                top.y - FRONT_PANEL_ROLL_DEPTH,
+                top.z - FRONT_PANEL_ROLL_DROP,
+            )
+        ),
     ]
-    return _catmull_rom(controls, steps)
+    return _catmull_rom(face, steps) + _catmull_rom(roll, steps)[1:]
 
 
 def _front_panel(
