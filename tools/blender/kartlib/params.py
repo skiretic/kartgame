@@ -1401,11 +1401,20 @@ class KartParams:
     wheel raked 26.9° from vertical has its highest rim point leaning forward. 500
     is 52.5 mm under it."""
 
-    front_panel_bottom_z: float = 0.190
-    """Front panel bottom edge. `estimated`: above the pedal pads at `pedal_z`
-    90, so Art. 9.5.3's *"must not impede the normal functioning of the pedals or
-    cover any part of the feet"* is satisfied by there being no panel at foot
-    height at all."""
+    front_panel_bottom_z: float = 0.240
+    """Front panel bottom edge. `estimated` off V8/V12: the foot tucks in just
+    behind and below the fairing's rear top edge (z 267 at the spine), so the
+    panel reads as the fairing's center section continuing up to the wheel --
+    which is what a real nose is, one visual mass, not a signboard floating in
+    daylight behind it.
+
+    Was 0.190 with a docstring claiming the height alone satisfied Art. 9.5.3's
+    feet clause. It did not: the panel stood at y 585-620, planted in the boot
+    zone, 29-33 mm INTO the boots (#205, caught by gate 3 on day one). The
+    penetration was fixed by moving the whole panel forward onto the fairing
+    (`bodywork.FRONT_PANEL_BOTTOM_Y`), not by this z; the occlusion half of
+    9.5.3 remains #205's open layout question because the pedals sit ~130 mm
+    further back than V4 shows them relative to the fairing."""
 
     sidepod_length: float = 0.595
     """Fore-aft length of a side pod. `derived`: 265 - (-330).

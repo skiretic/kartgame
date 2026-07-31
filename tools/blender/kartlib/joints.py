@@ -2448,11 +2448,13 @@ JOINTS: tuple[Joint, ...] = (
     ),
     Joint(
         a="bodywork_front_panel_stay_*",
-        b="chassis_cross_front",
+        b="chassis_nose_hoop_upper",
         kind="clamped",
-        why="both stays land on the front loop's leg centerline at x +-250, y +572. "
-        "They splay outboard from the panel's own x +-110 because at that x the loop "
-        "is 175 mm further forward, at y +760",
+        why="**replaces stay/chassis_cross_front**: with the panel's foot moved onto "
+        "the fairing (y 742, the V8/V12 windshield rake), the old backward run to the "
+        "loop crossed the lower nose bar and both lower bumper sockets. Real panel "
+        "brackets mount at the nose -- V10 -- so both stays clamp the upper bar's "
+        "straight run at x +-95, on the bar's centerline so the contact is 0.0",
     ),
     Joint(
         a="bodywork_front_panel_bar",
@@ -2763,17 +2765,6 @@ OPEN_DEFECTS: tuple[Defect, ...] = (
         "the block belong together and the pair is a **missing joint on the bodywork "
         "side**, not a collision: the bar has to end on the block rather than pass "
         "through where the block used to not exist",
-    ),
-    Defect(
-        a="bodywork_front_panel_stay_?",
-        b="pedal_mount_*",
-        gate="overlap",
-        measured=24,
-        issue="#190",
-        why="the panel's stays run down to the frame through x +-125..+-259, which is the "
-        "corridor §40.5 moved the pedal mounts into when it re-aimed them at the front "
-        "loop's legs at (+-259, +560, +50). Both are right about where they belong and "
-        "the two have not been reconciled",
     ),
     Defect(
         a="brake_*",
@@ -3090,15 +3081,6 @@ OPEN_DEFECTS: tuple[Defect, ...] = (
         why="the panel's lower edge is 29.07/28.13 mm into the boots and occludes "
         "17/16 of their sample points from straight above -- the gate's ray-up "
         "form of Art. 9.5.3's 'cover any part of the feet'",
-    ),
-    Defect(
-        a="bodywork_front_panel_stay_?",
-        b="driver_boot_?",
-        gate="driver",
-        measured=16.42,
-        issue="#205",
-        why="both panel stays run 16.42 mm through the foot box on their way down "
-        "to the pedal mounts",
     ),
     # #206 -- the limb paths. The leg hangs off an estimated +-180 knee splay
     # read from one photograph and the arm pose is the two-link solve that

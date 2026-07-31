@@ -276,23 +276,32 @@ KIT_HOOK_STANDOFF: float = 0.001
 KIT_LINK_X: float = 0.045
 KIT_LINK_DIAMETER: float = 0.010
 
-#: Front panel: the plan-view bow, and the forward lean.
+#: Front panel: the plan-view bow, and the rake.
 #:
-#: The panel leans **forward** going up, 6.4 degrees, which is what opens Art.
-#: 9.5.3's hands clearance: its top edge is at y +620 and its bottom at +585, and
-#: the gap from the top edge to the steering wheel's nearest rim point at
-#: (0, +463, +552) is hypot(157, 52) = 166 mm against a 50 mm minimum. A vertical
-#: panel at +585 would still clear 50, by 68 mm. `estimated` as shape, `derived` as
-#: clearance.
-FRONT_PANEL_TOP_Y: float = 0.620
-FRONT_PANEL_BOTTOM_Y: float = 0.585
+#: The panel is a **windshield, not a signboard** -- V8 and V12 both show it as
+#: a raked face rising off the fairing's center section to just under the wheel,
+#: with the column, tank and pedal hardware hidden behind it. The first build
+#: had it near-vertical at y 585-620: planted in the boot zone (#205's 29 mm
+#: penetration), a naked steering column in front of it, and daylight through
+#: the whole nose -- dimensionally compliant and visually not a kart.
+#:
+#: Foot at y +742, tucked just behind the fairing's rear top edge (spine z 267,
+#: foot z 240 -- 27 mm below it, zero overlap); top at y +600, raked back 28.6
+#: degrees. Art. 9.5.3's hands clearance off the built numbers: top edge
+#: (0, +600, +500) to the wheel's nearest rim point (0, +463, +552) is
+#: hypot(137, 52) = 146 mm against the 50 mm minimum. `estimated` as shape
+#: (V8/V12), `derived` as clearance.
+FRONT_PANEL_TOP_Y: float = 0.600
+FRONT_PANEL_BOTTOM_Y: float = 0.742
 
-#: How far the panel's ends sweep rearward, against |x| / half-width. `estimated`:
-#: a nassau panel is bowed in plan, and a flat one reads as a signboard.
+#: How far the panel's ends sweep rearward, against |x| / half-width.
+#: `estimated` off V9's plan view: the panel nests into the V between the
+#: fairing's lobes, so its edges pull back harder than the old 32 mm -- the
+#: bow is what makes the nose read as one mass from three-quarter front.
 FRONT_PANEL_SWEEP: tuple[tuple[float, float], ...] = (
     (0.00, 0.000),
-    (0.55, 0.010),
-    (1.00, 0.032),
+    (0.55, 0.018),
+    (1.00, 0.055),
 )
 
 #: Where the panel's two lower stays land on the front loop, and the one upper bar
@@ -308,12 +317,17 @@ FRONT_PANEL_SWEEP: tuple[tuple[float, float], ...] = (
 #: because that is where the loop *is*: its leg centerline passes (+-250, +572) and
 #: at the panel's own x +-110 the loop is 175 mm further forward, at y +760.
 FRONT_PANEL_STAY_X: float = 0.135
-#: Was (0.175, 0.578, 0.145). #201 steepened the brake pushrod's diagonal (the
-#: masters went 20 mm outboard), and the stay's lower leg crossed the pushrod's
-#: z 112 plane at x -201 where the rod passes y 564 -- zero clearance. This mid
-#: moves the crossing to x -207 where the rod is at y 560 and the stay at 584.
-FRONT_PANEL_STAY_MID: tuple[float, float, float] = (0.180, 0.592, 0.150)
-FRONT_PANEL_STAY_FRAME_X: float = 0.250
+#: Where the stays clamp the upper nose bar's straight run, in |x|. Was routed
+#: BACKWARD to the front loop at (+-250, +572) for a panel foot at y 585; with
+#: the foot at 742 that path crossed the lower nose bar and both lower bumper
+#: sockets (97/82/99/87 triangle pairs, measured). Real panel brackets mount at
+#: the nose, not the loop -- V10's underside shot -- so the stays now run
+#: FORWARD through the fairing's open-back hollow (top skin z ~263 above, kit
+#: hardware z <=175 below) to the upper bar at z 217. x +-95 keeps them clear
+#: of the kit's own clamps: hook releases at +-140, U-legs at +-225, struts at
+#: +-150. Art. 9.5.3's "directly or indirectly" is satisfied indirectly, one
+#: bar earlier than before.
+FRONT_PANEL_STAY_BAR_X: float = 0.095
 FRONT_PANEL_STAY_DIAMETER: float = 0.016
 
 #: The upper bar is **one part with two legs**, which is how Art. 9.5.3's *"one or
@@ -1204,6 +1218,23 @@ def _fairing_kit(
 # --- the front panel -------------------------------------------------------
 
 
+#: How much the panel narrows going up, as the x multiplier at the top edge.
+#: `estimated` off V12: the PN509 panel is visibly a teardrop, wide at the
+#: fairing and narrowing to the number zone. 0.82 keeps the regulated 250-300
+#: width where Art. 9.5.3 measures it, at the widest point.
+FRONT_PANEL_TOP_TAPER: float = 0.82
+
+#: Top-edge drop against |x| / half-width at the TOP (post-taper). What rounds
+#: the top corners: a dead-straight top edge is most of what read as a
+#: tombstone in the first raked build. `estimated` as shape.
+FRONT_PANEL_CROWN: tuple[tuple[float, float], ...] = (
+    (0.00, 0.000),
+    (0.55, 0.006),
+    (0.80, 0.016),
+    (1.00, 0.034),
+)
+
+
 def _front_panel_section(p: P.KartParams, s: float, steps: int) -> list[Vector]:
     """One (y, z) section of the nassau panel at lateral fraction `s` in [-1, 1].
 
@@ -1212,19 +1243,40 @@ def _front_panel_section(p: P.KartParams, s: float, steps: int) -> list[Vector]:
     least 50.0 mm between the panel and the steering wheel"*, which is a hands
     clearance and not a clearance to the front road wheel -- front matter §4 says
     so because it was misread once.
+
+    The strip leans inboard going up (`FRONT_PANEL_TOP_TAPER`), its top corner
+    drops (`FRONT_PANEL_CROWN`), and the face carries a slight forward bulge --
+    the first raked build was flat with a hint of dish and photographed as a
+    grey slab where V8/V12 show a shaped shell.
     """
     a = abs(s)
-    x = s * p.front_panel_width * 0.5
+    x_bottom = s * p.front_panel_width * 0.5
     sweep = _table(FRONT_PANEL_SWEEP, a)
-    bottom = Vector((x, FRONT_PANEL_BOTTOM_Y - sweep, p.front_panel_bottom_z))
-    top = Vector((x, FRONT_PANEL_TOP_Y - sweep, p.front_panel_top_z))
+    crown = _table(FRONT_PANEL_CROWN, a)
+    bottom = Vector((x_bottom, FRONT_PANEL_BOTTOM_Y - sweep, p.front_panel_bottom_z))
+    top = Vector(
+        (
+            x_bottom * FRONT_PANEL_TOP_TAPER,
+            FRONT_PANEL_TOP_Y - sweep,
+            p.front_panel_top_z - crown,
+        )
+    )
     height = top.z - bottom.z
+
+    def between(t: float, bulge: float) -> Vector:
+        return Vector(
+            (
+                bottom.x + (top.x - bottom.x) * t,
+                bottom.y + (top.y - bottom.y) * t + bulge,
+                bottom.z + height * t,
+            )
+        )
 
     controls = [
         bottom,
-        Vector((x, bottom.y + (top.y - bottom.y) * 0.22 - 0.004, bottom.z + height * 0.25)),
-        Vector((x, bottom.y + (top.y - bottom.y) * 0.50 - 0.006, bottom.z + height * 0.50)),
-        Vector((x, bottom.y + (top.y - bottom.y) * 0.78 - 0.004, bottom.z + height * 0.75)),
+        between(0.25, 0.006),
+        between(0.50, 0.010),
+        between(0.75, 0.006),
         top,
     ]
     return _catmull_rom(controls, steps)
@@ -1257,13 +1309,17 @@ def _front_panel(
     build.set_parent(panel, root)
 
     steel = context.material("axle_steel")
-    rail_z = P.rail_z(p)
 
     for label, side in (("l", -1.0), ("r", 1.0)):
         bm = bmesh.new()
         build.sweep_tube(
             bm,
             [
+                # Starts at the panel's lower BACK face (8 mm under the bottom
+                # edge, tube top tangent to it) and stays low the whole way: the
+                # fairing's top skin descends from the rear crown toward the
+                # apex and a run at the panel edge's own height grazes it from
+                # below at y 773 and 855 (52 triangle pairs, measured).
                 (
                     side * FRONT_PANEL_STAY_X,
                     FRONT_PANEL_BOTTOM_Y
@@ -1272,17 +1328,15 @@ def _front_panel(
                         FRONT_PANEL_STAY_X / (p.front_panel_width * 0.5),
                     )
                     + 0.002,
-                    p.front_panel_bottom_z + 0.005,
+                    p.front_panel_bottom_z - 0.008,
                 ),
+                # Ends 12 mm under the bar's centerline -- still inside the
+                # bar's Ø16 (the radii sum to 16), so gate 1 sees the declared
+                # clamp overlap and gate 2 measures the contact at 0.0.
                 (
-                    side * FRONT_PANEL_STAY_MID[0],
-                    FRONT_PANEL_STAY_MID[1],
-                    FRONT_PANEL_STAY_MID[2],
-                ),
-                (
-                    side * FRONT_PANEL_STAY_FRAME_X,
-                    _loop_leg_y(p, FRONT_PANEL_STAY_FRAME_X),
-                    rail_z,
+                    side * FRONT_PANEL_STAY_BAR_X,
+                    P.nose_y(p),
+                    p.nose_upper_z - 0.012,
                 ),
             ],
             FRONT_PANEL_STAY_DIAMETER * 0.5,
