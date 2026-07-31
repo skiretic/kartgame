@@ -356,9 +356,26 @@ FRONT_PANEL_BAR_DIAMETER: float = 0.016
 #: the same visual taper is bounded by construction: worst total inset is 22.0 mm
 #: against the axis-plane datum and 32.9 mm against the literal one, both at the
 #: front edge, and both inside 40.
+#: The front of the table is no longer a taper, it is the **nose**: the outer
+#: face curves in 55 mm over the leading 15% so the front edge is a rounded
+#: blade about 60 mm wide instead of a 113 mm C-rim cut off vertically --
+#: `crg_roadrebel_kz_front.webp`'s left pod, seen dead-front, is a narrow
+#: rounded leading edge, and ours was the flat end of an extrusion, which is
+#: most of why #199 calls the pods "sealed pontoons". Art. 9.5.4's datum band
+#: still holds where the band means anything: the pod's *face* -- everything
+#: from t 0.15 back -- stays inside the 29 mm reading, and the nose curling
+#: inboard of it is what the reference pod's own nose does.
+#: 46 mm at the front and not the 55 the photograph would take: the upper side
+#: bar's straight ends 5 mm short of the pod's front edge, so the blade forms
+#: around the tube. At 55 the flank's *curve* cleared the tube by 1.1 mm and
+#: the 3.8 mm wall plus the rim's returned lip spent it (28 triangle pairs,
+#: gate 1, measured); at 46 the outer face sits at 586 and the inner surface
+#: passes the tube's x 570 crown with 12 mm in hand.
 SIDEPOD_TAPER: tuple[tuple[float, float], ...] = (
-    (0.00, 0.014),
-    (0.18, 0.003),
+    (0.00, 0.046),
+    (0.06, 0.024),
+    (0.15, 0.006),
+    (0.30, 0.001),
     (0.45, 0.000),
     (0.72, 0.001),
     (0.88, 0.006),
@@ -375,9 +392,16 @@ SIDEPOD_TAPER: tuple[tuple[float, float], ...] = (
 #: and the mouth's bottom free edge is at x 505: an edge at z 70 is inside the bar,
 #: and its returned lip curls 10 mm further up into it. At 54 the lip tops out at
 #: 64 and clears the bar's underside by 6 mm.
+#: The front lip now *dips* rather than lifting: the reference pod's lowest
+#: point is its forward lower lip (`crg_roadrebel_kz_front.webp`, the pointed
+#: lower corner leading the pod), so the panel minimum moves from 48 mid-pod to
+#: 42 at the front edge -- still inside Art. 9.5.4's 25-60 band, and the free
+#: edge at the front is 60 mm wide now (see `SIDEPOD_TAPER`), so the lip's curl
+#: into the lower side bar is not in play there: the bar starts 145 mm behind
+#: the front edge.
 SIDEPOD_BOTTOM_Z: tuple[tuple[float, float], ...] = (
-    (0.00, 0.054),
-    (0.25, 0.050),
+    (0.00, 0.042),
+    (0.25, 0.049),
     (0.55, 0.048),
     (0.85, 0.050),
     (1.00, 0.053),
@@ -394,12 +418,30 @@ SIDEPOD_BOTTOM_Z: tuple[tuple[float, float], ...] = (
 #: per side. At 0.900 the top edge is 216 everywhere and the shell passes 37 mm
 #: outboard of the bar at its height, which is what *"securely attached to the side
 #: bumpers"* needs geometrically -- the bar inside the C, not through its wall.
+#: The rear no longer sags -- it **rises**. Both reference karts sweep the
+#: pod's trailing quarter up into a hump ahead of the rear tire
+#: (`tonykart_racer401T_threequarter.png`, `crg_roadrebel_kz_detail11.webp`:
+#: the trailing edge kicks up into a raised lip, and the old 0.910 rear was
+#: read off nothing). Crest 1.130 at t 0.90: top edge 50 + 180 x 1.130 = 253,
+#: which is 30.7 mm under Art. 9.5.4's 283.7 tire-top plane, then a slight
+#: drop to the rear edge the way the reference hump rounds off. This is half
+#: of #199's "the rear third balloons": the balloon was a rear that tapered
+#: down in every axis at once, which reads as an inflated closed end.
+#: And the front holds 0.960 rather than 0.900 for a reason that is a tube, not
+#: a taste: the upper side bar's straight runs to y 260 -- 5 mm short of the
+#: pod's front edge -- so the blade nose forms directly over it, and the deck
+#: has to cross x 560-570 above the tube's z 185 crown at every nose station.
+#: At 0.900 with the front lip's 42 mm dip the section topped out at 204 and
+#: the crease fell to 162, which put the shell through the bar (90 triangle
+#: pairs, gate 1). At 0.960 the top edge is 215 at the front and the deck
+#: crosses the bar at 201.
 SIDEPOD_HEIGHT_FRACTION: tuple[tuple[float, float], ...] = (
-    (0.00, 0.900),
-    (0.20, 0.960),
+    (0.00, 0.960),
+    (0.20, 0.980),
     (0.55, 1.000),
-    (0.80, 0.985),
-    (1.00, 0.910),
+    (0.78, 1.010),
+    (0.90, 1.130),
+    (1.00, 1.060),
 )
 
 #: How far the shoulder crease sits **below the pod's top edge**, against
@@ -418,12 +460,36 @@ SIDEPOD_HEIGHT_FRACTION: tuple[tuple[float, float], ...] = (
 #: roughly a fifth of the pod's depth below its top edge. Slightly deeper at the
 #: two ends, because the deck narrows there as the plan taper pulls the outer face
 #: inboard and the crease has to go somewhere.
+#: The front value is 0.020, not 0.042, and it is load-bearing: with the nose
+#: face pulled in to 577 (see `SIDEPOD_TAPER`) the flank at the nose passes
+#: 3-4 mm outboard of the upper side bar's tube, so the crease there must sit
+#: above the tube's z 185 crown or the deck's turn-down crosses the bar. A high
+#: crease at the nose is also what the reference shows: the leading edge's top
+#: rolls inboard close to its top edge (`crg_roadrebel_kz_front.webp`).
 SIDEPOD_SHOULDER_DROP: tuple[tuple[float, float], ...] = (
-    (0.00, 0.042),
+    (0.00, 0.020),
     (0.25, 0.036),
     (0.55, 0.034),
     (0.80, 0.036),
     (1.00, 0.044),
+)
+
+#: How far the **top** of the leading sections sweeps rearward, against
+#: normalized station -- zero from t 0.25 back. Issue #199's "open scoop
+#: mouths": the pod's front edge is not a vertical cut. On the reference pod
+#: (`crg_roadrebel_kz_front.webp`, left pod) the lower lip leads and the deck
+#: arrives 40-odd millimeters later, so the mouth opening faces forward-up and
+#: the leading edge rakes back as it rises. Applied as a per-point y offset
+#: scaled by normalized height to the 1.6 power -- the exponent keeps the lip
+#: nearly unmoved through the lower third, which is what the photograph shows.
+#: 40 mm at the front edge is under one loft span (~50 mm at low detail), so
+#: consecutive grid rows cannot fold through each other by construction.
+SIDEPOD_NOSE_SWEEP: tuple[tuple[float, float], ...] = (
+    (0.00, 0.040),
+    (0.08, 0.018),
+    (0.16, 0.005),
+    (0.25, 0.000),
+    (1.00, 0.000),
 )
 
 #: Bottom of the flank's near-vertical run, where it starts tucking back inboard.
@@ -440,6 +506,19 @@ SIDEPOD_BULGE_BOTTOM_Z: tuple[tuple[float, float], ...] = (
     (0.50, 0.096),
     (1.00, 0.092),
 )
+
+#: The louver stack (#199): three raised ribs over the pod's leading quarter,
+#: stations as normalized t and a tube radius. `crg_roadrebel_kz_bodywork.webp`
+#: shows them as closed crescents stepping rearward-down along the shoulder
+#: just behind the mouth, roughly 45 mm apart -- and they are **raised ribs,
+#: not holes**, which is sourced: Art. 9.5.4 forbids *"holes other than those
+#: necessary for attachment purposes"*, and in the photograph they read as
+#: closed scallops. Each rib is a tube swept along the section polyline itself,
+#: so its centerline lies on the surface and half the diameter stands proud;
+#: the buried half pokes at most 3 mm through the 3.8 mm wall into the C, which
+#: stays 9 mm clear of the upper side bar under the nose deck.
+SIDEPOD_LOUVER_T: tuple[float, ...] = (0.070, 0.145, 0.220)
+SIDEPOD_LOUVER_RADIUS: float = 0.009
 
 #: Where the pods bolt to the lower side bar, and the bracket arm's diameter.
 #: Two per side is what a CIK pod carries. Both stations sit on the bar's 420 mm
@@ -1425,7 +1504,8 @@ def _sidepod_section(p: P.KartParams, t: float, steps: int) -> list[Vector]:
 
     **Nothing regulated moves.** `out_x` is still Art. 9.5.4's tapering datum via
     `_sidepod_face_x`, `mouth_x` is still 505 and still clears the radiator's
-    outboard extremity at 489, `bottom_z` still bottoms at 48 inside the 25-60
+    outboard extremity at 489, `bottom_z` bottoms at 42 -- the front lip's dip,
+    see `SIDEPOD_BOTTOM_Z` -- inside the 25-60
     band, and both side bars still run inside the C -- the lower at (500, z 80)
     under the bottom tuck, the upper at (560, z 175) under the deck with 20 mm of
     daylight, which is what *"securely attached to the side bumpers"* means
@@ -1458,14 +1538,22 @@ def _sidepod_section(p: P.KartParams, t: float, steps: int) -> list[Vector]:
     # arrives there at about -43 degrees and the flank leaves at about -95, so the
     # dihedral is ~52 and the edge is marked sharp -- which is what makes a crease
     # a crease and not a highlight gradient.
+    # Interior control points sit at **fractions of the section's width**, not at
+    # fixed offsets from its edges. The fractions below reproduce the previous
+    # fixed offsets exactly at the widest station (width 147: 0.27 x 147 = 40,
+    # 0.61 x 147 = 90, and so on) -- but at the nose, where `SIDEPOD_TAPER`
+    # collapses the width to ~72 mm, fixed offsets crossed over (mouth + 90 was
+    # 18 mm *outboard* of face - 30) and the section folded through itself,
+    # which gate 1 reported as the pod inside the upper side bar.
+    width = out_x - mouth_x
     deck = [
         # The inboard free edge and its returned lip, rolling up off the deck.
         Vector((mouth_x, y, top_z)),
-        Vector((mouth_x + 0.040, y, top_z + 0.005)),
-        Vector((mouth_x + 0.090, y, top_z + 0.001)),
+        Vector((mouth_x + 0.27 * width, y, top_z + 0.005)),
+        Vector((mouth_x + 0.61 * width, y, top_z + 0.001)),
         # Near-flat across most of the deck's width: this is the surface that was
         # missing, and it is most of the fix.
-        Vector((out_x - 0.030, y, top_z - 0.007)),
+        Vector((out_x - 0.20 * width, y, top_z - 0.007)),
         # The crease.
         Vector((out_x, y, shoulder_z)),
     ]
@@ -1476,11 +1564,24 @@ def _sidepod_section(p: P.KartParams, t: float, steps: int) -> list[Vector]:
         Vector((out_x - 0.003, y, shoulder_z - 0.035)),
         Vector((out_x - 0.006, y, bulge_bottom_z)),
         # The bottom tuck, turning back inboard under the lower side bar.
-        Vector((out_x - 0.034, y, bottom_z + 0.016)),
-        Vector((mouth_x + 0.038, y, bottom_z + 0.005)),
+        Vector((out_x - 0.23 * width, y, bottom_z + 0.016)),
+        Vector((mouth_x + 0.26 * width, y, bottom_z + 0.005)),
         Vector((mouth_x, y, bottom_z)),
     ]
-    return _catmull_rom(deck, steps) + _catmull_rom(flank, steps)[1:]
+    section = _catmull_rom(deck, steps) + _catmull_rom(flank, steps)[1:]
+
+    # The mouth rake (#199): near the front the top of the section sweeps
+    # rearward while the lower lip holds its station, so the leading edge is a
+    # raked blade and the opening faces forward-up rather than being a flat
+    # vertical cut. See `SIDEPOD_NOSE_SWEEP` for the sourcing and the fold-over
+    # argument; the 1.6 exponent keeps the lower third essentially unswept.
+    sweep = _table(SIDEPOD_NOSE_SWEEP, t)
+    if sweep > 0.0:
+        span = max(top_z - bottom_z, 1e-6)
+        for point in section:
+            rise = min(max((point.z - bottom_z) / span, 0.0), 1.0)
+            point.y -= sweep * rise**1.6
+    return section
 
 
 def _sidepods(
@@ -1507,7 +1608,32 @@ def _sidepods(
 
     grid = [_sidepod_section(p, index / (spans - 1), steps) for index in range(spans)]
 
-    right = _panel(context, "bodywork_sidepod_r", grid, collection, material)
+    def louvers(bm: bmesh.types.BMesh) -> None:
+        # See `SIDEPOD_LOUVER_T`. The path is the run of section points from the
+        # deck's outboard half over the crease and a little way down the flank,
+        # which is where the reference's scallops sit; sampling the *same*
+        # section the loft reads keeps the ribs on the surface at both details.
+        for t in SIDEPOD_LOUVER_T:
+            y = p.sidepod_front_y - t * p.sidepod_length
+            out_x = _sidepod_face_x(p, y, t)
+            width = out_x - p.sidepod_mouth_x
+            bottom_z = _table(SIDEPOD_BOTTOM_Z, t)
+            top_z = bottom_z + p.sidepod_height * _table(SIDEPOD_HEIGHT_FRACTION, t)
+            shoulder_z = top_z - _table(SIDEPOD_SHOULDER_DROP, t)
+            section = _sidepod_section(p, t, steps)
+            path = [
+                v
+                for v in section
+                if v.x >= p.sidepod_mouth_x + 0.30 * width
+                and v.z >= shoulder_z - 0.020
+            ]
+            build.sweep_tube(
+                bm, path, SIDEPOD_LOUVER_RADIUS, detail.tube_segments
+            )
+
+    right = _panel(
+        context, "bodywork_sidepod_r", grid, collection, material, extra=louvers
+    )
     build.set_parent(right, root)
 
     # `build.mirror_x` copies the source's material slots, so the material is not

@@ -125,8 +125,8 @@ Every row is a regulated dimension. Margin is signed toward the limit that binds
 | pod face inset, §4 datum | 8–21 | 0–40 inboard | +8 / −19 | 9.5.4 (24) |
 | pod face inset, strict datum | 18.8–32.9 | 0–40 inboard | +18.8 / −7.1 | 9.5.4 (24) |
 | pod face, wet-weather plane | 664 max | ≤700 | −36 | 9.5.4 (25) |
-| pod top edge | 228 | ≤283.7 at y +265 (tire-top plane) | −55.7 | 9.5.4 (25) |
-| pod ground clearance | 48 | 25–60 | +23 / −12 | 9.5.4 (25) |
+| pod top edge | 254 at the rear crest (228 at the widest station) | ≤283.7 at y +265 (tire-top plane) | −29.7 | 9.5.4 (25) |
+| pod ground clearance | 42 at the front lip | 25–60 | +17 / −18 | 9.5.4 (25) |
 | gap, pod front to front wheels | 120 | ≤150 | −30 | 9.5.4 (25) |
 | gap, pod rear to rear wheels | 47.5 | ≤60 | −12.5 | 9.5.4 (25) |
 | pod overlaps frame in plan | no; 505 vs rail 300 | must not overlap | +205 | 9.5.4 (24) |
@@ -488,16 +488,17 @@ construction.
 | dimension | `params.py` field | value | prov | basis |
 | --- | --- | --- | --- | --- |
 | outer face | `sidepod_datum_x0`, `sidepod_datum_slope`, `sidepod_inset` | 652 − 0.0762·y − taper | `derived` | §50.4, from Art. 9.5.4's datum and the two frozen tracks. Replaces `sidepod_x` = 0.480 |
-| — front edge, y +265 | — | 618 | `derived` | inset 22 (§4 datum) / 32.9 (strict) |
+| — front edge, y +265 | — | 586 | `derived` | the nose blade: `SIDEPOD_TAPER` curls the face 46 mm inboard over the leading 15% the way the reference pod's own nose does (`crg_roadrebel_kz_front.webp`), so the *band* is read from t 0.15 back, where the inset is 20 (§4 datum) — the 46 is also load-bearing against the upper side bar, whose straight ends 5 mm short of the pod's front edge |
 | — widest, y −2.8 | — | 652 | `derived` | inset 8.0 / 18.8 |
 | — rear edge, y −330 | — | 664 | `derived` | inset 21.0 / 32.3; and 36 mm inside the wet-weather 700 plane |
 | forward edge | `sidepod_front_y` | +265 | `sourced` (in range) | gap to the front tire's rear face at y +385 is 120, against Art. 9.5.4's 150 maximum. Hoisted out of `bodywork.py` |
 | length | `sidepod_length` | 595 | `derived` | 265 − (−330). **Was 560, and that was non-compliant**: a rear edge at −295 leaves an 82.5 mm gap to the rear tire's forward face at −377.5, against a 60 mm maximum. Nobody had measured it |
 | rear edge | — | −330 | `derived` | gap 47.5, 12.5 under the maximum |
 | mouth, both free edges | `sidepod_mouth_x` | 505 | `estimated` | §50.5 sets the floor at 489 + clearance; 505 gives the radiator 16 mm. Cross-checked photogrammetrically at 519 ±10 on `crg_roadrebel_kz_front.webp` at 1.807 mm/px, where the pod's top lip stands visibly outboard of the radiator's outer face |
-| bottom edge, widest station | — | 48 | `sourced` (in range) | Art. 9.5.4's ground clearance 25–60. Unchanged from `SIDEPOD_BOTTOM_Z` |
-| bottom edge, both ends | — | 66–70 | `estimated` | unchanged. Clearance is the panel's *minimum* gap, so 48 is the compliant figure and the lifted ends are shape |
-| height | `sidepod_height` | 180 | `estimated` | unchanged. Top edge 228 at the widest station, 55.7 mm under the tire-top plane at the front edge |
+| bottom edge, front lip | — | **42** | `sourced` (in range) | Art. 9.5.4's ground clearance 25–60. The front lip *dips* below the 48 mid-pod figure — the reference pod's lowest point is its forward lower lip — so the panel minimum, which is what the article measures, is 42 |
+| bottom edge, widest station | — | 48 | `sourced` (in range) | `SIDEPOD_BOTTOM_Z`; rear edge lifts to 53 |
+| height | `sidepod_height` | 180 | `estimated` | unchanged as a section height. The top edge now *rises* toward the rear — `SIDEPOD_HEIGHT_FRACTION` crests at 1.130 at t 0.90, top edge 254, 29.7 mm under the 283.7 tire-top plane — because both reference karts sweep the trailing quarter up into a hump ahead of the rear tire, and the old sagging rear is most of what #199 called ballooning |
+| louver stack | `SIDEPOD_LOUVER_T`, `SIDEPOD_LOUVER_RADIUS` | 3 ribs, r 9, t 0.070/0.145/0.220 | `estimated` | `crg_roadrebel_kz_bodywork.webp`: closed crescents stepping rearward-down along the shoulder behind the mouth. **Raised ribs, never holes** — Art. 9.5.4 forbids holes other than for attachment |
 | section, mouth to face | — | 147 laterally | `derived` | 652 − 505 at the widest station. The side bar at x 430–445 now runs *outside* the C rather than inside it, which is what the brackets are for |
 | wall thickness | `panel_thickness` | 3.8 | `derived` | §50.6 |
 | free-edge return radius | — | 5.0 | `sourced` | Art. 4.10.2 |
