@@ -2572,3 +2572,62 @@ mirroring it and put the radiator on the wrong side of the kart.
    `karting championship KZ2 final` returned nothing usable at all. Per
    CLAUDE.md's Conventions the honest move at this point is to ask: two pasted
    reference photographs would settle in seconds what this sweep could not.
+
+## The livery and the driver, as raced — the 2026-07-31 Commons haul
+
+Sourced for the refinement thread against `refs/kart-visual/goal_render_kart_93.jpg`
+(the presentation bar). Files in `refs/kart-visual/`, URLs + sha256 + licenses in
+its `sources.txt`. The earlier judgment that Commons was close to exhausted was
+too narrow: it was exhausted for *cockpit-from-above and KZ2 close-up* queries.
+Manufacturer categories (`Category:Tony Kart`, `Category:CRG`, `Category:Karts`)
+and driver-name searches yielded fifteen usable photographs.
+
+What each contributes, grouped:
+
+**Whole-kart livery direction candidates** (the decision set):
+- `det_tonykart_401t_museum.jpg` — museum-lit Racer 401T, 7 Mpx: the heritage
+  pinstripe wrap and how it follows every panel curve; translucent seat *and*
+  tank; airbox twin trumpets; silencer stubs; gold magnesium hubs. The best
+  single detail photograph in the repo.
+- `liv_travisanutto_kr_rosberg.jpg` — silver/teal/black factory-block livery,
+  front-on; the real-world composition closest to the goal render: painted
+  helmet, mirrored visor, multi-panel suit, front-panel number.
+- `liv_estep_praga_grid.jpg` — blue/gold factory livery sweeping nose-to-pod,
+  national-flag suit with printed sponsor text, grid context.
+- `liv_ivanov_crg_kz.jpg` — the dark option: grey/orange with a hex-mesh motif,
+  adult driver, front-panel number plate.
+- `liv_crg_factory_tent.jpg` — CRG factory orange/black per-panel graphics on
+  two karts on stands; paddock furniture.
+- `liv_giardelli_lario.jpg` — blue/red/white club-team livery, corner shot.
+
+**Scene and field**: `liv_stock125_julio_reis.jpg`, `liv_stock125_largada.jpg`
+(adult shifter class, public domain, posture + livery variety),
+`liv_kz_pregrid_lemans.jpg` (KZ pregrid, small), `liv_lorandi_babyrace.jpg`
+(patterned wrap + driver name on pod + nose).
+
+**Driver**: `drv_crg_suit_portrait.jpg` (suit panel layout: body color, black
+shoulder yokes, white piping, sponsor block placement),
+`drv_ticktum_helmet_closeup.jpg` (visor pivot, tear-off posts, chin vents,
+balaclava at the aperture), `drv_helmet_crown_layouts.jpg` (nine painted
+helmets top-down — crown art composition).
+
+**Engine dress**: `eng_tm_kz10_dress.jpg` (TM KZ10 in frame: fin detail, carb
+and fuel-line routing, exhaust springs, clutch cover),
+`det_tonykart_stand_essen.jpg` (display stand, nose-up: pedals, column,
+radiator plumbing, rear bumper underside).
+
+Reference-backed observations against the current model (turntable
+`shots/kart-refine-00.png`, mesh `23bed41c`):
+1. Every raced kart carries its **number on the front panel**; ours has pods
+   and rear tray only, front panel blank. The goal render's *nose* number is
+   the non-compliant variant — the front-panel number is the correct one.
+2. Every suit in the haul is **multi-panel with piping and printed blocks**;
+   ours is one flat color. Same for gloves and boots (always contrast).
+3. Every helmet is **painted** (crown-centered design) with a dark visor and
+   visible pivot hardware; ours is untextured white.
+4. Seat and tank on the 401T and the Essen stand kart are **translucent
+   natural fiberglass / polyethylene**; ours are opaque grey.
+5. Factory liveries **sweep with the panel curves** in every photograph; no
+   real kart wears a flat z-band stripe.
+6. Magnesium rims are **spoked/vented, gold**, on every modern kart photo;
+   ours are solid discs (the recorded teardrop-cutout omission).
