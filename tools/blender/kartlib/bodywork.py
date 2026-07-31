@@ -62,6 +62,7 @@ Interfaces published for later milestones:
 from __future__ import annotations
 
 import math
+import os
 
 import bmesh
 import bpy
@@ -664,6 +665,7 @@ def build_module(context: build.BuildContext) -> None:
     _front_panel(context, collection, material, root)
     _sidepods(context, collection, material, root)
     _rear_protection(context, collection, material, root)
+    _racing_numbers(context, collection, root)
 
 
 # --- curve and surface helpers ---------------------------------------------
@@ -1676,6 +1678,188 @@ def _sidepods(
                 shade_smooth=True,
             )
             build.set_parent(bracket, root)
+
+
+# --- the racing numbers -----------------------------------------------------
+
+
+#: Fore-aft center of the pod's number, chosen where the flank is tallest: the
+#: glyphs span y -167..-323, inside the rear edge at -330, across stations
+#: whose flat vertical band runs 102-122 mm tall. `estimated` against V3/V13,
+#: where the number sits on the pod's rear upsweep.
+NUMBER_POD_CENTER_Y: float = -0.245
+#: Vertical center of the pod glyphs: the middle of the flank band between the
+#: bulge bottom (~92) and the shoulder crease (~194 at these stations).
+NUMBER_POD_CENTER_Z: float = 0.143
+#: Vertical center of the rear glyphs on the tray's aft face (z 65..203).
+NUMBER_REAR_CENTER_Z: float = 0.134
+#: How far the decal's base is sunk into the panel skin, so gate 2 measures
+#: contact rather than a hover. Well under `panel_thickness`.
+NUMBER_SINK: float = 0.0002
+
+
+def _glyph_mesh(
+    p: P.KartParams, height: float
+) -> tuple[list[Vector], list[tuple[int, ...]]]:
+    """`race_number` as a tessellated solid: verts and polygons, glyphs upright
+    in the (x, z)-like local frame -- x the advance, y the thickness, z the cap.
+
+    Blender's own text tessellation, off the hash-pinned Liberation Sans Bold
+    (Art. 3.7 names Arial, which is not redistributable; the fetch script's
+    header carries the argument). The curve resolution is set explicitly so the
+    mesh is a function of the font file and this module alone, and the result
+    is normalized: advance centered on zero, baseline at zero, cap height
+    scaled to `height` exactly -- digits are cap-height glyphs, so the measured
+    bounding box IS the cap height and the scale is exact rather than a font
+    metric recalled from documentation.
+    """
+    root = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+    font_path = os.path.join(root, "assets", "fonts", "liberation", "LiberationSans-Bold.ttf")
+    font = bpy.data.fonts.load(font_path, check_existing=True)
+
+    curve = bpy.data.curves.new("number_glyphs", type="FONT")
+    curve.body = p.race_number
+    curve.font = font
+    curve.resolution_u = 12
+    curve.extrude = p.number_decal_thickness * 0.5
+    curve.fill_mode = "BOTH"
+    holder = bpy.data.objects.new("number_glyphs_tmp", curve)
+    bpy.context.scene.collection.objects.link(holder)
+    try:
+        evaluated = holder.evaluated_get(bpy.context.evaluated_depsgraph_get())
+        mesh = evaluated.to_mesh()
+        verts = [Vector((v.co.x, v.co.y, v.co.z)) for v in mesh.vertices]
+        polys = [tuple(poly.vertices) for poly in mesh.polygons]
+        evaluated.to_mesh_clear()
+    finally:
+        bpy.data.objects.remove(holder)
+        bpy.data.curves.remove(curve)
+
+    xs = [v.x for v in verts]
+    ys = [v.y for v in verts]
+    scale = height / (max(ys) - min(ys))
+    cx = 0.5 * (max(xs) + min(xs))
+    y0 = min(ys)
+    verts = [
+        Vector(((v.x - cx) * scale, (v.y - y0) * scale, v.z)) for v in verts
+    ]
+    return verts, polys
+
+
+def _number_object(
+    context: build.BuildContext,
+    name: str,
+    verts: list[Vector],
+    polys: list[tuple[int, ...]],
+    place,
+    collection: bpy.types.Collection,
+    root: bpy.types.Object,
+) -> None:
+    bm = bmesh.new()
+    made = [bm.verts.new(place(v)) for v in verts]
+    for poly in polys:
+        bm.faces.new(tuple(made[i] for i in poly))
+    bmesh.ops.recalc_face_normals(bm, faces=list(bm.faces))
+    obj = build.object_from_bmesh(
+        name,
+        bm,
+        collection,
+        material=context.material("number_vinyl_black"),
+        shade_smooth=False,
+    )
+    build.set_parent(obj, root)
+
+
+def _pod_flank_x(p: P.KartParams, y: float, z: float, steps: int) -> float:
+    """The built flank's x at (y, z), off the same section the loft reads.
+
+    `_sidepod_face_x` is the *widest* point; the flank bows inboard of it by a
+    few millimeters between the crease and the bulge, which is more than the
+    decal's sink. Sampling the section keeps the decal on the skin it is
+    supposedly stuck to.
+    """
+    t = (p.sidepod_front_y - y) / p.sidepod_length
+    section = _sidepod_section(p, t, steps)
+    mouth = p.sidepod_mouth_x
+    face = _sidepod_face_x(p, y, t)
+    run = sorted(
+        (v for v in section if v.x > mouth + 0.6 * (face - mouth)),
+        key=lambda v: v.z,
+    )
+    if z <= run[0].z:
+        return run[0].x
+    for a, b in zip(run, run[1:]):
+        if z <= b.z:
+            return a.x + (b.x - a.x) * (z - a.z) / max(b.z - a.z, 1e-9)
+    return run[-1].x
+
+
+def _rear_face_y(p: P.KartParams, x: float, z: float, steps: int) -> float:
+    """The tray's aft face y at (x, z), from the section the loft reads."""
+    front_y = P.rear_prot_front_y(p)
+    section = _rear_section(p, x, steps)
+    run = sorted(
+        (v for v in section if v.y < front_y - 0.80 * p.rear_prot_depth),
+        key=lambda v: v.z,
+    )
+    if z <= run[0].z:
+        return run[0].y
+    for a, b in zip(run, run[1:]):
+        if z <= b.z:
+            return a.y + (b.y - a.y) * (z - a.z) / max(b.z - a.z, 1e-9)
+    return run[-1].y
+
+
+def _racing_numbers(
+    context: build.BuildContext,
+    collection: bpy.types.Collection,
+    root: bpy.types.Object,
+) -> None:
+    """Art. 3.7's numbers as die-cut vinyl solids on both pods and the tray.
+
+    Three parts and not one mirrored pair plus one: mirroring a mesh mirrors
+    its digits, so each side is built in its own frame -- the left pod's
+    mapping is the right's rotated half a turn about z, which keeps the text
+    readable and the winding proper. Every vertex is conformed to the panel's
+    own section curve, so the film bends over the convex faces the way vinyl
+    does instead of hovering flat over a curve (#189's zone-wrap defect).
+    """
+    p = context.params
+    steps = _profile_steps(context.detail)
+    thickness = p.number_decal_thickness
+
+    pod_verts, pod_polys = _glyph_mesh(p, p.number_glyph_height_pod)
+
+    def place_pod_r(v: Vector) -> Vector:
+        y = NUMBER_POD_CENTER_Y + v.x
+        z = NUMBER_POD_CENTER_Z + v.y - p.number_glyph_height_pod * 0.5
+        base = _pod_flank_x(p, y, z, steps) - NUMBER_SINK
+        return Vector((base + (v.z + thickness * 0.5), y, z))
+
+    def place_pod_l(v: Vector) -> Vector:
+        y = NUMBER_POD_CENTER_Y - v.x
+        z = NUMBER_POD_CENTER_Z + v.y - p.number_glyph_height_pod * 0.5
+        base = _pod_flank_x(p, y, z, steps) - NUMBER_SINK
+        return Vector((-(base + (v.z + thickness * 0.5)), y, z))
+
+    _number_object(
+        context, "bodywork_number_pod_r", pod_verts, pod_polys, place_pod_r, collection, root
+    )
+    _number_object(
+        context, "bodywork_number_pod_l", pod_verts, pod_polys, place_pod_l, collection, root
+    )
+
+    rear_verts, rear_polys = _glyph_mesh(p, p.number_glyph_height)
+
+    def place_rear(v: Vector) -> Vector:
+        x = v.x
+        z = NUMBER_REAR_CENTER_Z + v.y - p.number_glyph_height * 0.5
+        base = _rear_face_y(p, x, z, steps) + NUMBER_SINK
+        return Vector((x, base - (v.z + thickness * 0.5), z))
+
+    _number_object(
+        context, "bodywork_number_rear", rear_verts, rear_polys, place_rear, collection, root
+    )
 
 
 # --- the rear wheel protection ---------------------------------------------

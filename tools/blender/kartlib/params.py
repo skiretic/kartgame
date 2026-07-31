@@ -1473,6 +1473,37 @@ class KartParams:
     26 mm -- which plus any base inset walks the face out of a 40 mm band. As
     millimeters the same visual taper is bounded by construction."""
 
+    race_number: str = "85"
+    """The racing number on the pods and the rear panel. `estimated` -- a number
+    is the entrant's, not the regulation's, so any digits are as sourced as any
+    others. Two digits and not three because the pods' achieved zone is 253 mm
+    wide against Art. 3.7's 370 for three digits (spec §60.4.3), and the same
+    number must appear on every panel. The glyphs are die-cut solids in
+    Liberation Sans Bold (`assets/fonts/liberation/`, hash-pinned; Art. 3.7
+    names Arial, which is not redistributable -- Liberation is the
+    metric-compatible face this repo may ship, issue #187)."""
+
+    number_glyph_height: float = 0.125
+    """Cap height of the rear panel's glyphs. `estimated`, and knowingly under
+    Art. 3.7's 150 minimum: the tray's aft face is 138 mm tall between its
+    bottom turn-under and its top roll (z 65..203), so a regulation glyph
+    cannot sit on this panel without wrapping a curve the article calls flat.
+    Same geometry finding as spec §60.4.3's "the 150 mm number is what sets
+    kart bodywork height" -- the built tray is 177 tall where the KG C2 form's
+    is 177, so the shortfall is the reference part's, not a modeling economy."""
+
+    number_glyph_height_pod: float = 0.095
+    """Cap height on the pod flank. `estimated`, same shading as the rear: the
+    flank's flat vertical band is 102-122 mm tall across the number's stations,
+    so 95 is the largest glyph that stays a flat decal instead of wrapping the
+    shoulder crease -- which is #189's recorded zone-wrap defect, being avoided
+    rather than reproduced. The reference pods' numbers fill the flank the same
+    way (V3, V13)."""
+
+    number_decal_thickness: float = 0.0006
+    """Die-cut vinyl standoff. `estimated`: real number film is ~0.1 mm; 0.6
+    reads as a sticker at turntable distance without z-fighting."""
+
     sidepod_mouth_x: float = 0.505
     """Lateral station of both of the pod's free edges -- the mouth of the C.
     `estimated`, with a measured floor.

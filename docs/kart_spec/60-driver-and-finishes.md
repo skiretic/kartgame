@@ -1271,6 +1271,30 @@ geometry-and-material problem.
 | contrast test | *"clearly different"* — no numeric threshold in the text. Spec it as **≥0.25 difference in linear luminance** from the main part, so it is checkable rather than judged. | `estimated`, and flagged as an invented threshold |
 | what it must not be | the number-field yellow, in any palette. A third color adjacent to a regulation yellow field reads as a printing error. | `derived` |
 
+### 60.4.6 The glyphs, built
+
+`bodywork_number_pod_r`, `bodywork_number_pod_l`, `bodywork_number_rear` — Art.
+3.7's digits as **die-cut vinyl solids**, not texture: V13 is literally a die-cut
+sheet, a number on a real kart is a shaped film, and this pipeline has a normal
+bake and no albedo stage. Each part is Blender's own tessellation of
+`race_number` in Liberation Sans Bold (hash-pinned, `fetch_liberation_sans.sh`;
+Art. 3.7 names Arial, which is not redistributable — #187's metric-compatible
+substitution), every vertex conformed to the carrying panel's **own section
+curve** and sunk 0.2 mm into the skin, so the film bends over the convex faces
+the way vinyl does. That conformation is what retires §60.4.4's recorded defect
+of the pod field wrapping 174 mm laterally around a curve while the glyph
+hovered flat.
+
+| property | value | prov |
+| --- | --- | --- |
+| digits | `race_number` = "85" | `estimated` — a number is the entrant's; two digits because the pod field fits 2, not 3 (§60.4.3) |
+| rear cap height | **125** | `estimated`, knowingly under Art. 3.7's 150: the tray's aft face is 138 tall (z 65..203) between its bottom turn-under and top roll, and the KG C2 form's own tray is the same 177 — the shortfall is the reference part's geometry, not an economy |
+| pod cap height | **95** | `estimated`, same shading: the flank's flat band is 102–122 tall over the number's stations, and 95 is the largest glyph that stays a decal instead of wrapping the shoulder crease |
+| film standoff | 0.6 | `estimated`; real number film is ~0.1, 0.6 reads as a sticker at turntable distance without z-fighting |
+| joint | `bonded`, the tenth kind | adhesive film, zero standoff by definition; sunk so gate 2 measures contact |
+| material | `number_vinyl_black` `#111113`, rough 0.35 | Art. 3.7 *"black numbers"*; cut vinyl is slightly glossier than the printed field under it |
+| built per side, never mirrored | — | mirroring a mesh mirrors its digits |
+
 ---
 
 ## 60.5 Livery palettes

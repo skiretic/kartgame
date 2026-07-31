@@ -99,6 +99,10 @@ KINDS: frozenset[str] = frozenset(
         # One part passes through an opening in the other: an axle through a
         # bearing hanger, a tube through a pedal boss, a tray cut around a strut.
         "pierced",
+        # Adhesive film on a panel: a die-cut vinyl number or decal. The one
+        # joint with zero standoff by definition -- the decal is sunk a fraction
+        # of a millimeter into its panel so the gate can see them touch.
+        "bonded",
     }
 )
 
@@ -2486,6 +2490,28 @@ JOINTS: tuple[Joint, ...] = (
         b="bodywork_sidepod_bracket_l?",
         kind="bolted",
         why="the left-hand pair of the same joint",
+    ),
+    # --- bodywork.py: the racing numbers ------------------------------------
+    Joint(
+        a="bodywork_number_pod_r",
+        b="bodywork_sidepod_r",
+        kind="bonded",
+        why="Art. 3.7's number as die-cut vinyl on the pod's flank, sunk 0.2 mm "
+        "into the skin so the gate measures contact rather than a hover. Built "
+        "per side rather than mirrored, because mirroring digits mirrors them",
+    ),
+    Joint(
+        a="bodywork_number_pod_l",
+        b="bodywork_sidepod_l",
+        kind="bonded",
+        why="the left-hand number of the same film",
+    ),
+    Joint(
+        a="bodywork_number_rear",
+        b="bodywork_rear_panel",
+        kind="bonded",
+        why="the rear panel's three-digit-capable field carries the same number "
+        "at Art. 3.7's full 150 mm cap height",
     ),
     Joint(
         a="bodywork_sidepod_bracket_r?",

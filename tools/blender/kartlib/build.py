@@ -943,6 +943,12 @@ FIXED_FINISHES: dict[str, Finish] = {
     # flexible opaque plastic and carries no clear laminate (Art. 3.7), and it has
     # to stay legible off-axis.
     "number_yellow": ("#ecd44c", 0.330, 0.45, 0.0),
+    # The glyphs on that field. Art. 3.7: *"black numbers on a yellow
+    # background"*, and cut vinyl is glossier than the printed field it sits on
+    # -- slightly, not chrome. Hue near-neutral; a pure #000000 albedo returns
+    # nothing to the eye and reads as a hole, same reasoning as the other
+    # near-blacks in this table.
+    "number_vinyl_black": ("#111113", 0.012, 0.35, 0.0),
     # --- driver package (§60.1.6; driver.py builds it, #17) ------------------
     "suit_fabric": ("#16305c", 0.055, 0.68, 0.0),
     "helmet_shell": ("#f0ece6", 0.640, 0.14, 0.0),
