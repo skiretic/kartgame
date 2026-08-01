@@ -813,10 +813,10 @@ JOINTS: tuple[Joint, ...] = (
         b="brake_disc_rear_hub",
         kind="clamped",
         why="OTK's *\"MG DISK'S HUB D.50mm FOR BRAKE\"* clamps the 50 mm axle on the "
-        "kart's **left**, opposite the sprocket at +115. Art. 4.3's four-keyway "
+        "kart's **left**, opposite the sprocket at +445. Art. 4.3's four-keyway "
         "clause is the formal reason it has to be opposite: four stations on one "
         "shaft, of which the disc and the sprocket are two, so they cannot be "
-        "coplanar. Measured separation 515 mm, on opposite sides of the center "
+        "coplanar. Separation 845 mm, on opposite sides of the center "
         "bearing",
     ),
     Joint(
@@ -1144,10 +1144,21 @@ JOINTS: tuple[Joint, ...] = (
     ),
     Joint(
         a="drive_chain_guard_flange",
-        b="chassis_cross_rear",
+        b="chassis_bearing_hanger_r",
         kind="bolted",
-        why="Art. 5.9's compulsory guard needs an anchor, and Art. 4.2.3 already "
-        "contemplates a welded attachment point on this member",
+        why="Art. 5.9's compulsory guard needs an anchor. It was "
+        "`chassis_cross_rear`, but ADR-0061 moved the guard to 431..463 and "
+        "that member ends at +-310; the hanger plate is the metal a real "
+        "guard's bracket bolts to, beside the cassette",
+    ),
+    Joint(
+        a="drive_chain_guard_flange",
+        b="axle_cassette_r",
+        kind="bolted",
+        why="the same bracket foot: the cassette's flange stands proud of the "
+        "hanger plate it bolts through, so a stay landing on the plate's "
+        "outboard face passes the cassette's rim -- on a real kart the guard "
+        "bracket is sandwiched under the cassette bolts themselves",
     ),
     Joint(
         a="drive_chain_guard",
@@ -1175,17 +1186,38 @@ JOINTS: tuple[Joint, ...] = (
     ),
     Joint(
         a="drive_sprocket_carrier",
-        b="engine_clutch_cover",
-        kind="pierced",
-        why="the output shaft and its carrier come out through the clutch "
-        "cover; a gearbox output that did not pass through its own cover "
-        "would be inside a sealed casing",
+        b="engine_ignition_cover",
+        kind="welded",
+        why="one drive-side casting on the real engine: KZ-R1 HF p. 1's drive "
+        "side is a single cover whose outline bulges around both the crank "
+        "(ignition) and the output bearing. Built as two lathe parts, the "
+        "boss merges into the cover's disc exactly where the real casting's "
+        "web is -- the crank-to-output distance is 42 mm against radii of "
+        "52 + 32, so the overlap is the part, not an accident",
     ),
     Joint(
         a="drive_sprocket_carrier",
-        b="engine_clutch_bell",
+        b="engine_ignition_bolt_2",
+        kind="seated",
+        why="the ring's 180 deg position lands on the merged web -- the Ø84 "
+        "bolt circle passes through the carrier's footprint over a ~90 deg "
+        "arc, and a real cover runs fasteners through exactly that web. The "
+        "ring's 36 deg phase (see `_cover_bolts`) exists to keep every bolt "
+        "out of the output *bore*; the web is where the survivors sit",
+    ),
+    Joint(
+        a="drive_sprocket_carrier",
+        b="engine_ignition_bolt_3",
+        kind="seated",
+        why="the 252 deg position, same web as bolt 2",
+    ),
+    Joint(
+        a="drive_output_shaft",
+        b="engine_ignition_cover",
         kind="pierced",
-        why="the carrier reaches back inside the bell housing to the gearbox",
+        why="the output shaft comes out through the drive-side cover; a "
+        "gearbox output that did not pass through its own cover would be "
+        "inside a sealed casing",
     ),
     Joint(
         a="drive_sprocket_carrier",
@@ -1827,6 +1859,16 @@ JOINTS: tuple[Joint, ...] = (
         why="M8 through an Art. 4.8.1 reinforcement plate, and the bracket's shell "
         "end is snapped to the **nearest sampled point on the loft** rather than to "
         "an authored coordinate",
+    ),
+    Joint(
+        a="seat_shell",
+        b="chassis_seat_strut_*",
+        kind="bolted",
+        why="the same M8, seen from the stay's side: the 2026-07-31 bucket wall "
+        "and back lean over the ear points, so each stay's last ~15 mm is inside "
+        "fiberglass it is bolted to -- the bolt zone at the plate, measured. The "
+        "front ears sit at x 170 so BOTH flanks contact despite the chain "
+        "relief pulling the right wall inboard",
     ),
     Joint(
         a="seat_bracket_upper_r",
@@ -2858,16 +2900,16 @@ OPEN_DEFECTS: tuple[Defect, ...] = (
         "x 143..228 to clear the re-routed intake boot. 18 pairs; the battery has one "
         "free axis left and it is forward, into the crankcase",
     ),
-    # **`drive_*`/`seat_shell` is deleted, not waived**, and the resolution is the seat's.
-    # Wave 3 found 90 pairs on `drive_output_shaft`, 60 on `drive_chain_guard`, 50 on
-    # `drive_chain` and 48 on `drive_output_sprocket`, and called it a design decision
-    # needing both sections. It is, and the arithmetic settles it one way: the shell's
-    # right edge at the driveline's height is x 173..179 and `engine_clutch_cover`'s
-    # inboard face is at 182, so the free lateral window is **6.8 mm** and a 9 mm chain
-    # inside a compulsory 32 mm Art. 5.9 guard does not fit in it at any `chain_x`. The
-    # chain cannot go outboard of the shell and it cannot go inboard of it -- that is the
-    # driver -- so the shell is relieved on the right, which is why real KZ shells are
-    # sold handed. `cockpit.SEAT_CHAIN_RELIEF` is the cutaway and it carries the depth.
+    # **`drive_*`/`seat_shell` is deleted, and the corridor audit dissolved its whole
+    # premise.** Wave 3 found 90 pairs on `drive_output_shaft`, 60 on
+    # `drive_chain_guard`, 50 on `drive_chain` and 48 on `drive_output_sprocket`, and
+    # the argument recorded here -- a 6.8 mm window between shell edge 179 and clutch
+    # cover 182, therefore the chain must pass *through* the shell "at any `chain_x`"
+    # -- assumed the sprocket emerged from the engine's inboard face. It does not:
+    # KZ-R1 HF p. 1 puts the drive side opposite the clutch, and p05's top-down shows
+    # the guard at +378..+462 over a bare inboard axle. `params.chain_x` is +0.445 now,
+    # the whole driveline is 250 mm outboard of the shell's flank, and
+    # `cockpit.SEAT_CHAIN_RELIEF` shrank from a 74 mm tunnel to a 12 mm clutch scallop.
     Defect(
         a="engine_cylinder",
         b="engine_plug_lead",
@@ -2925,15 +2967,9 @@ OPEN_DEFECTS: tuple[Defect, ...] = (
         "plate is 46 mm tall where a real OTK bracket is slotted rather than solid",
     ),
     # -- gate 1: parts built inside other parts ------------------------------
-    Defect(
-        a="drive_output_shaft",
-        b="engine_clutch_bolt_4",
-        gate="overlap",
-        measured=28,
-        issue="#192",
-        why="a clutch cover bolt is buried in the output shaft -- the bolt "
-        "circle is inside the shaft's radius at that angle",
-    ),
+    # `drive_output_shaft`/`engine_clutch_bolt_4` (#192, 28 pairs) is deleted:
+    # the shaft left the clutch side entirely when ADR-0061 flipped the drive
+    # side outboard, so the pair no longer exists to waive.
     # -- gate 1, #190: the footprint moved and four other assemblies did not --
     #
     # Every entry below is the *same* fact seen from a different part: a chassis
@@ -3058,43 +3094,12 @@ OPEN_DEFECTS: tuple[Defect, ...] = (
     # its leg and boot rows predate #201's 300 mm pedal separation and #202's
     # live foot chain, and 24 of its findings no longer exist.
     #
-    # #204 -- the drive cluster at x 100-112 is inboard of the seat's own +-184
-    # flank. A kart-geometry fault: the pelvis is where the sourced H-point
-    # puts it, and a chain run belongs outboard of the seat.
-    Defect(
-        a="drive_chain*",
-        b="driver_pelvis",
-        gate="driver",
-        measured=17.64,
-        issue="#204",
-        why="chain 5.77 mm and chain guard 17.64 mm inside the pelvis block; #200 "
-        "flagged this cluster as suspicious before the gate could measure it",
-    ),
-    Defect(
-        a="drive_chain*",
-        b="driver_torso",
-        gate="driver",
-        measured=16.04,
-        issue="#204",
-        why="the same run higher up: guard 16.04 mm into the torso's clipped volume",
-    ),
-    Defect(
-        a="drive_output_*",
-        b="driver_pelvis",
-        gate="driver",
-        measured=5.58,
-        issue="#204",
-        why="output shaft 5.58 mm and sprocket 3.82 mm into the pelvis -- the "
-        "sprocket at x 112 is what puts the whole chain line inboard",
-    ),
-    Defect(
-        a="drive_output_*",
-        b="driver_torso",
-        gate="driver",
-        measured=2.25,
-        issue="#204",
-        why="shaft and sprocket graze the torso's lower flank, 2.25 and 0.73 mm",
-    ),
+    # #204 -- CLOSED by ADR-0061. Its four waivers (chain/guard/shaft/sprocket
+    # 0.73-17.64 mm inside the pelvis and torso) said in their own preamble
+    # that "a chain run belongs outboard of the seat", and the corridor audit
+    # proved it: `chain_x` moved from +0.115 to +0.445 and the nearest
+    # driveline part is now ~280 mm from the driver. The gate itself demanded
+    # this deletion -- a waiver is stale when its pair fails at neither detail.
     # #205 -- Art. 9.5.3 says the front panel must not cover any part of the
     # feet, and as built it does. The boots are where #202's live pedal
     # derivation puts them, so the panel is the part that is wrong.
@@ -3154,6 +3159,28 @@ OPEN_DEFECTS: tuple[Defect, ...] = (
         measured=4.14,
         issue="#206",
         why="the boot soles clip the floor tray's turned edges, 0.00/4.14 mm",
+    ),
+    Defect(
+        a="driver_pelvis",
+        b="seat_bracket_lower_?",
+        gate="driver",
+        measured=0.89,
+        issue="#206",
+        why="the 2026-07-31 bucket wall grazes the pelvis superellipse by design "
+        "(interior 162.1 vs 162.5), so the flush-mounted Art. 4.8.1 plate's "
+        "thickness reads 0.28/0.89 mm into the flank -- the plate is where the "
+        "Essen photograph shows it and the pelvis half-width is estimated",
+    ),
+    Defect(
+        a="driver_thigh_?",
+        b="seat_bracket_lower_?",
+        gate="driver",
+        measured=8.21,
+        issue="#206",
+        why="the thighs hang off the same estimated knee splay as the shin "
+        "findings above and overhang the bucket wall the bracket bolts "
+        "through, 3.48/8.21 mm at the strap -- moving a regulated plate to "
+        "clear a guessed splay is what ADR-0055 forbids",
     ),
     Defect(
         a="brake_*",

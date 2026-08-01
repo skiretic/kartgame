@@ -651,8 +651,12 @@ def _bearing_hangers(
 #: surface met by a constant authored in a second module is the same failure as
 #: `Dictionary.get(key, default)` -- it drifts and nothing says so. Highest-value
 #: follow-up in spec §10.
-SEAT_EAR_FRONT: tuple[float, float, float] = (0.196, -0.215, 0.070)
-SEAT_EAR_REAR: tuple[float, float, float] = (0.205, -0.338, 0.300)
+#: Re-measured with the 2026-07-31 bucket resculpt, in lockstep with
+#: `cockpit.SEAT_PAD_*`: the U-walled tub pulls the low flank inboard and the
+#: chain relief pinches the right wall behind y -180, so the lower ear moved
+#: forward and up onto the wall that actually exists.
+SEAT_EAR_FRONT: tuple[float, float, float] = (0.170, -0.205, 0.110)
+SEAT_EAR_REAR: tuple[float, float, float] = (0.140, -0.332, 0.338)
 
 
 def _seat_struts(
@@ -705,7 +709,18 @@ def _seat_struts(
             "front",
             [
                 (_rail_x(p, p.cross_strut_y) + 0.019, p.cross_strut_y, rail),
-                (0.302, -0.020, 0.052),
+                # Three constraints on this run, all measured. Down at |x| 302:
+                # the central strut spans to 286 + a 15 mm tube radius, so 302
+                # clears its end by 1 mm and anything inboard is 35 triangle
+                # pairs through it. Inboard turn at y -60, behind the member's
+                # rear face at +25. And the whole inboard run stays |x| <= 225
+                # against the radiator's inner wall at 240 -- the ear's
+                # 2026-07-31 move forward-and-up otherwise put the climb
+                # through radiator_tank_low, the lower hose and the rear brake
+                # line on the left.
+                (0.302, -0.010, 0.050),
+                (0.225, -0.100, 0.060),
+                (0.200, -0.170, 0.078),
                 tuple(front_ear),
             ],
         ),

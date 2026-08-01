@@ -3909,3 +3909,73 @@ same stage. The numbers stay geometry — a film with thickness photographs as
 one, and nothing about an albedo stage argues for flattening a part that
 already works. `SKIP_IMPORT=1` gains a second stale-texture trap, which the
 existing `STALE IMPORT` guard in `kartview.gd` should be extended to cover.
+
+## ADR-0061 — The chain runs outboard of the engine, and the seat's 74 mm chain tunnel was clearing a fiction
+
+**Status:** accepted, 2026-07-31. The corridor audit, run after the part-2 seat
+was rejected twice: Anthony's read was that a seat needing a 74 mm engine-side
+cutaway means the placements upstream of it are wrong, and he was right.
+
+**The finding.** `chain_x` = +0.115 put the chain plane 285 mm inboard of where
+the reference kart carries it. `tonykart_racer401T_p05.jpg` — the repo's only
+top-down, scaled at 2.10 mm/px on the sourced 1050 mm wheelbase, front tire
+diameter cross-checking to 2% — shows a **bare axle from the centerline out to
++368**, the Art. 5.9 chain guard plate at **+378..+462**, and the crown wheel
+under it, between the right bearing hanger (+300) and the right hub (~+548).
+TM KZ-R1 HF `041-EZ-75` p. 1 photographs the **drive side and the clutch side
+as opposite ends of the engine** — clutch inboard, output sprocket outboard —
+so the chain exits the cluster's outboard face and never enters the seat
+corridor at all.
+
+Every number downstream of +0.115 was internally consistent and collectively
+wrong, which is why no gate caught it: the wave-3 joints analysis measured a
+real 6.8 mm window between shell (+179) and clutch cover (+182), correctly
+concluded a 32 mm guard could not fit, and then wrote *"the chain cannot pass
+outboard of the shell whatever `chain_x` is"* — an argument whose hidden
+premise, sprocket-emerges-inboard, nobody had sourced. The 74 mm
+`SEAT_CHAIN_RELIEF` tunnel was that premise made fiberglass.
+
+**Decided.**
+
+1. **`params.chain_x` = +0.445**, `derived`: 15 mm outboard of the ignition
+   cover's face at +430 (the cluster's outboard-most feature), inside p05's
+   measured +414 ±25 band. `wheels.SPROCKET_X` moves with it and stays a
+   must-equal literal (#112's hoist there is still open).
+2. **The driveline flips faces.** Sprocket carrier boss at 393..428 on the
+   case's outboard face (30 mm proud, 2 mm short of the ignition cover plane);
+   output shaft Ø18 in the carrier to 430, Ø12 nose to 460; sprocket mid-nose
+   at 445. The old 125 mm inboard cantilever is not mirrored — the real stack
+   is short.
+3. **The guard follows**: `CHAIN_GUARD_X` (0.431, 0.463), same wall-to-band
+   offsets as before; its mounting stay reroutes as a diagonal to
+   `chassis_cross_rear`'s top at x 296, beside the right bearing hanger,
+   because the member ends at ±310 and a straight drop from 427 lands in air.
+4. **`SEAT_CHAIN_RELIEF` shrinks from 74 mm to a 12 mm clutch scallop** over
+   the same t band — which is what p05's real seat shows beside the clutch
+   (its edge dips ~30 mm and it is a ~25 mm wider seat than our Tillett ML).
+
+**Also convicted by the audit, deliberately not fixed here.**
+
+- **`seat_y` is ~80 mm too far forward.** Tillett's own positioning sheet
+  (fetched, read) measures the 13.5 cm KZ "axle to driver's back" gap **at
+  axle height**; the derivation in `params.seat_y` applied it to the top of
+  the reclined back. Correcting the station puts the shell top at ≈ −444;
+  p05 independently measures the back top at −460 ±20 and the front rim at
+  +95 against our −365/+240. Two sources, one direction. Not moved tonight
+  because it cascades into the hard-coded driver datum chain
+  (`driver_hip/shoulder/eye/helmet`), the corroborated 731/735 hip-to-pedal
+  pair, the glove:rim gate row and the seat struts — that is the ground-up
+  question and it gets its own ticket and decision.
+- **Tillett dimension C was misread as a chord.** The 2024 chart's diagram
+  puts C across the **front wings** (ML: 460); `seat_shell_rake`'s
+  `sqrt(460² − 335²)` derivation is arithmetic on a misread dimension. The
+  22° value survives on its photographic bracket (19-26°) and does not move;
+  the docstring's justification must. p05's measured 412-452 front-wing width
+  reconciles with C=460 exactly — the reference seat is not oversized, and
+  `seat_width` A=325 internal at the hip bones was read correctly all along.
+
+**Acquitted:** engine placement (built inboard face +240 vs measured +227
+±15), radiator (x −240..−490 built vs ~−200..−540 measured, center y −235 vs
+−215), `seat_z`, bearing hangers. §30's claim that p05 is "a high front
+three-quarter with no seat in frame" was false of the file on disk and is
+corrected in place — the caption in `sources.txt` was right.

@@ -171,8 +171,33 @@ func _load_kart() -> void:
 	_kart = packed.instantiate()
 	_kart.name = "Kart"
 	add_child(_kart)
+	_hide_parts()
 	_bounds = _visual_bounds(_kart)
 	_measured = _measure()
+
+
+## `--hide=driver,fuel_tank` hides every node whose name starts with a listed
+## prefix. A close-up of the seat is otherwise a close-up of the driver
+## sitting in it, and the same applies to anything the driver model straddles.
+## Hiding is a view choice, so it lives here: the still stays reproducible
+## from its command, and the mesh on disk is untouched. The bounds and the
+## measured caption still cover every part — the caption's job is to catch a
+## scale error on the mesh, not to describe the crop.
+func _hide_parts() -> void:
+	var prefixes := Cmdline.as_string(_args, "hide", "")
+	if prefixes == "":
+		return
+	var hidden := 0
+	for prefix in prefixes.split(","):
+		if prefix == "":
+			continue
+		for child in _walk(_kart):
+			var visual := child as VisualInstance3D
+			if visual != null and String(visual.name).begins_with(prefix):
+				visual.visible = false
+				hidden += 1
+	if hidden == 0:
+		push_warning("kartview: --hide=%s matched nothing" % prefixes)
 
 
 ## Union of every visual instance's world-space AABB.

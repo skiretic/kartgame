@@ -372,8 +372,12 @@ too big, and close enough to plausible that it survived a render."""
 SPROCKET_THICKNESS: float = 0.008
 SPROCKET_HUB_RADIUS: float = 0.042
 SPROCKET_HUB_HALF: float = 0.014
-SPROCKET_X: float = 0.115
-"""Sprocket center, on the kart's RIGHT, between the center and right bearings.
+SPROCKET_X: float = 0.445
+"""Sprocket center, on the kart's RIGHT, between the right bearing hanger at
++300 and the right hub's inboard face at ~+548 -- which is where
+`tonykart_racer401T_p05.jpg`'s chain guard plate (+378..+462) puts it. Must
+equal `params.chain_x`; the corridor audit moved both from +0.115, a value
+that ran the chain through the seat's right flank.
 
 **It was on the left, and the reason given was wrong.** The comment here said "a
 KZ drives the left rear", which cannot be a reason for anything: the rear axle is
@@ -384,7 +388,7 @@ so the chain has to reach a sprocket on the right -- a chain crossing under the 
 to the far side is not a thing any kart does. **The rear brake disc is what goes on
 the left**, and Art. 4.3's four-keyway clause is the formal reason it has to: four
 stations on one shaft, of which the disc and the sprocket are two, so they cannot
-be coplanar. Measured separation 468 mm, on opposite sides of the center bearing."""
+be coplanar. Separation 845 mm, on opposite sides of the center bearing."""
 
 
 # --- the brake system ------------------------------------------------------

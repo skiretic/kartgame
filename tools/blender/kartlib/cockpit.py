@@ -141,39 +141,29 @@ notes about."""
 #: How much is cut off the **right** flank's half-width, in meters, against the same
 #: normalized arc length. Zero everywhere else, and the left flank never sees it.
 #:
-#: **This is the chain relief, and it is forced rather than styled.** Wave 3 measured
-#: the driveline through the corrected shell -- 90 triangle pairs on
-#: `drive_output_shaft`, 60 on `drive_chain_guard`, 50 on `drive_chain`, 48 on
-#: `drive_output_sprocket` -- and the arithmetic says no lateral lane exists for the
-#: chain to run in:
+#: **This is a clutch scallop now, not a chain tunnel.** The 74 mm relief this
+#: table used to carve was forced by `chain_x` = 0.115 -- a chain plane the
+#: corridor audit proved fictional. `tonykart_racer401T_p05.jpg` (2.10 mm/px on
+#: the sourced wheelbase) shows a bare axle from the centerline to +368 and the
+#: chain guard at +378..+462: the drive sprocket exits the engine's *outboard*
+#: face (KZ-R1 HF p. 1), and with `chain_x` at 0.445 nothing of the driveline
+#: comes within 250 mm of this flank. The old table's own preamble -- "the chain
+#: cannot pass outboard of the shell whatever chain_x is" -- assumed the sprocket
+#: emerged inboard, and that assumption was the whole error.
 #:
-#:     shell's right edge at the driveline's height      x 173..179
-#:     `engine_clutch_cover`'s inboard face              x 182
-#:     free window between them                          6.8 mm
-#:     what has to fit in it: a 9 mm chain band inside
-#:     a 32 mm Art. 5.9 guard                            32 mm
-#:
-#: So the chain cannot pass outboard of the shell whatever `chain_x` is: the engine's
-#: own clutch cover caps it at 182 and the shell reaches 179. It cannot pass inboard
-#: either -- that is the driver. It passes **through** the shell's right flank, which
-#: is why real KZ shells are sold handed with this flank relieved, and this table is
-#: that relief rather than a decision anybody here made.
-#:
-#: The depth is set by the innermost driveline part in the seat's own y band, which is
-#: `drive_output_shaft`'s inboard end at x 100 and the guard's inboard wall at 101 --
-#: not by the chain at 110.5. 92 mm of half-width leaves 8 mm to both.
-#:
-#: The band ends at t 0.84 on purpose: `SEAT_PAD_UPPER` is at z 300, i.e. t ~0.87, and
-#: a relief that reached it would take away the fiberglass Art. 4.2.3's fourth seat
-#: support lands on. Below it ends at t 0.44, which is above the hip -- the pan and
-#: the hip roll are full width on both sides.
+#: And the depth is now zero everywhere, though the mechanism stays. p05's real
+#: seat does dip ~30 mm beside the clutch (measured rows y -256..-319, edge
+#: +200 -> +166 -> +200) -- but that is a ~390 mm-wide OEM shell with margin to
+#: spend. Ours is a Tillett ML whose interior equals the #206 driver's pelvis
+#: half-width *exactly*, zero margin by construction, so a 12 mm scallop in the
+#: torso band put the wall 5.45 mm inside the driver -- reported by the
+#: undeclared bracket flush on it, not by the shell, whose declared `sits_on`
+#: rows measure gap only and read penetration as 0. The clutch gap without any
+#: scallop is 182 - 172 = 10 mm at the widest station, which is the same
+#: tight-but-real corridor p05 shows. The table stays so the next wave can
+#: author a dip *if the seat ever widens*; its zeros are the audit's answer.
 SEAT_CHAIN_RELIEF: tuple[tuple[float, float], ...] = (
     (0.00, 0.000),
-    (0.44, 0.000),
-    (0.50, 0.040),
-    (0.56, 0.083),
-    (0.76, 0.087),
-    (0.84, 0.000),
     (1.00, 0.000),
 )
 
@@ -181,26 +171,52 @@ SEAT_CHAIN_RELIEF: tuple[tuple[float, float], ...] = (
 #: the same normalized arc length. Deepest just above the hip, which is where a
 #: kart seat actually grips the driver, and shallow at the top.
 SEAT_WING_FLARE: tuple[tuple[float, float], ...] = (
-    (0.00, 0.022),
-    (0.18, 0.040),
-    (0.36, 0.082),
-    (0.52, 0.090),
-    (0.78, 0.062),
-    (1.00, 0.028),
+    # Wall HEIGHT now, not edge trim. The Essen bucket's side wall at the hip
+    # is on the order of the hip half-width itself; 90 mm rendered as a tray
+    # with a turned edge, twice.
+    (0.00, 0.030),
+    (0.16, 0.060),
+    (0.30, 0.120),
+    (0.42, 0.165),
+    (0.55, 0.160),
+    (0.68, 0.140),
+    (0.84, 0.100),
+    (1.00, 0.060),
 )
 
-#: Half of one lateral cross-section of the shell, as (fraction of half-width,
-#: fraction of wing flare). Nearly flat through the middle and turning hard up at
-#: the edge, which is what makes the free edge a lip rather than a taper.
-SEAT_SECTION: tuple[tuple[float, float], ...] = (
+#: Half of one lateral cross-section of the shell, in two Catmull-Rom runs
+#: concatenated at a shared rim vertex -- the #199 crease pattern. Each point
+#: is (fraction of half-width, fraction of wing flare).
+#:
+#: The face fit three ways before it held: flat-to-0.74 with an upturned edge
+#: (a tray, and it rendered as one), a U-bowl (mid-slope 24 mm inside the
+#: frozen #206 pelvis flank), an outward-leaning V (interior x 150 where the
+#: pelvis -- a superellipse of half-width 162.5 spanning the pan to z +190 --
+#: actually is). What the Essen bucket and the driver both dictate is a
+#: VERTICAL wall: flat floor, hard turn at the pan edge, straight up at
+#: x_frac ~0.99, interior 162.1 against the pelvis's 162.5 -- grazing by
+#: design, like the real shell.
+#:
+#: The lip then folds outboard and DOWN past the rim, a ~120 degree turn in
+#: the section: every free edge of the Essen bucket is a fold you could hook
+#: fingers under. Outboard reach capped at 1.035 of the half-width: at the
+#: widest station that is ~172, and `engine_clutch_bell`'s face at 182 is the
+#: nearest thing beside it -- the fold spends 3.2 of that 10 mm window. (The cap
+#: was originally chain-window arithmetic; the audit moved the chain to +445,
+#: but the clutch face keeps the same cap honest.)
+SEAT_SECTION_FACE: tuple[tuple[float, float], ...] = (
     (0.000, 0.000),
-    (0.300, 0.006),
-    (0.560, 0.042),
-    (0.740, 0.135),
-    (0.865, 0.300),
-    (0.945, 0.520),
-    (0.988, 0.760),
-    (1.000, 1.000),
+    (0.350, 0.008),
+    (0.600, 0.030),
+    (0.850, 0.070),
+    (0.960, 0.180),
+    (0.990, 0.550),
+    (1.000, 0.980),
+)
+SEAT_SECTION_LIP: tuple[tuple[float, float], ...] = (
+    (1.000, 0.980),
+    (1.020, 0.960),
+    (1.035, 0.895),
 )
 
 #: The four points Art. 4.2.3's *"seat with four seat supports"* has to reach, on
@@ -214,8 +230,15 @@ SEAT_SECTION: tuple[tuple[float, float], ...] = (
 #: the same failure shape as `Dictionary.get(key, default)`. The upper pad's z 300
 #: is on the back's outer face at y -337.7, and x 140 is 44 mm inboard of the
 #: shoulder half-width, which is where the visible discs sit in every photograph.
-SEAT_PAD_UPPER: tuple[float, float, float] = (0.205, -0.338, 0.300)
-SEAT_PAD_LOWER: tuple[float, float, float] = (0.196, -0.215, 0.070)
+#: Re-measured 2026-07-31 for the bucket-walled shell (tray-era numbers were
+#: (0.205, -0.338, 0.300) and (0.196, -0.215, 0.070)). The lower boss sits
+#: MID-WALL, outboard of the pelvis flank that ends at x 162.5 -- which is
+#: where the visible disc is in the Essen photograph -- and the upper through
+#: the BACK FACE ~44 mm inboard of the shoulder edge, strap rearward. Flank
+#: and wing anchors at thigh or torso height were each tried and each built
+#: 6-31 mm inside the frozen #206 driver; gate 3 measured every one.
+SEAT_PAD_UPPER: tuple[float, float, float] = (0.140, -0.332, 0.338)
+SEAT_PAD_LOWER: tuple[float, float, float] = (0.170, -0.205, 0.110)
 
 #: **Deviation from spec §40.3, and it is the loft that decides.** §40.3 publishes
 #: the pads at x ±140 and ±150, and both are *inside* this shell: the corrected
@@ -849,8 +872,9 @@ def _seat(
     the four brackets Art. 4.2.3's *"seat with four seat supports"* requires.
 
     The right flank carries `SEAT_CHAIN_RELIEF` and the left does not, so this is a
-    **handed** shell. That is not a shortcut: see the table's own note for the 6.8 mm
-    lateral window between the shell's edge and the clutch cover that makes it forced.
+    **handed** shell -- now a 12 mm clutch-side scallop rather than the 74 mm chain
+    tunnel; see the table's own note and `params.chain_x` for the audit that
+    dissolved the tunnel's premise.
     """
     p = context.params
     detail = context.detail
@@ -866,10 +890,14 @@ def _seat(
     spine = build.fillet(_seat_spine(p), SEAT_HIP_RADIUS, detail.bend_segments)
     stations = _resample(spine, 33 if detail.is_high else 15)
 
+    # Two runs sharing the rim vertex: the fold reads as an edge only if the
+    # tangent actually jumps there (#199).
+    per_segment = 3 if detail.is_high else 1
     section = _catmull_rom(
-        [Vector(point) for point in SEAT_SECTION],
-        3 if detail.is_high else 1,
-    )
+        [Vector(point) for point in SEAT_SECTION_FACE], per_segment
+    ) + _catmull_rom(
+        [Vector(point) for point in SEAT_SECTION_LIP], per_segment
+    )[1:]
     # Mirror the authored half about the centerline. Columns run left to right so
     # that `_grid_normals` gets a consistent sign out of du x dv.
     lateral = [Vector((-point.x, point.y)) for point in reversed(section[1:])]
@@ -906,6 +934,8 @@ def _seat(
             ]
         )
 
+    _seat_pad_flats(grid)
+
     bm = bmesh.new()
     _shell(bm, grid, p.seat_thickness)
     shell = build.object_from_bmesh(
@@ -918,7 +948,7 @@ def _seat(
     build.bevel_object(shell, detail)
     build.set_parent(shell, seat_root)
 
-    _seat_brackets(context, collection, seat_root, grid)
+    _seat_brackets(context, collection, seat_root, grid, [q.x for q in lateral])
     build.set_parent(seat_root, root)
 
 
@@ -941,8 +971,50 @@ def _seat_half_width(p: P.KartParams, t: float) -> float:
     return hip + (shoulder - hip) * fraction
 
 
-def _nearest_on_grid(grid: list[list[Vector]], target: Vector) -> Vector:
-    """The sampled shell point closest to `target`.
+def _seat_pad_flats(grid: list[list[Vector]]) -> None:
+    """Dish a flat into the shell around each of the four pad anchors, in place.
+
+    A real shell has visible flats where the strut bosses clamp -- the Essen
+    bucket shows all four -- and Art. 4.8.1's O45 reinforcement plate seats
+    flush on a flat, not tangent to a compound curve. Each grid point within
+    45 mm of a pad's nearest sample is pulled toward the anchor's tangent
+    plane with a smoothstep-squared falloff, so the flat fades into the loft
+    and the same continuous function shapes both detail levels. Runs BEFORE
+    `_shell` and `_seat_brackets`, so the thickness offset follows the dish
+    and the brackets re-find their anchors on what was actually built.
+    """
+    normals = _grid_normals(grid)
+    radius = 0.045
+    for pad in (SEAT_PAD_UPPER, SEAT_PAD_LOWER):
+        for sign in (1.0, -1.0):
+            target = Vector((sign * pad[0], pad[1], pad[2]))
+            best_u, best_v = 0, 0
+            best_distance = (grid[0][0] - target).length
+            for u, row in enumerate(grid):
+                for v, point in enumerate(row):
+                    distance = (point - target).length
+                    if distance < best_distance:
+                        best_u, best_v, best_distance = u, v, distance
+            anchor = grid[best_u][best_v].copy()
+            normal = normals[best_u][best_v]
+            for row in grid:
+                for v, point in enumerate(row):
+                    distance = (point - anchor).length
+                    if distance < radius:
+                        weight = (1.0 - (distance / radius) ** 2) ** 2
+                        row[v] = point - normal * (
+                            (point - anchor).dot(normal) * weight
+                        )
+
+
+def _nearest_on_grid(
+    grid: list[list[Vector]],
+    target: Vector,
+    columns: "list[int] | None" = None,
+    z_window: "float | None" = None,
+) -> tuple[int, int]:
+    """The sampled shell point closest to `target`, optionally within `columns`
+    and within `z_window` of the target's height.
 
     This is the whole point of publishing the ears from here rather than letting
     `frame.py` carry constants: the shell's flank is a *sampled surface*, so the only
@@ -950,17 +1022,30 @@ def _nearest_on_grid(grid: list[list[Vector]], target: Vector) -> Vector:
     were actually built. A number authored elsewhere misses by a few millimeters and
     never says so.
 
+    `z_window` exists because the bands alone are not a station: they select
+    section columns, and the same column runs the full spine. When ADR-0061
+    un-pinched the right wall, the lower-right anchor's nearest sample slid up
+    the shell to a station whose plate sat 5.45 mm inside the torso -- a strap
+    is short, so its honest anchor is near its own ear's height, and the window
+    says so explicitly.
+
     Deterministic by construction -- the grid is emitted in a fixed order and ties
     resolve to the first index.
     """
-    best = grid[0][0]
-    best_distance = (best - target).length
-    for row in grid:
-        for point in row:
-            distance = (point - target).length
-            if distance < best_distance:
-                best, best_distance = point, distance
-    return best
+    column_range = columns if columns is not None else list(range(len(grid[0])))
+    best_u, best_v, best_distance = None, None, None
+    for u, row in enumerate(grid):
+        for v in column_range:
+            if z_window is not None and abs(row[v].z - target.z) > z_window:
+                continue
+            distance = (row[v] - target).length
+            if best_distance is None or distance < best_distance:
+                best_u, best_v, best_distance = u, v, distance
+    if best_u is None:
+        # An empty window is a authoring error worth failing loudly on, but the
+        # windowless answer keeps the report readable while it is diagnosed.
+        return _nearest_on_grid(grid, target, columns)
+    return best_u, best_v
 
 
 def _seat_brackets(
@@ -968,6 +1053,7 @@ def _seat_brackets(
     collection: bpy.types.Collection,
     parent: bpy.types.Object,
     grid: list[list[Vector]],
+    lateral_fractions: list[float],
 ) -> None:
     """Four pads, four straps, four published empties.
 
@@ -981,10 +1067,31 @@ def _seat_brackets(
     were 78 mm away.
     """
     steel = context.material("frame_powdercoat")
+    grid_normals = _grid_normals(grid)
+    # Where each pad may anchor, as a band of the section's |x| fraction. The
+    # driver overhangs the bucket wall (frozen #206 pose), so the honest
+    # anchor is never "nearest sample anywhere": the lower pads bolt through
+    # the VERTICAL WALL mid-height (outboard of the pelvis flank) and the
+    # upper pads through the BACK FACE inboard of the shoulder edge. Wing and
+    # lip columns are excluded outright -- a strap anchored there builds
+    # beside the torso, 17 mm deep, measured.
+    bands = {"upper": (0.58, 0.88), "lower": (0.97, 1.005)}
     for label, pad in (("upper", SEAT_PAD_UPPER), ("lower", SEAT_PAD_LOWER)):
+        lo, hi = bands[label]
         for side, sign in (("r", 1.0), ("l", -1.0)):
             target = Vector((sign * pad[0], pad[1], pad[2]))
-            anchor = _nearest_on_grid(grid, target)
+            band = [
+                v
+                for v, fraction in enumerate(lateral_fractions)
+                if lo <= sign * fraction <= hi
+            ]
+            anchor_u, anchor_v = _nearest_on_grid(grid, target, band, z_window=0.05)
+            anchor = grid[anchor_u][anchor_v]
+            # The plate lies flush on the shell -- along the surface normal at
+            # the anchor, never along the strap: with a short strap the
+            # (target - anchor) direction tilts the O45 disc through the
+            # 3.8 mm wall into the driver. 11 mm deep, measured.
+            outward = -grid_normals[anchor_u][anchor_v]
             empty = build.empty(
                 "seat_ear_%s_%s" % (label, side), tuple(target), collection, size=0.03
             )
@@ -994,10 +1101,10 @@ def _seat_brackets(
             bm = bmesh.new()
             # The reinforcement plate, flat against the shell, then a strap out to
             # the stay's own end point.
-            plate_normal = (target - anchor)
-            if plate_normal.length < 1e-6:
-                plate_normal = Vector((sign, 0.0, 0.0))
-            plate_normal.normalize()
+            plate_normal = outward
+            strap_direction = target - anchor
+            if strap_direction.length < 1e-6:
+                strap_direction = outward
             build.sweep_tube(
                 bm,
                 [

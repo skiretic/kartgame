@@ -2310,7 +2310,8 @@ anyone hangs a brake-bias tunable off this.
    disc and the sprocket are two, so they cannot be coplanar. This is the formal
    version and it is the one to cite.
 2. **Packaging.** The engine is on the driver's right (`engine_x = +0.319`), so
-   the chain must reach a sprocket on the right (`SPROCKET_X = +0.115`) and the
+   the chain must reach a sprocket on the right (`SPROCKET_X = +0.445`, equal to
+   `params.chain_x` since the corridor audit moved both off +0.115) and the
    brake goes left to balance it. A chain crossing under the seat to the far side
    is not a thing any kart does. `wheels.py`'s `SPROCKET_X` docstring already has
    this right, including the correction history.
@@ -2318,8 +2319,8 @@ anyone hangs a brake-bias tunable off this.
    side and the drilled disc, its star carrier and the caliper above it are
    plainly there, inboard of the left rear wheel.
 
-Separation check, `derived`: sprocket plane +115 (8 thick), disc plane −260
-(18.5 thick) — **375 mm apart**, on opposite sides of the center bearing at x 0.
+Separation check, `derived`: sprocket plane +445 (8 thick), disc plane −400
+(18.5 thick) — **845 mm apart**, on opposite sides of the center bearing at x 0.
 No interaction. The disc's clearance problem is with the **left bearing cassette**
 and not with the sprocket.
 
@@ -3930,7 +3931,7 @@ crankcase's rear housing and that is this section's tightest pair.
 | — | — | **`exhaust_stinger_diameter` 0.0263** | new, sourced |
 | — | — | **`exhaust_baffle_diameter` 0.1145** | new, sourced |
 | — | — | **`exhaust_wall` 0.0010** | new, derived; Art. 5.10 floor 0.00075 |
-| — | — | **`chain_x` 0.115** | new. Issue #112: `powertrain.CHAIN_X` and `wheels.SPROCKET_X` are the same number with opposite signs and neither owns it. **+0.115** — a KZ carries engine, chain and crown wheel on the driver's right and the brake disc on the left; `wheels.py`'s docstring reasons to the right magnitude and then says *"a KZ drives the left rear"*, which a locked axle makes meaningless |
+| — | — | **`chain_x` 0.445** | new; was authored 0.115 and the 2026-07-31 corridor audit moved it. Issue #112: `powertrain.CHAIN_X` and `wheels.SPROCKET_X` were the same number with opposite signs and neither owned it; both now read +0.445 — chain and crown wheel on the driver's right, **outboard of the engine** (KZ-R1 HF p. 1: drive side opposite the clutch; p05 top-down: guard plate +378..+462, bare axle inboard), brake disc on the left. The 0.115 value ran the chain through the seat's right flank and forced the 74 mm `SEAT_CHAIN_RELIEF` tunnel |
 | — | — | **`chain_pitch` 0.0055626** | new |
 | — | — | **`sprocket_teeth_engine` 12**, **`sprocket_teeth_axle` 82** | new. `wheels.SPROCKET_DIAMETER` 0.145 becomes derived: `p/sin(pi/82)` = 145.23 |
 | `radiator_width` | 0.265 | **0.250** | EM-01, sourced |
@@ -4027,20 +4028,26 @@ Numerically, and each was measured rather than suspected.
    floor pan stops at the back of the footwell. Four `pierced` declarations are
    the cost of not fixing it; that is a legitimate choice, but it should be a
    choice.
-5. **`wheels.SPROCKET_X` is on the wrong side.** −0.115 against this module's
-   +0.115. Its docstring's reasoning — *"it lands the sprocket between frame.py's
-   centre and outer bearing hangers"* — is right and its conclusion, *"a KZ drives
-   the left rear"*, is not a thing a locked rear axle can do. Issue #112 is the
-   standing ticket; §30.9 hoists the number to `params.chain_x` so the sign has
-   one owner.
+5. **`wheels.SPROCKET_X` agreed on the sign and both modules were wrong on the
+   magnitude.** The −0.115/+0.115 sign fight was #112 and was settled by hoisting
+   the number to `params.chain_x`; the 2026-07-31 corridor audit then moved the
+   magnitude to **+0.445** — the sprocket sits between the right bearing hanger
+   (+300) and the right hub (~+548), outboard of the engine, where p05's chain
+   guard plate (+378..+462) puts it. `wheels.SPROCKET_X` remains a module literal
+   that must equal `params.chain_x`; completing the hoist there is still open
+   under #112.
 6. **`refs/kart-visual/sources.txt`'s caption for `tonykart_racer401T_p05.jpg`
-   calls it a top-down and lists a seat in it.** Three agents have now measured
-   it as a high front three-quarter, and there is no seat in the frame. This
-   section's own reading of that image is restricted to *which face of the engine
-   a part is on*, which survives the projection; every distance
-   `notes_exhaust.md` took from it — the joint at y −399, the pipe at −483, the
-   intake silencer at +112, the carburettor at −168 — is not usable, and the
-   figures in §30.6.3 do not depend on any of them.
+   calls it a top-down and lists a seat in it — and the caption is right.** The
+   claim that stood here, "three agents have now measured it as a high front
+   three-quarter, and there is no seat in the frame", is false of the file on
+   disk (unchanged since its 2026-07-28 fetch): the 2026-07-31 corridor audit
+   re-opened it and it is a near-orthographic top-down — symmetric kingpins,
+   circular wheel outlines, full plan silhouette — with the translucent seat
+   filling the center of frame. Whatever those agents opened, it was not this
+   file. The audit scaled it at 2.10 mm/px on the sourced 1050 wheelbase
+   (front tire diameter cross-checks to 2%) and its lateral measurements are
+   what moved `chain_x`. Distances `notes_exhaust.md` took from it should be
+   re-derived against that scale rather than dismissed.
 
 # 40 — Cockpit
 

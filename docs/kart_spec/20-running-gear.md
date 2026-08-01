@@ -654,7 +654,8 @@ anyone hangs a brake-bias tunable off this.
    disc and the sprocket are two, so they cannot be coplanar. This is the formal
    version and it is the one to cite.
 2. **Packaging.** The engine is on the driver's right (`engine_x = +0.319`), so
-   the chain must reach a sprocket on the right (`SPROCKET_X = +0.115`) and the
+   the chain must reach a sprocket on the right (`SPROCKET_X = +0.445`, equal to
+   `params.chain_x` since the corridor audit moved both off +0.115) and the
    brake goes left to balance it. A chain crossing under the seat to the far side
    is not a thing any kart does. `wheels.py`'s `SPROCKET_X` docstring already has
    this right, including the correction history.
@@ -662,8 +663,8 @@ anyone hangs a brake-bias tunable off this.
    side and the drilled disc, its star carrier and the caliper above it are
    plainly there, inboard of the left rear wheel.
 
-Separation check, `derived`: sprocket plane +115 (8 thick), disc plane −260
-(18.5 thick) — **375 mm apart**, on opposite sides of the center bearing at x 0.
+Separation check, `derived`: sprocket plane +445 (8 thick), disc plane −400
+(18.5 thick) — **845 mm apart**, on opposite sides of the center bearing at x 0.
 No interaction. The disc's clearance problem is with the **left bearing cassette**
 and not with the sprocket.
 

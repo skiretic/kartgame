@@ -867,9 +867,12 @@ class KartParams:
     """Radians from vertical, 22 deg ±5 -- the **fiberglass chord's own line**,
     not the driver's torso recline and not the radiator's core rake.
 
-    `derived` from Tillett C 460 and E 335: total horizontal run
-    sqrt(460² - 335²) = 315, less 150-200 mm of flat pan, so the back rises 335
-    over 115-165 of run, atan = 19-26 deg.
+    `estimated` inside a photographically bracketed 19-26 deg band. It was
+    marked `derived` from "Tillett C 460 and E 335" via sqrt(460² - 335²), but
+    the 2024 chart's own diagram puts C across the **front wings** in plan --
+    a width, not a chord -- so that arithmetic was on a misread dimension
+    (ADR-0061). The value never rested on it: the 19-26 deg bracket comes from
+    the side-view photographs, and 22 sits in the middle.
 
     Replaces `seat_back_angle` 0.610 (35 deg), which sat between the shell's
     chord and the driver's 40-45 deg recline and did double duty for both -- and
@@ -886,7 +889,18 @@ class KartParams:
 
     Was -0.060, i.e. 170 mm too far forward, and that single error was most of
     why the built cockpit did not fit a driver: it is what made issue #13's
-    hip-to-pedal reach 618.5 mm."""
+    hip-to-pedal reach 618.5 mm.
+
+    **CONVICTED by ADR-0061 and deliberately not yet moved.** The 135 mm gap is
+    measured *at axle height* -- Tillett's positioning sheet photographs the
+    tape beside the spine depression at the axle -- not at the top of the
+    reclined back, where this derivation applied it. Correcting the station
+    puts the shell top at ~-444, and p05 independently measures the real back
+    top at -460 +-20 and the front rim at +95 against this value's -365/+240:
+    the seat belongs ~80 mm further rearward. It stays put because moving it
+    drags the hard-coded driver datum chain, the corroborated 731/735
+    hip-to-pedal pair, the glove:rim gate row and the seat struts with it --
+    that is a decided-with-eyes-open relocation wave, not a parameter edit."""
 
     seat_z: float = 0.032
     """Base plane above the ground. `sourced` -> `derived`: Tillett's own seat
@@ -1185,18 +1199,29 @@ class KartParams:
     exhaust_segments: int = 16
     exhaust_segments_high: int = 32
 
-    chain_x: float = 0.115
-    """The chain plane, and **the sign is the point.** Issue #112:
-    `powertrain.CHAIN_X` and `wheels.SPROCKET_X` were the same magnitude with
-    opposite signs and neither owned it. A KZ carries engine, chain and crown wheel
-    on the driver's **right** and the brake disc on the left; `wheels.py`'s
-    docstring reasoned to the right magnitude and then concluded *"a KZ drives the
-    left rear"*, which a locked rear axle makes meaningless.
+    chain_x: float = 0.445
+    """The chain plane, and **the side of the engine is the point.** `derived`,
+    from the 2026-07-31 corridor audit (ADR pending):
 
-    `estimated` as a value -- it lands the crown wheel between `frame.py`'s centre
-    and outer bearing hangers -- and a chain plane out at x 300-330, which
-    `notes_exhaust.md` assumed when it worried about header interference, would put
-    the crown wheel outboard of its own bearing hanger at 185."""
+    * `tonykart_racer401T_p05.jpg` top-down, scaled 2.10 mm/px on the sourced
+      1050 wheelbase: the axle is **bare** from the centerline out to +368, the
+      chain guard plate spans **+378..+462**, so chain and crown wheel sit
+      *outboard* of the engine. Measured plane +414 +-25.
+    * TM KZ-R1 HF `041-EZ-75` p. 1: the drive side and the clutch side are
+      **opposite ends** of the engine -- clutch inboard, output sprocket outboard.
+    * Construction: the cluster's outboard-most face is the ignition cover at
+      +430 (`powertrain.IGNITION_COVER_OUTBOARD_X`), so the sprocket disc sits
+      15 mm clear of it at +445, inside the photo band. The crown wheel clears
+      the right hub's inboard face (~+548) by ~90 and the right bearing hanger
+      at +300 by 145 -- outboard of the hanger, inboard of the hub, which is
+      where p05 shows it.
+
+    **Was +0.115** -- an `estimated` value that ran the chain through the space
+    the real seat's right flank occupies (measured +166..+200 at those
+    stations), and is the single number that forced `cockpit.SEAT_CHAIN_RELIEF`
+    to carve 74 mm out of the seat wall. Issue #112's actual content -- one
+    owner for the number, sprocket on the kart's right, disc on the left --
+    survives unchanged; only the magnitude was wrong."""
 
     chain_pitch: float = 0.0055626
     """219 chain. `derived`: 0.219 in x 25.4 exactly.

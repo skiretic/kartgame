@@ -28,17 +28,21 @@ to get wrong:
 CHAIN LINE — the one thing in this module that contradicts another module
 -------------------------------------------------------------------------
 A kart engine's crankshaft is parallel to the rear axle and its gearbox output
-sprocket is on the *inboard* end of that shaft, so the chain runs in a plane
-perpendicular to the axle. That plane must contain both sprockets, and a chain
-cannot be skewed by even a few millimeters without throwing itself.
+sprocket is on the **outboard** end of that shaft -- KZ-R1 HF `041-EZ-75` p. 1
+photographs the drive side and the clutch side as opposite ends, clutch inboard
+-- so the chain runs in a plane perpendicular to the axle, outboard of the
+cases. That plane must contain both sprockets, and a chain cannot be skewed by
+even a few millimeters without throwing itself.
 
 **Issue #112 is closed by giving the number one owner.** `powertrain.CHAIN_X` and
 `wheels.SPROCKET_X` were the same magnitude with opposite signs and neither owned
 it, so the two modules disagreed about which side of the kart the chain ran on and
 the disagreement was reported rather than resolved. Both now read
-`params.chain_x` = **+0.115**: a KZ carries engine, chain and crown wheel on the
+`params.chain_x` = **+0.445**: a KZ carries engine, chain and crown wheel on the
 driver's right and the brake disc on the left, and `wheels.py`'s conclusion that
-*"a KZ drives the left rear"* is not a thing a locked rear axle can do.
+*"a KZ drives the left rear"* is not a thing a locked rear axle can do. The
+magnitude moved from +0.115 to +0.445 in the corridor audit -- the chain exits
+the engine's *outboard* face, not through the seat's flank; see `params.chain_x`.
 
 The other half of #112 was the **pitch diameter formula**. It is
 `p / sin(pi/N)` and not `p * N / pi`; the approximation is 0.03% small at 82 teeth
@@ -127,7 +131,7 @@ pitches; bringing the centre distance back 0.49 mm to 256.5 lands it on exactly
 **142**. That moves this station from -0.268 to -0.2685, and the 0.5 mm is the
 whole content of the change."""
 
-CHAIN_GUARD_X: tuple[float, float] = (0.101, 0.133)
+CHAIN_GUARD_X: tuple[float, float] = (0.431, 0.463)
 CHAIN_GUARD_Y: tuple[float, float] = (-0.610, -0.258)
 CHAIN_GUARD_WALL: float = 0.002
 """Art. **5.9**, PDF p. **17**, verbatim: *"A chain guard is mandatory in all
@@ -136,9 +140,11 @@ the chain guard must cover the sprocket and the crown wheel down to the centre o
 the crown wheel axis."*
 
 So the guard is **compulsory** and the kart did not have one. The lateral span is
-`derived`: the chain band is 110.5-119.5 and both sprockets sit inside it, so
+`derived`: the chain band is 440.5-449.5 and both sprockets sit inside it, so
 7.5 mm of clearance a side, which is the smallest gap a composite guard holds
-without rubbing. The fore-aft span runs from the small sprocket's front to the
+without rubbing. The inner wall at 431 also stays 1 mm clear of the ignition
+cover's face at 430, which it can only do because the cover's y span (-242..-138)
+ends 16 mm before the guard's begins at -258. The fore-aft span runs from the small sprocket's front to the
 crown wheel's rear plus 10 mm each end. Its **lower edge is z = rear_axle_z**,
 which is the article's own words rather than a choice.
 
@@ -148,10 +154,10 @@ part as a collision."""
 """Engine output sprocket center. `SPROCKET_Z` is `engine_z` — the crankshaft and
 the gearbox output sit at the same height on a kart engine, and that height is
 what `engine_z` has to mean for the chain line to work at all (see `_engine`).
-`SPROCKET_Y` is 257 mm ahead of the rear axle, which is a normal KZ chain run,
-and is as far forward as it can go: `frame.py`'s right rear seat strut dives
-through z = 0.150 at y = -0.335, straight through where the sprocket carrier
-would otherwise sit."""
+`SPROCKET_Y` is 257 mm ahead of the rear axle, which is a normal KZ chain run.
+(It once also dodged the right rear seat strut, back when the carrier sat on the
+*inboard* face at x 212; at x 393 nothing of the strut, which never passes x
+300, comes near it.)"""
 
 MOUNT_PLATE_TOP: float = 0.100
 """Top of the engine mount, and therefore the underside of the crankcase.
@@ -197,9 +203,10 @@ BELL_PROUD: float = 0.014
 The clutch is inside the cases on a KZ — a hand-operated multi-plate, not the
 external centrifugal drum a TaG kart carries — and R2 shows the housing over it
 standing well proud of the case as a round boss the height of the case itself.
-It sits above and ahead of the gearbox output boss, which is why the sprocket
-carrier at `SPROCKET_Y`/`SPROCKET_Z` emerges from under its rear lower edge
-rather than from a flat wall.
+The clutch owns the **inboard** face alone: KZ-R1 HF p. 1 photographs drive side
+and clutch side as opposite ends, so the sprocket carrier emerges from the
+*outboard* face at the case's far side (see `_driveline`), and nothing on this
+face has a shaft through it.
 """
 
 CLUTCH_COVER_RADIUS: float = 0.056
@@ -1631,6 +1638,11 @@ def _crankcase(
         IGNITION_BOLT_COUNT,
         inward=False,
         proud=0.007,
+        # Half a pitch: the output shaft's bore sits at ring angle ~214 deg and
+        # the unrotated #3 bolt lands at 216 -- inside a rotating shaft. At +36
+        # the nearest bolts are 34 and 38 deg off the bore against a ~15 deg
+        # exclusion. ADR-0061.
+        phase=math.radians(36.0),
     )
 
 
@@ -1646,6 +1658,7 @@ def _cover_bolts(
     *,
     inward: bool,
     proud: float = 0.004,
+    phase: float = 0.0,
 ) -> None:
     """A ring of hex bolt heads on a cover face normal to X.
 
@@ -1655,14 +1668,17 @@ def _cover_bolts(
 
     The first bolt is at angle zero — straight up — rather than at half a pitch,
     so that a cover with an even count has one at top and one at bottom, which is
-    what the eye checks a bolt circle against.
+    what the eye checks a bolt circle against. `phase` rotates the whole ring for
+    the one cover where a position is physically occupied: the ignition ring's
+    Ø84 circle passes within 0.2 mm of the output shaft's axis, so its unrotated
+    #3 bolt sat inside the output bore.
     """
     height = 0.005
     # A lathe about X grows from its center along +X, so a bolt head standing
     # proud of an *inboard* face has to be started `height` back from it.
     base_x = center[0] - height if inward else center[0] - proud
     for index in range(count):
-        angle = 2.0 * math.pi * index / count
+        angle = 2.0 * math.pi * index / count + phase
         _hex_nut(
             name_format % index,
             (
@@ -2290,7 +2306,7 @@ def _driveline(
     of radius -- and that 0.24 mm is what put the chain's inner strand 1.9 mm inside
     a Ø18 output shaft.
 
-    **The shaft is Ø12 inboard of x 130 and the margins that once read 1.0 and 2.7 mm
+    **The shaft is Ø12 outboard of x 430 and the margins that once read 1.0 and 2.7 mm
     were measured to the wrong circle.** They were taken to the *pitch* circle at
     10.745 mm, and the chain is a 9 x 8 mm band straddling the tooth, so its inner
     edge is `CHAIN_HALF_HEIGHT` further in at **7.245 mm** from the axis. Against that:
@@ -2331,28 +2347,37 @@ def _driveline(
     # trap `wheels.py` documents at its hubs. One evaluation here.
     bpy.context.view_layer.update()
 
-    # Sprocket carrier: the boss the output shaft comes out of. Held to a 32 mm
-    # radius because the right rear seat strut passes 50 mm above its axis.
+    # Sprocket carrier: the boss the output shaft comes out of, on the DRIVE
+    # (outboard) face -- KZ-R1 HF p. 1; the clutch owns the inboard face. Spans
+    # 393..428: 5 mm into the case's outboard face at 398 so the joint is metal
+    # rather than a kiss, 30 mm proud, and stops 2 mm short of the ignition
+    # cover's face plane at 430 -- their y bands (-300..-236 vs -242..-138) are
+    # what actually keeps them apart. The old inboard boss protruded 60 because
+    # chain_x 0.115 was 125 mm from the case face; the real stack is short.
     _lathe_object(
         "drive_sprocket_carrier",
-        _disc_profile(0.032, 0.0325),
-        (0.2125, SPROCKET_Y, p.engine_z),
+        _disc_profile(0.032, 0.0175),
+        (0.4105, SPROCKET_Y, p.engine_z),
         context,
         collection,
         root,
         context.material("engine_cast"),
     )
 
-    # Stepped: Ø18 where it lives inside the carrier, Ø16 where the chain wraps it.
+    # Stepped: Ø18 where it seats in the carrier (423..430, 5 mm inside the
+    # boss's outboard face and clear of the cases -- the carrier bridges to the
+    # crankcase, the shaft only ever touches the carrier and the cover it
+    # pierces), Ø12 nose 430..460 where the chain wraps it. Sprocket plane at
+    # `chain_x` 445 is mid-nose.
     _lathe_object(
         "drive_output_shaft",
         [
-            (0.0, 0.100),
-            (0.006, 0.100),
-            (0.006, 0.130),
-            (0.009, 0.130),
-            (0.009, 0.185),
-            (0.0, 0.185),
+            (0.0, 0.423),
+            (0.009, 0.423),
+            (0.009, 0.430),
+            (0.006, 0.430),
+            (0.006, 0.460),
+            (0.0, 0.460),
         ],
         (0.0, SPROCKET_Y, p.engine_z),
         context,
@@ -2562,21 +2587,25 @@ def _chain_guard(
     )
     build.set_parent(guard, root)
 
-    # The inboard mounting flange, down onto `chassis_cross_rear` at the axle
-    # station. Art. 4.2.3 already contemplates a welded attachment point here.
-    # Inboard of the guard's own wall and **below** both the axle and the crown
-    # wheel: `axle_sprocket` is a Ø145 disc at x 111..119 and the axle's underside is
-    # at z 122.5, so a flange reaching the guard's lower edge at 147.5 would be
-    # inside both. It stops at z 110 and hangs at x 93..101.
-    # A leg rather than a plate: the guard's own edge only reaches z = `lower` at the
-    # two ends of the crown-wheel arc, 83 mm either side of the axle, so a flange
-    # standing straight up at the axle's own station ends 69 mm short of the part it
-    # is supposed to be welded to.
+    # The mounting stay, onto the right bearing hanger's outboard face. The old
+    # anchor was `chassis_cross_rear`, but that member spans +-310 and the
+    # guard's walls now sit at 431..463: a leg dropped straight down from the
+    # wall lands 117 mm outboard of any metal, and a diagonal back to the
+    # member's top runs straight through the hanger plate (294..306) on the
+    # way. So the stay bolts to the plate itself -- which is where a real
+    # guard's bracket lands, beside the cassette -- running from its outboard
+    # face at (306, -540, 100) up-out-rearward to the guard's rear-lower
+    # corner, over the rail (crosses x 310 at z ~101 against a rail top of 66)
+    # and under the axle (z ~106 at y -550 against an axle underside of 115).
     _tube_object(
         "drive_chain_guard_flange",
         (
-            (CHAIN_GUARD_X[0] - 0.004, axle_y, 0.048),
-            (CHAIN_GUARD_X[0] - 0.004, axle_y - radius + 0.004, lower),
+            (0.306, axle_y - 0.015, 0.100),
+            # Ends ON the inner wall's outboard face, not 4 mm shy of it: the
+            # stay runs mostly along x now, so the tube's end cap has almost no
+            # radial reach in x and an endpoint short of the sheet never
+            # touches the part it is welded to.
+            (CHAIN_GUARD_X[0] + 0.002, axle_y - radius + 0.004, lower),
         ),
         0.010,
         context,
