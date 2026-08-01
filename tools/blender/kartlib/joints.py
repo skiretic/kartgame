@@ -1221,10 +1221,14 @@ JOINTS: tuple[Joint, ...] = (
     ),
     Joint(
         a="drive_sprocket_carrier",
-        b="engine_crankcase_*",
+        b="engine_crankcase_[lu]*",
         kind="pierced",
         why="the output boss emerges from the crankcase's own bore, which is "
-        "split across the upper and lower halves",
+        "split across the upper and lower halves. The glob is narrowed to those "
+        "two rather than `engine_crankcase_*` because a glob pair is a cross "
+        "product: #212 added `engine_crankcase_deck` on top of the case, 14 mm "
+        "from this shaft and 90 mm above its axis, and the wider pattern demanded "
+        "the output shaft pierce the cylinder's deck",
     ),
     # --- powertrain.py: engine castings -------------------------------------
     Joint(
@@ -1257,9 +1261,32 @@ JOINTS: tuple[Joint, ...] = (
     ),
     Joint(
         a="engine_crankcase_upper",
+        b="engine_crankcase_deck",
+        kind="welded",
+        why="the deck boss is cast into the upper half and then machined "
+        "perpendicular to the bore; its lower two thirds are inside the casting",
+    ),
+    Joint(
+        a="engine_crankcase_deck",
         b="engine_cylinder_base",
         kind="bolted",
-        why="the barrel's base flange lands on the crankcase deck",
+        why="**#212's gap.** The barrel's base flange lands on the deck, and the "
+        "deck's face and the flange's face are the same plane by construction -- "
+        "both go through `powertrain._lean`. Before this pair existed the flange "
+        "landed on a case top that was flat at z 240 while the flange itself was "
+        "25 degrees off it, which crossed near the bore and opened to 33 mm of "
+        "daylight at the outboard edge. 18 triangle pairs overlapped at the "
+        "crossing, so gate 1 saw an overlap and gate 2 saw a contact and neither "
+        "could see the wedge between them",
+    ),
+    Joint(
+        a="engine_crankcase_upper",
+        b="engine_cylinder_base",
+        kind="bolted",
+        why="the flange's forward half still reaches past the deck boss and into "
+        "the case's own top, because the bore is inclined and the case's outer "
+        "top edge is not -- a barrel's skirt entering the case through its spigot "
+        "bore is what that is",
     ),
     Joint(
         a="engine_cylinder",
@@ -2359,6 +2386,44 @@ JOINTS: tuple[Joint, ...] = (
         "62 x 44 pattern straddles the parting between barrel and base",
     ),
     Joint(
+        a="engine_cylinder",
+        b="exhaust_manifold_bolt_[23]",
+        kind="threaded",
+        why="the upper pair threads into the barrel, which is the other half of "
+        "what the line above says about the pattern straddling the parting. It "
+        "was undeclared while the jacket was a Ø128 revolution because the bolts "
+        "cleared it: they sit 31 mm either side of the port axis, where a squared "
+        "jacket stands 7 mm further out than the circle did",
+    ),
+    Joint(
+        a="engine_crankcase_deck",
+        b="exhaust_manifold_bolt_[01]",
+        kind="threaded",
+        why="the lower pair reaches the deck boss as well as the base casting "
+        "they are declared into above -- same two studs, one casting further "
+        "down. The upper pair is 37 mm clear of the boss and is not listed",
+    ),
+    Joint(
+        a="engine_crankcase_deck",
+        b="exhaust_manifold_spigot",
+        kind="pierced",
+        why="the port bore carries on through the boss; see the plate below",
+    ),
+    Joint(
+        a="engine_crankcase_deck",
+        b="exhaust_manifold",
+        kind="pierced",
+        why="the exhaust port is a hole this mesh does not cut -- "
+        "`CYLINDER_PORT_WINDOW` says so and `engine_cylinder_base` is already "
+        "declared `pierced` by the same spigot for the same reason. The deck boss "
+        "is the next casting the un-bored port passes through, because the boss's "
+        "top is a 25 degree plane and the manifold's plate is vertical: in the "
+        "barrel's own frame the plate's lower edge is 21 mm clear of the deck, and "
+        "in world it crosses. #213 is the follow-up -- the plate is a 78 x 60 "
+        "rectangle where a real manifold flange is shaped to clear the case, and "
+        "the 62 x 44 bolt pattern it has to carry is sourced and cannot shrink",
+    ),
+    Joint(
         a="engine_cylinder_base",
         b="exhaust_spring_?",
         kind="clamped",
@@ -2369,10 +2434,13 @@ JOINTS: tuple[Joint, ...] = (
         a="engine_crankcase_upper",
         b="engine_cylinder",
         kind="bolted",
-        why="**new with the 25 degree lean.** The deck plane inclines but the case's "
-        "top stays flat at z 240, so the barrel's forward skirt dips into the "
-        "casting. A prismatic deck is a crankcase change and this wave did not make "
-        "one; the pair is a real bolted joint either way",
+        why="**the 25 degree lean, and #212 corrected it halfway.** The barrel's "
+        "forward skirt dips into the casting because the bore is inclined and the "
+        "case's outer top edge is not. That much was always right and stays. What "
+        "was wrong was the sentence this line used to carry -- that a prismatic "
+        "deck was a crankcase change nobody had to make -- because the same two "
+        "planes that cross at the front diverge at the back into 33 mm of air "
+        "under a bolted flange. `engine_crankcase_deck` is the prismatic deck",
     ),
     Joint(
         a="engine_head",
@@ -2946,15 +3014,12 @@ OPEN_DEFECTS: tuple[Defect, ...] = (
     # sits on `engine_water_inlet`, so anything bolted to that boss is under it.
     # Moving the battery forward clears all three at once, which is what the row
     # above already says the fix is.
-    Defect(
-        a="engine_battery",
-        b="engine_inlet_neck",
-        gate="overlap",
-        measured=5,
-        issue="#190",
-        why="the crankcase inlet's port, under the same battery. 5 pairs -- the collar "
-        "only, because the neck runs inboard away from it",
-    ),
+    # `engine_battery`/`engine_inlet_neck` is **deleted, fixed by #212.** Giving the
+    # crankcase draft and corner radii pulled its rear-corner wall in to x 255, and
+    # `WATER_INLET_BOSS` had to follow it outboard by 18 mm to stay cast into the
+    # casting at all. The neck bolted to that boss went with it, out from under the
+    # battery. Nobody set out to fix this one; the row above still names the real
+    # cure for the two that are left, which is moving the battery forward.
     Defect(
         a="engine_battery",
         b="engine_inlet_hose_clamp",

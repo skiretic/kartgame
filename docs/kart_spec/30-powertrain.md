@@ -144,20 +144,67 @@ instead of an observation.
 ## 30.3 Crankcase, covers and the outboard face
 
 ### `engine_crankcase_upper`, `engine_crankcase_lower`
-**Status:** built; the upper casting's **top deck changes** — see §30.4
-**Attaches to:** each other (bolted, on the parting line), `engine_mount_plate` (bolted), `engine_cylinder_base` (bolted, 4 studs), `engine_clutch_bell` (welded — one casting), `engine_ignition_cover` (bolted), `engine_reed_block` (bolted), `engine_starter` (bolted), `engine_battery` (clamped), `engine_water_inlet` (welded), `drive_sprocket_carrier` (pierced)
+**Status:** built; **castings rebuilt as lofted sections**, #212 — they were two `build.box` calls
+**Attaches to:** each other (bolted, on the parting line), `engine_mount_plate` (bolted), `engine_crankcase_deck` (welded — cast in), `engine_cylinder_base` (bolted, 4 studs), `engine_clutch_bell` (welded — one casting), `engine_ignition_cover` (bolted), `engine_reed_block` (bolted), `engine_starter` (bolted), `engine_battery` (clamped), `engine_water_inlet` (welded), `drive_sprocket_carrier` (pierced)
 **Envelope:** Art. 9.10.1 — two-part case, PDF p. 27. No dimension.
 **Verification:** gate 1 (`bodywork_sidepod_r` waiver, 44 pairs), gate 2
 
 | dimension | value | prov | basis |
 | --- | --- | --- | --- |
-| inboard face | x **+240** | `estimated` | clears the right seat stays, which pass x 206–224 at case height. Unchanged. |
-| **outboard face** | x **+398** | `estimated` | unchanged, and now stated with both clearances rather than one: **107 mm** to the right pod's mouth at x 505 (§Bodywork's `sidepod_mouth_x`), and **26 mm** to the right side bar's inboard surface, which is at x **424** at y −245 — *not* the 432 `IGNITION_COVER_OUTBOARD_X`'s comment claims |
+| inboard face | x **+240** | `estimated` | clears the right seat stays, which pass x 206–224 at case height. Unchanged, and it is now the **widest** station rather than a flat wall — see draft below. |
+| **outboard face** | x **+398** | `estimated` | unchanged at the parting line, and stated with both clearances: **107 mm** to the right pod's mouth at x 505 (§Bodywork's `sidepod_mouth_x`), and **26 mm** to the right side bar's inboard surface, which is at x **424** at y −245 — *not* the 432 `IGNITION_COVER_OUTBOARD_X`'s comment claims |
 | front face | y −145 | `estimated` | the front seat stay ends at y −129 |
 | rear face | y −345 | `estimated` | leaves room for the reed block and carburettor |
 | parting line | z 150 | `derived` | = `engine_z`, the crank axis, by definition of a split case |
-| deck (upper casting top) | inclined, §30.4 | `derived` | was a flat z 240 |
-| lower half inset | 5 | `estimated` | the bolting flange's overhang, unchanged |
+| deck (upper casting top) | inclined, §30.4 | `derived` | was a flat z 240 — **built now**, as `engine_crankcase_deck` |
+| lower half inset | 3 in x, 5 in y | `estimated` | the bolting flange's overhang. 3 rather than 5 in x because `drive_sprocket_carrier`'s inboard face is at x 393 and both halves have to be inside it |
+| **section** | superellipse, n = **4** | `estimated` | every vertical arris is a radius. n = 4 pulls the corner to 0.841 of the box's, about 20 mm in |
+| **draft, upper half** | 6 mm a side over 90 mm, **3.8°** | `estimated` | walls lean in going down. A real draft angle for sand casting, and enough that the highlight down the flank moves |
+| **sump foot** | 116 × 166 at z 100 | `derived` | the lower half swells from a flat foot to nearly full width at the parting line. The foot is sized by the contact, not the look: it puts **61 × 140 mm** on `engine_mount_plate`'s table (x 230–322, top z 100) |
+
+**The castings are a superellipse and not a rounded rectangle, and the reason is a
+number.** `|x/a|^n + |y/b|^n = 1` has its furthest point on the **diagonal**, at
+`half × 2^(0.5 − 1/n)` — 1.149 at n = 4, 1.231 at n = 5, 1.260 at n = 6. Squaring
+a section therefore *grows* it, all of the growth at the corners, and the first
+build of #212 shipped a docstring claiming the exact opposite. Gate 1 answered with
+twelve intersecting pairs. A rounded rectangle reading the same off the photograph
+— 128 across flats on a 22 mm radius — would have pushed the barrel's corners 17 mm
+outside the Ø128 jacket every clearance figure in this section was measured against.
+The invariant that does hold, and the one the tables lean on, is that **a
+superellipse is exactly `half` on its axes**.
+
+### `engine_crankcase_deck`
+**Status:** **new**, #212 — the deck plane §30.4 has specified since M5 and nothing built
+**Attaches to:** `engine_crankcase_upper` (welded — cast in, then machined), `engine_cylinder_base` (bolted), `exhaust_manifold`/`_spigot` (pierced) and `exhaust_manifold_bolt_[01]` (threaded), all three of those per #213
+**Envelope:** none
+**Verification:** gate 1, gate 2, and the arithmetic below
+
+| dimension | value | prov | basis |
+| --- | --- | --- | --- |
+| top face | the deck plane of §30.4, less 1.5 | `derived` | built at z 238.5 and put through the same `_lean` matrix the flange gets, so the two can only ever be parallel |
+| top half-extents | 74 × 80, n = 4 | `derived` | the flange is 70 × 76 at the same exponent, so the boss's outline is outside the flange's at **every** azimuth — minimum clearance **4.00 mm** over 720 samples |
+| bottom face | flat, z 196 | `estimated` | 44 mm down, horizontal — a machined boss on a cast body is two frames at once. The top plane's lowest point is 203.4, so the solid never turns itself inside out |
+| bottom half-extents | 74.5 × 83 | `estimated` | inside the case wall at that height (76.6 × 97.6). A boss that pokes out through the flank is not a boss |
+| proud at the rear | 33.6 | `derived` | wholly buried at the front. That is the same 33 mm the wedge was |
+
+**What this part is for.** The barrel leans 25° and the case's top was flat at
+z 240, so the flange's bottom face and the deck it landed on were two planes 25°
+apart. Two such planes cross once and diverge either side of the crossing: 18
+triangle pairs overlapped **at** the crossing, so gate 1 saw an overlap, gate 2 saw
+a contact, and neither could see the wedge. Measured along the flange's own bottom
+face, rear edge to front:
+
+    station        was            now
+    −76 mm         +32.1 air      1.5 seated
+    −38 mm         +16.1 air      1.5 seated
+    bore centre      0.0          1.5 seated       <- the crossing
+    +38 mm         −16.1 buried   1.5 seated
+    +76 mm         −32.1 buried   1.5 seated
+
+The 1.5 mm is deliberate and is not slack: coplanar faces z-fight, so the flange
+buries its bottom face in the boss. **This is the class of defect neither gate can
+find** — the wedge is outside both meshes, so it is neither an undeclared overlap
+nor a gap between declared parts. It took somebody looking at the engine.
 
 **The 26.7 mm sidepod intrusion is fixed by construction, from the other side.**
 `CRANKCASE_OUTBOARD_X = 0.398` was justified against the side bar at 0.420 and
@@ -241,7 +288,11 @@ into `sourced`.
 | axis (x, y) at the base face | 319, −250 | `estimated` | unchanged; x is the case's own centre |
 | base face z | 240 | `derived` | `MOUNT_PLATE_TOP` 100 + `CRANKCASE_HEIGHT` 140 |
 | lean | 25° forward from vertical | `derived` | above |
-| jacket radius | 64 | `estimated` | unchanged. No fins: Art. 9.10.1 water-cools the cylinder, ADR-0028 |
+| jacket **half-width across flats** | 64 | `estimated` | unchanged as a number and changed as a shape — it was a radius. No fins: Art. 9.10.1 water-cools the cylinder, ADR-0028 |
+| **jacket section** | superellipse n = **5** | `estimated` | `eng_tm_kz10_dress.jpg` at 0.346 mm/px: the barrel's front face reads flat across **275 of its 370 px**, so 74% of the width is a flat face and only the outer quarter turns. `det_tonykart_401t_museum.jpg` shows the same casting from the rear — flat panel, straight flanks. A jacket is a squared casting with a bore in it. n = 5 and not 6 because the corner stands at 78.8 against 80.6, and those 1.8 mm are the whole clearance against the base nuts |
+| **cast corner webs** | 4 × **5 mm** proud, 40° of arc each | `estimated` | R1 shows them running the barrel's full height and dying into the fillet over the base flange. Diagonal 78.8 + 5 = 83.8 |
+| **skirt tuck** | 104 across flats at z 254, flaring to 128 at 274 | `derived` | **a clearance, not a style line.** The four base nuts sit at the flange's corners, 83.6 mm out on the diagonal, inner faces at 76.1, standing z 258–266. A barrel at full width puts its webbed corner at 83.8 and eats all four — which is what the first build did. Both photographs show exactly this hollow with the nuts sitting in it |
+| **top deck section** | superellipse n = **2.4** | `derived` | the head is round and lands on it. The casting squares up as it comes down, which is the transition both photographs show |
 | cylinder height, base face to deck | 95.0 | `sourced` | KZ-R1 HF p. 3 development, 1581 px at 0.0601 mm/px. **The build's 108 mm of jacket is 13 mm tall**; flagged, not changed, because the head's proportion was tuned against a render |
 | **port centre, above the base face** | **49.9** | `derived` | HF p. 3 development, 830 px. Lower edge 35.8, upper 64.0 |
 | port window | **44.1 × 28.2** | `derived` | same, 733 × 470 px. 81.6% of the bore because the HF lists **three** exhaust ports, one main plus two auxiliaries |
@@ -258,7 +309,12 @@ into `sourced`.
 
 | dimension | value | prov | basis |
 | --- | --- | --- | --- |
-| head radius | 53 | `estimated` | leaves 11 mm of barrel crown showing all round; a 60 mm head reads as a lid |
+| head radius | 53 | `estimated` | leaves 11 mm of barrel crown showing all round; a 60 mm head reads as a lid. Still the outline's **maximum** — the lobing below only ever comes inside it |
+| **outline** | **6 lobes**, base 45 + 8 amplitude, n = 2.6 | `estimated` | the outline bulges at every stud. `eng_tm_kz10_dress.jpg` rows b–d have six raised pads round the perimeter, each with its fastener in a counterbore; `det_tonykart_401t_museum.jpg` looks straight down on the same six. Phased at 0, which is `engine_head_nut_0`, so each nut lands on its own pad |
+| **nut deck** | flat annulus at z **393**, radius 30 to 40.5 | `derived` | a nut on the Ø38 circle spans radius 30.5 to 45.5, so it sits fully on the casting where the lobes carry it to 46 and overhangs between them. That is what both photographs show and it is why the lobes are worth having |
+| **crown** | domes **7 mm**, radius 30 in to the apex at 17.5 | `estimated` | `engine_height` still fixes the head's top at 400 and the apex **is** that top — the deck came down 7 mm to buy the crown rather than the head growing. The six nuts top out at 400 exactly, level with it |
+| **plug bore** | **13.5 deep**, Ø35 mouth to Ø24 floor | `estimated` | a two-stroke plug goes down a bore; it was standing on a boss above a flat plate. Measured **along the bore axis** off the built mesh — a world-z reading compares the rim's highest corner to a point on the axis and says the plug is 4.5 mm *below* the crown |
+| plug protrusion | **3.0 mm of hex** above the crown | `derived` | the rest of it is down the hole. Hex circumscribed radius 12.1 against a bore wall at 15.2 at that height |
 | combustion chamber volume | ≥11.0 cm³ | `sourced` | Art. 9.10.1, p. 27. Not a mesh dimension; recorded because it is the only *internal* number the regulation fixes |
 | plug thread | M14 × 1.25, housing 18.5 long | `sourced` | Art. 5.2.1, p. 15. `PLUG_HEX_FLATS` 21 is the B-series spanner size, `estimated` |
 | bolt circle | Ø38, 6 nuts | `estimated` | R2 shows six in spotfaced counterbores |
@@ -280,10 +336,25 @@ an unleaned head.
 **Envelope:** Art. 5.3, §5a
 **Verification:** gate 2
 
-Boss Ø24 × 14 proud at **(240, −300, 175)**, `estimated`: on the crankcase's
-inboard face, low, because Art. 9.10.1 water-cools the **crankcase** as well and
-the coolant has to get in somewhere. There is no such part today, which is why
-the lower hose ends on the clutch cover.
+Boss Ø24 × 11 proud, centre **(258, −330, 165)**, mouth **(244, −330, 165)**,
+`estimated`: on the crankcase's inboard face, low, because Art. 9.10.1 water-cools
+the **crankcase** as well and the coolant has to get in somewhere. Before it
+existed the lower hose ended on the clutch cover.
+
+Two corrections in one row. This section said **(240, −300, 175)** and the build
+has been at y −330, z 165 since the part landed — a drift nobody caught, because
+no gate reads this file; the built figures are the ones above. And x moved 240 →
+**258** with #212: the boss sits 85 mm back from the case's centre, which is deep
+in the rear corner, and once the casting had corner radii the wall there was at
+255 while the boss still ended at 240. It was standing 15 mm off the casting it is
+cast into. `PORT_MOUTHS["engine_inlet"]` is the same point less the boss's own 14
+and moves with it.
+
+That move **fixed a #190 waiver nobody was aiming at**: the neck bolted to this
+boss went outboard with it and left `engine_battery`, so
+`engine_battery`/`engine_inlet_neck` is deleted and known-open drops 15 → 14. The
+two that remain on the battery still want the same cure this section already
+names, which is moving the battery forward.
 
 ## 30.5 Driveline, the chain line, and the guard
 
@@ -977,6 +1048,25 @@ The upper rod clears the left rear seat stay by 39 mm, `derived`.
 | `cooling_axle_pulley` | `axle_rear` | clamped | Art. 4.3's fourth keyway is the sprocket's, not the pulley's; the pulley clamps |
 | `cooling_belt` | `cooling_pump_pulley` | meshed | |
 | `cooling_belt` | `cooling_axle_pulley` | meshed | |
+
+**Add, #212 — the deck and what the squared jacket brought with it:**
+
+| a | b | kind | why |
+| --- | --- | --- | --- |
+| `engine_crankcase_upper` | `engine_crankcase_deck` | welded | cast into the upper half and then machined; its lower two thirds are inside the casting |
+| `engine_crankcase_deck` | `engine_cylinder_base` | bolted | **the gap.** Both faces go through `powertrain._lean`, so they can only ever be parallel |
+| `engine_cylinder` | `exhaust_manifold_bolt_[23]` | threaded | the upper pair threads into the barrel — the other half of what `engine_cylinder_base`/`exhaust_manifold_bolt_[01]` already says about the 62 × 44 pattern straddling the parting. Undeclared while the jacket was a revolution because the bolts cleared it: they sit 31 mm either side of the port axis, where a squared jacket stands 7 mm further out |
+| `engine_crankcase_deck` | `exhaust_manifold` | pierced | #213 |
+| `engine_crankcase_deck` | `exhaust_manifold_spigot` | pierced | #213 |
+| `engine_crankcase_deck` | `exhaust_manifold_bolt_[01]` | threaded | #213 |
+
+**Change, #212:**
+
+| pair | what changes |
+| --- | --- |
+| `drive_sprocket_carrier`/`engine_crankcase_*` | glob narrowed to `engine_crankcase_[lu]*`. **A glob pair is a cross product**: `engine_crankcase_deck` landed on top of the case, 14 mm from this shaft and 90 mm above its axis, and the wider pattern demanded the output shaft pierce the cylinder's deck |
+| `engine_crankcase_upper`/`engine_cylinder_base` | kept, `why` rewritten — the flange's forward half still reaches past the boss into the case's own top, which is a barrel's skirt entering its spigot bore |
+| `engine_crankcase_upper`/`engine_cylinder` | kept, `why` rewritten. It used to argue that a prismatic deck was a crankcase change nobody had to make. The forward dip was always right; the sentence justifying the rear wedge was not |
 
 **Rename:** `exhaust_flange` → `exhaust_manifold`; `exhaust_flange_nut_0..1` →
 `exhaust_manifold_bolt_0..3` (two becomes four); `exhaust_hanger` → the three

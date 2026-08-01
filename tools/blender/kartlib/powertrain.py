@@ -194,6 +194,94 @@ flange overhangs it: that ledge and the shadow under it are the whole reason to
 build two boxes instead of one, and it is what a plain box could never show.
 """
 
+CASE_EXPONENT: float = 4.0
+CASE_UPPER_STATIONS: tuple[tuple[float, float, float], ...] = (
+    (0.1500, 0.0790, 0.1000),
+    (0.1560, 0.0790, 0.1000),
+    (0.1620, 0.0778, 0.0988),
+    (0.2000, 0.0770, 0.0980),
+    (0.2340, 0.0755, 0.0962),
+    (0.2385, 0.0740, 0.0945),
+    (0.2400, 0.0730, 0.0932),
+)
+CASE_LOWER_STATIONS: tuple[tuple[float, float, float], ...] = (
+    (0.1000, 0.0580, 0.0830),
+    (0.1015, 0.0605, 0.0855),
+    (0.1100, 0.0655, 0.0900),
+    (0.1260, 0.0715, 0.0940),
+    (0.1440, 0.0760, 0.0965),
+    (0.1500, 0.0755, 0.0955),
+)
+"""`(z, half_x, half_y)` sections through the two case halves, on the case's own
+centre (0.319, -0.245). #212, and the second half of it: *"the crankcase is
+basically a cube, that is not realistic."* It was, exactly — two `build.box`
+calls, eight sharp vertical arrises and a flat bottom.
+
+Read off `eng_tm_kz10_dress.jpg` and `exh_commons_shifter_engine.jpg`, which
+agree on the three things a case does that a box cannot:
+
+    draft       the walls lean in going down. 6 mm a side over the upper half's
+                90 mm, which is 3.8 degrees -- a real draft angle for sand, and
+                enough that the highlight down the flank moves.
+    corners     every vertical arris is a radius. `CASE_EXPONENT` 4 pulls the
+                diagonal to 0.841 of the half-width, so the corner comes in
+                about 20 mm from where the box's did and nothing anywhere grows.
+    sump        the lower half is not a slab. It swells out of a narrow flat
+                foot at z 100 to nearly full width at the parting line, which is
+                the belly both photographs show under the clutch cover.
+
+**The foot is a contact and not a styling choice.** `engine_crankcase_lower` is
+declared `bolted` to `engine_mount_plate`, whose table is x 0.230..0.322 at
+z 0.100; the foot's 0.058 half-width puts 61 x 140 mm of case on that table. A
+sump rounded all the way to a point would have left the engine resting on
+nothing and gate 2 would have said so.
+
+The widest lower station is 0.0760 rather than the old box's 0.074 because
+`drive_sprocket_carrier`'s inboard face is at x 0.393 and is declared `pierced`
+into `engine_crankcase_*` -- a glob, so **both** halves have to be inside it.
+At 0.074 the two are exactly coplanar, which is a knife-edge for a contact test;
+0.0760 buys 2 mm.
+"""
+
+CASE_DECK_BOTTOM_Z: float = 0.1960
+CASE_DECK_TOP_Z: float = 0.2385
+CASE_DECK_BOTTOM_HALF: tuple[float, float] = (0.0745, 0.0830)
+CASE_DECK_TOP_HALF: tuple[float, float] = (0.0740, 0.0800)
+"""`engine_crankcase_deck` -- the machined boss the barrel bolts to, and the
+first half of #212: *"there is a gap between the cylinder and the block."*
+
+There was, and it was 33 mm at its worst. The barrel leans 25 degrees
+(`params.cylinder_lean`) and the case's top was flat at z 240, so the flange's
+bottom face and the deck it was supposed to sit on were two planes 25 degrees
+apart. They crossed near the bore, which is why 18 triangle pairs overlapped and
+every gate passed: it is neither a gap between declared parts nor an
+undeclared overlap, it is a **wedge of daylight in the middle of one joint**,
+and the only instrument that can see it is somebody looking at the engine.
+
+A real crankcase deck is machined perpendicular to the bore, so this part's top
+face *is* the flange's bottom plane -- built at `CASE_DECK_TOP_Z` and put through
+`_lean`, the same matrix the flange gets, so the two can only ever be parallel.
+Its bottom is a flat horizontal ring buried inside the upper case. Nothing else
+moves: `CYLINDER_BASE_Z` is still 0.240 and the head still tops out at 0.400.
+
+The numbers:
+
+    top 1.5 mm under the flange   coplanar faces z-fight. The flange buries its
+                                  bottom in the boss instead.
+    top half 74 x 80 against the  the flange's outline is strictly inside the
+    flange's 70 x 76, same n = 4  boss's at every angle, so the seat is
+                                  full-face by construction rather than by luck
+    bottom at z 196               44 mm down. The top plane's lowest point is
+                                  0.2034 with the lean on, so the solid never
+                                  turns itself inside out
+    bottom half 74.5 x 83         inside the case wall at that height (76.6 x
+                                  97.6) -- a boss that pokes out through the
+                                  flank is not a boss
+
+It stands 33.6 mm proud at the rear and is wholly buried at the front, which is
+the same 33 mm the wedge was: the metal that was missing is now there.
+"""
+
 BELL_RADIUS: float = 0.060
 BELL_CENTER_Y: float = -0.228
 BELL_CENTER_Z: float = 0.172
@@ -273,6 +361,144 @@ The base flange is wider than the barrel on all four sides, which is what makes
 the two read as one casting with a machined joint rather than as a taper.
 """
 
+BASE_EXPONENT: float = 4.0
+BASE_STATIONS: tuple[tuple[float, float, float], ...] = (
+    (0.2400, 0.0700, 0.0760),
+    (0.2415, 0.0700, 0.0760),
+    (0.2545, 0.0690, 0.0750),
+    (0.2580, 0.0660, 0.0720),
+)
+JACKET_WEB_PROUD: float = 0.005
+JACKET_WEB_SPAN: float = math.radians(20.0)
+JACKET_STATIONS: tuple[tuple[float, float, float, float], ...] = (
+    (0.2540, 0.0520, 5.0, 0.0),
+    (0.2670, 0.0545, 5.0, 0.0),
+    (0.2740, 0.0640, 5.0, 1.0),
+    (0.3000, 0.0640, 5.0, 1.0),
+    (0.3280, 0.0635, 5.0, 1.0),
+    (0.3400, 0.0615, 4.0, 0.5),
+    (0.3440, 0.0575, 3.0, 0.0),
+    (0.3480, 0.0550, 2.4, 0.0),
+)
+"""The barrel: `(z, half, exponent, web fraction)` for the jacket, and
+`(z, half_x, half_y)` for the base flange under it. Both leaned.
+
+`CYLINDER_RADIUS`'s docstring below has the dimensions and why there are no
+fins, and none of that moves. What moves is the **section**: it was a plain
+revolution, and #212 says the engine does not read as one. It does not, and both
+close-range photographs say why.
+
+`eng_tm_kz10_dress.jpg` at 0.346 mm/px: the barrel's front face reads flat
+across 275 px of its 370 px width, so **74% of the width is a flat face** and
+only the outer quarter turns. `det_tonykart_401t_museum.jpg` shows the same
+casting from the rear -- a flat panel with a cast rectangle on it, and straight
+flanks either side. A jacket is a squared casting with a bore in it, not a tube.
+
+    exponent 5      over the body. Puts about 60% of the width within half a
+                    millimeter of flat, which is what 74% read off a photograph
+                    taken at an angle is worth. It is 5 and not 6 because of
+                    what the corner costs: `_casting_ring` explains that
+                    squaring a section grows its diagonal, and 5 puts the
+                    corner at 78.8 mm where 6 puts it at 80.6. Those 1.8 mm are
+                    the whole clearance against the base nuts.
+    exponent 2.4    at the top deck, because the head is round and lands on it.
+                    The casting squares up as it comes down, which is the
+                    transition both photographs show.
+    web 5 mm        on each of the four diagonals, `JACKET_WEB_SPAN` either
+                    side. R1 shows these running the barrel's full height and
+                    dying into the fillet over the base flange, which is what
+                    the fraction column does -- 0 at both ends, 1 through the
+                    body.
+
+**The skirt tuck is a clearance and not a styling line.** The four base nuts sit
+at the flange's corners, 83.6 mm out from the bore on the diagonal, and their
+inner faces are at 76.1. They stand from z 258 to 266. A barrel at full width
+puts its webbed corner at 83.8 and eats all four of them, which is what the
+first build did. So the first two stations hold the skirt at 54.5 and 57.0 --
+corners at 67.1 and 70.2, clear by 6 to 9 mm -- and the flare to full width
+happens at 274, above the nuts. Both photographs show exactly that hollow with
+the nuts sitting in it; it was read as a fillet and it is a clearance.
+
+The exhaust port is at azimuth 270 degrees (`EXHAUST_INLET` is 78 mm rearward of
+the bore on the bore's own height), and a superellipse is exactly `half` on its
+axes. So the port face is at 64.0 mm before this change and after it, and
+`exhaust_manifold`'s bolted contact cannot have moved. Its four bolts and two
+springs are off-axis and the section did grow under them -- 26 degrees off the
+port axis it stands 7 mm further out than the circle -- which is why the upper
+bolt pair is now declared into the barrel rather than into thin air.
+
+The flange keeps its 70 x 76 half-extents and gains n = 4 corners, which for
+once is a shrink: the old box's corner stood at 103 mm from the bore and the
+superellipse's stands at 87, so the nuts sit further inside the casting they are
+torqued against than they used to.
+"""
+
+HEAD_LOBE_COUNT: int = 6
+HEAD_EXPONENT: float = 2.6
+HEAD_DECK_Z: float = 0.3930
+HEAD_STATIONS: tuple[tuple[float, float, float], ...] = (
+    (0.3470, 0.0450, 0.0080),
+    (0.3520, 0.0450, 0.0080),
+    (0.3820, 0.0448, 0.0080),
+    (0.3900, 0.0438, 0.0076),
+    (0.3915, 0.0420, 0.0068),
+    (0.3930, 0.0405, 0.0055),
+    (0.3930, 0.0300, 0.0000),
+    (0.3960, 0.0270, 0.0000),
+    (0.3985, 0.0225, 0.0000),
+    (0.4000, 0.0175, 0.0000),
+    (0.3994, 0.0158, 0.0000),
+    (0.3880, 0.0150, 0.0000),
+    (0.3872, 0.0128, 0.0000),
+    (0.3870, 0.0120, 0.0000),
+)
+"""The head: `(z, half between the lobes, lobe amplitude)`, leaned with the rest
+of the cluster.
+
+It was a plain disc with six nuts standing on it. Both references show a casting
+whose **outline bulges out at every stud** -- `eng_tm_kz10_dress.jpg` rows b-d
+have six raised pads round the perimeter, each with its fastener in a
+counterbore, and `det_tonykart_401t_museum.jpg` looks straight down on the same
+six on their circle. That lobing is most of what makes a head read as cast
+rather than turned, and it costs nothing: `half + amplitude` is 0.053 at the
+deck, which is `HEAD_RADIUS` exactly, so the outline's maximum is unchanged and
+the shape only ever comes *inside* the disc it replaces.
+
+The lobes are phased at 0, which is where `engine_head_nut_0` sits, so each nut
+lands on its own pad rather than in a valley. `HEAD_DECK_Z` is the flat annulus
+they are torqued against: it runs from radius 30 out to 40.5, and a nut on the
+38 mm bolt circle spans 30.5 to 45.5, so it sits fully on the casting where the
+lobes carry it out to 46 and overhangs between them. That is what both
+photographs show and it is why the lobes are worth having.
+
+First station is 1 mm below `CYLINDER_TOP_Z` so the head buries its spigot in
+the barrel's deck instead of sharing a plane with it.
+
+**The crown domes and the plug goes down a bore**, which is the second round of
+his eye on this part: the first build put a flat 46 mm plate on top with the
+plug standing on a boss above it. Both are wrong for a two-stroke head. The
+seven stations above `HEAD_DECK_Z` are one shape read as three:
+
+    dome        7 mm of rise from the annulus at radius 30 in to the apex at
+                17.5. `engine_height` still fixes the head's top at 0.400 and
+                the apex *is* that top, so the parameter did not have to move
+                to buy the crown -- the deck came down 7 mm instead.
+    bore        the four stations after the apex turn back down into the
+                casting: 13 mm deep, Ø35 at the mouth and Ø24 at the floor.
+                A ring list that descends is not a mistake here. `_loft_object`
+                winds quads from consecutive rings, so a descending pair faces
+                inward -- which is outward for the solid, because the surface
+                of a cavity points into the cavity. The winding gate is what
+                proves that rather than the render.
+    seat        `engine_plug_boss` is no longer a boss standing on the head. It
+                is the machined seat at the bottom of the bore, 6 mm of it, and
+                it still welds to the casting because its foot is buried in the
+                floor.
+
+The nuts top out at 0.4000 exactly, which is the apex: fasteners level with the
+crown and neither of them hiding the other.
+"""
+
 HEAD_RADIUS: float = 0.053
 HEAD_BOLT_CIRCLE: float = 0.038
 HEAD_BOLT_COUNT: int = 6
@@ -289,8 +515,9 @@ two pixels. 53 mm puts 11 mm of barrel crown on show all the way round, and
 moving `CYLINDER_TOP_Z` up to 0.348 at the same time makes the head a squat
 52 mm disc rather than a 70 mm drum, which is the proportion R2 has."""
 
-PLUG_BOSS_RADIUS: float = 0.021
-PLUG_BOSS_HEIGHT: float = 0.009
+PLUG_SEAT_Z: float = 0.3870
+PLUG_BOSS_RADIUS: float = 0.0125
+PLUG_BOSS_HEIGHT: float = 0.006
 PLUG_HEX_FLATS: float = 0.021
 PLUG_INSULATOR_RADIUS: float = 0.0080
 PLUG_CAP_DIAMETER: float = 0.026
@@ -302,6 +529,13 @@ in R2 the white insulator and the black cap are the highest-contrast objects in
 the whole engine bay. 21 mm across the flats is a B-series plug's spanner size.
 The lead is included because the plug cap alone reads as a stub — what says
 ignition is the lead arcing away from it down to the coil.
+
+`PLUG_SEAT_Z` is the floor of `HEAD_STATIONS`' plug well and the whole plug now
+hangs off it rather than off `head_top`: seat, hex, insulator and cap all drop
+16.5 mm, so the hex sits down the bore with 2.5 mm of it showing above the
+crown. That is what a plug in a two-stroke head looks like and it is what the
+well was cut for. The hex's circumscribed radius is 12.1 mm against a bore wall
+at 15.2 at that height, so it goes down the hole rather than into it.
 """
 
 MANIFOLD_BOLT_FLATS: float = 0.010
@@ -788,7 +1022,7 @@ PORT_MOUTHS: dict[str, tuple[tuple[float, float, float], tuple[float, float, flo
     # **axial in on the end face, radial out on the flank**. The inlet used to be on
     # the crown, which is neither.
     "engine_outlet": ((0.299, -0.311, 0.376), (0.0, -1.0, 0.0)),
-    "engine_inlet": ((0.226, -0.330, 0.165), (-1.0, 0.0, 0.0)),
+    "engine_inlet": ((0.244, -0.330, 0.165), (-1.0, 0.0, 0.0)),
     "cooling_pump_axial": ((0.148, -0.386, 0.110), (-1.0, 0.0, 0.0)),
     "cooling_pump_front": ((0.164, -0.356, 0.110), (0.0, 1.0, 0.0)),
 }
@@ -1017,11 +1251,19 @@ a clearance that will disagree with itself.
 it and the lower stays forward of it. That half was always true and is still
 measured: 220.7 mm to `axle_rear`."""
 
-WATER_INLET_BOSS: tuple[float, float, float] = (0.240, -0.330, 0.165)
+WATER_INLET_BOSS: tuple[float, float, float] = (0.258, -0.330, 0.165)
 """A **new** cast boss on the crankcase's inboard face, low. Art. 9.10.1
 water-cools *"the crankcase, cylinder and head"* -- all three -- so the coolant has
 to get into the case somewhere, and there was no such part: the lower hose ended on
-the clutch cover instead. 24 dia x 14 proud, `estimated`."""
+the clutch cover instead. 24 dia x 14 proud, `estimated`.
+
+x was 0.240 while the case was a box whose inboard face was the plane x = 0.240.
+#212 gave the case draft and corner radii and this boss sits 85 mm back from the
+case's centre, which is deep in the rear corner: the wall there is at 0.2553, and
+the boss was left standing 15 mm off the casting it is supposed to be cast into.
+0.258 puts its outboard end 2.5 mm inside the wall and leaves 11 mm of it proud,
+which is what the figure above describes. `PORT_MOUTHS["engine_inlet"]` is the
+same point less the boss's own 14 mm and moves with it."""
 
 PUMP_SPINDLE: tuple[float, float, float] = (0.160, -0.386, 0.110)
 PUMP_BODY_DIAMETER: float = 0.060
@@ -1320,6 +1562,171 @@ def _ribbon(
             bm.faces.new(
                 (lower[corner], lower[following], upper[following], upper[corner])
             )
+
+
+WEB_EDGE_GAP: float = math.radians(1.0)
+"""Half the angular width of a cast web's own edge, and the whole reason the web
+is visible.
+
+A web has to be a step, and a step needs two vertices close together at the top
+and bottom of it. Uniform sampling cannot supply them: at `exhaust_segments` = 24
+the samples are 15 degrees apart, which on a Ø157 corner is 20.4 mm of arc, and a
+5 mm rise spread over 20.4 mm turns the surface by **13.8 degrees**.
+`object_from_bmesh` marks an edge sharp above 40, so the web was shaded smooth
+and rendered as exactly the plain radius it was meant to replace -- authored,
+built, measured, and invisible. That is #199's crease trap, cited two docstrings
+above this one and then walked straight into.
+
+One degree either side puts the rise over 2.7 mm of arc, which is 61.6 degrees
+and reads. The four edge pairs are inserted at every station of a webbed part
+whether that station carries a web or not, because `_loft_object` needs the same
+column count in every ring; on a station with no web the pair is 2.7 mm apart at
+the same radius, which is a narrow quad and not a degenerate one.
+
+The inserted angles are 24, 26, 64 and 66 degrees in each quadrant and neither
+detail level samples any of them -- 24 misses the low level's 15 degree grid and
+the high level's 7.5 -- so no vertex is ever emitted twice.
+"""
+
+
+def _ring_angles(segments: int, web_edges: bool) -> list[float]:
+    """The azimuths one ring is sampled at, in ascending order.
+
+    A pure function of the two arguments, so every station of a part sees the
+    same list and `_loft_object`'s quads line up column for column.
+    """
+    angles = [2.0 * math.pi * step / segments for step in range(segments)]
+    if web_edges:
+        for quadrant in range(4):
+            diagonal = quadrant * math.pi * 0.5 + math.pi * 0.25
+            for edge in (diagonal - JACKET_WEB_SPAN, diagonal + JACKET_WEB_SPAN):
+                angles.append(edge - WEB_EDGE_GAP)
+                angles.append(edge + WEB_EDGE_GAP)
+    return sorted(angles)
+
+
+def _casting_ring(
+    center: tuple[float, float],
+    half_x: float,
+    half_y: float,
+    z: float,
+    segments: int,
+    *,
+    exponent: float,
+    lobes: int = 0,
+    lobe_amplitude: float = 0.0,
+    web_proud: float = 0.0,
+    web_span: float = 0.0,
+    web_edges: bool = False,
+) -> list[Vector]:
+    """One horizontal section through a sand casting, as a closed ring.
+
+    A casting is neither a box nor a cylinder, and the shape that is both is the
+    **superellipse**, `|x/a|^n + |y/b|^n = 1`. At n = 2 it is an ellipse, as n
+    grows it approaches a rectangle, and every value between is a rectangle with
+    a corner radius — which is what every casting on this engine actually is.
+
+    **Squaring a part grows it, and the growth is all on the diagonal.** The
+    radius at 45 degrees is `half * 2 ** (0.5 - 1/n)`: 1.000 at n = 2, 1.149 at
+    n = 4, 1.231 at n = 5, 1.260 at n = 6, and `sqrt(2)` as n runs away to a
+    rectangle. So a barrel rebuilt from a circle of radius R into a superellipse
+    of half-width R keeps its across-flats and pushes its corners 16 to 26 percent
+    further out than the circle every clearance figure in this module was measured
+    against.
+
+    That is written down because the first version of this docstring said the
+    opposite — that the furthest point was on the axes and the shape could only
+    ever come inside the circle — and used it to argue no clearance figure could
+    move. Gate 1 answered with twelve intersecting pairs on the first build: four
+    base nuts, two manifold bolts and two exhaust springs, every one of them
+    sitting near a diagonal where the section had just grown 16 mm. The exponent
+    and the station tables are chosen against that arithmetic now, and the
+    invariant that actually holds is the weaker and true one: **the section is
+    exactly `half` on its axes**, so the machined port face has not moved.
+
+    `lobes` adds a raised pad every `360 / lobes` degrees, which is how a
+    cylinder head's outline bulges out at each stud; `half_x` is then the radius
+    *between* the lobes and `half_x + lobe_amplitude` is the outline's true
+    maximum. `web_proud` raises the four diagonals, which is the cast web that
+    runs up a barrel's corner.
+
+    The web is a **step and not a swell**, because `object_from_bmesh` marks an
+    edge sharp only above 40 degrees: a 6 mm rise spread smoothly over a quadrant
+    turns each edge by two degrees, is erased by the shading, and renders as
+    exactly the plain barrel it was meant to replace. That is #199's crease trap
+    in a different module. Stepping it over one sample turns the edge by about
+    55 degrees at low detail, which reads.
+
+    `web_span` is the half-width of the step in radians from the diagonal, and it
+    must not land *on* a sample at either detail level or the two densities stop
+    being the same shape. 20 degrees clears both the 15 degree step of
+    `exhaust_segments` = 24 and the 7.5 degree step of 48, and both densities put
+    the same 40 degrees of arc on the web.
+    """
+    ring: list[Vector] = []
+    for angle in _ring_angles(segments, web_edges):
+        cos_a = math.cos(angle)
+        sin_a = math.sin(angle)
+        radius = (
+            abs(cos_a / half_x) ** exponent + abs(sin_a / half_y) ** exponent
+        ) ** (-1.0 / exponent)
+        if lobes:
+            radius += lobe_amplitude * 0.5 * (1.0 + math.cos(lobes * angle))
+        if web_proud and abs(math.fmod(angle, math.pi * 0.5) - math.pi * 0.25) < web_span:
+            radius += web_proud
+        ring.append(
+            Vector((center[0] + cos_a * radius, center[1] + sin_a * radius, z))
+        )
+    return ring
+
+
+def _loft_object(
+    name: str,
+    rings: list[list[Vector]],
+    context: build.BuildContext,
+    collection: bpy.types.Collection,
+    root: bpy.types.Object,
+    material: bpy.types.Material,
+    *,
+    shade_smooth: bool = True,
+    transform: Matrix | None = None,
+) -> bpy.types.Object:
+    """A closed solid lofted through a stack of equal-length rings.
+
+    Rings run bottom to top and each must wind counter-clockwise seen from +Z,
+    which is what `_casting_ring` emits. The face order is the same one
+    `build.lathe` uses for its barrel quads and for the same reason: it is the
+    winding that puts the normals outward, and inward winding is invisible in
+    every render this project takes. `genkart.py`'s signed-volume assertion is
+    what actually catches it, and it can only do that because these are closed.
+
+    There is deliberately **no bevel**. `build.bevel_object` at high detail uses
+    a 4 mm offset, and a cast web standing 6 mm proud would have most of itself
+    chamfered away — the same arithmetic that makes a Ø35 access hole in a 4 mm
+    tray measure 36.2. Chamfers here are authored as their own ring pair, a
+    millimeter or two below the face they break, which also makes them
+    detail-independent.
+    """
+    bm = bmesh.new()
+    made = [[bm.verts.new(point) for point in ring] for ring in rings]
+    count = len(made[0])
+    for index in range(len(made) - 1):
+        lower, upper = made[index], made[index + 1]
+        for step in range(count):
+            following = (step + 1) % count
+            bm.faces.new(
+                (lower[step], lower[following], upper[following], upper[step])
+            )
+    # Reversed at the bottom so it faces -Z, in order at the top so it faces +Z.
+    bm.faces.new(tuple(reversed(made[0])))
+    bm.faces.new(tuple(made[-1]))
+    if transform is not None:
+        bm.transform(transform)
+    obj = build.object_from_bmesh(
+        name, bm, collection, material=material, shade_smooth=shade_smooth
+    )
+    build.set_parent(obj, root)
+    return obj
 
 
 def _disc_profile(radius: float, half_thickness: float) -> list[tuple[float, float]]:
@@ -1773,35 +2180,72 @@ def _crankcase(
     #116's complaint about the crankcase is that it is "a plain box" where a real
     one is "an organic casting: a bell housing round the clutch, cast ribbing, a
     raised bearing boss, a sump profile, visible case-half split line and bolt
-    bosses". Of that list, the two that carry the read at the distances this game
-    uses are the **split line** and the **bell**, and both are silhouette rather
-    than surface — a normal bake cannot supply either. Cast ribbing and bolt
-    bosses are surface, and are left to issue #19.
+    bosses". #212 is the same complaint made again after two milestones, in one
+    sentence: *"the crankcase is basically a cube, that is not realistic."*
+
+    It was a cube because the first answer to #116 took the **split line** and the
+    **bell** as the two things that carry the read, which was right as far as it
+    went, and then left the casting itself as two `build.box` calls. What that
+    misses is that a box has no draft, no corner radius and a flat bottom, and
+    all three of those are silhouette — the one thing a normal bake cannot
+    supply. `CASE_UPPER_STATIONS` has the shape and where it was read off.
+
+    Cast ribbing and bolt bosses are still surface, and are still issue #19's.
     """
     # Upper and lower halves, parted on the crankshaft axis, with the lower one
-    # inset so the upper's bolting flange overhangs it. Two boxes, one shadow
-    # line, and the engine stops being extruded.
-    _block(
-        "engine_crankcase_upper",
-        (CRANKCASE_INBOARD_X, CRANKCASE_REAR_Y, CASE_SPLIT_Z),
-        (CRANKCASE_OUTBOARD_X, CRANKCASE_FRONT_Y, crank_top),
-        context,
-        collection,
-        root,
-        material,
+    # inset so the upper's bolting flange overhangs it. Two lofts, one shadow
+    # line, drafted walls and a sump the engine sits on.
+    center = (
+        (CRANKCASE_INBOARD_X + CRANKCASE_OUTBOARD_X) * 0.5,
+        (CRANKCASE_FRONT_Y + CRANKCASE_REAR_Y) * 0.5,
     )
-    _block(
-        "engine_crankcase_lower",
-        (
-            CRANKCASE_INBOARD_X + CASE_LOWER_INSET,
-            CRANKCASE_REAR_Y + CASE_LOWER_INSET,
-            crank_bottom,
-        ),
-        (
-            CRANKCASE_OUTBOARD_X - CASE_LOWER_INSET,
-            CRANKCASE_FRONT_Y - CASE_LOWER_INSET,
-            CASE_SPLIT_Z,
-        ),
+    segments = context.detail.exhaust_segments
+    for name, stations in (
+        ("engine_crankcase_upper", CASE_UPPER_STATIONS),
+        ("engine_crankcase_lower", CASE_LOWER_STATIONS),
+    ):
+        _loft_object(
+            name,
+            [
+                _casting_ring(
+                    center, half_x, half_y, z, segments, exponent=CASE_EXPONENT
+                )
+                for z, half_x, half_y in stations
+            ],
+            context,
+            collection,
+            root,
+            material,
+        )
+
+    # The deck the barrel bolts to, machined perpendicular to the bore. Its top
+    # ring goes through the same `_lean` the flange does and its bottom ring does
+    # not, so this is the one part in the module built in two frames at once --
+    # which is exactly what it is: a machined face on a cast body.
+    bore = (CYLINDER_AXIS_X, CYLINDER_AXIS_Y)
+    _loft_object(
+        "engine_crankcase_deck",
+        [
+            _casting_ring(
+                bore,
+                CASE_DECK_BOTTOM_HALF[0],
+                CASE_DECK_BOTTOM_HALF[1],
+                CASE_DECK_BOTTOM_Z,
+                segments,
+                exponent=CASE_EXPONENT,
+            ),
+            [
+                _lean(context.params) @ point
+                for point in _casting_ring(
+                    bore,
+                    CASE_DECK_TOP_HALF[0],
+                    CASE_DECK_TOP_HALF[1],
+                    CASE_DECK_TOP_Z,
+                    segments,
+                    exponent=CASE_EXPONENT,
+                )
+            ],
+        ],
         context,
         collection,
         root,
@@ -1972,20 +2416,28 @@ def _cylinder(
     the base-face centre. Authoring fifteen leaned parts by hand is how one of them
     ends up at a different angle from the rest.
 
-    **What the lean does not do is re-cut the crankcase.** §30.4's inclined deck
-    plane is expressed here by the *flange* leaning on a case whose top stays flat
-    at z 240, so the flange's forward corner dips into the casting. That pair is a
-    declared `bolted` joint and gate 1 permits it; a prismatic deck is a crankcase
-    change and this wave did not make one. Recorded so nobody reads the flat top as
-    an oversight.
+    **The lean now re-cuts the crankcase**, which it did not before and which is
+    the first half of #212. This docstring used to argue the other way: that the
+    flange leaning on a case whose top stayed flat at z 240 was a declared
+    `bolted` joint gate 1 permitted, and that a prismatic deck was a crankcase
+    change this wave had not made. Both sentences were true and the conclusion
+    was wrong — two planes 25 degrees apart cross once and diverge either side of
+    the crossing, so half that joint was 33 mm of daylight under a cylinder.
+    `engine_crankcase_deck` is the prismatic deck, and `CASE_DECK_TOP_Z` carries
+    the arithmetic.
     """
     axis = (CYLINDER_AXIS_X, CYLINDER_AXIS_Y)
     lean = _lean(context.params)
+    segments = context.detail.exhaust_segments
 
-    _block(
+    _loft_object(
         "engine_cylinder_base",
-        (axis[0] - CYLINDER_BASE_HALF[0], axis[1] - CYLINDER_BASE_HALF[1], crank_top),
-        (axis[0] + CYLINDER_BASE_HALF[0], axis[1] + CYLINDER_BASE_HALF[1], CYLINDER_BASE_TOP_Z),
+        [
+            _casting_ring(
+                axis, half_x, half_y, z, segments, exponent=BASE_EXPONENT
+            )
+            for z, half_x, half_y in BASE_STATIONS
+        ],
         context,
         collection,
         root,
@@ -2012,26 +2464,30 @@ def _cylinder(
             transform=lean,
         )
 
-    # The jacket. Slightly barrelled — widest just above the flange and drawn in
-    # again at the top — because a sand casting has draft on it and a perfect
-    # cylinder reads as turned bar.
-    _lathe_object(
+    # The jacket. Still barrelled — widest just above the flange and drawn in
+    # again at the top — but no longer a revolution: a squared water jacket with
+    # four cast corner webs, squaring up as it comes down and rounding off under
+    # the head. `JACKET_STATIONS` has the section and the photographs.
+    _loft_object(
         "engine_cylinder",
         [
-            (0.0, CYLINDER_BASE_TOP_Z - 0.004),
-            (CYLINDER_RADIUS - 0.004, CYLINDER_BASE_TOP_Z - 0.004),
-            (CYLINDER_RADIUS, CYLINDER_BASE_TOP_Z + 0.006),
-            (CYLINDER_RADIUS, CYLINDER_TOP_Z - 0.020),
-            (CYLINDER_RADIUS - 0.003, CYLINDER_TOP_Z - 0.006),
-            (HEAD_RADIUS + 0.002, CYLINDER_TOP_Z),
-            (0.0, CYLINDER_TOP_Z),
+            _casting_ring(
+                axis,
+                half,
+                half,
+                z,
+                segments,
+                exponent=exponent,
+                web_proud=JACKET_WEB_PROUD * web,
+                web_span=JACKET_WEB_SPAN,
+                web_edges=True,
+            )
+            for z, half, exponent, web in JACKET_STATIONS
         ],
-        (axis[0], axis[1], 0.0),
         context,
         collection,
         root,
         material,
-        axis="Z",
         transform=lean,
     )
 
@@ -2164,25 +2620,42 @@ def _head(
     All of it is **carried by the cylinder's 25 degree lean**, which is why every
     part here takes the same `transform`: the head bolts to the barrel, so it cannot
     have an orientation of its own.
+
+    `head_top` is asserted rather than used, because the head's own top is now the
+    last row of `HEAD_STATIONS` and the two must not be allowed to drift apart:
+    `engine_height` still sets how tall the engine is, and a shape table that
+    silently stopped honoring it would be a parameter that no longer does
+    anything.
     """
     axis = (CYLINDER_AXIS_X, CYLINDER_AXIS_Y)
     lean = _lean(context.params)
+    # The *highest* station rather than the last one: the table runs on past the
+    # crown and back down into the plug bore, so `[-1]` is the bore's floor.
+    crown = max(station[0] for station in HEAD_STATIONS)
+    assert abs(crown - head_top) < 1e-9, (
+        "HEAD_STATIONS crowns at %.4f and engine_height puts the head at %.4f"
+        % (crown, head_top)
+    )
 
-    _lathe_object(
+    _loft_object(
         "engine_head",
         [
-            (0.0, CYLINDER_TOP_Z),
-            (HEAD_RADIUS, CYLINDER_TOP_Z),
-            (HEAD_RADIUS, head_top - 0.010),
-            (HEAD_RADIUS - 0.007, head_top),
-            (0.0, head_top),
+            _casting_ring(
+                axis,
+                half,
+                half,
+                z,
+                context.detail.exhaust_segments,
+                exponent=HEAD_EXPONENT,
+                lobes=HEAD_LOBE_COUNT,
+                lobe_amplitude=lobe,
+            )
+            for z, half, lobe in HEAD_STATIONS
         ],
-        (axis[0], axis[1], 0.0),
         context,
         collection,
         root,
         material,
-        axis="Z",
         transform=lean,
     )
 
@@ -2193,7 +2666,7 @@ def _head(
             (
                 axis[0] + math.cos(angle) * HEAD_BOLT_CIRCLE,
                 axis[1] + math.sin(angle) * HEAD_BOLT_CIRCLE,
-                head_top - 0.002,
+                HEAD_DECK_Z - 0.002,
             ),
             HEAD_NUT_FLATS,
             0.009,
@@ -2271,14 +2744,19 @@ def _spark_plug(
     alloy = context.material("engine_cast")
     lean = _lean(context.params)
 
-    boss_top = head_top + PLUG_BOSS_HEIGHT
+    # **Down the bore, not on top of the head.** This was a boss standing proud of
+    # a flat head top; the head crowns now and carries a 13 mm plug well, so the
+    # part that used to be the boss is the machined seat at the bottom of it. Its
+    # foot is 0.5 mm under the well's floor, which is what keeps the `welded`
+    # declaration to `engine_head` a contact rather than a claim.
+    boss_top = PLUG_SEAT_Z + PLUG_BOSS_HEIGHT
     _lathe_object(
         "engine_plug_boss",
         [
-            (0.0, head_top - 0.004),
-            (PLUG_BOSS_RADIUS, head_top - 0.004),
-            (PLUG_BOSS_RADIUS, boss_top - 0.003),
-            (PLUG_BOSS_RADIUS - 0.004, boss_top),
+            (0.0, PLUG_SEAT_Z - 0.0005),
+            (PLUG_BOSS_RADIUS, PLUG_SEAT_Z - 0.0005),
+            (PLUG_BOSS_RADIUS, boss_top - 0.002),
+            (PLUG_BOSS_RADIUS - 0.003, boss_top),
             (0.0, boss_top),
         ],
         (axis_x, axis_y, 0.0),
