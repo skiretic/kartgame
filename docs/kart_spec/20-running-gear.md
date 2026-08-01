@@ -301,6 +301,16 @@ authored 6.0. Net visible change: the flange lip shrinks 1 mm and the bead seat
 0.35 mm in radius. `genkart.sh --check` and gate 1/gate 2 are the only gates that
 see it.
 
+**The face plate carries five oblong vent slots** (part 5 of the sculpt wave,
+ADR-0062's intent rule applied): `estimated` and deliberately generic — every
+reference magnesium wheel is vented and no manufacturer's exact cutout is
+copied. Slots span radii 30–50 of the plate's 16–60 dish at half the angular
+period, `wheels.VENT_*`. True through-holes, boolean-free: the plate is a
+hand-built revolution grid whose vent boundaries are exact stations at both
+detail levels, every hole edge stitched, and the winding gate counts all four
+wheels watertight with positive volume — the vents are inside the gate's
+coverage, not an exception to it. New construction, no dimension moved.
+
 ### 20.2.3 The sidewall bulge: also visual, also fixable now
 
 `tire_sidewall_bulge = 0.008` is documented precisely — the widest point sits at

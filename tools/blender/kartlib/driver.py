@@ -434,15 +434,19 @@ GLOVE_ALONG_RIM: float = 0.105
 #: 19). `estimated` at 4 mm *inside* the tube surface: fingers squeeze a foam
 #: grip, and the overlap is also what keeps the declared `grips` contact
 #: measuring zero rather than riding `CONTACT_TOLERANCE`'s 2 mm edge.
-GLOVE_WRAP_INNER: float = 0.015
+GLOVE_WRAP_INNER: float = 0.011
+#: 11 mm: inside the tube surface in every direction, including the squashed
+#: axial half-height 0.82 x 14.5 = 11.9 mm. It was 15, chosen against the old
+#: 38 mm tube whose axial half was 17.1 -- a wrap inner that pokes past the
+#: tube's fore-aft faces is a visible daylight ring between glove and grip.
 
 #: The palm-and-fingers band, as knots of `(wrap angle deg, outer radius)`.
 #: Angle 0 is outboard on the rim's cross-section, positive toward the driver's
 #: side of the wheel plane. Knots ascend because `_wrap_loft`'s winding proof
 #: assumes the sweep runs with +phi: the band starts at the fingertips tucked
 #: behind the far side (-115, where a fingertip is barely thicker than the
-#: glove), comes over the outboard knuckles (+20, the thickest station — tube 19
-#: plus ~23 of hand, glove and padding), and ends at the palm heel on the
+#: glove), comes over the outboard knuckles (+20, the thickest station — tube 16
+#: plus ~26 of hand, glove and padding), and ends at the palm heel on the
 #: driver's side (+100). All `estimated` against a 25-30 mm deep gloved hand.
 GLOVE_FINGER_KNOTS: tuple[tuple[float, float], ...] = (
     (-115.0, 0.026),

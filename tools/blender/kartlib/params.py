@@ -929,11 +929,18 @@ class KartParams:
     wheels sell at 280/300/320/340 and the side-view trace scales to 306 mm,
     which picks 320 out of that list."""
 
-    wheel_rim_thickness: float = 0.038
-    """Padded grip section, across the foam. `derived`: red-grip mask 21 px of
-    vertical chord corrected for the 40 deg axis lean = 44 mm raw, less a pixel
-    of soft edge each side, so 38 ±6. Was 0.024, 14 mm thin -- kart grips are
-    genuinely chunky."""
+    wheel_rim_thickness: float = 0.029
+    """Padded grip section, across the foam. `derived`: tube/OD ratio measured
+    on two references and both agree at ~0.10. `crg_roadrebel_steering.webp`,
+    radial scan through the wheel center along the apparent major axis: orange
+    grip runs 47.7 and 56.5 px against 510 px outer span, 0.094-0.111 (the
+    lower run crosses the stitched seam, so the low end is the cleaner read).
+    `vlr_emerald_2025_full.jpg`, near edge-on: tube ~22 px against a ~232 px
+    ring span, 0.096. 0.10 x 320 = 32 +-3; 29 is the thin edge of that band,
+    picked by Anthony's eye against the built render -- 32 still read thick.
+    Was 0.038 off a 21 px mask in `tonykart_racer401T_p05.jpg` (+-6 by its own
+    arithmetic) and 0.024 before that: both this number's previous lives came
+    from single sources."""
 
     column_length: float = 0.490
     """Overall column length, threaded tip to open top. `sourced`: OTK "38/50

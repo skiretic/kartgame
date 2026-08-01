@@ -344,14 +344,33 @@ WHEEL_SPOKE_ANGLES: tuple[float, float, float] = (
 #: `estimated` off `crg_roadrebel_steering.webp`, where an arm's width at the rim
 #: is about 0.42 of the boss diameter.
 #:
-#: The teardrop cutouts themselves are **not modeled**, and that is a stated
-#: omission rather than an oversight: they are interior holes in a 8 mm plate,
-#: they need the plate authored as a boundary with islands, and at the ~0.55 m the
-#: cockpit camera sits from the rim the arm *width* is the difference that reads.
-#: Issue #199 carries it.
+#: The cutouts ARE modeled now (part 7, closing #199's stated omission): each
+#: arm is four overlapping closed prisms -- inner bridge, outer bridge, two
+#: side rails -- so the window is real daylight without authoring a boundary
+#: with islands, every prism stays watertight for the winding gate, and the
+#: 6 mm overlaps keep any two faces from being coincident. Rail width 13 mm,
+#: window spanning the middle ~55% of the arm's radial run, `estimated` off
+#: `crg_roadrebel_steering.webp`.
 WHEEL_SPOKE_THICKNESS = 0.008
 WHEEL_SPOKE_WIDTH_INNER = 0.052
 WHEEL_SPOKE_WIDTH_OUTER = 0.044
+WHEEL_SPOKE_RAIL = 0.013
+WHEEL_SPOKE_WINDOW: tuple[float, float] = (0.062, 0.118)
+WHEEL_SPOKE_LAP = 0.006
+
+#: The six boss bolts, the hardware a bolted disc actually shows: bolt circle,
+#: hex head across-flats radius, head height. `estimated` -- every reference
+#: boss carries six heads on a circle just inside the flange edge.
+WHEEL_BOSS_BOLT_CIRCLE = 0.027
+WHEEL_BOSS_BOLT_RADIUS = 0.0048
+WHEEL_BOSS_BOLT_HEIGHT = 0.0045
+
+#: Grip cross-section squash along the wheel axis: a kart grip is flattened
+#: fore-aft, not a circle. 0.82 is what the section photographs read. The 0.90
+#: this started at existed because the 38 mm tube squashed deeper moved its
+#: rear face 3.4 mm against the gate-3 glove rows; at the re-measured 32 mm
+#: tube the whole section sits smaller and 0.82 clears. Part 7.
+WHEEL_GRIP_AXIAL_SCALE = 0.82
 
 #: How far forward of the rim plane the boss sits — the wheel's dish.
 #:
@@ -787,6 +806,7 @@ def _sweep_closed_planar(
     plane_normal: Vector,
     radius: float,
     segments: int,
+    axial_scale: float = 1.0,
 ) -> None:
     """Sweep a circle along a closed *planar* path, with no seam.
 
@@ -813,7 +833,7 @@ def _sweep_closed_planar(
         ring: list[bmesh.types.BMVert] = []
         for step in range(segments):
             angle = 2.0 * math.pi * step / segments
-            offset = plane_normal * (math.cos(angle) * radius) + across * (
+            offset = plane_normal * (math.cos(angle) * radius * axial_scale) + across * (
                 math.sin(angle) * radius
             )
             ring.append(bm.verts.new(path[index] + offset))
@@ -1275,7 +1295,12 @@ def _steering(
 
     bm = bmesh.new()
     _sweep_closed_planar(
-        bm, rim_path, wheel_axis, p.wheel_rim_thickness * 0.5, detail.tube_segments
+        bm,
+        rim_path,
+        wheel_axis,
+        p.wheel_rim_thickness * 0.5,
+        detail.tube_segments,
+        axial_scale=WHEEL_GRIP_AXIAL_SCALE,
     )
     rim = build.object_from_bmesh(
         "steering_rim",
@@ -1330,20 +1355,43 @@ def _wheel_spokes(
         # Plate axes: along the spoke, and across it in the wheel's plane.
         along = right * radial.x + up * radial.y
         across = right * (-radial.y) + up * radial.x
-        _extruded_polygon(
-            bm,
-            [
-                (inner_radius, WHEEL_SPOKE_WIDTH_INNER * 0.5),
-                (length, WHEEL_SPOKE_WIDTH_OUTER * 0.5),
-                (length, -WHEEL_SPOKE_WIDTH_OUTER * 0.5),
-                (inner_radius, -WHEEL_SPOKE_WIDTH_INNER * 0.5),
-            ],
-            center,
-            along,
-            across,
-            axis,
-            WHEEL_SPOKE_THICKNESS,
-        )
+
+        def width_at(r: float) -> float:
+            t = (r - inner_radius) / (length - inner_radius)
+            return (
+                WHEEL_SPOKE_WIDTH_INNER
+                + (WHEEL_SPOKE_WIDTH_OUTER - WHEEL_SPOKE_WIDTH_INNER) * t
+            ) * 0.5
+
+        def strip(r0: float, r1: float, fraction_a: float, fraction_b: float) -> None:
+            # A tapered quad from radius r0 to r1; the two sides are signed
+            # fractions of the local half-width, so every strip tapers with
+            # the arm's own outline.
+            _extruded_polygon(
+                bm,
+                [
+                    (r0, fraction_a * width_at(r0)),
+                    (r1, fraction_a * width_at(r1)),
+                    (r1, fraction_b * width_at(r1)),
+                    (r0, fraction_b * width_at(r0)),
+                ],
+                center,
+                along,
+                across,
+                axis,
+                WHEEL_SPOKE_THICKNESS,
+            )
+
+        w0, w1 = WHEEL_SPOKE_WINDOW
+        lap = WHEEL_SPOKE_LAP
+        rail_fraction = 1.0 - WHEEL_SPOKE_RAIL / width_at((w0 + w1) * 0.5)
+        # Four overlapping closed prisms: two bridges at full width, two side
+        # rails framing the window. Overlaps keep faces non-coincident and
+        # every prism watertight -- see the WHEEL_SPOKE_* comment.
+        strip(inner_radius, w0 + lap, -1.0, 1.0)
+        strip(w1 - lap, length, -1.0, 1.0)
+        for side in (-1.0, 1.0):
+            strip(w0, w1, side, side * rail_fraction)
 
     spokes = build.object_from_bmesh(
         "steering_spokes", bm, collection, material=context.material("engine_cast")
@@ -1382,6 +1430,28 @@ def _wheel_boss(
 
     bm = bmesh.new()
     build.lathe(bm, profile, context.detail.tube_segments, axis="Z")
+    # The six hex heads on the bolt circle -- six segments and flat shading is
+    # the hardware pattern the engine covers use. Phased half a pitch so no
+    # head lands under a spoke's centerline.
+    for index in range(6):
+        angle = 2.0 * math.pi * (index + 0.5) / 6
+        head = [
+            (0.0, 0.011),
+            (WHEEL_BOSS_BOLT_RADIUS, 0.011),
+            (WHEEL_BOSS_BOLT_RADIUS, 0.011 + WHEEL_BOSS_BOLT_HEIGHT),
+            (0.0, 0.011 + WHEEL_BOSS_BOLT_HEIGHT),
+        ]
+        build.lathe(
+            bm,
+            head,
+            6,
+            axis="Z",
+            center=(
+                WHEEL_BOSS_BOLT_CIRCLE * math.cos(angle),
+                WHEEL_BOSS_BOLT_CIRCLE * math.sin(angle),
+                0.0,
+            ),
+        )
     bm.transform(
         Matrix.Translation(center) @ Matrix((right, up, axis)).transposed().to_4x4()
     )

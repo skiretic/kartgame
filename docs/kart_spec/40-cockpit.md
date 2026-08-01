@@ -337,7 +337,8 @@ a wheel ends up skewed on its own column — `cockpit._column_frame`'s existing
 instinct is right, it just needs the delta.
 
 ### `steering_rim`, `steering_spokes`, `steering_boss`
-**Status:** built — geometry stands; four numbers change
+**Status:** built — part 7 sculpt (2026-07-31): windowed spoke plate, bolted
+boss, grip re-measured thin and flattened; Anthony's sign-off on the board
 **Attaches to:** `steering_spokes` <-> `steering_rim` (welded),
 `steering_spokes` <-> `steering_boss` (welded), `steering_boss` <->
 `steering_hub_wedge` (bolted, 6x M6)
@@ -350,10 +351,13 @@ protrude >20 mm ahead of its front plane); Art. 9.5.3 via §4 of the front matte
 | dimension | field | value | prov | basis |
 | --- | --- | --- | --- | --- |
 | outside diameter | `wheel_diameter` | 320 | `sourced` size, `derived` choice | Kart wheels sell at 280/300/320/340. Seen edge-on in the side view the rim's trace is a straight segment of true length D: endpoints scale to 204.8 x 227.1 mm = **306 mm**, which picks 320 out of that list rather than 300 or 340. `wheel_diameter = 0.320` is the one steering number in `params.py` that is already right. |
-| padded grip section | `wheel_rim_thickness` | 38 | `derived` | red-grip mask, 21 px vertical chords corrected for the 40° axis lean = 16.1 px perpendicular ≈ 44 mm raw; the mask over-reads a soft foam edge by a pixel each side, so 38 ±6. Kart grips are genuinely chunky. **`wheel_rim_thickness = 0.024` is 14 mm thin.** |
-| bare rim tube | — | 20 | `estimated` | never visible under the foam; the usual round tube for a steel or aluminium rim, and consistent with 38 mm padded over ~9 mm of foam per side. |
-| spokes | — | 3 flat plates, two upper diagonals and one lower | `derived` | the bare-chassis plan view and the CRG close-up both show a single flat drilled centre plate with three arms, not a cast hub. Matches `WHEEL_SPOKE_ANGLES`. |
-| rim shape | `WHEEL_OUTLINE` | butterfly, straight top third, chord across the bottom | `sourced` (permitted) + `derived` (shape) | Art. 4.5.1 permits the straight thirds; both the CRG and OTK wheels in the repo's photographs have a straight top. The built 39.8 mm dip is the feature that has to read at 0.55 m and it stays. |
+| padded grip section | `wheel_rim_thickness` | 29 | `derived` | tube/OD ratio ≈ 0.10 on two references: `crg_roadrebel_steering.webp` radial scan through the wheel center, grip runs 47.7/56.5 px on a 510 px span (0.094–0.111, the fat run crosses the stitched seam); `vlr_emerald_2025_full.jpg` near edge-on, ~22 px tube on a ~232 px ring (0.096). 0.10 × 320 = 32 ±3; 29 is the thin edge of the band, picked by eye against the built render. Supersedes 38 (single 21 px mask, ±6) and 0.024 before that — both previous lives were single-source. |
+| grip fore-aft squash | `cockpit.WHEEL_GRIP_AXIAL_SCALE` | 0.82 | `derived` | a kart grip is flattened along the wheel axis, not round; 0.82 is what the section photographs read. The 0.90 it shipped at existed only because the old 38 mm tube squashed deeper fouled the gate-3 glove rows; the 29 mm tube clears at 0.82. |
+| bare rim tube | — | 20 | `estimated` | never visible under the foam; the usual round tube for a steel or aluminium rim, and consistent with 29 mm padded over ~4.5 mm of foam per side. |
+| spokes | — | 3 flat plates, two upper diagonals and one lower, windowed | `derived` | the bare-chassis plan view and the CRG close-up both show a single flat drilled centre plate with three arms, not a cast hub. Matches `WHEEL_SPOKE_ANGLES`. |
+| spoke windows | `cockpit.WHEEL_SPOKE_RAIL` 13, `WHEEL_SPOKE_WINDOW` (62, 118) | one cutout per arm over the middle ~55% of its radial run | `estimated` | off `crg_roadrebel_steering.webp` — the arm is wide with material removed as interior cutouts, not tapered to a stick. Built as four overlapping watertight prisms per arm (part 7, closes #199's stated omission) so the winding gate still covers the plate. |
+| boss bolts | `cockpit.WHEEL_BOSS_BOLT_*` | 6 hex heads, Ø54 bolt circle, head 9.6 across flats × 4.5 proud | `estimated` | every reference boss carries six heads on a circle just inside the flange edge; the 6-hole count itself is `sourced` (OTK "STEER.WHEEL HUB - 6 HOLE", §40.2 hub row). Phased off the spoke angles so no head lands under an arm root. |
+| rim shape | `WHEEL_OUTLINE` | round, height/width 0.975, slight bottom flat | `derived` | both primary references show a **round** rim: `crg_roadrebel_steering.webp` (continuous arc, no dip) and `tonykart_racer401T_p05.jpg` top-down (clean circle; the four red segments are grip pads, not lobes — the two-tone trap that produced the old butterfly outline). Art. 4.5.1's straight-thirds *permission* is not evidence of shape. |
 | dish, rim plane ahead of the boss face | `WHEEL_DISH` | 15 | `estimated` | not separable from the hub stack in a side view at 2.9 mm/px. Kart wheels are close to flat; 15 mm clears the hub bolt heads. **`cockpit.WHEEL_DISH = 0.048` is 3.2x this**, and it is subtracted from the wheel centre to find the column's top, so it shortens the column by 33 mm as a side effect. |
 | hub stack, along the axis | `hub_stack` | 25 | `derived` | side view: the rim centre sits 16.9 mm rearward and 17.5 mm above the column's top end = 24 mm back along the axis. OTK sells it as a stack — hub, spacer, inclined spacer. |
 | top of the wheel, absolute | — | 613 | `derived` | 496 + (320/2) x cos 43° = 496 + 117. **Checks against Art. 9.1.1's 650 mm chassis height without the seat (PDF p. 22): 37 mm of margin.** Also the plane Art. 9.5.3 puts the front panel below, 50 mm clear. |
@@ -972,7 +976,7 @@ tolerance, not by a nudge.
     wheel_incline_delta = 0.122                 # new: the inclined hub is a real part
     upper_bore          = (0.0, 0.262, 0.393)   # new, and derivable at 366 mm up-axis
     # wheel_center_y / wheel_center_z: DELETE as authored; derive to (0, 0.187, 0.496)
-    wheel_rim_thickness = 0.038                 # was 0.024
+    wheel_rim_thickness = 0.029                 # was 0.024, then 0.038; part-7 two-ref re-measure
 
     # seat
     seat_z              = 0.032                 # was 0.075
