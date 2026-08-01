@@ -850,38 +850,60 @@ of the chassis frame, ahead of the seat and behind the rotation axis of the fron
 wheels."*
 
 ### `fuel_tank`
-**Status:** new
+**Status:** rebuilt at the sculpt wave — ADR-0063, a section loft, not three
+boxes wearing a bevel; envelope shrunk twice at Anthony's sign-off
 **Attaches to:** `chassis_floor_tray` (seated — it sits on the tray),
-`fuel_tank_strap_front` and `_rear` (clamped), `fuel_tank_filler` (threaded)
+`fuel_tank_strap_front` and `_rear` (clamped), `fuel_tank_mount_*` (seated —
+the four anchor tabs stand against the flanks and locate the tank),
+`fuel_tank_filler` (threaded)
 **Envelope:** Art. 4.7 in full — securely fixed, flexible pipes, no
 pressurization other than the fuel pump, and **not shaped to act as an
 aerodynamic device**. Art. 9.3 — capacity.
-**Verification:** gate 1 (three neighbors it must clear: `steering_column`,
-`seat_shell`, both rails), gate 2 (four declared joints)
+**Verification:** gate 1 (neighbors it must clear: `steering_column`,
+`seat_shell`, both rails), gate 2 (declared joints), winding gate (one
+watertight shell)
 
 | dimension | field | value | prov | basis |
 | --- | --- | --- | --- | --- |
 | capacity | `tank_capacity` | 8.5 L | `sourced` | OTK **0073.EA** "Fuel tank, KZ, 8.5 Litre"; KG SER.003 and CKR also sell 8.5. Art. 9.3's minimum is 8, so 8.5 is the catalog size that clears it. |
-| outer size | `tank_size` | 255 W x 250 D x 230 H | `estimated` | must fit between the rails, and 255 x 250 x 230 is 14.7 L of bounding box of which 8.5 L is 58% — the right fraction for a body radiused on every edge and waisted at the bottom front, which is what the 0073.EA photo shows. |
-| centre | `tank_center` | (0, +225, +184) | `derived` | Art. 4.7, three clauses at once: between the main tubes -> x 0; behind the front wheel axis (+525) -> front face +350, **175 mm clear**; ahead of the seat (lip +30) -> rear face +100, **70 mm clear**. z from the tray: bottom = tray top 69, so centre = 69 + 115 = 184 and top = 299. **Every one of the three coordinates is forced by the article, which is why this is `derived` and not `estimated`.** |
-| lateral clearance to the rails | — | 170 per side | `derived` | rail centerline interpolates to x 297 at y +225; half-width 127.5. |
-| **steering column relief** | — | notch above z 265, y +325…+350, 70 wide on the centerline | `derived` | the column's height along its axis is z(y) = 97 + 1.3763 (477 - y). At the tank's front face y 350 that is z **271.8**, and it crosses the tank's top plane z 299 at y **330.2**. So the mandated position drives the column through the tank's top-front corner over 20 mm of y and 27 mm of z. The real molding is *"waisted at the bottom front to clear the steering column and the shins"* (`sourced` as a shape, 0073.EA photo) — this is the same feature, and it has to be **real geometry, not a declared joint**, because a joint would permit the interpenetration gate 1 exists to catch. Ø20 column plus 25 mm of clearance per side = 70 mm wide. |
-| shape | — | waisted at the bottom front, widest at the top, molded strap channels | `sourced` (shape) | 0073.EA photo. It sits between the driver's legs; Art. 4.7 forces the position that causes the shape. |
+| outer size | `tank_width/depth/height` | 228 W x 240 D x 201 H | `estimated` | 255 x 250 x 230 shrunk ~7% at the first sign-off, then width and height another 5% with the draft deepened to 0.88 at the second — the eye's call against the reference tanks both times. The lost volume is bought back **forward**: depth 235 -> 240 entirely on the front face, the least-visible dimension and the one with 185 mm of slack to its clause. Measured off the built mesh: **9.18 L shell, ~8.4 L inside a 3 mm wall** — ullage is gone, the molding holds the sourced 8.5 L brim-full, and this envelope is the floor: smaller argues with `tank_capacity`. |
+| centre | `tank_center` | (0, +220, +169.5) | `derived` | Art. 4.7, three clauses at once: between the main tubes -> x 0; ahead of the seat (lip +30) -> rear face +100, **70 mm clear** (the tight side — depth moves only at the front); behind the front wheel axis (+525) -> front face +340, **185 mm clear**. z from the tray: bottom = tray top 69, so centre = 69 + 100.5 = 169.5 and top = 270. **Every one of the three coordinates is forced by the article, which is why this is `derived` and not `estimated`.** |
+| lateral clearance to the rails | — | ≥70 per side | `derived` | the rail centerline interpolates `frame_half_strut` 286 at y +40 to `frame_half_waist` 139 at y +375 (the 297-at-+225 figure a previous revision carried was wrong — the frame waists harder than that). Tightest at the rear strap station y +282: rail at 180, built flank at 110. |
+| **steering column relief** | — | notch 22 deep, plateau half-width 20 feathered to \|x\| 55, ramping in over y +300…+335 | `derived` | the column's Ø20 **lower** surface is z(y) = 87 + 1.376 (477 − y), which only reaches the shrunk top plane z 270 at y **344** — past the front face at 340 — so the shell now clears the column by 5+ mm with no notch at all. The notch is kept as the molded relief both references show (*"waisted at the bottom front to clear the steering column and the shins"*, `sourced` as a shape, 0073.EA photo), and it is **real geometry, not a declared joint**, because a joint would permit the interpenetration gate 1 exists to catch. |
+| shape | — | superellipse section loft, draft 0.88 (top pulls in 12% against the base), molded sticker recess, waisted at the bottom front | `sourced` (shape) | 0073.EA photo and both reference tanks; construction per ADR-0063, values in `cockpit.TANK_*`. |
 | fittings | — | **three** on the top rear: feed, return, vent, Ø8 nipples | `sourced` | *the KZ tank differs from the OK tank by an extra fitting for a return line* — that is the distinguishing feature of this part and it is the reason not to reuse an OK tank. The 0073.EA photo shows two red-collared fittings plus one bare nipple. Modeled as molded bosses on this mesh rather than as three separate parts, which is a mesh-count decision and not a claim about the real part. |
 
 ### `fuel_tank_strap_front`, `fuel_tank_strap_rear`
-**Status:** new
-**Attaches to:** `fuel_tank` (clamped), `chassis_rail_l` and `chassis_rail_r`
-(clamped)
+**Status:** rebuilt twice at the sculpt wave — Ø25 tube -> flat webbing ->
+dead-vertical drop onto anchor tabs (the rail fan-out was rejected twice)
+**Attaches to:** `fuel_tank` (clamped), `fuel_tank_mount_front_?` /
+`_rear_?` (clamped — per-strap declarations, because a glob pair is a
+cross-product and the gate demanded the front strap touch the rear tabs)
 **Envelope:** Art. 4.7 — securely fixed; *"A quick attachment to the chassis is
 strongly recommended."*
-**Verification:** gate 2, three declared contacts each
+**Verification:** gate 2, three declared contacts each; drop verticality
+measured off the built mesh (2 mm of x spread = the webbing's own thickness)
 
 | dimension | value | prov | basis |
 | --- | --- | --- | --- |
 | count | two, over the top | `estimated` | the 0073.EA photo shows two molded strap channels; the count follows the channels. |
-| positions | y +310 and y +140 | `derived` | over the channels, inboard of the tank's front and rear faces by 40 mm. |
+| positions | y +282 and y +196 | `derived` | over the channels (`TANK_STRAP_Y`), inboard of the tank's faces; the +310/+140 figures a previous revision carried predate the depth shrink. |
 | section | 25 x 2 nylon-reinforced strap, cam buckle | `estimated` | a quick attachment per Art. 4.7's recommendation; a bolted steel band would satisfy the article and lose the recommendation. |
+| routing | flank-hugging over the top, then **dead vertical** down each flank onto its tab — no run out to the rails | `sourced` (shape) | neither reference shows webbing splayed off the tank's shoulders; the rails sit 60–100 mm outboard at these stations and the old diagonal feet were the rejected fan-out. |
+
+### `fuel_tank_mount_front_l/r`, `fuel_tank_mount_rear_l/r`
+**Status:** new at the sculpt wave sign-off (ADR-0063 amendment)
+**Attaches to:** `chassis_floor_tray` (bolted — foot flange, an M5 pair
+through the pan; Art. 4.6 permits holes to 10 mm, so the pan is drilled and
+not slotted), `fuel_tank` (seated — the plates stand against the flank's
+widest belt and locate the tank sideways), its strap (clamped)
+**Envelope:** Art. 4.7 — the structure the *"quick attachment"* pulls against
+**Verification:** gate 2, three declared contacts each
+
+| dimension | value | prov | basis |
+| --- | --- | --- | --- |
+| form | stamped steel L-tab: 3 plate, 30 wide, top at z 130, foot flange 22 outboard | `estimated` | proportions of a stamped strap bracket; 30 wide carries the 25 webbing with a rim. The plate top sits just above the flank's widest belt (z 90–130 off the built section) so the strap wraps the tab's outer face rather than threading behind it. |
+| plate face | at the flank's widest x per station, embedded 0.5 | `derived` | read off each strap station's own section ring at build time, so the tabs follow the envelope wherever the eye moves it next. |
 
 ### `fuel_tank_filler`
 **Status:** new
@@ -891,9 +913,9 @@ strongly recommended."*
 
 | dimension | value | prov | basis |
 | --- | --- | --- | --- |
-| centre | (0, +140, +299) | `estimated` | top face, rearward third, on the centerline — reached between the legs past the steering wheel. The 401T side view shows the red cap at the tank's top-rear corner. |
+| centre | (0, +138, +270) | `estimated` | top face, rearward third, on the centerline — reached between the legs past the steering wheel. The 401T side view shows the red cap at the tank's top-rear corner. |
 | size | Ø60 x 25 tall | `estimated` | 0073.EA photo proportions. |
-| top of the cap | z 324 | `derived` | 299 + 25. Well under Art. 9.1.1's 650. |
+| top of the cap | z 295 | `derived` | 270 + 25. Well under Art. 9.1.1's 650. |
 
 ### `fuel_line_feed`, `fuel_line_return`
 **Status:** new
@@ -955,7 +977,9 @@ possibility and the model may not assume the input can be cut electrically.
 | `pedal_mount_?` <-> `chassis_cross_pedal` | clamped | **replaces** `pedal_mount_? <-> chassis_cross_front`; closes the 5.2 mm waiver |
 | `fuel_tank` <-> `chassis_floor_tray` | seated | new |
 | `fuel_tank` <-> `fuel_tank_strap_?` | clamped | new |
-| `fuel_tank_strap_?` <-> `chassis_rail_?` | clamped | new |
+| `fuel_tank_strap_(front\|rear)` <-> `fuel_tank_mount_(front\|rear)_?` | clamped | **replaces** `fuel_tank_strap_? <-> chassis_rail_?` at the sculpt wave — the straps anchor on their own tabs, not the rails (ADR-0063 amendment) |
+| `fuel_tank_mount_*` <-> `chassis_floor_tray` | bolted | new at the sculpt wave |
+| `fuel_tank` <-> `fuel_tank_mount_*` | seated | new at the sculpt wave — the tabs locate the tank |
 | `fuel_tank` <-> `fuel_tank_filler` | threaded | new |
 | `fuel_tank` <-> `fuel_line_?` | routed | new |
 

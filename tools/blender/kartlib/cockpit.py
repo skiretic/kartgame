@@ -549,19 +549,180 @@ SHIFT_SELECTOR_JOINT = (0.215, -0.205, 0.100)
 #:
 #: **The notch is geometry, not a joint.** Art. 4.7 mandates the position -- between
 #: the main tubes, ahead of the seat, behind the front wheel axis -- and that
-#: position drives the steering column through the tank's top-front corner: the
-#: column's height along its axis is `z(y) = 97 + 1.3763 (477 - y)`, which is 271.8
-#: at the tank's front face y 350 and crosses the tank's top plane z 299 at y 330.2.
-#: So the interference is 20 mm of y and 27 mm of z, and a real molding is *"waisted
-#: at the bottom front to clear the steering column and the shins"* (`sourced` as a
-#: shape, the 0073.EA photo). Cutting it is the honest build; declaring a joint would
-#: *permit* the interpenetration gate 1 exists to catch.
-TANK_NOTCH_WIDTH = 0.070
+#: position runs the steering column right over the tank's top-front corner: the
+#: column's height along its axis is `z(y) = 97 + 1.3763 (477 - y)`, which is 285.6
+#: at the tank's front face y 340 against a top plane of 270 -- the shrunk envelope
+#: clears the column outright, and the notch survives as the molded relief a real
+#: tank is *"waisted at the bottom front to clear the steering column and the
+#: shins"* with (`sourced` as a shape, the 0073.EA photo). Cutting it is the honest
+#: build; declaring a joint would *permit* the interpenetration gate 1 exists to
+#: catch.
 TANK_FILLER_DIAMETER = 0.060
 TANK_FILLER_HEIGHT = 0.025
 TANK_STRAP_Y = (0.282, 0.196)
 TANK_STRAP_SECTION = (0.025, 0.002)
 TANK_FITTING_DIAMETER = 0.008
+
+#: The strap anchors. The webbing goes **straight down the flanks** onto four
+#: steel L-tabs standing on the pan beside the tank -- no run out to the rails
+#: at all: the rails sit 60-100 mm outboard of the flank at the strap stations,
+#: and a strap splayed out to them is the fan-out both references lack and the
+#: read that was rejected twice. The tabs earn their place doubly: the plate
+#: stands against the flank's widest belt (z 90-130 measured off the built
+#: section), so the pair also locates the tank sideways the way a molded
+#: locating rib would. All `estimated` -- proportions of a stamped strap
+#: bracket: 3 mm plate, 30 mm wide against the 25 mm webbing, foot flange
+#: bolted through the pan (Art. 4.6 permits holes up to 10 mm, an M5 clears).
+#: The plate top ends just above the belt so the strap wraps the tab's outer
+#: face rather than threading behind it.
+TANK_MOUNT_THICKNESS = 0.003
+TANK_MOUNT_WIDTH = 0.030
+TANK_MOUNT_TOP_Z = 0.130
+TANK_MOUNT_FOOT = 0.022
+TANK_MOUNT_EMBED = 0.0005
+
+#: The molded body, ADR-0063: a section loft, not three boxes and a bevel. All
+#: `estimated` off `det_tonykart_401t_museum.jpg` (front three-quarter) and
+#: `det_tonykart_stand_essen.jpg` (rear-above), per ADR-0062's intent rule --
+#: typology and proportion, no manufacturer's molding copied.
+#:
+#: Corner rounding is a superellipse exponent: 5 keeps the faces usefully flat
+#: and rounds roughly the top 15% of each half-dimension, which is the museum
+#: tank's shoulder read (~35 mm on a 230 tank). Draft 0.93 narrows the top of
+#: every section against its bottom -- the flanks lean inward a couple of
+#: degrees the way a rotomold pulls. The end shoulder is a 22 mm quarter-round
+#: carried by the width alone; the bottom stays dead flat at the pan because
+#: `fuel_tank <-> chassis_floor_tray` is a `seated` joint and a rounded belly
+#: would lift the contact the gate measures. The end sections clamp at 0.55 of
+#: full size, so each end caps as a flat rounded oval rather than pinching to
+#: a point. The top falls 10 mm toward the front face over the forward quarter
+#: (the museum top reads slightly nose-down); the filler at y 138 and the
+#: fittings at y 122 sit behind the slope's start at y 280 and never move.
+TANK_SHELL_EXPONENT = 5.0
+#: 0.93 read too parallel-sided against both references at the second sign-off;
+#: 0.88 narrows the top of every section 12% against its bottom, the molded
+#: pull both tanks actually show. The volume it costs is bought back in depth
+#: -- see `params.tank_width`'s docstring for the whole trade.
+TANK_DRAFT = 0.88
+TANK_END_SHOULDER = 0.022
+TANK_END_FLOOR = 0.55
+TANK_FRONT_SLOPE = 0.010
+TANK_FRONT_SLOPE_START = 0.280
+#: The column notch, as a smooth depression of the top surface: plateau
+#: half-width 20, feathered to nothing by |x| 55, ramping in over y 300..335.
+#: At the twice-shrunk 201 envelope the top plane is 270 and the column's Ø20
+#: *lower* surface z(y) = 87 + 1.376 x (477 - y) only reaches it at y 344 --
+#: past the front face at 340 -- so the shell clears by 5+ mm with no notch at
+#: all. 22 mm keeps the molded relief both references show and makes the
+#: clearance 27+ mm everywhere instead of a shave.
+TANK_NOTCH_DEPTH = 0.022
+TANK_NOTCH_RAMP = (0.300, 0.335)
+TANK_NOTCH_PLATEAU = 0.020
+TANK_NOTCH_FEATHER = 0.055
+#: The sunken sticker panel both references show on the big faces: 4 mm deep,
+#: spanning y 140..310 and z 100..260 with 25/40 mm soft edges.
+TANK_RECESS_DEPTH = 0.004
+TANK_RECESS_Y = (0.140, 0.310)
+TANK_RECESS_Z = (0.100, 0.260)
+
+
+def _tank_smooth(t: float) -> float:
+    """Cubic smoothstep, clamped: 0 below 0, 1 above 1, zero slope at both."""
+    t = min(max(t, 0.0), 1.0)
+    return t * t * (3.0 - 2.0 * t)
+
+
+def _tank_section(
+    p: P.KartParams, y: float, points: int
+) -> list[tuple[float, float]]:
+    """One closed ring of the tank shell at station y, `points` long, CCW.
+
+    Returns (x, z) pairs starting at the bottom center and walking toward the
+    driver's right (+x), so consecutive stations' rings zip into quads with a
+    consistent orientation and `recalc_face_normals` on the closed solid does
+    the rest.
+    """
+    half_w = p.tank_width * 0.5
+    half_d = p.tank_depth * 0.5
+    cy, cz = p.tank_center_y, p.tank_center_z
+    z_bottom = cz - p.tank_height * 0.5
+    z_top = cz + p.tank_height * 0.5
+
+    # End shoulder: a quarter-round carried by the section's width, clamped so
+    # the end caps stay real faces. The bottom is exempt on purpose (seated).
+    edge = min(y - (cy - half_d), (cy + half_d) - y)
+    scale = 1.0
+    if edge < TANK_END_SHOULDER:
+        t = (TANK_END_SHOULDER - edge) / TANK_END_SHOULDER
+        scale = max(math.sqrt(max(1.0 - t * t, 0.0)), TANK_END_FLOOR)
+
+    top = z_top - TANK_FRONT_SLOPE * _tank_smooth(
+        (y - TANK_FRONT_SLOPE_START) / ((cy + half_d) - TANK_FRONT_SLOPE_START)
+    )
+    top = z_bottom + (top - z_bottom) * (1.0 - 0.30 * (1.0 - scale))
+
+    ramp_start, ramp_end = TANK_NOTCH_RAMP
+    drop = TANK_NOTCH_DEPTH * _tank_smooth(
+        (y - ramp_start) / (ramp_end - ramp_start)
+    )
+    recess_y = _tank_smooth((y - TANK_RECESS_Y[0]) / 0.025) * _tank_smooth(
+        (TANK_RECESS_Y[1] - y) / 0.025
+    )
+
+    zc = (z_bottom + top) * 0.5
+    hh = (top - z_bottom) * 0.5
+    exponent = TANK_SHELL_EXPONENT
+    ring: list[tuple[float, float]] = []
+    for index in range(points):
+        theta = -math.pi * 0.5 + 2.0 * math.pi * index / points
+        c, s = math.cos(theta), math.sin(theta)
+        x_hat = math.copysign(abs(c) ** (2.0 / exponent), c)
+        z_hat = math.copysign(abs(s) ** (2.0 / exponent), s)
+        z = zc + z_hat * hh
+        width = half_w * scale
+        width *= 1.0 + (TANK_DRAFT - 1.0) * (z - z_bottom) / (z_top - z_bottom)
+        x = x_hat * width
+        # The column notch: top surface only, plateau then feather.
+        if drop > 0.0 and z_hat > 0.0:
+            span = TANK_NOTCH_FEATHER - TANK_NOTCH_PLATEAU
+            bump = 1.0 - _tank_smooth((abs(x) - TANK_NOTCH_PLATEAU) / span)
+            z -= drop * bump * z_hat
+        # The sticker recess, on both flanks.
+        recess_z = _tank_smooth((z - TANK_RECESS_Z[0]) / 0.040) * _tank_smooth(
+            (TANK_RECESS_Z[1] - z) / 0.040
+        )
+        flank = _tank_smooth((abs(x_hat) - 0.80) / 0.15)
+        x -= math.copysign(
+            TANK_RECESS_DEPTH * flank * recess_y * recess_z, x
+        )
+        ring.append((x, z))
+    return ring
+
+
+def _tank_stations(p: P.KartParams, count: int) -> list[float]:
+    """Station list along y: clustered through the end shoulders and the notch
+    ramp so both arcs are sampled, uniform elsewhere. Ordered, deduplicated at
+    a tenth of a millimeter -- a zero-length span is the trap the track
+    validator rejects, and the same arithmetic applies here."""
+    half_d = p.tank_depth * 0.5
+    y0, y1 = p.tank_center_y - half_d, p.tank_center_y + half_d
+    stations = [y0, y1]
+    shoulder = TANK_END_SHOULDER
+    for step in range(1, 4):
+        arc = shoulder * (1.0 - math.cos(math.pi * 0.5 * step / 3.0))
+        stations.append(y0 + arc)
+        stations.append(y1 - arc)
+    ramp_start, ramp_end = TANK_NOTCH_RAMP
+    for step in range(5):
+        stations.append(ramp_start + (ramp_end - ramp_start) * step / 4.0)
+    for step in range(1, count):
+        stations.append(y0 + (y1 - y0) * step / count)
+    stations.sort()
+    merged = [stations[0]]
+    for y in stations[1:]:
+        if y - merged[-1] > 0.0001:
+            merged.append(y)
+    return merged
 FUEL_LINE_DIAMETER = 0.008
 
 
@@ -2305,10 +2466,10 @@ def _fuel_tank(
     **return** line is what distinguishes a KZ tank from an OK tank and is not a feed
     line, which is why there are three top-rear fittings and one feed.
 
-    **The notch is real geometry.** The mandated position drives the steering column
-    through the tank's top-front corner between y +330 and +350 above z 272; a real
-    molding is waisted there and declaring a joint instead would *permit* exactly the
-    interpenetration gate 1 exists to catch. See `TANK_NOTCH_WIDTH`.
+    **The notch is real geometry.** The mandated position runs the steering column
+    just over the tank's top-front corner; a real molding is waisted there, and
+    declaring a joint instead would *permit* exactly the interpenetration gate 1
+    exists to catch. See the `TANK_NOTCH_*` table for the clearance arithmetic.
     """
     p = context.params
     detail = context.detail
@@ -2321,43 +2482,35 @@ def _fuel_tank(
     front = cy + half_d
     top = cz + half_h
 
-    # The shell, as a lofted box with the top-front corner cut away for the column
-    # and the bottom front waisted for the shins.
-    notch_half = TANK_NOTCH_WIDTH * 0.5
+    # The shell, ADR-0063: one closed section loft. The column notch is still an
+    # absence -- a smooth depression of the top surface -- and the clearance
+    # arithmetic against the column's Ø20 lower surface lives at the
+    # TANK_NOTCH_* table: 12+ mm everywhere at the shrunk envelope.
+    points = detail.tube_segments * 6
+    stations = _tank_stations(p, detail.tube_segments)
+    rings = [_tank_section(p, y, points) for y in stations]
     bm = bmesh.new()
-    # Body, in three blocks so the notch is an absence rather than a boolean: the
-    # two flanks run full depth and the centre section stops short of the column.
-    for low_x, high_x in (
-        (-half_w, -notch_half),
-        (notch_half, half_w),
-    ):
-        build.box(
-            bm,
-            (high_x - low_x, p.tank_depth, p.tank_height),
-            ((low_x + high_x) * 0.5, cy, cz),
-        )
-    # The centre section: full height at the back, and cut down to clear the column
-    # over the forward 20 mm of y.
-    # Where the notch has to **start**, not where the column crosses the top plane.
-    # The column is Ø20, so its *lower surface* is what the molding has to clear:
-    # z(y) - 10 reaches the tank's top plane 299 at y 323, not at the 330 the
-    # centreline gives. The 7 mm is the difference between a notch that works and a
-    # notch that reports 52 intersecting triangle pairs.
-    column_clear_y = 0.318
-    build.box(
-        bm,
-        (TANK_NOTCH_WIDTH, column_clear_y - (cy - half_d), p.tank_height),
-        (0.0, ((cy - half_d) + column_clear_y) * 0.5, cz),
-    )
-    build.box(
-        bm,
-        (TANK_NOTCH_WIDTH, front - column_clear_y, p.tank_height - 0.048),
-        (0.0, (column_clear_y + front) * 0.5, cz - 0.024),
-    )
+    grid = [
+        [bm.verts.new((x, y, z)) for (x, z) in ring]
+        for y, ring in zip(stations, rings)
+    ]
+    for row in range(len(grid) - 1):
+        for col in range(points):
+            after = (col + 1) % points
+            bm.faces.new(
+                (
+                    grid[row][col],
+                    grid[row][after],
+                    grid[row + 1][after],
+                    grid[row + 1][col],
+                )
+            )
+    bm.faces.new(tuple(reversed(grid[0])))
+    bm.faces.new(tuple(grid[-1]))
+    bmesh.ops.recalc_face_normals(bm, faces=list(bm.faces))
     tank = build.object_from_bmesh(
-        "fuel_tank", bm, collection, material=plastic
+        "fuel_tank", bm, collection, material=plastic, shade_smooth=True
     )
-    build.bevel_object(tank, detail)
     build.set_parent(tank, root)
 
     # Three fittings on the top rear: feed, return, vent. Art. 5.6.1 caps the feed
@@ -2394,36 +2547,66 @@ def _fuel_tank(
     )
     build.set_parent(filler, root)
 
-    # Two straps over the top, on the molded channels, down to both main rails.
-    # Art. 4.7: *"A quick attachment to the chassis is strongly recommended"*, so a
-    # cam-buckle strap rather than a bolted steel band.
-    # **The rail's half-width at the strap's own station, and the frame waists hard
-    # here.** Spec §40.6 says the rail interpolates to x 297 at y +225; on this chassis
-    # it does not -- `frame_half_strut` is 286 at y +40 and `frame_half_waist` is 139 at
-    # y +375, so the rail is at 217 at y +196 and 180 at y +282. A strap authored to a
-    # single 291 or 330 misses by 79 mm. Duplicated here rather than read off
-    # `frame.py`'s objects, for the reason `wheels._pedal_plate_y` gives.
-    def rail_half(y: float) -> float:
-        span = (y - p.cross_strut_y) / (p.frame_waist_y - p.cross_strut_y)
-        span = min(max(span, 0.0), 1.0)
-        return p.frame_half_strut + (p.frame_half_waist - p.frame_half_strut) * span
-
+    # Two straps over the top, on the molded channels, straight down the flanks
+    # onto four anchor tabs standing on the pan -- no run out to the rails at
+    # all. Art. 4.7: *"A quick attachment to the chassis is strongly
+    # recommended"*, so a cam-buckle strap rather than a bolted steel band, and
+    # the buckle pulls against the tab, which bolts through the pan.
+    tray_top = P.tray_top_z(p)
     for label, strap_y in (("front", TANK_STRAP_Y[0]), ("rear", TANK_STRAP_Y[1])):
-        rail_x = rail_half(strap_y)
+        # The strap hugs the molded surface rather than a box's constants: the
+        # section's own ring, subsampled, so half the webbing embeds -- which
+        # is what `clamped` means to gate 2. The sample count is fixed at 96
+        # so both detail levels sweep the same polyline (ADR-0059).
+        # The ring starts at the bottom center -- the lowest point -- so the
+        # z-cut removes one arc containing index 0 and the kept run is
+        # contiguous mid-range: right flank up, over the top, left flank down.
+        ring = _tank_section(p, strap_y, 96)
+        # The tab plane sits at the flank's widest x for *this* station's ring,
+        # embedded half a millimeter so the pair genuinely locates the tank.
+        flank = max(x for x, _ in ring)
+        face_inner = flank - TANK_MOUNT_EMBED
+        face_outer = face_inner + TANK_MOUNT_THICKNESS
+        for side, sign in (("l", -1.0), ("r", 1.0)):
+            bm = bmesh.new()
+            build.box(
+                bm,
+                (TANK_MOUNT_THICKNESS, TANK_MOUNT_WIDTH, TANK_MOUNT_TOP_Z - tray_top),
+                (
+                    sign * (face_inner + TANK_MOUNT_THICKNESS * 0.5),
+                    strap_y,
+                    (TANK_MOUNT_TOP_Z + tray_top) * 0.5,
+                ),
+            )
+            # The foot flange, bent outboard at the plate's base: overlaps the
+            # plate by a millimeter so the two boxes read as one stamped L, and
+            # embeds half a millimeter into the pan for the bolted contact.
+            build.box(
+                bm,
+                (TANK_MOUNT_FOOT, TANK_MOUNT_WIDTH, 0.003),
+                (
+                    sign * (face_outer + TANK_MOUNT_FOOT * 0.5 - 0.001),
+                    strap_y,
+                    tray_top + 0.001,
+                ),
+            )
+            mount = build.object_from_bmesh(
+                "fuel_tank_mount_%s_%s" % (label, side),
+                bm,
+                collection,
+                material=context.material("zinc_plated"),
+            )
+            build.set_parent(mount, root)
+        # Cut the ring at the tab's top so the webbing leaves the flank there,
+        # wraps the tab's top edge and runs dead vertical down its outer face
+        # to just above the foot. No x anywhere in the drop but the tab's own.
+        arc = [(x, z) for x, z in ring if z > TANK_MOUNT_TOP_Z]
+        path = [(-face_outer, tray_top + 0.004), (-face_outer, TANK_MOUNT_TOP_Z - 0.004)]
+        path.extend(reversed(arc[:: max(len(arc) // 18, 1)]))
+        path.append((face_outer, TANK_MOUNT_TOP_Z - 0.004))
+        path.append((face_outer, tray_top + 0.004))
         bm = bmesh.new()
-        build.sweep_tube(
-            bm,
-            [
-                (-rail_x, strap_y, P.rail_z(p)),
-                (-half_w - 0.004, strap_y, top - 0.030),
-                (-half_w + 0.020, strap_y, top + 0.003),
-                (half_w - 0.020, strap_y, top + 0.003),
-                (half_w + 0.004, strap_y, top - 0.030),
-                (rail_x, strap_y, P.rail_z(p)),
-            ],
-            TANK_STRAP_SECTION[0] * 0.5,
-            6,
-        )
+        _strap_band(bm, path, strap_y)
         strap = build.object_from_bmesh(
             "fuel_tank_strap_%s" % label,
             bm,
@@ -2464,6 +2647,59 @@ def _fuel_tank(
             shade_smooth=True,
         )
         build.set_parent(line, root)
+
+
+def _strap_band(
+    bm: bmesh.types.BMesh, path: list[tuple[float, float]], y: float
+) -> None:
+    """A flat webbing band swept along an (x, z) polyline in the plane y.
+
+    `TANK_STRAP_SECTION` is (width, thickness) and always was -- the old sweep
+    read the width as a *tube radius* and drew a Ø25 hose over the tank. A cam
+    strap is 25 mm of webbing 2 mm thick lying on the surface, so the section
+    is a rectangle: width across y, thickness along the path's own 2D normal,
+    centered on the polyline so 1 mm embeds and 1 mm stands proud -- which is
+    both the `clamped` contact gate 2 wants and the read a strap has.
+    """
+    width, thickness = TANK_STRAP_SECTION
+    half_w = width * 0.5
+    half_t = thickness * 0.5
+    count = len(path)
+    normals: list[tuple[float, float]] = []
+    for index in range(count):
+        x0, z0 = path[max(index - 1, 0)]
+        x1, z1 = path[min(index + 1, count - 1)]
+        dx, dz = x1 - x0, z1 - z0
+        length = math.hypot(dx, dz)
+        if length < 1e-12:
+            dx, dz = 1.0, 0.0
+            length = 1.0
+        # Tangent rotated 90 deg CCW in (x, z): the path walks left tab to
+        # right tab over the top, so this points away from the tank everywhere.
+        normals.append((-dz / length, dx / length))
+    rings = []
+    for (x, z), (nx, nz) in zip(path, normals):
+        ring = [
+            bm.verts.new((x - nx * half_t, y - half_w, z - nz * half_t)),
+            bm.verts.new((x + nx * half_t, y - half_w, z + nz * half_t)),
+            bm.verts.new((x + nx * half_t, y + half_w, z + nz * half_t)),
+            bm.verts.new((x - nx * half_t, y + half_w, z - nz * half_t)),
+        ]
+        rings.append(ring)
+    for row in range(count - 1):
+        for col in range(4):
+            after = (col + 1) % 4
+            bm.faces.new(
+                (
+                    rings[row][col],
+                    rings[row][after],
+                    rings[row + 1][after],
+                    rings[row + 1][col],
+                )
+            )
+    bm.faces.new(tuple(reversed(rings[0])))
+    bm.faces.new(tuple(rings[-1]))
+    bmesh.ops.recalc_face_normals(bm, faces=list(bm.faces))
 
 
 def _fitting_mesh(

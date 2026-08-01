@@ -4024,3 +4024,89 @@ bands; regulation dimensions are the hard constraints; within them, liberties
 are welcome where they read better. Spec and ADR language says "informed by
 reference photography," not "matched to" a named product, and no manufacturer's
 livery is ever copied.
+
+## ADR-0063 — The fuel tank is a lofted saddle, not three boxes wearing a bevel
+
+**Status:** accepted, 2026-07-31. Part 8 of the sculpt wave; the construction
+rewrite the plan required an ADR for before build.
+
+**Context.** `cockpit._fuel_tank` is the only box-derived part left of the
+wave's eight: three `build.box` blocks (two flanks, one shortened center) plus
+a bevel, with the steering-column notch made by the center block stopping
+short. Every regulated fact about it is right — Art. 4.7's mandated position
+drives all three `tank_center_*` coordinates, the capacity is sourced, the
+feed/return fitting count is a scrutineering fact — and it still reads as
+luggage, because a rotomolded polyethylene tank has no box anywhere in it.
+Both references in the repo show the same body language
+(`det_tonykart_401t_museum.jpg` front three-quarter,
+`det_tonykart_stand_essen.jpg` rear-above, both translucent white moldings):
+large rounded shoulders everywhere, flanks drafted inward toward the top, a
+domed top surface falling toward a front filler cap, a molded recessed panel
+sunk into the large face, and the column clearance as a smooth molded waist —
+an absence the sections flow around, not a slot cut out of a prism.
+
+**Decided.**
+
+1. **The shell is one section loft along y** — rounded-rectangle sections
+   (superellipse-family, the `_loft_shell`/`_catmull_rom` pattern the bodywork
+   modules already use) walked through a station table: rear face, mid-body,
+   shoulder, front face. Corner radius, draft and dome are properties of the
+   section table, so low and high detail are the same shape at two densities
+   and the counts come from `context.detail` as ADR-0059 requires.
+2. **The column notch stays an absence by construction**: the center sections
+   between the flank stations pull their top edge down and their walls apart
+   where the column passes, exactly as the current three-block build does in
+   spirit — no boolean, no declared joint, and gate 1 keeps catching a notch
+   that stops clearing (`column_clear_y` 0.318 carries over: the notch clears
+   the column's Ø20 *lower surface*, not its centerline).
+3. **What may not move:** capacity (sourced), all three `tank_center_*`
+   (derived from Art. 4.7's sentence), the `fuel_tank*` part names
+   (`build.py`'s `FINISHES` glob-matches them), and the strap/floor-tray/column
+   gate-1 and gate-2 relationships. The overall `tank_width/depth/height`
+   envelope is `estimated` and may move a few millimeters where the molding's
+   radii demand it, spec rows updating with the reasoning.
+4. **Shape values are `estimated` off the two photographs, per ADR-0062's
+   intent rule** — typology and proportion, no manufacturer's molding copied:
+   shoulder radius read as a fraction of tank height (~0.15), draft a few
+   degrees, recess panel depth a few millimeters. Translucency is a material
+   question and stays flagged for the material pass, not this geometry wave.
+
+**Consequences.** The tank joins the other seven parts on the section-loft
+construction, the winding gate covers it as one watertight shell instead of
+three, and the sticker-recess face gives the livery pass a real landing zone
+when it comes.
+
+**Amended at sign-off, same day.** Two changes out of Anthony's eye on the
+built part, both inside this ADR's scope and one overriding its point 3.
+
+1. **The straps anchor on their own tabs, not on the rails.** The first build
+   ran each strap's feet out to the main rails — the rails sit 60–100 mm
+   outboard of the flank at the strap stations, and the resulting fan-out was
+   rejected twice. The webbing now drops **dead vertical** down the flank
+   (measured 2 mm of x spread in the drop, the webbing's own thickness) onto
+   four stamped steel L-tabs standing on the pan beside the tank
+   (`fuel_tank_mount_{front,rear}_{l,r}`, 3 mm plate, foot flange bolted
+   through the pan — Art. 4.6 permits holes to 10 mm). The tab plates stand
+   against the flank's widest belt, embedded half a millimeter, so the four of
+   them also locate the tank sideways. This **replaces** point 3's frozen
+   strap/tray relationships: `fuel_tank_strap_* <-> chassis_rail_?`, the
+   strap<->tray `pierced` declaration and the strap<->tray-edge clamp are all
+   deleted; strap<->tab (clamped, per strap — a glob pair here is a
+   cross-product and the gate demanded the front strap touch the rear tabs),
+   tab<->tray (bolted) and tank<->tab (seated) replace them.
+2. **Second shrink, with the volume bought back forward.** 240x235x212 read
+   too big and too parallel-sided against both references. Width and height
+   went down 5% (228/201), the draft deepened 0.93 -> 0.88, and the lost
+   volume was recovered by growing depth 235 -> 240 entirely on the front face
+   — the least-visible dimension and the one with 185 mm of slack to its
+   Art. 4.7 clause; the rear face stays pinned 70 mm off the seat. Measured
+   off the built mesh: 9.18 L shell, ~8.4 L inside a 3 mm wall. Ullage is
+   gone — the molding holds the sourced 8.5 L brim-full, and this envelope is
+   the floor: any further shrink argues with `tank_capacity` and becomes a
+   smaller-capacity tank, which Art. 9.3's 8 L minimum bounds at ~6% more
+   volume.
+
+The Blender MCP carried both iterations: the built .blend opened live in the
+GUI, flank/tray/volume measured off the mesh in place, Anthony's sign-off given
+on the live viewport rather than a published board. `genkart.sh` remained the
+only generator; the MCP session only ever read its output.

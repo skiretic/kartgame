@@ -1188,6 +1188,7 @@ FINISHES: tuple[tuple[str, str], ...] = (
     # --- §60.3.12 the fuel tank ---
     ("fuel_tank_fitting_*", "anodized_clear"),
     ("fuel_tank_strap_*", "rubber_grip"),
+    ("fuel_tank_mount_*", "zinc_plated"),
     ("fuel_tank_filler", "tank_polyethylene"),
     ("fuel_tank", "tank_polyethylene"),
     # --- §60.4.5 the rear protection's two adjustable outer parts ---

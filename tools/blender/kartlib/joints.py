@@ -2138,11 +2138,35 @@ JOINTS: tuple[Joint, ...] = (
         "a cam buckle rather than a bolted steel band",
     ),
     Joint(
-        a="fuel_tank_strap_*",
-        b="chassis_rail_?",
+        a="fuel_tank_strap_front",
+        b="fuel_tank_mount_front_?",
         kind="clamped",
-        why="both ends of both straps, down to the two main tubes Art. 4.7 puts the "
-        "tank between",
+        why="both ends of the strap run dead vertical down the flank onto their "
+        "own anchor tab and the buckle grips there -- no run out to the rails, "
+        "which sit 60-100 mm outboard at these stations and gave the old strap "
+        "its rejected fan-out. Per-strap declarations because a glob pair here "
+        "is a cross-product: the gate demanded the front strap touch the rear "
+        "tabs 58.5 mm away",
+    ),
+    Joint(
+        a="fuel_tank_strap_rear",
+        b="fuel_tank_mount_rear_?",
+        kind="clamped",
+        why="as the front strap, on its own pair of tabs",
+    ),
+    Joint(
+        a="fuel_tank_mount_*",
+        b="chassis_floor_tray",
+        kind="bolted",
+        why="each tab's foot flange, an M5 pair through the pan; Art. 4.6 permits "
+        "holes up to 10 mm, so the pan is drilled and not slotted",
+    ),
+    Joint(
+        a="fuel_tank",
+        b="fuel_tank_mount_*",
+        kind="seated",
+        why="the plates stand against the flank's widest belt, so the four tabs "
+        "also locate the tank sideways the way a molded locating rib would",
     ),
     Joint(
         a="fuel_tank",
@@ -2376,24 +2400,9 @@ JOINTS: tuple[Joint, ...] = (
         why="the bracket's upper end reaches the saddle's underside beside the rubber "
         "isolator it bolts through",
     ),
-    Joint(
-        a="fuel_tank_strap_*",
-        b="chassis_floor_tray",
-        kind="pierced",
-        why="each strap's ends come down past the pan's edge to reach the rail beneath "
-        "it, so the pan is cut for two 25 mm straps. Art. 4.6 permits holes up to 10 mm "
-        "and two 35 mm ones for the column and the shift lever, so a molded slot is "
-        "outside its list -- **the honest reading is that the strap goes round the pan's "
-        "edge**, and this declaration is what the built geometry says instead. Recorded "
-        "as a joint and flagged in the report rather than made to look clean",
-    ),
-    Joint(
-        a="fuel_tank_strap_*",
-        b="chassis_tray_edge_?",
-        kind="clamped",
-        why="and over the pan's edging tube, which is the structure the buckle actually "
-        "pulls against at that station",
-    ),
+    # The strap<->tray `pierced` declaration and the strap<->tray-edge clamp are
+    # gone with the fan-out: the webbing now ends on its tab 4 mm above the pan
+    # and touches neither the tray, its edging tube nor the rails.
     Joint(
         a="exhaust_silencer",
         b="exhaust_silencer_isolator",
@@ -3232,15 +3241,9 @@ OPEN_DEFECTS: tuple[Defect, ...] = (
         issue="#206",
         why="and 26.38/25.68 mm through the shins behind them",
     ),
-    Defect(
-        a="fuel_tank*",
-        b="driver_shank_?",
-        gate="driver",
-        measured=22.70,
-        issue="#206",
-        why="the shins straddle the tank -- which real legs genuinely do -- at "
-        "14.41 mm into the tank and 22.70 into its front strap",
-    ),
+    # fuel_tank* <-> driver_shank_? was waived here at 22.70 (#206, shins into
+    # the old box tank and its Ø25 tube strap). ADR-0063's smaller loft and the
+    # flat webbing strap cleared it and the gate insisted the waiver go.
     Defect(
         a="steering_rim",
         b="driver_shank_?",

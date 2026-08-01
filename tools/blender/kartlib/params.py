@@ -1107,21 +1107,31 @@ class KartParams:
     SER.003 and CKR also sell 8.5. Art. 9.3's minimum is **8 litres** and the kart
     had no tank at all, so this is a compliance item and not a detail."""
 
-    tank_width: float = 0.255
-    tank_depth: float = 0.250
-    tank_height: float = 0.230
-    """Outer bounding size. `estimated`: 255 x 250 x 230 is 14.7 L of box of which
-    8.5 L is 58%, the right fraction for a body radiused on every edge and waisted
-    at the bottom front -- which is what the 0073.EA photo shows."""
+    tank_width: float = 0.228
+    tank_depth: float = 0.240
+    tank_height: float = 0.201
+    """Outer bounding size. `estimated`: 255 x 250 x 230 shrunk ~7% at part 8's
+    first sign-off, then width and height another 5% with the draft deepened to
+    0.88 (`cockpit.TANK_DRAFT`) at the second -- Anthony's eye both times, the
+    top read too wide against the reference tanks. The lost volume is bought
+    back **forward**: depth 235 -> 240 taken entirely on the front face, the
+    dimension the eye reads least between the legs and the one with 185 mm of
+    slack to its Art. 4.7 clause. Measured off the built mesh (bmesh
+    `calc_volume`, the shape arithmetic underestimates the superellipse): 9.18 L
+    shell, ~8.4 L inside a 3 mm wall -- ullage is gone and the molding holds the
+    sourced 8.5 L only brim-full. This IS the floor: any further shrink argues with
+    `tank_capacity`, and the answer to "smaller still" is a smaller-capacity
+    tank, which Art. 9.3's 8 L minimum bounds at another ~6% of volume."""
 
-    tank_center_y: float = 0.225
-    tank_center_z: float = 0.184
+    tank_center_y: float = 0.220
+    tank_center_z: float = 0.1695
     """Centre, on the kart's centreline. **`derived`, and all three coordinates
     are forced by Art. 4.7**, which does not permit a position but *mandates*
     one: *"between the main tubes of the chassis frame, ahead of the seat and
-    behind the rotation axis of the front wheels."* So x 0; front face +350
-    against the front axis at +525, 175 mm clear; rear face +100 against the
-    seat's lip at +30, 70 mm clear; bottom on the tray at 69, so centre 184."""
+    behind the rotation axis of the front wheels."* So x 0; rear face +100
+    against the seat's lip at +30, 70 mm clear (the tight side, which is why
+    depth moves only at the front); front face +340 against the front axis at
+    +525, 185 mm clear; bottom on the tray at 69, so centre 169.5."""
 
     # --- engine, exhaust, radiator ----------------------------------------
 
