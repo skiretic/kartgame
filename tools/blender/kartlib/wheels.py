@@ -139,6 +139,23 @@ parts and the rim keeps only its mounting plate. The plate's bore is smaller tha
 either hub body, so the two overlap at a declared bolted joint rather than sharing
 a surface."""
 
+VENT_COUNT: int = 5
+VENT_ARC_FRACTION: float = 0.5
+VENT_INNER_RADIUS: float = 0.030
+VENT_OUTER_RADIUS: float = 0.050
+"""Five oblong vent slots through the face plate, the visual signature of a cast
+magnesium kart wheel and the recorded omission from the first build. `estimated`,
+and deliberately generic per ADR-0062's design-intent rule: every reference mag
+wheel is vented (the 401T museum kart's gold rims, the OTK/AMV catalogs), no
+manufacturer's exact teardrop is copied. Five slots at half the period each,
+spanning radii 30..50 of the plate's 16..60 dish, read as the type without being
+anyone's part.
+
+The slots are true through-holes built into the revolution grid -- no booleans:
+the vent boundary radii and angles are exact grid stations at both detail levels,
+so low and high are the same shape at two densities, and every hole edge is
+stitched with wall quads so the plate stays watertight for the winding gate."""
+
 BEAD_PEG_COUNT: int = 3
 BEAD_PEG_DIAMETER: float = 0.007
 BEAD_PEG_PROJECTION: float = 0.005
@@ -870,7 +887,7 @@ def _rim(context: build.BuildContext, bm: bmesh.types.BMesh, rim_width: float) -
 
     build.lathe(bm, _rim_barrel_profile(p, half_width), segments, axis="X",
                 close_profile=True)
-    build.lathe(bm, _rim_plate_profile(p), segments, axis="X", close_profile=True)
+    _rim_plate_vented(context, bm, p)
     _bead_pegs(context, bm, p, half_width)
 
 
@@ -905,25 +922,164 @@ def _rim_barrel_profile(p: P.KartParams, half_width: float) -> list[tuple[float,
     ]
 
 
-def _rim_plate_profile(p: P.KartParams) -> list[tuple[float, float]]:
-    """Outline of the wheel face: a shallow dish each side of the center bore.
+def _plate_front_axial(p: P.KartParams, radius: float) -> float:
+    """Front-face axial position of the dish at `radius`, off the same 3-point
+    outline the plain lathe used to revolve: bore, knee at 0.45 of the edge,
+    edge at half the plate thickness. The back face is its mirror.
 
-    The intermediate point is what makes it a dish rather than a straight cone --
-    the face flattens toward the flange and steepens toward the hub, which is how a
-    cast wheel face is actually shaped.
+    A function of radius rather than a point list because the vented plate needs
+    the surface evaluated at the vent boundary radii exactly -- the hole edges
+    are grid stations, not intersections.
     """
     seat = p.rim_bead_diameter * 0.5 - RIM_SEAT_CLEARANCE
-    # Sunk half a wall into the barrel, so the two revolutions overlap instead of
-    # leaving a hairline gap for the light to come through.
     edge = seat - RIM_WALL * 0.5
-    return [
-        (RIM_PLATE_BORE, -RIM_PLATE_DISH),
-        (edge * 0.45, -RIM_PLATE_DISH * 0.42),
-        (edge, -RIM_PLATE_THICKNESS * 0.5),
-        (edge, RIM_PLATE_THICKNESS * 0.5),
-        (edge * 0.45, RIM_PLATE_DISH * 0.42),
-        (RIM_PLATE_BORE, RIM_PLATE_DISH),
+    knee_r = edge * 0.45
+    knee_x = -RIM_PLATE_DISH * 0.42
+    if radius <= knee_r:
+        t = (radius - RIM_PLATE_BORE) / (knee_r - RIM_PLATE_BORE)
+        return -RIM_PLATE_DISH + (knee_x + RIM_PLATE_DISH) * t
+    t = (radius - knee_r) / (edge - knee_r)
+    return knee_x + (-RIM_PLATE_THICKNESS * 0.5 - knee_x) * t
+
+
+def _rim_plate_vented(
+    context: build.BuildContext, bm: bmesh.types.BMesh, p: P.KartParams
+) -> None:
+    """The wheel face as a closed revolution grid with `VENT_COUNT` through-slots.
+
+    The plain plate was one `build.lathe` of a closed outline. A vent hole cannot
+    come out of a lathe, and a boolean is banned by the determinism rules, so this
+    builds the same torus of quads by hand and simply does not emit the front and
+    back sheet faces inside a vent window -- then stitches the four edges of each
+    window (inner arc, outer arc, two radial sides) with wall quads connecting the
+    front sheet to the back sheet. Every edge ends up with exactly two faces, so
+    the winding gate's watertightness check covers the vents rather than skipping
+    them.
+
+    The angular grid is built per vent period -- `spoke_steps` stations across the
+    solid spoke, `vent_steps` across the window -- so the window boundaries land on
+    exact stations at any density and low/high detail are the same shape. Radial
+    stations are the same short list at both details: the surface between them is a
+    straight polyline, so extra stations would change nothing.
+    """
+    seat = p.rim_bead_diameter * 0.5 - RIM_SEAT_CLEARANCE
+    edge = seat - RIM_WALL * 0.5
+    knee_r = edge * 0.45
+    mid_r = (VENT_INNER_RADIUS + VENT_OUTER_RADIUS) * 0.5
+
+    # Front outline radii, bore to edge; the vent band's three stations are exact.
+    radii = [
+        RIM_PLATE_BORE,
+        knee_r,
+        VENT_INNER_RADIUS,
+        mid_r,
+        VENT_OUTER_RADIUS,
+        (VENT_OUTER_RADIUS + edge) * 0.5,
+        edge,
     ]
+    r_in_i, r_out_i = 2, 4
+    count = len(radii)
+
+    # Closed outline loop: front sheet bore->edge, edge wall, back sheet
+    # edge->bore, bore wall (implicit in the loop closure). Outline index k:
+    # 0..count-1 front, count..2*count-1 back (reversed radii).
+    outline: list[tuple[float, float]] = []
+    for radius in radii:
+        outline.append((radius, _plate_front_axial(p, radius)))
+    for radius in reversed(radii):
+        outline.append((radius, -_plate_front_axial(p, radius)))
+    loop = len(outline)
+
+    def back_index(front_index: int) -> int:
+        return loop - 1 - front_index
+
+    # Angular stations: per period, spoke first then vent window.
+    detail_scale = max(1, context.detail.tire_segments // 32)
+    spoke_steps = 3 * detail_scale
+    vent_steps = 4 * detail_scale
+    period_steps = spoke_steps + vent_steps
+    total = VENT_COUNT * period_steps
+    period = 2.0 * math.pi / VENT_COUNT
+    spoke_arc = period * (1.0 - VENT_ARC_FRACTION)
+    angles: list[float] = []
+    for vent in range(VENT_COUNT):
+        base = vent * period
+        for step in range(spoke_steps):
+            angles.append(base + spoke_arc * step / spoke_steps)
+        for step in range(vent_steps):
+            angles.append(
+                base + spoke_arc + (period - spoke_arc) * step / vent_steps
+            )
+
+    def in_vent(column: int) -> bool:
+        return column % period_steps >= spoke_steps
+
+    rings: list[list[bmesh.types.BMVert]] = []
+    for radius, along in outline:
+        ring = []
+        for angle in angles:
+            ring.append(
+                bm.verts.new(
+                    Vector((along, math.cos(angle) * radius, math.sin(angle) * radius))
+                )
+            )
+        rings.append(ring)
+
+    def quad(a: bmesh.types.BMVert, b, c, d) -> None:
+        bm.faces.new((a, b, c, d))
+
+    # Sheet faces, matching build.lathe's winding: (lower[s], lower[s+1],
+    # upper[s+1], upper[s]) with "upper" the next outline point.
+    for k in range(loop):
+        k_next = (k + 1) % loop
+        front_band = r_in_i <= k < r_out_i
+        back_band = back_index(r_out_i) <= k < back_index(r_in_i)
+        for a in range(total):
+            a_next = (a + 1) % total
+            if (front_band or back_band) and in_vent(a):
+                continue
+            quad(rings[k][a], rings[k][a_next], rings[k_next][a_next], rings[k_next][a])
+
+    # Vent walls. Inner arc at r_in, outer arc at r_out, and the two radial side
+    # strips per window; windings chosen so each wall faces into its window.
+    f_in, f_out = r_in_i, r_out_i
+    b_in, b_out = back_index(r_in_i), back_index(r_out_i)
+    for column in range(total):
+        if not in_vent(column):
+            continue
+        a_next = (column + 1) % total
+        quad(rings[f_in][a_next], rings[f_in][column], rings[b_in][column], rings[b_in][a_next])
+        quad(rings[f_out][column], rings[f_out][a_next], rings[b_out][a_next], rings[b_out][column])
+        first = column % period_steps == spoke_steps
+        last = (column + 1) % period_steps == 0
+        if first:
+            for k in range(f_in, f_out):
+                quad(
+                    rings[k][column],
+                    rings[k + 1][column],
+                    rings[back_index(k + 1)][column],
+                    rings[back_index(k)][column],
+                )
+        if last:
+            for k in range(f_in, f_out):
+                quad(
+                    rings[k + 1][a_next],
+                    rings[k][a_next],
+                    rings[back_index(k)][a_next],
+                    rings[back_index(k + 1)][a_next],
+                )
+
+    # Rings strictly inside the vent band (the mid station, front and back) have
+    # no faces at window-interior stations -- the sheet is skipped there and the
+    # side walls only touch the window's two boundary stations. Left in place
+    # they export as loose vertices, so they go.
+    orphans = [
+        rings[k][a]
+        for k in (f_in + 1, back_index(f_in + 1))
+        for a in range(total)
+        if a % period_steps > spoke_steps
+    ]
+    bmesh.ops.delete(bm, geom=orphans, context="VERTS")
 
 
 def _bead_pegs(
