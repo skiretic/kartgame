@@ -5710,10 +5710,14 @@ deliberate deviation, see #197), Art. 4.11, Art. 4.10.2.
 | --- | --- | --- | --- | --- |
 | overall width, all three parts | `rear_prot_width` | 1390 | `derived` | see the note below. Was `REAR_HALF_WIDTH` × 2 = 572 |
 | fore-aft depth | `rear_prot_depth` | 187 | `sourced` | KG C2 HF `003-BR-48` p. 2 drawing |
-| height | `rear_prot_height` | 177 | `sourced` | same drawing |
+| height, C2 figure of record | `rear_prot_height` | 177 | `sourced` | same drawing — **no longer builds the part**, ADR-0062: kept on `FIELD_COVERAGE_EXEMPT`, the manifest still publishes it |
 | front face | `rear_prot_front_y` | −705 | `derived` | rear tire's rearmost surface at −672.5 plus a 32.5 mm gap, which is the center of Art. 9.5.5.1's 15–50 band |
 | rear face | — | −892 | `derived` | −705 − 187; rear overhang 367, 33 under the 400 cap. Matches front matter §5's arithmetic exactly, which is where the 1920 came from |
-| top edge | — | 217 | `derived` | 40 + 177, 78 under the rear tire top at 295 |
+| top edge, crown \|x\| = 0 | — | 295 | `derived` | `tire_rear_diameter` — Art. 9.5.5.1's *"no higher than the rear wheels"* ceiling, which the reference photo brackets at 290 ±15. ADR-0062: the top edge is `bodywork._rear_top_profile`, a measured station table, not a constant |
+| top edge, valley wall \|x\| = 300 | — | 180 | `estimated` | the silencer's Ø32 outlet stubs (z 174–206) show above the edge in the reference dead-rear, so the edge is under ~174 by \|x\| 290 |
+| top edge, valley floor \|x\| = 455 | — | 170 | `estimated` | measured both sides of the reference photo, 168 L / 175 R |
+| top edge, lobe crest | — | 250 | `estimated` height at a `derived` station, `rear_hub_x` = 592.5 |
+| top edge, outer end \|x\| = 695 | — | 235 | `estimated` | edge roll at the panel end |
 | bottom edge, in the three windows | `rear_prot_bottom_z` | 40 | `sourced` (in range) | Art. 9.5.5.1's 25–60 |
 | bottom edge, between the windows | — | 95 | `estimated` | the article only regulates the windows; lifting between them is what makes them windows |
 | window, centerline | — | \|x\| ≤ 100 | `derived` | 200 mm, *"in the extension of […] the centreline of the chassis"* |

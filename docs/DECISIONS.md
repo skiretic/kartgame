@@ -3979,3 +3979,48 @@ premise, sprocket-emerges-inboard, nobody had sourced. The 74 mm
 −215), `seat_z`, bearing hangers. §30's claim that p05 is "a high front
 three-quarter with no seat in frame" was false of the file on disk and is
 corrected in place — the caption in `sources.txt` was right.
+
+## ADR-0062 — The rear protection's top edge is a measured profile, and the reference corpus informs the shape without dictating it
+
+**Status:** accepted, 2026-07-31. Part 3 of the sculpt wave, accepted by eye
+against the dead-rear reference.
+
+**Context.** The rear protection was lofted at a constant 177 mm height over its
+whole 1390 mm span — the KG C2 form's overall height applied everywhere — and it
+read as two boxes and a bar. The reference photograph (`tonykart_rear_header.jpg`,
+dead-rear, scaled 1.053 mm/px on the panel's own plane with the lobe crest
+landing at |x| 597 against the hub's derived 592.5 as the lateral self-check)
+shows a single molded part: a tall center crown, wide near-flat valleys, rounded
+lobes over each tire. Measured: crown ~290 ±15, valley floor 168-175, lobe ~250,
+outer end ~235 — the reference part is a different manufacturer's plain
+protection, roughly 70 mm taller than the C2 everywhere except the valleys.
+
+**Decided.**
+
+1. **The top edge is `bodywork._rear_top_profile`**, a station table interpolated
+   with per-span cubic smoothstep — zero slope at every control, so each station
+   is its local extremum, the profile cannot overshoot between controls, and |x|
+   symmetry gives a flat crown by construction. Crown authors as
+   `tire_rear_diameter` (295): Art. 9.5.5.1's *"no higher than the rear wheels"*
+   is a sourced ceiling and the measurement brackets it. Valley and lobe stations
+   are `estimated` off the photograph; the lobe station is `derived` at
+   `rear_hub_x`. Depth 187, the width argument, the bottom windows and their lift
+   table are untouched and still read the C2 form.
+2. **`rear_prot_height` = 177 stays as the C2 form's figure of record**, on
+   `FIELD_COVERAGE_EXEMPT` — nothing derives from it, and the manifest still
+   publishes what the sourced form says.
+3. **Two joints deleted.** The silencer can and its clips were declared `pierced`
+   through the panel; that was true of the flat 177 top (the top-front curve
+   crossed the can's skin) and is false of the tall crown — the can now sits
+   wholly inside the shell's hollow, which is what the photograph shows: only the
+   outlet stubs proud of the valley. The Art. 5.10 outlet argument the joint
+   carried moved to a comment at the declaration site.
+
+**And the design-intent rule, stated once because it governs the rest of the
+wave.** Anthony, at this sign-off: the kart must *look good and be reasonably
+accurate to something real* — it must not replicate any manufacturer's part or
+trade dress. Reference photographs are measured for typology and proportion
+bands; regulation dimensions are the hard constraints; within them, liberties
+are welcome where they read better. Spec and ADR language says "informed by
+reference photography," not "matched to" a named product, and no manufacturer's
+livery is ever copied.

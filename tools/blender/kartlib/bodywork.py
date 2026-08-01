@@ -559,7 +559,7 @@ SIDE_BAR_PATH: tuple[tuple[float, float, float], ...] = (
 )
 
 #: The rear protection's cross-section, as (fore-aft fraction, z fraction) of the
-#: box `rear_prot_front_y` / `rear_prot_depth` / bottom / `rear_prot_height` make.
+#: box `rear_prot_front_y` / `rear_prot_depth` / bottom / `_rear_top_z` make.
 #:
 #: A fraction pair rather than absolute (y, z) so that the depth and height stay
 #: single-owner parameters sourced off the KG C2 form. The front face is vertical
@@ -605,6 +605,64 @@ REAR_WINDOWS: tuple[tuple[float, float], ...] = (
     (0.485, 0.695),
 )
 REAR_WINDOW_RAMP: float = 0.050
+
+#: Top edge of the rear protection against |x|, in meters above the ground --
+#: the profile that makes it one molded part instead of two boxes and a bar.
+#:
+#: Measured off `tonykart_rear_header.jpg` (dead-rear product shot) at
+#: 1.053 mm/px on the panel's own plane -- the panel span is the scale, because
+#: the tire plane sits ~200 mm further from the camera and reads 6% smaller;
+#: the lateral self-check is that the lobe crest lands at |x| 597 against the
+#: hub's derived 592.5. Stations:
+#:
+#:     crown, |x| <= 250     ~290 +-15 measured (seat occludes the center);
+#:                           authored as `tire_rear_diameter` because Art.
+#:                           9.5.5.1's "no higher than the rear wheels" is a
+#:                           sourced ceiling at 295 and the measurement
+#:                           brackets it -- `derived`
+#:     crown edge, |x| 230   the crown side of the valley is steep: by |x| 290
+#:                           the silencer's Ø32 outlet stubs (z 174..206) are
+#:                           visible above the edge in the photo, so the edge
+#:                           is below ~174 there -- `estimated`
+#:     valley, |x| 300-455   wide and nearly flat, ~170 measured both sides
+#:                           (168 L / 175 R) -- `estimated`
+#:     lobe over the tire    ~250 measured, station tied to `rear_hub_x` --
+#:                           `estimated`
+#:     outer end             ~235 at the edge roll -- `estimated`
+#:
+#: The KG C2 form's 177 overall height is deliberately overridden (ADR-0062):
+#: the reference part is a different manufacturer's plain protection, ~70 mm
+#: taller, and the profile is informed by that photograph rather than cloned
+#: from it -- proportions inside regulation limits, liberties where they read
+#: better. Depth 187, the width basis and the clearance windows still read the
+#: C2 form and Art. 9.5.5.1. Interpolation is per-span cubic
+#: smoothstep -- zero slope at every control, so each station IS its local
+#: extremum and the profile cannot overshoot the sourced ceiling between
+#: controls; |x| makes it mirror-symmetric with a flat crown by construction.
+
+
+def _rear_top_profile(p: P.KartParams) -> tuple[tuple[float, float], ...]:
+    return (
+        (0.000, p.tire_rear_diameter),
+        (0.230, 0.290),
+        (0.300, 0.180),
+        (0.455, 0.170),
+        (P.rear_hub_x(p), 0.250),
+        (p.rear_prot_width * 0.5, 0.235),
+    )
+
+
+def _rear_top_z(p: P.KartParams, x: float) -> float:
+    """Top edge of the rear protection at lateral station `x`."""
+    profile = _rear_top_profile(p)
+    distance = abs(x)
+    if distance <= profile[0][0]:
+        return profile[0][1]
+    for (x0, z0), (x1, z1) in zip(profile, profile[1:]):
+        if distance <= x1:
+            t = (distance - x0) / (x1 - x0)
+            return z0 + (z1 - z0) * t * t * (3.0 - 2.0 * t)
+    return profile[-1][1]
 
 
 def _rear_bottom_z(p: P.KartParams, x: float) -> float:
@@ -1948,14 +2006,15 @@ def _racing_numbers(
 def _rear_section(p: P.KartParams, x: float, steps: int) -> list[Vector]:
     """One (y, z) section of the rear protection at lateral station `x`.
 
-    `REAR_SECTION` is in fractions of the box `rear_prot_depth` and
-    `rear_prot_height` define, so the two sourced KG C2 dimensions stay
-    single-owner and the three ground-clearance windows are a bottom-edge table
-    rather than a second section.
+    `REAR_SECTION` is in fractions of the box `rear_prot_depth` and the local
+    `_rear_top_z` span define, so the sourced KG C2 depth stays single-owner,
+    the top edge is the measured `_rear_top_profile`, and the three
+    ground-clearance windows are a bottom-edge table rather than a second
+    section.
     """
     front_y = P.rear_prot_front_y(p)
     bottom_z = _rear_bottom_z(p, x)
-    top_z = bottom_z + p.rear_prot_height
+    top_z = _rear_top_z(p, x)
     controls = [
         Vector(
             (

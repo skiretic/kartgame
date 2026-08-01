@@ -1561,9 +1561,19 @@ class KartParams:
 
     rear_prot_depth: float = 0.187
     rear_prot_height: float = 0.177
-    """Rear wheel protection depth and height. `sourced`: KG C2 homologation form
-    `003-BR-48` p. 2 drawing. The 187 is also the depth `overhang_rear_protection`
-    is derived from, so the two cannot drift."""
+    """Rear wheel protection depth, and the KG C2 form's overall height. Depth is
+    `sourced`: KG C2 homologation form `003-BR-48` p. 2 drawing, and the 187 is
+    also the depth `overhang_rear_protection` is derived from, so the two cannot
+    drift.
+
+    The height is `sourced` off the same drawing but **no longer builds the
+    part** (ADR-0062): current plain protections run ~70 mm taller than the C2,
+    and the top edge lives in `bodywork._rear_top_profile` -- crown at
+    `tire_rear_diameter` (Art. 9.5.5.1's "no higher than the rear wheels"
+    ceiling, which the reference photograph brackets), valley and lobe stations
+    measured off `tonykart_rear_header.jpg` and authored with deliberate
+    liberty. This field stays as the C2 form's figure of record; nothing
+    derives from it."""
 
     rear_prot_bottom_z: float = 0.040
     """Bottom edge of the protection **inside its three clearance windows**.
@@ -1882,6 +1892,14 @@ FIELD_COVERAGE_EXEMPT: dict[str, str] = {
         "issue #111: powertrain.py restates it as literals -- SPROCKET_Y and the "
         "cylinder stations are authored absolutely rather than off the engine's "
         "own datum."
+    ),
+    "rear_prot_height": (
+        "the KG C2 form's overall height, kept as the figure of record. The "
+        "built top edge is bodywork._rear_top_profile -- photo-matched to the "
+        "401T part, which is ~70 mm taller than the C2, under Art. 9.5.5.1's "
+        "no-higher-than-the-rear-wheels ceiling (tire_rear_diameter, which "
+        "geometry does read). Nothing derives from this field; it exists so "
+        "the manifest still publishes what the sourced form says."
     ),
     "tank_capacity": (
         "Art. 9.3's 8 litre minimum is what makes the tank exist, and 8.5 L is the "

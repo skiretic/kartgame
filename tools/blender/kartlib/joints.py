@@ -2336,20 +2336,15 @@ JOINTS: tuple[Joint, ...] = (
         kind="pierced",
         why="the U-bend crosses the same shell",
     ),
-    Joint(
-        a="bodywork_rear_panel",
-        b="exhaust_silencer",
-        kind="pierced",
-        why="and the can, which Art. 5.10 requires to discharge behind the driver and "
-        "not past the kart's outer limits -- at x 280 the outlet is 420 mm inside the "
-        "700 limit, so it is inside the protection and not beyond it",
-    ),
-    Joint(
-        a="bodywork_rear_panel",
-        b="exhaust_silencer_band_0",
-        kind="pierced",
-        why="the two jubilee clips are on the body, inside the same cut",
-    ),
+    # The silencer can and its jubilee clips were declared `pierced` through the
+    # rear panel while the panel's top was the C2's flat 177: the top-front curve
+    # crossed the can's skin. The photo-matched top profile carries the crown
+    # ~70 mm higher, so the can now sits wholly inside the shell's hollow and no
+    # skin touches -- which is what the reference photo shows, a can behind the
+    # crown with only the outlet stubs proud of the valley. The Art. 5.10
+    # argument the joint carried still holds and lives here: the outlet at x 280
+    # discharges behind the driver, 420 mm inside the 700 mm outer limit, so it
+    # is inside the protection and not beyond it.
     Joint(
         a="bodywork_rear_panel",
         b="exhaust_silencer_bracket",
