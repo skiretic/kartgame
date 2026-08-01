@@ -1385,13 +1385,21 @@ class KartParams:
     and blow-moulded wall is not uniform -- so this is the mean wall and not a
     caliper reading. It is not 3.0."""
 
-    nose_width: float = 1.090
-    """Nose fairing overall width. `sourced`: OTK M4 homologation form
-    `100/CA/20` p. 2, a dimensioned drawing read at 200 dpi.
+    nose_width: float = 1.200
+    """Nose fairing overall width. Was 1.090, `sourced` off the OTK M4 form
+    `100/CA/20` p. 2 -- that figure stays recorded here as the form's number.
+    1.200 is a deliberate deviation, `estimated`, part 6 of the sculpt wave:
+    Anthony's directive that the fairing is an aero piece and must screen the
+    front wheels. 1.310 was tried first and judged too wide -- a wall passing
+    in front of the tire rather than a tip sculpted around it. At 1.200 the
+    tips reach |x| 600 against the tire's 552.5..687.5 span, covering its
+    inboard 48 mm, and the tip itself wraps: apex swept hard back, trailing
+    edge pulled rearward toward the tire face (`NOSE_BACK_*_INSET`'s negative
+    outboard stations).
 
     Art. 9.5.2 sets *"Minimum width: 1.000 mm"* and caps the maximum at the
-    overall rear width of the front wheel/front axle unit, i.e. `track_front` =
-    1240 -- so 1090 clears the minimum by 90 and the maximum by 150.
+    overall width of the front wheel/front axle unit -- `track_front` 1240 plus
+    a tire width is 1375. 1200 sits between them.
 
     It was 0.680 while `bodywork.NOSE_HALF_WIDTH_LIMIT` clamped the built panel to
     a half-width of 0.256: the parameter said 680 mm, the mesh was 512 mm wide,
@@ -1433,12 +1441,20 @@ class KartParams:
     wheel raked 26.9° from vertical has its highest rim point leaning forward. 500
     is 52.5 mm under it."""
 
-    front_panel_bottom_z: float = 0.240
+    front_panel_bottom_z: float = 0.243
     """Front panel bottom edge. `estimated` off V8/V12: the foot tucks in just
     behind and below the fairing's rear top edge (z 267 at the spine), so the
     panel reads as the fairing's center section continuing up to the wheel --
     which is what a real nose is, one visual mass, not a signboard floating in
     daylight behind it.
+
+    Was 0.240 -- 27 mm below the spine edge, which left a visible letterbox of
+    daylight under the panel's foot at any low camera. 252 was tried first and
+    measured 26 triangle pairs at the centerline, y 736-739 z 247-255: both
+    parts' Catmull-Rom endpoint hooks curl into a 5 mm shutline. 246 still grazed at 6 pairs; 243 is the
+    working point -- 14 mm under the rolled rear edge, tight enough to read as
+    a shutline, clear of both hooks. The flanking daylight is closed by
+    `bodywork.NOSE_REAR_RISE`'s lobes, not by this number.
 
     Was 0.190 with a docstring claiming the height alone satisfied Art. 9.5.3's
     feet clause. It did not: the panel stood at y 585-620, planted in the boot

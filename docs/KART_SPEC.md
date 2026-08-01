@@ -5260,8 +5260,8 @@ Every row is a regulated dimension. Margin is signed toward the limit that binds
 
 | regulated dimension | specified | limit | margin | article (PDF p.) |
 | --- | --- | --- | --- | --- |
-| fairing width | 1090 | ≥1000 | +90 | 9.5.2 (24) |
-| fairing width | 1090 | ≤1240 (front-axle unit) | −150 | 9.5.2 (24) |
+| fairing width | 1200 | ≥1000 | +200 | 9.5.2 (24) |
+| fairing width | 1200 | ≤1240 (front-axle unit) | −40 | 9.5.2 (24) |
 | fairing top edge | 267 | ≤280 (front wheel top) | −13 | 9.5.2 (24) |
 | gap, front wheels to back of fairing | 77 | ≤180 | −103 | 9.5.2 (24) |
 | front overhang, fairing | 504 | ≤680 | −176 | 9.5.2 (24) |
@@ -5457,7 +5457,7 @@ seven 9.5.2 rows.
 
 | dimension | `params.py` field | value | prov | basis |
 | --- | --- | --- | --- | --- |
-| width | `nose_width` | 1090 | `sourced` | OTK M4 HF `100/CA/20` p. 2 drawing, read at 200 dpi. Was 0.680 and built at 0.512 |
+| width | `nose_width` | 1200 | `estimated` (deviation) | the M4 form's `sourced` 1090 stays recorded; 1200 is part 6's deliberate deviation on Anthony's aero directive -- tips reach |x| 600, covering the tire's inboard 48 mm. Inside 9.5.2's band either way. Was 0.680 and built at 0.512, then 1090 sourced, then briefly 1310 (judged too wide) |
 | fore-aft depth at centerline | `nose_depth` | 287 | `sourced` | same drawing, plan view |
 | overall height | `nose_height` | 227 | `sourced` | same drawing, front elevation. Was 0.130 |
 | frontmost plane (apex, centerline) | `nose_apex_y` | +1029 | `derived` | front matter §5: front axle +525 plus front overhang 504 |
@@ -5465,9 +5465,12 @@ seven 9.5.2 rows.
 | kit recess in the rear lip, \|x\| ≤ 120 | — | +800 | `estimated` | the notch visible mid-rear in the OTK plan view; 58 mm forward of the lip clears the two clamp tubes and their hooks |
 | bottom edge, centerline | `nose_bottom_z` | 40 | `estimated` | 5 mm above the rails' underside at 35, which are the lowest thing on the kart (`ground_clearance`). Was 46; 40 buys the fairing's top edge 6 mm against the 280 ceiling |
 | top edge, centerline | — | 267 | `derived` | 40 + 227. 13 mm under the front tire top at 280 |
-| bottom edge at the tips | — | 130 | `estimated` | the turned-up outer ends, read off the OTK front elevation as ~0.40 of the panel height above the centerline edge |
-| top edge at the tips | — | 215 | `estimated` | same elevation; tip height 85 mm against 227 at the spine |
-| apex setback at the tips | — | 189 | `estimated` | `NOSE_APEX_SETBACK`'s existing curve × 1.8, which is what carries it from a 256 to a 545 half-width; tip depth 98 mm |
+| bottom edge at the tips | — | 108 | `estimated` | part 6: the horn's lower edge; the old 130 turned-up read was the M4's flat-tip design |
+| top edge at the tips | — | 254 | `estimated` | part 6, the VLR-typology horns: tip tops RISE outboard, 26 under the 280 tire crown. The M4's falling 215 tip is superseded |
+| top edge, hump/valley | — | 267 / 245 / 252 | `estimated` | part 6 center hump: valley at |x| 260, ridge shoulder at 350 -- at 260 rather than the reference's ~190 because Art. 9.4.1's upper bar runs its straight at z 217 exactly there (46 measured pairs) |
+| rear edge rise (the V walls) | — | −10 .. +24 | `estimated` | `NOSE_REAR_RISE`: rear corners rise flanking the front panel so the panel grows out of the fairing; lobes lean 14 mm forward of the 742 lip to clear the panel's base belly (26 measured pairs at a 5 mm shutline; 14 mm is the working shutline) |
+| apex setback at the tips | — | 189 | `estimated` | `NOSE_APEX_SETBACK`'s existing curve × 1.8; tip depth grows to ~143 with the horn's trailing pull |
+| horn trailing edge, tips | — | 697 | `estimated` | `NOSE_BACK_TOP_INSET` −45 at the tip: the trailing edge sweeps rearward alongside the tire, 32 mm off its leading face at 665 -- the crescent that reads as sculpted around the wheel |
 | apex height, centerline | — | 108 | `derived` | unchanged: mid-height of the 75 mm gap between the two nose-hoop tiers at the bumper plane, and demand 1 keeps both tiers where it was measured |
 | wall thickness | `panel_thickness` | 3.8 | `derived` | §50.6 |
 | free-edge return radius | — | 5.0 | `sourced` | Art. 4.10.2, PDF p. 11 |
@@ -5476,7 +5479,8 @@ seven 9.5.2 rows.
 
 Clearances, all `derived`, none of them regulated but each one a gate-1 pair:
 
-    front tires: fairing spans y 742..1029, tire spans y 385..665      77 mm clear
+    front tires: center lip at 742 is 77 mm clear; the horn trailing
+    edges chase the tire to 32 mm at |x| 600 (static, unsteered)
     nose hoop lower tier, tube surface z 50..70 at y +950              inside the cavity, 6.2 mm under the inner lower skin at 43.8
     nose hoop upper tier, tube surface z 145..165 at y +950            inside the cavity by 101 mm above and 98 mm below
 

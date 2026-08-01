@@ -108,13 +108,31 @@ LIP_FLAP: float = 0.006
 #: front elevation as ~0.37 of the spine height. `_nose_top_z` substitutes the
 #: parameter at the centerline and fades the correction out, so a
 #: `--set nose_height=` sweep moves the spine rather than being transcribed here.
+#: The two added stations at 0.230 and 0.320 are part 6's center hump: every
+#: reference fairing carries a raised spine with a soft valley either side
+#: (`crg_roadrebel_kz_bodywork.webp` from above, the KG 506 and OTK M6 share the
+#: type), and a monotone top read as a plank from the driver's seat. Valley
+#: depth ~13 mm against the spine, ridge shoulder 4 mm proud of the fall line --
+#: `estimated`, generic per ADR-0062's intent rule, soft enough that the linear
+#: table through the loft cannot alias into a crease at either detail, and the
+#: valley sits at |x| 230 rather than the reference's ~190 because Art. 9.4.1's
+#: upper bumper bar runs its 375..395 straight at z ~217 exactly there -- a
+#: valley over the bar puts the skin through the tube, measured 46 triangle
+#: pairs the first time.
+#: ...and outboard of the ridge the top edge RISES again toward the tips:
+#: the fairing is an aero piece (Anthony, part 6) and its tips are endplates
+#: screening the front tires -- the CRG front-on shows the tip tops near tire
+#: height. 250 at the tip against the front tire's 280 crown leaves the top
+#: 30 mm of tire visible head-on, which is what the reference shows.
 NOSE_TOP_Z: tuple[tuple[float, float], ...] = (
     (0.000, 0.267),
-    (0.120, 0.264),
-    (0.240, 0.257),
-    (0.380, 0.240),
-    (0.470, 0.228),
-    (0.545, 0.215),
+    (0.110, 0.263),
+    (0.260, 0.248),
+    (0.350, 0.252),
+    (0.420, 0.238),
+    (0.500, 0.243),
+    (0.560, 0.248),
+    (0.600, 0.254),
 )
 
 #: Bottom edge of the fairing, against |x| in meters. Flat under the spine and
@@ -129,9 +147,10 @@ NOSE_TOP_Z: tuple[tuple[float, float], ...] = (
 NOSE_BOTTOM_Z: tuple[tuple[float, float], ...] = (
     (0.000, 0.040),
     (0.200, 0.042),
-    (0.300, 0.052),
-    (0.420, 0.085),
-    (0.545, 0.130),
+    (0.300, 0.050),
+    (0.420, 0.075),
+    (0.545, 0.098),
+    (0.600, 0.108),
 )
 
 #: Height of the fairing's forward-most point, against |x| in meters.
@@ -147,6 +166,7 @@ NOSE_APEX_Z: tuple[tuple[float, float], ...] = (
     (0.200, 0.113),
     (0.380, 0.133),
     (0.545, 0.170),
+    (0.600, 0.175),
 )
 
 #: How far the apex is swept back from the centerline apex, against |x| /
@@ -179,15 +199,48 @@ NOSE_APEX_SETBACK: tuple[tuple[float, float], ...] = (
 #: Spec §50.8 asserts the panel is *"entirely forward of the loop"* at a 742 lip.
 #: It is not: 742 < 775. The underside of a real CIK fairing is shallower than its
 #: top for exactly this reason -- 247 mm against 287.
+#: The 0.36-station bump is part 6: the rear-rise lobes lean their edge 14 mm
+#: FORWARD (larger y = away from the panel) so the risen corners clear the
+#: panel's forward base belly -- 26 measured triangle pairs when they shared
+#: the 742 plane. The lobe overlapping in front of the panel's flank is also
+#: the look: a bumper cover laps the body panel, not the reverse.
+#: ...and the outboard stations go NEGATIVE -- the tips are HORNS (the VLR
+#: 2025 front end Anthony pasted as the target): the trailing edge sweeps
+#: rearward alongside the tire, chasing its leading face at 665. -45 puts the
+#: horn's trailing edge at 697, a 32 mm gap -- the crescent that makes the tip
+#: read as sculpted around the wheel. Static gap only: the gate measures the
+#: unsteered wheel, and 32 mm is what the reference geometry runs.
 NOSE_BACK_TOP_INSET: tuple[tuple[float, float], ...] = (
     (0.00, 0.000),
-    (0.50, 0.004),
-    (1.00, 0.000),
+    (0.24, 0.002),
+    (0.36, 0.014),
+    (0.52, 0.010),
+    (0.80, -0.016),
+    (1.00, -0.045),
+)
+
+#: Rear top edge z, as a delta on `_nose_top_z` against |s|. Part 6's
+#: bumper-cover blend: the panel's foot spans |x| <= 137 and the fairing's rear
+#: corners RISE either side of it -- the V walls every reference shows
+#: (`crg_roadrebel_kz_bodywork.webp`, the KG 506 family) -- so the panel grows
+#: out of the fairing instead of standing in a letterbox of daylight. Center
+#: stays -10 (the rolled edge the panel foot tucks behind, 5 mm shutline at
+#: `front_panel_bottom_z` 252); the lobes peak +24 at |s| 0.36 (|x| ~196, just
+#: outboard of the panel's base flare); outboard returns to a light -6 roll.
+#: `estimated`, and soft -- no crease, the rear edge is a free edge.
+NOSE_REAR_RISE: tuple[tuple[float, float], ...] = (
+    (0.00, -0.010),
+    (0.26, -0.002),
+    (0.36, 0.024),
+    (0.50, 0.014),
+    (0.66, -0.002),
+    (1.00, -0.006),
 )
 NOSE_BACK_BOTTOM_INSET: tuple[tuple[float, float], ...] = (
     (0.00, 0.040),
     (0.50, 0.042),
-    (1.00, 0.030),
+    (0.80, 0.012),
+    (1.00, -0.030),
 )
 
 #: Fore-aft station of the fairing's single air vent, and its diameter.
@@ -1120,7 +1173,7 @@ def _nose_section(p: P.KartParams, s: float, steps: int) -> list[Vector]:
     depth_bottom = apex_y - back_bottom_y
 
     controls = [
-        Vector((x, back_top_y, top_z - 0.010)),
+        Vector((x, back_top_y, top_z + _table(NOSE_REAR_RISE, a))),
         Vector((x, back_top_y + depth_top * 0.30, top_z)),
         Vector((x, apex_y - depth_top * 0.32, top_z - 0.004)),
         Vector(
@@ -1131,11 +1184,16 @@ def _nose_section(p: P.KartParams, s: float, steps: int) -> list[Vector]:
             )
         ),
         Vector((x, apex_y, apex_z)),
+        # Lower front pulled further back and lower than the old
+        # (0.028, 0.35) pair: the skin under the apex tucks inward, which is
+        # the mouth shadow every reference front-on shows -- the bumper's
+        # lower bar sits in that shadow line instead of hanging in open air
+        # under a boat hull. Part 6, Anthony's flow note.
         Vector(
             (
                 x,
-                apex_y - min(0.028, depth_bottom * 0.22),
-                bottom_z + (apex_z - bottom_z) * 0.35,
+                apex_y - min(0.048, depth_bottom * 0.34),
+                bottom_z + (apex_z - bottom_z) * 0.28,
             )
         ),
         Vector((x, back_bottom_y, bottom_z)),
