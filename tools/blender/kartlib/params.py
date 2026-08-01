@@ -782,14 +782,13 @@ class KartParams:
     agrees: mid-sidewall on a Ø260 tire over a Ø136 flange is (130 + 68)/2 = 99,
     so one widest-point radius serves both ends. Spec §20.2.3; no physics reads
     it.
+
+    Caveat found in the tire pass: the form's cross-section sketch is one
+    template -- 047-TO-12 and -14 p. 3 carry pixel-identical curves for two
+    different tires -- so this figure is an `estimated` mid-sidewall placement
+    the sketch and the museum photo agree on, not a scaled-drawing measurement.
+    The value survives; the provenance is weaker than §20.2.3 claims.
     """
-
-    tire_shoulder_radius: float = 0.022
-    """Tread-to-sidewall corner radius. `estimated`. Kart slicks have a soft
-    shoulder and a square one reads as a toy.
-
-    It no longer sets the tread band's width -- `tire_*_tread_width` does, and the
-    shoulder is fitted between that band and the sidewall."""
 
     tire_segments: int = 32
     tire_segments_high: int = 64

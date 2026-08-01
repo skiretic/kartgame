@@ -76,6 +76,27 @@ MAX_RAY_DISTANCE = 0.02
 #: do not sample the empty atlas next door.
 MARGIN = 8
 
+#: Tread graining: a driven slick is not perfectly smooth -- the contact band
+#: carries a worked, mottled surface from abrasion, visible in
+#: `refs/kart-visual/det_tonykart_401t_museum.jpg` as a matte band against the
+#: sheen of the sidewall. Modeled as a procedural bump on the *high-poly* tire
+#: only, attached for the duration of the bake and removed after, so it rides
+#: the normal atlas like a bevel highlight: no geometry cost, no change to the
+#: shipped materials or the glTF export path. Verified before building
+#: (probe, this session): a selected-to-active NORMAL bake does capture the
+#: source material's bump chain.
+#:
+#: Feature size is bounded from below by the atlas, not by realism: the tire's
+#: island resolves ~2 mm per texel, so sub-texel grit would average to mush at
+#: 16 samples. ~4.5 mm mottling bakes cleanly; true micro-grain stays the
+#: `tire_tread` zone's roughness value. All three figures `estimated`.
+TREAD_GRAIN_SCALE = 220.0
+TREAD_GRAIN_DISTANCE = 0.0004
+#: The grain masks in radially: zero 12 mm below the tread-edge radius, full 6 mm
+#: below it, so the whole crown is worked and the band dies a hand's width down
+#: the shoulder -- wear lives where the road touches.
+TREAD_GRAIN_FADE = (0.012, 0.006)
+
 
 def run(context: build.BuildContext) -> None:
     """Bake tangent-space normals for every paired object into one atlas."""
@@ -108,6 +129,7 @@ def run(context: build.BuildContext) -> None:
     # baked into, and connecting it through a Normal Map node means the same setup
     # also gives the exported glTF its normal map. One arrangement, two purposes.
     targets = _attach_normal_map(context, image)
+    grain_overrides, grain_materials = _attach_tread_grain(context)
 
     baked = 0
     orphans: list[str] = []
@@ -142,6 +164,8 @@ def run(context: build.BuildContext) -> None:
             continue
         baked += 1
         del index
+
+    _detach_tread_grain(grain_overrides, grain_materials)
 
     if baked == 0:
         print("    warning: nothing baked, leaving the normal map unattached")
@@ -239,6 +263,91 @@ def _attach_normal_map(
         tree.nodes.active = texture
         added.append((material, texture))
     return added
+
+
+def _grain_material(name: str, tread_radius: float) -> bpy.types.Material:
+    """One bake-only material: noise bump masked to the tread band by radius.
+
+    The mask reads the mesh's own object-space coordinates -- the tire is lathed
+    about local X with its origin at the wheel center, so radial distance is the
+    length of (0, y, z) and no per-object transform is involved.
+    """
+    material = bpy.data.materials.new(name)
+    material.use_nodes = True
+    tree = material.node_tree
+    principled = tree.nodes["Principled BSDF"]
+
+    coords = tree.nodes.new("ShaderNodeTexCoord")
+    separate = tree.nodes.new("ShaderNodeSeparateXYZ")
+    tree.links.new(coords.outputs["Object"], separate.inputs["Vector"])
+    plane = tree.nodes.new("ShaderNodeCombineXYZ")
+    plane.inputs["X"].default_value = 0.0
+    tree.links.new(separate.outputs["Y"], plane.inputs["Y"])
+    tree.links.new(separate.outputs["Z"], plane.inputs["Z"])
+    radius = tree.nodes.new("ShaderNodeVectorMath")
+    radius.operation = "LENGTH"
+    tree.links.new(plane.outputs["Vector"], radius.inputs[0])
+
+    fade_out, fade_full = TREAD_GRAIN_FADE
+    mask = tree.nodes.new("ShaderNodeMapRange")
+    mask.inputs["From Min"].default_value = tread_radius - fade_out
+    mask.inputs["From Max"].default_value = tread_radius - fade_full
+    tree.links.new(radius.outputs["Value"], mask.inputs["Value"])
+
+    noise = tree.nodes.new("ShaderNodeTexNoise")
+    noise.inputs["Scale"].default_value = TREAD_GRAIN_SCALE
+    noise.inputs["Detail"].default_value = 3.0
+    tree.links.new(coords.outputs["Object"], noise.inputs["Vector"])
+
+    bump = tree.nodes.new("ShaderNodeBump")
+    bump.inputs["Distance"].default_value = TREAD_GRAIN_DISTANCE
+    tree.links.new(noise.outputs["Fac"], bump.inputs["Height"])
+    tree.links.new(mask.outputs["Result"], bump.inputs["Strength"])
+    tree.links.new(bump.outputs["Normal"], principled.inputs["Normal"])
+    return material
+
+
+def _attach_tread_grain(
+    context: build.BuildContext,
+) -> tuple[
+    list[tuple[bpy.types.MaterialSlot, str, bpy.types.Material]],
+    list[bpy.types.Material],
+]:
+    """Swap the high-poly tires onto grain materials, as object-level overrides.
+
+    Object-level (`slot.link = "OBJECT"`) so the shared mesh materials are never
+    touched -- the shipped low-poly reads the same datablocks throughout, and
+    restoring is clearing the override. Front and rear get their own material
+    because the mask is keyed to each end's tread radius.
+    """
+    overrides: list[tuple[bpy.types.MaterialSlot, str, bpy.types.Material]] = []
+    materials: dict[str, bpy.types.Material] = {}
+    p = context.params
+    radii = {"f": p.tire_front_diameter * 0.5, "r": p.tire_rear_diameter * 0.5}
+    for name in sorted(context.high_poly):
+        if not (name.startswith("wheel_") and name.endswith("_tire")):
+            continue
+        end = name.split("_")[1][0]
+        if end not in materials:
+            materials[end] = _grain_material("bake_tread_grain_%s" % end, radii[end])
+        for slot in context.high_poly[name].material_slots:
+            overrides.append((slot, slot.link, slot.material))
+            slot.link = "OBJECT"
+            slot.material = materials[end]
+    return overrides, [materials[end] for end in sorted(materials)]
+
+
+def _detach_tread_grain(
+    overrides: list[tuple[bpy.types.MaterialSlot, str, bpy.types.Material]],
+    materials: list[bpy.types.Material],
+) -> None:
+    for slot, link, material in overrides:
+        slot.material = None
+        slot.link = link
+        if link == "OBJECT":
+            slot.material = material
+    for material in materials:
+        bpy.data.materials.remove(material)
 
 
 def _detach_normal_map(

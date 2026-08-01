@@ -839,10 +839,13 @@ FIXED_FINISHES: dict[str, Finish] = {
     # Sidewall 0.72 (kept), tread 0.62: a scrubbed slick is glossier than its
     # sidewall, `sourced` exh_commons_buntschu_kz2.jpg, the only worked tire here.
     "tire_rubber": ("#1a1614", 0.0165, 0.72, 0.0),
-    # The crown, at the same value and a cooler hue: the worked band's bluish sheen
-    # in buntschu. Held to the *same* luminance as the sidewall on purpose, so the
-    # tread reads as a different surface rather than as a different rubber.
-    "tire_tread": ("#141a1c", 0.0165, 0.62, 0.0),
+    # The crown, at the *same albedo* as the sidewall: an earlier cooler hue
+    # (#141a1c, read off buntschu's bluish sheen) drew a hard-edged painted band
+    # around the tire and Anthony rejected it on sight — one rubber, one color.
+    # A sheen is an illumination effect, so it lives in the roughness delta
+    # (0.62 worked vs 0.72 virgin) and the baked tread grain, both of which move
+    # with the light instead of sitting in the paint.
+    "tire_tread": ("#1a1614", 0.0165, 0.62, 0.0),
     # --- §60.3.5 steel running gear, which was four finishes -------------
     # Kept exactly: heat-treated steel, dark satin, and the old comment's reason
     # for it (a 1,080 mm bright cylinder becomes the kart's focal point) still holds.
@@ -1336,8 +1339,14 @@ NUMBER_ZONE_REAR_FRACTION = 0.45
 NUMBER_FIELD_SIZE: tuple[float, float] = (0.370, 0.170)
 
 #: Fraction of the tire's half width that is crown rather than sidewall.
-#: `estimated` off buntschu, where the worked band covers most of the tread face.
-TIRE_TREAD_FRACTION = 0.62
+#: `derived`: the tread reaches every surface that touches the road, so the band
+#: is the sourced tread width over the overall width -- 179/215 = 0.83 rear,
+#: 110/135 = 0.81 front. 0.80 selects exactly the crown faces at both detail
+#: levels under the face-center rule below (last rear crown face center sits at
+#: 0.70 low / 0.76 high, first shoulder face at 0.84; front 0.68/0.78 vs 0.83)
+#: with >=0.02 margin on all eight cases. Replaces an `estimated` 0.62 that cut
+#: the outer tread face ring at low detail and drew the worked band 25% narrow.
+TIRE_TREAD_FRACTION = 0.80
 
 #: What a livery role's material is, for the default livery, in the old
 #: `(color linear, roughness, metallic)` shape. Kept because the name is part of

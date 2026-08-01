@@ -105,16 +105,48 @@ roughly what a real slick's lower sidewall does -- the tire's overall width is
 207 against 198 of rim, so the sidewall stands 4.5 mm proud of each flange and
 there is only 4.5 mm of axial room for the turn-in to happen in anyway."""
 
-TIRE_SIDEWALL_LEAN: float = 0.004
-"""How far inboard of the widest point the sidewall's upper end sits, i.e. how
-much the sidewall leans outward on its way down to the bulge."""
+# The tire's shape table. Every figure here was read off
+# `refs/kart-visual/det_tonykart_401t_museum.jpg` (gridded crops, tire-pass
+# session), which mounts the same Vega 5-inch slicks the dimensions come from.
+# The homologation forms' own cross-section sketch is NOT usable for shape: the
+# 047-TO-12 and 047-TO-14 p. 3 curves are pixel-identical -- one template
+# drawing claiming to be both 130 mm and 207 mm wide -- so only their dimension
+# tables are sourced and the photograph is the shape authority.
 
-TIRE_SHOULDER_STEPS: int = 4
-TIRE_SIDEWALL_STEPS: int = 3
-TIRE_BEAD_STEPS: int = 3
-"""Points along each part of the profile. Independent of `tire_segments`, which is
-the resolution *around* the tire: the shoulder needs several points at any
-circumferential density, and one chamfer segment reads as a toy at every one."""
+TIRE_TREAD_CROWN_FRAC: float = 0.011
+"""Radial drop from the tread center to the tread edge, as a fraction of tread
+width: ~2.0 mm rear, ~1.2 mm front. `estimated` -- the museum photo shows the
+tread band reading a few millimeters convex, never dead flat; the template
+sketch agrees in kind (~3 mm) but is a template."""
+
+TIRE_ROLL_HANDLE_AXIAL: float = 0.45
+TIRE_ROLL_HANDLE_RADIAL: float = 0.18
+"""Bezier handle lengths for the shoulder roll, as fractions of the axial gap
+(tread edge to widest point) and the radial drop (tread edge to widest point).
+Larger reads squarer. `estimated`: tuned so the roll spans ~30-35 mm radially on
+the rear against the museum photo's soft continuous shoulder, where the old
+quarter-arc spanned the 8.5-14 mm left over between two sourced widths and read
+as a corner."""
+
+TIRE_BULGE_HANDLE: float = 0.45
+"""Lower-sidewall Bezier handle below the widest point, as a fraction of the
+radial drop from bulge to bead. Sets how long the sidewall stays fat before
+diving for the rim; the museum photo's sidewall carries its bulge well past
+mid-height."""
+
+TIRE_SEAT_TUCK: float = 0.006
+"""Axial length of the concave landing onto the bead seat. The S-flip is what
+makes the sidewall arrive steep at the flange lip so the gold rim edge reads
+recessed into the rubber, as in the museum photo, instead of the tire ending on
+a convex chamfer."""
+
+TIRE_CROWN_STEPS: int = 3
+TIRE_ROLL_STEPS: int = 7
+TIRE_LOWER_STEPS: int = 7
+"""Points along each piece of the profile at low detail; the caller scales them
+by `tire_segments // 32` so the high-detail bake source samples the same curves
+twice as densely (ADR-0059: one shape, two densities). Independent of
+`tire_segments`, which is the resolution *around* the tire."""
 
 RIM_FLANGE_WIDTH: float = 0.005
 RIM_FLANGE_TAPER: float = 0.004
@@ -737,7 +769,9 @@ def _wheel(
     bm = bmesh.new()
     build.lathe(
         bm,
-        _tire_profile(p, diameter, width, tread),
+        _tire_profile(
+            p, diameter, width, tread, max(1, context.detail.tire_segments // 32)
+        ),
         context.detail.tire_segments,
         axis="X",
         # Closes the last profile ring back onto the first, which is the tire's
@@ -779,8 +813,39 @@ def _wheel(
 # --- tire profile ----------------------------------------------------------
 
 
+def _cubic_samples(
+    p0: tuple[float, float],
+    c0: tuple[float, float],
+    c1: tuple[float, float],
+    p1: tuple[float, float],
+    steps: int,
+) -> list[tuple[float, float]]:
+    """`steps` samples of a cubic Bezier at t = 1/steps .. 1, excluding t = 0.
+
+    The caller has already emitted p0 as the previous piece's last point, so
+    including t = 0 would double a ring and hand `lathe` a zero-height quad band.
+    """
+    out: list[tuple[float, float]] = []
+    for step in range(1, steps + 1):
+        t = step / steps
+        u = 1.0 - t
+        out.append(
+            (
+                u * u * u * p0[0]
+                + 3.0 * u * u * t * c0[0]
+                + 3.0 * u * t * t * c1[0]
+                + t * t * t * p1[0],
+                u * u * u * p0[1]
+                + 3.0 * u * u * t * c0[1]
+                + 3.0 * u * t * t * c1[1]
+                + t * t * t * p1[1],
+            )
+        )
+    return out
+
+
 def _tire_profile(
-    p: P.KartParams, diameter: float, width: float, tread: float
+    p: P.KartParams, diameter: float, width: float, tread: float, scale: int
 ) -> list[tuple[float, float]]:
     """(radius, x) pairs for one tire, revolved about X by `build.lathe`.
 
@@ -789,22 +854,37 @@ def _tire_profile(
     the same mesh correct on both sides of the kart without a mirror or a 180 degree
     rotation -- see the module docstring for why that matters.
 
-    The half runs from the edge of the flat tread band outward and down:
+    The half runs from the tread center outward and down, three pieces:
 
-        tread edge -> shoulder arc -> sidewall -> bead turn-in -> rim seat
+        crowned tread -> shoulder roll -> lower sidewall S onto the bead seat
 
-    **The tread band's width is now authored**, `tire_*_tread_width` off the
-    homologation forms, and the shoulder is fitted between it and the sidewall. It
-    used to be `half_width - lean - shoulder`, i.e. the residue after a taste
-    constant, and it measured 163 mm at the rear against a sourced 179 and 83 mm at
-    the front against 110. The front was worse because the same 22 mm shoulder is a
-    bigger fraction of a narrower tire.
+    There is deliberately no straight "sidewall" segment left: the museum photo
+    (see the shape table above) shows one continuous convex roll from the tread
+    edge to the widest point, so the shoulder is a single tangent-matched cubic
+    covering that whole span rather than a corner radius plus a flat. The old
+    quarter-arc construction clamped to the 8.5-14 mm left between two sourced
+    widths and read as a machined chamfer on a drum.
+
+    The lower piece is one cubic with an inflection: convex while it carries the
+    bulge down from the widest point, concave as it lands on the bead seat, which
+    is what tucks the rubber in behind the rim flange lip. It crosses the flange
+    lip radius ~1.5 mm proud of the rim face and dives inside, so the visible seam
+    is the flange edge pressing into the sidewall, same overlap discipline as the
+    old profile.
+
+    `tire_*_tread_width` stays authored off the homologation forms; the crown drops
+    the tread edge by `TIRE_TREAD_CROWN_FRAC` and the roll starts tangent to that
+    slope, so the tread/shoulder joint never creases.
 
     Point order is what sets the surface orientation. `build.lathe` winds a ring
     pair so that a profile advancing in +x on the outward-facing side gives outward
     normals, so the fold at the widest point -- where x stops increasing and turns
     back inboard toward the bead -- is what makes the turn-in face outboard rather
     than inside out.
+
+    `scale` multiplies the per-piece step counts (1 at low detail, 2 at high) so
+    both details sample identical curves and the high mesh is the same shape at
+    twice the profile density.
     """
     tread_radius = diameter * 0.5
     half_width = width * 0.5
@@ -812,52 +892,54 @@ def _tire_profile(
     bulge_radius = bead_radius + p.tire_sidewall_bulge
 
     tread_x = tread * 0.5
-    wall_x = half_width - TIRE_SIDEWALL_LEAN
-    # The shoulder is what bridges the authored tread edge and the sidewall's upper
-    # end, so it is the *gap between two sourced widths* and only falls back on
-    # `tire_shoulder_radius` when that gap is wider than a kart slick's shoulder.
-    # Clamped positive so a sweep onto a narrow tread cannot fold the profile
-    # through its own center plane.
-    shoulder = min(p.tire_shoulder_radius, max(0.001, wall_x - tread_x))
-    shoulder_top = tread_radius - shoulder
+    crown = tread * TIRE_TREAD_CROWN_FRAC
+    edge_radius = tread_radius - crown
+    # dr/dx of the crown parabola at the tread edge; the roll's first handle leaves
+    # along this slope so the joint is tangent-continuous.
+    crown_slope = 2.0 * crown / tread_x
 
-    half: list[tuple[float, float]] = [(tread_radius, wall_x - shoulder)]
+    half: list[tuple[float, float]] = []
 
-    # Shoulder: a quarter arc, tangent to the flat tread where it starts and purely
-    # radial where it ends, so neither joint creases.
-    for step in range(1, TIRE_SHOULDER_STEPS + 1):
-        angle = 0.5 * math.pi * step / TIRE_SHOULDER_STEPS
-        half.append(
-            (
-                shoulder_top + shoulder * math.cos(angle),
-                wall_x - shoulder + shoulder * math.sin(angle),
-            )
+    # Tread: a shallow parabola from center to edge. Starts at step 1 -- the
+    # center ring at x = 0 would mirror onto itself and give lathe a zero-height
+    # band; the chord across the first two samples sags by well under a tenth of
+    # a millimeter.
+    crown_steps = TIRE_CROWN_STEPS * scale
+    for step in range(1, crown_steps + 1):
+        x = tread_x * step / crown_steps
+        half.append((tread_radius - crown * (x / tread_x) ** 2, x))
+
+    # Shoulder roll: one cubic from the tread edge to the widest point, leaving
+    # along the crown's slope and arriving purely radial.
+    axial_gap = half_width - tread_x
+    radial_drop = edge_radius - bulge_radius
+    roll_h0 = TIRE_ROLL_HANDLE_AXIAL * axial_gap
+    half.extend(
+        _cubic_samples(
+            (edge_radius, tread_x),
+            (edge_radius - crown_slope * roll_h0, tread_x + roll_h0),
+            (bulge_radius + TIRE_ROLL_HANDLE_RADIAL * radial_drop, half_width),
+            (bulge_radius, half_width),
+            TIRE_ROLL_STEPS * scale,
         )
+    )
 
-    # Sidewall: down to the bulge, leaning outward on the way. Eased at both ends so
-    # it leaves the shoulder radially and arrives at the widest point with no axial
-    # slope left, which is what makes the bulge read as round.
-    for step in range(1, TIRE_SIDEWALL_STEPS + 1):
-        fraction = step / TIRE_SIDEWALL_STEPS
-        ease = fraction * fraction * (3.0 - 2.0 * fraction)
-        half.append(
+    # Lower sidewall: one cubic from the widest point onto the bead seat. The
+    # second handle stands TIRE_SEAT_TUCK proud of the seat, which is what puts
+    # the inflection -- convex bulge above, concave tuck below -- into the curve.
+    seat_x = half_width - TIRE_BEAD_INSET
+    half.extend(
+        _cubic_samples(
+            (bulge_radius, half_width),
             (
-                shoulder_top + (bulge_radius - shoulder_top) * fraction,
-                wall_x + TIRE_SIDEWALL_LEAN * ease,
-            )
+                bulge_radius - TIRE_BULGE_HANDLE * (bulge_radius - bead_radius),
+                half_width,
+            ),
+            (bead_radius, seat_x + TIRE_SEAT_TUCK),
+            (bead_radius, seat_x),
+            TIRE_LOWER_STEPS * scale,
         )
-
-    # Bead turn-in: an elliptical quarter from the widest point back in and down
-    # onto the bead seat, tangent to the sidewall at the start and to the rim flange
-    # face at the end.
-    for step in range(1, TIRE_BEAD_STEPS + 1):
-        angle = 0.5 * math.pi * step / TIRE_BEAD_STEPS
-        half.append(
-            (
-                bulge_radius - (bulge_radius - bead_radius) * math.sin(angle),
-                half_width - TIRE_BEAD_INSET * (1.0 - math.cos(angle)),
-            )
-        )
+    )
 
     mirrored = [(radius, -along) for radius, along in reversed(half)]
     return mirrored + half

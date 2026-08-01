@@ -346,6 +346,35 @@ that and there is none for the second — the built tread band is
 `half_width − LEAN − shoulder` wide, which is a shoulder-radius accident rather
 than the sourced 179/110.
 
+### 20.2.4 The profile shape, and the drawing that turned out to be a template
+
+The tire pass (2026-08-01) gridded both forms' p. 3 cross-sections to measure
+the profile and found **the two drawings are pixel-identical** — one template
+sketch claiming to be both a 130 mm front and a 207 mm rear. A curve cannot be
+to scale for both, so the sketch carries **topology only** (bulged sidewall,
+near-flat tread, bead hook) and no measurable shape. The dimension tables
+remain `sourced`; every *shape* figure is `estimated` off
+`refs/kart-visual/det_tonykart_401t_museum.jpg`, which mounts the same Vega
+5-inch slicks. This weakens §20.2.3's derivation basis — the widest-point
+radius was read off a sketch that is not a scaled drawing — but the value
+survives: the template, the photo, and mid-sidewall arithmetic on both ends all
+put the widest point in the same place, so `tire_sidewall_bulge = 0.038` stands
+as `estimated` with three agreeing witnesses rather than `derived` from one.
+
+The profile itself was rebuilt in the same pass (`wheels._tire_profile`):
+crowned tread (parabola, `TIRE_TREAD_CROWN_FRAC`), one tangent-matched cubic
+from the tread edge to the widest point (`TIRE_ROLL_HANDLE_*` — there is
+deliberately no straight sidewall segment left; the photo shows one continuous
+convex roll), and a single lower cubic with an inflection that lands the rubber
+concave behind the rim flange lip (`TIRE_BULGE_HANDLE`, `TIRE_SEAT_TUCK`).
+`tire_shoulder_radius` and `TIRE_SIDEWALL_LEAN` are gone — the paragraph above
+records the defect they carried. Profile sampling is detail-scaled
+(`tire_segments // 32`), so the bake source runs the same curves at twice the
+density. The tread band additionally carries a bake-time procedural grain
+(`bake_stage.TREAD_GRAIN_*`): a driven slick's worked contact band, baked into
+the normal atlas from a high-poly-only material override, no shipped-material
+or export change.
+
 ---
 
 ## 20.3 The front track chain, which does not close by 142.5 mm
@@ -918,8 +947,10 @@ And `_tire_profile` reads `rim_diameter` for the bead radius, so the split in
 | rear overall Ø | `tire_rear_diameter` | **295 frozen** (274 sourced) | `estimated` | §20.2.1 |
 | front / rear overall mounted width | `tire_front_width` / `tire_rear_width` | **135 / 215 frozen** (130 / 207 sourced) | `estimated` | §20.2.1 |
 | front / rear tread width | `tire_front_tread_width` / `tire_rear_tread_width` (new) | 110 / 179 | `sourced` | 047-TO-12 / -14 p3 |
-| widest-point radius | `tire_sidewall_bulge` | 38 (fix from 8) | `derived` | §20.2.3 |
-| tread-to-sidewall corner | `tire_shoulder_radius` | 22 | `estimated` | kart slicks have a soft shoulder; unchanged, no source found |
+| widest-point radius | `tire_sidewall_bulge` | 38 (fix from 8) | `derived` | §20.2.3, caveat in §20.2.4 |
+| tread crown | `wheels.TIRE_TREAD_CROWN_FRAC` | 0.011 × tread ≈ 2.0 rear / 1.2 front | `estimated` | §20.2.4; museum photo, never dead flat |
+| shoulder roll | `wheels.TIRE_ROLL_HANDLE_AXIAL` / `_RADIAL` | 0.45 / 0.18 | `estimated` | §20.2.4; one cubic, tread edge to widest point |
+| lower sidewall S | `wheels.TIRE_BULGE_HANDLE` / `TIRE_SEAT_TUCK` | 0.45 / 6 mm | `estimated` | §20.2.4; convex bulge, concave tuck at the flange lip |
 | tread depth, front / rear | — | 3.3 ±0.5 / 3.5 ±0.5 | `sourced` | 047-TO-12/-14 p2 item 9 |
 | tread thickness, front / rear | — | 3.5 ±1.0 / 3.8 ±1.0 | `sourced` | p2 item 12 |
 | mass, front / rear | — | 1200 g / 1600 g, ±10% | `sourced` | p2 item 10 |
@@ -1296,7 +1327,10 @@ Reported, not acted on, with the arithmetic. Verify before believing any of it.
    a sourced 110. So the built tread band is 16 mm narrow at the rear and 27 mm
    narrow at the front, and the shoulder radius is eating the difference — the
    front is worse because the same 22 mm shoulder is a bigger fraction of a
-   narrower tire. §20.2.3.
+   narrower tire. §20.2.3. **Resolved in two steps:** the tread widths were
+   authored first (`tire_*_tread_width`), then the tire pass deleted
+   `tire_shoulder_radius` and `TIRE_SIDEWALL_LEAN` outright — the profile is
+   now the §20.2.4 construction and no taste radius touches a sourced width.
 7. **`wheels.py` builds no bead retention.** Art. 4.14.1 makes at least three
    pegs in the outboard flange mandatory on all four wheels in Groups 1 & 2.
    Twelve pegs, and they are visible in every wheel-level photograph.
