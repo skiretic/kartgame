@@ -3057,7 +3057,7 @@ Two of those change what this repo believed:
 | 3 | engine mount | clamps bored **Ø30.0 coaxial with the right rail**, bodies straddling the rail centerline at x 271.6 / 260.7. Gap 12.10 and 22.90 → **0.0**. §30.2. |
 | 4 | crankcase outboard face | **x +398** unchanged; 107 mm to the pod's mouth at 505, 26 mm to the side bar's inboard surface at 424. §30.3. |
 | 5 | radiator lateral dispute | **x −365, core width 250.** Lateral extent **−240 … −490**. §30.7. |
-| 6 | radiator brackets and rake | rake **45° from vertical**, its own parameter; `radiator_z` **240**; both brackets clamp **`chassis_rail_l`**; **no joint to `seat_shell`, ever.** §30.7. |
+| 6 | radiator brackets and rake | rake **40° from vertical**, its own parameter; `radiator_z` **270**; both brackets clamp **`chassis_rail_l`**; **no joint to `seat_shell`, ever.** §30.7. |
 | 7 | exhaust hanger | Ø30 mushroom clamp on **`chassis_cross_rear` at x +54**, 169 mm arm, spring cradle on the pipe at s = 513. §30.6. |
 
 ## 30.2 The mount — and the rail station this section requires
@@ -3782,13 +3782,13 @@ gap on its own.
 
 | dimension | `params.py` | value | prov | basis |
 | --- | --- | --- | --- | --- |
-| core height, up the slant, tanks included | `radiator_height` | **435** | `sourced` | EM-01 and EM-02 both 435 (New-Line RS MAX 430). The build's 0.432 is right for the wrong reason — its docstring traces it to "17 in", which nobody sourced |
+| core height, up the slant, tanks included | `radiator_height` | **420** | `sourced` | New-Line RS size M is 245 × **420**; the KZ family runs 420–470 (EM-01/EM-02 435, RS MAX 430), so this is its short end. Was 435, and came down with ADR-0065 — standing the core up raises its top and 15 mm of length is what holds it. The older 0.432 was right for the wrong reason: its docstring traced it to "17 in", which nobody sourced |
 | core width, across the kart | `radiator_width` | **250** | `sourced` | EM-01. Was 265 |
 | core thickness, through the face | `radiator_thickness` | **40** | `sourced` | EM-01 and EM-02 |
 | centre x | `radiator_x` | **365**, sign from `RADIATOR_SIDE` = −1 | `derived` | §30.7.1 |
-| centre y | `radiator_y` | **−235** | `estimated` | not re-measurable: the only frame that shows it in plan is p05 and its fore-aft is unusable. Retained because it sits comfortably inside Art. 5.3.1's window, and **relabelled** — its docstring's "measured off V4, the plan-view reference" is a citation nothing in this repo can support |
-| centre z | `radiator_z` | **240** | `derived` | above. Was 320 |
-| rake | `radiator_rake` (**new**) | **45° from vertical** | `derived` | above. Replaces `radiator_rake_delta` |
+| centre y | `radiator_y` | **−282** | `estimated` | not re-measurable: the only frame that shows it in plan is p05 and its fore-aft is unusable. Retained because it sits comfortably inside Art. 5.3.1's window, and **relabelled** — its docstring's "measured off V4, the plan-view reference" is a citation nothing in this repo can support. Moved 47 mm rearward from −235 by ADR-0065; 98 mm of margin to the axle |
+| centre z | `radiator_z` | **270** | `derived` | above, then +30 by ADR-0065 to lift the low tank off `chassis_side_bar_l`. 262 is the bare floor and leaves the bar **1.7 mm**, which fires no gate and is knife-edge; 270 is that floor plus margin. Core top **422**, bottom 118 |
+| rake | `radiator_rake` | **40° from vertical** | `derived` | replaces `radiator_rake_delta`. Was 45, on the edge of both bracketing ranges; 40 sits inside both (height-budget 40 ±5, kart practice 30–45 from vertical). **The change from 45 is what closes #190's radiator cluster** — the low tank's fore-aft half-extent is `(height/2) sin(rake)`, 154 mm at 45 and 140 at 40, and 14 mm walks it clear of the side-bumper socket. ADR-0065 |
 | yaw in plan | — | **0° ±3** | `derived` | p05: the core's inboard and outboard edges are parallel to within 7 px over 178. The fin face points **forward**, the way the driver does |
 | tank height | `RADIATOR_TANK_HEIGHT` | **22** ±6 | `estimated` | the polished band above the fin block reads ~16 px in the dead-rear shot, foreshortened by rake and elevation, so the true height is larger; cross-checked against the CRG close-up. Was 30. Fin block becomes **391** |
 | tank proud of the core, each face | `RADIATOR_TANK_PROUD` | 7 | `estimated` | a folded box welded across the tube ends is necessarily thicker than the fin pack |
@@ -3796,6 +3796,39 @@ gap on its own.
 | flat-tube pitch | — | 10.4 | `derived` | 38 bright tube lines at a median 10.0 px, 1.0409 mm/px → ~24 tubes across 250 |
 | fin pitch, as modelled | `RADIATOR_FIN_PITCH` | 12 | `estimated` | the real pitch is **1.8 ±0.5** (`estimated`, unresolvable below ~2 mm at 1.04 mm/px, checked against 12–16 fins/inch practice) and 288 fins cost more than the rest of the kart. 12 mm is where the pattern still reads at cockpit range without shimmering at chase range; issue #19's bake is the designed answer above it. With width 250 the count is **18**, and the divider at −0.44 of the half-width still lands between fins 4 and 5, so joints.py's two explicit rows stay correct |
 | divider | `RADIATOR_DIVIDER_*` | at −0.44 of the half-width, 11 thick, 5 proud | `sourced` (that it exists) / `estimated` (dimensions) | a New-Line KZ core is double-pass; the welded rib splitting the face is the single most recognizable thing about one |
+
+### 30.7.3 Hose ports — six of them, and they are parts
+
+Every hose termination on the kart used to be a swept tube arriving at a casting
+and stopping, with its last centimetre inside the part it fed. ADR-0064 has the
+full argument; the short version is that all six were declared `kind="routed"`,
+which is the kind for a hose that *lies against* something, so the contact gate
+was satisfied by an 18 mm overshoot.
+
+Each port is now two parts, `<port>_neck` and `<port>_hose_clamp`:
+
+| dimension | constant | value | prov | basis |
+| --- | --- | --- | --- | --- |
+| neck collar Ø | `NECK_ROOT_DIAMETER` | 30 | `estimated` | the brass barbs in `eng_tm_kz10_dress.jpg` all show a root collar wider than the shank the hose grips |
+| neck shank Ø | `NECK_SHANK_DIAMETER` | 21 | `derived` | `HOSE_DIAMETER`'s *sourced* 20 mm ID plus a millimetre so the rubber grips |
+| neck length | `NECK_LENGTH` | 20 | `estimated` | must carry the clamp on hose that is over shank |
+| neck exposed | `NECK_EXPOSED` | 8 | `estimated` | what the hose does **not** cover. Without it the neck is 100% inside the hose and the fitting still does not read — the step is the whole point |
+| clamp station | `CLAMP_ALONG` | 16 | `estimated` | behind the barb ridge, clear of the collar |
+| clamp band | `CLAMP_WIDTH` / `CLAMP_PROUD` | 9 / 1.5 | `estimated` | a 9 mm worm band is the trade size for a 20–32 range; read off the same photograph |
+| screw housing | `CLAMP_HOUSING` | 15 × 11 × 9 | `estimated` | band and housing are **one mesh**, because a worm clamp is one item and without the housing it reads as a ferrule |
+| lead-out | `HOSE_PORT_LEAD` | 34 | `derived` | `NECK_LENGTH` + `CLAMP_ALONG` + `CLAMP_WIDTH`/2, so the band lands on straight hose |
+
+`PORT_MOUTHS` carries each port's mouth and outward axis — one line per port,
+because every one of them was previously a hose control point sitting at a boss's
+**centre**. The pump's two are now correct for a centrifugal pump: **axial
+suction on the end face, radial discharge on the flank**; the inlet was on the
+crown. The head's outlet moved to the casting's **rear** face, 43 mm the other
+side of `CYLINDER_AXIS_Y`, because the radiator is rearward-left and the hose was
+hairpinning forward and back over the head.
+
+A port's collar overhangs the 40 × 22 tank end into the fin block and the end
+channel. Declared `welded`: a kart radiator is one furnace-brazed assembly. The
+**steel clamp gets no such row** — it is a bolt-on item and keeps its distance.
 
 ### `radiator_cap`
 **Status:** built, unchanged

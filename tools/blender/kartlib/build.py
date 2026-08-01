@@ -1140,6 +1140,17 @@ FINISHES: tuple[tuple[str, str], ...] = (
     ("cooling_pump_bracket", "anodized_clear"),
     ("cooling_pump_pulley", "anodized_clear"),
     ("cooling_axle_pulley", "anodized_clear"),
+    # --- the six hose ports, `powertrain._hose_fitting` ---
+    # A worm clamp is stainless strip whatever it is clamping, so one row covers all
+    # six. The suffix is `_hose_clamp` and not `_clamp` for a reason: a bare
+    # `*_clamp` would also swallow `radiator_bracket_lower_clamp`, which is a rod
+    # clamp on a chassis rail and is anodized with the rest of its bracket.
+    ("*_hose_clamp", "stainless_polished"),
+    # The necks take the finish of whatever they are cast into, which is why this is
+    # three rows rather than one.
+    ("radiator_*_neck", "radiator_alu"),
+    ("cooling_*_neck", "engine_cast"),
+    ("engine_*_neck", "engine_cast"),
     # --- §60.3.8 machined billet ---
     ("engine_mount_*", "anodized_clear"),
     ("brake_caliper_*", "anodized_clear"),

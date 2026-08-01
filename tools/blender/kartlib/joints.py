@@ -1678,48 +1678,117 @@ JOINTS: tuple[Joint, ...] = (
         kind="threaded",
         why="the filler neck and cap screw into the high tank",
     ),
+    # --- the six hose ports, `powertrain._hose_fitting` ----------------------
+    #
+    # Every one of the six terminations above is `routed`, and that is correct for
+    # what those rows describe -- a hose arriving at a casting. What was missing is
+    # that a hose arriving at a casting arrives at a *fitting*: a neck to push onto
+    # and a clamp to hold it. Rendered, each of the six dissolved into the metal.
+    #
+    # **Per pair and not by glob.** `radiator_*_neck` x `radiator_hose_*` is a
+    # cross-product, and gate 2 would then demand the top tank's neck touch the
+    # bottom hose 300 mm away -- the same trap the fuel tank straps hit in #206,
+    # where a glob pair asked the front strap to reach the rear tabs.
     Joint(
-        a="radiator_hose_upper",
+        a="radiator_inlet_neck",
         b="radiator_tank_high",
-        kind="routed",
-        why="the top hose enters the high tank's outlet",
+        kind="welded",
+        why="the inlet port is brazed into the high tank's end, which is where both "
+        "`crg_roadrebel_kz_side.webp` and New-Line's *\"curved top tank inlet\"* put it",
     ),
+    # A kart radiator is **one furnace-brazed assembly** -- core, both tanks, both
+    # end channels and both ports go through the oven together. So a port whose
+    # collar overhangs the 22 mm tank end into the fin block and the end channel is
+    # not a part built inside another; it is three faces of one weldment. The
+    # `NECK_ROOT_DIAMETER` 30 against a 40 x 22 end face makes that overhang
+    # unavoidable, and `HOSE_UPPER_LOCAL` says why the face cannot be traded for a
+    # bigger one. The **steel worm clamp is a separate bolt-on item** and gets no
+    # such row -- it has to keep its distance, and `HOSE_PORT_LEAD` is what buys it.
     Joint(
-        a="radiator_hose_lower",
-        b="radiator_tank_low",
-        kind="routed",
-        why="the bottom hose enters the low tank's inlet",
-    ),
-    Joint(
-        a="radiator_hose_lower",
+        a="radiator_inlet_neck",
         b="radiator_end_inboard",
-        kind="routed",
-        why="that inlet is in the corner, so the hose also passes the inboard "
-        "end channel",
+        kind="welded",
+        why="the inlet port's collar overhangs the tank end into the inboard "
+        "channel; both are brazed in the same oven",
     ),
     Joint(
-        a="radiator_core",
-        b="radiator_hose_lower",
-        kind="routed",
-        why="and the tube pack itself, for the same reason: the low tank's inlet is in "
-        "the core's own footprint, so a hose reaching it is inside the core. Was a #190 "
-        "overlap waiver reading *\"the outboard half of the same 33 mm problem\"*; with "
-        "`HOSE_LOWER_ROUTE`'s waypoint order fixed the 20 remaining pairs are all at the "
-        "inlet, which is a joint and not a collision",
+        a="radiator_outlet_neck",
+        b="radiator_end_inboard",
+        kind="welded",
+        why="and the outlet port's, at the other end of the same channel",
     ),
     Joint(
-        a="engine_water_outlet",
+        a="radiator_inlet_neck",
         b="radiator_hose_upper",
         kind="routed",
-        why="the other end of the top hose, on the head's outlet elbow",
+        why="and the hose is pushed over it -- the neck is inside the hose for its "
+        "whole grip length, which is why only the collar is ever visible",
     ),
     Joint(
-        a="cooling_pump_body",
+        a="radiator_inlet_hose_clamp",
+        b="radiator_hose_upper",
+        kind="clamped",
+        why="the worm clamp squeezes the hose onto that neck. It grips the hose and "
+        "never reaches the neck, which is why this is its only joint",
+    ),
+    Joint(
+        a="radiator_outlet_neck",
+        b="radiator_tank_low",
+        kind="welded",
+        why="the same port at the other end of the core, on the low tank",
+    ),
+    Joint(
+        a="radiator_outlet_neck",
         b="radiator_hose_lower",
         kind="routed",
-        why="the other end of the bottom hose, on the pump's inlet. Renamed from "
-        "`engine_water_pump`, and it is a different place on the kart: the pump is on "
-        "the rear axle now, not on the clutch cover",
+        why="and its hose over it",
+    ),
+    Joint(
+        a="radiator_outlet_hose_clamp",
+        b="radiator_hose_lower",
+        kind="clamped",
+        why="and its clamp",
+    ),
+    Joint(
+        a="engine_outlet_neck",
+        b="engine_water_outlet",
+        kind="welded",
+        why="the head's outlet elbow gets the same treatment. Its seat is derived "
+        "through `cylinder_lean` off the hose's own last leg, so it cannot part "
+        "company with the boss when the lean moves",
+    ),
+    Joint(
+        a="engine_outlet_neck",
+        b="radiator_hose_upper",
+        kind="routed",
+        why="the top hose's engine end, over that neck",
+    ),
+    Joint(
+        a="engine_outlet_hose_clamp",
+        b="radiator_hose_upper",
+        kind="clamped",
+        why="and its clamp",
+    ),
+    Joint(
+        a="cooling_pump_axial_neck",
+        b="cooling_pump_body",
+        kind="welded",
+        why="the pump's inlet, on the drum's end face. A centrifugal pump takes "
+        "its suction axially and discharges radially, so this is the end and "
+        "`cooling_pump_front` is the flank; it used to be on the crown, which is "
+        "neither, and it aimed the fitting down into the body",
+    ),
+    Joint(
+        a="cooling_pump_axial_neck",
+        b="radiator_hose_lower",
+        kind="routed",
+        why="the bottom hose's engine end, over that neck",
+    ),
+    Joint(
+        a="cooling_pump_axial_hose_clamp",
+        b="radiator_hose_lower",
+        kind="clamped",
+        why="and its clamp",
     ),
     Joint(
         a="radiator_curtain",
@@ -1828,17 +1897,44 @@ JOINTS: tuple[Joint, ...] = (
         kind="meshed",
         why="the other wrap of the same belt",
     ),
+    # Ports five and six -- see the block above the curtain for why these are
+    # written per pair rather than globbed.
     Joint(
-        a="cooling_pump_body",
-        b="cooling_hose_pump_engine",
-        kind="routed",
-        why="the pump's outlet",
+        a="cooling_pump_front_neck",
+        b="cooling_pump_body",
+        kind="welded",
+        why="the pump's outlet port, out of the forward face because its top is "
+        "already spoken for by the bottom radiator hose",
     ),
     Joint(
-        a="engine_water_inlet",
+        a="cooling_pump_front_neck",
         b="cooling_hose_pump_engine",
         kind="routed",
-        why="and the crankcase's inlet boss at the other end. Short by design",
+        why="and its hose over it",
+    ),
+    Joint(
+        a="cooling_pump_front_hose_clamp",
+        b="cooling_hose_pump_engine",
+        kind="clamped",
+        why="and its clamp",
+    ),
+    Joint(
+        a="engine_inlet_neck",
+        b="engine_water_inlet",
+        kind="welded",
+        why="the crankcase inlet boss's own port, the sixth and last of them",
+    ),
+    Joint(
+        a="engine_inlet_neck",
+        b="cooling_hose_pump_engine",
+        kind="routed",
+        why="the short hose's engine end",
+    ),
+    Joint(
+        a="engine_inlet_hose_clamp",
+        b="cooling_hose_pump_engine",
+        kind="clamped",
+        why="and its clamp",
     ),
     # --- cockpit.py ---------------------------------------------------------
     # Art. **4.2.3** lists *"seat with four seat supports"*, so four is a number and
@@ -2249,27 +2345,6 @@ JOINTS: tuple[Joint, ...] = (
         "uniball is a ball in the rod's eye and not a separate link",
     ),
     Joint(
-        a="radiator_hose_upper",
-        b="radiator_core",
-        kind="routed",
-        why="both hoses enter their tank in the corner, and a Ø28 hose on a 40 mm "
-        "core cannot reach a tank without crossing the core's own face. Declared "
-        "rather than dodged: moving the fitting off the corner is not what a real "
-        "core does",
-    ),
-    Joint(
-        a="radiator_hose_upper",
-        b="radiator_end_inboard",
-        kind="routed",
-        why="the same, against the inboard end channel",
-    ),
-    Joint(
-        a="radiator_hose_lower",
-        b="radiator_fin_17",
-        kind="routed",
-        why="and against the outermost fin, which is the one beside that corner",
-    ),
-    Joint(
         a="engine_cylinder_base",
         b="exhaust_manifold_spigot",
         kind="pierced",
@@ -2307,16 +2382,6 @@ JOINTS: tuple[Joint, ...] = (
         "its way down the back of the engine",
     ),
     Joint(
-        a="engine_head",
-        b="radiator_hose_upper",
-        kind="routed",
-        why="the top hose meets the outlet elbow, which is a boss on this casting, "
-        "so the hose's **last** bend is against the head. This said *first* and "
-        "pointed a reader at the wrong end of the pipe: both routes are authored "
-        "radiator-first and have been consumed that way since #190 wave 3b, so the "
-        "head is where the run ends",
-    ),
-    Joint(
         a="fuel_tank",
         b="fuel_line_*",
         kind="routed",
@@ -2336,13 +2401,6 @@ JOINTS: tuple[Joint, ...] = (
         why="the boot goes over the carburettor's 64 mm air spigot and the float bowl "
         "hangs off the same body 2 mm forward of it, so the rubber lies against the "
         "bowl's rear corner",
-    ),
-    Joint(
-        a="cooling_hose_pump_engine",
-        b="engine_crankcase_upper",
-        kind="routed",
-        why="the hose's last 40 mm lies along the case's inboard face on its way into "
-        "`engine_water_inlet`, which is a boss on that face",
     ),
     Joint(
         a="bodywork_rear_panel",
@@ -2853,27 +2911,6 @@ OPEN_DEFECTS: tuple[Defect, ...] = (
         "so the regulator is the part that should move. §Running gear owns it",
     ),
     Defect(
-        a="chassis_bumper_socket_side_*_rear_l",
-        b="radiator_*",
-        gate="overlap",
-        measured=96,
-        issue="#190",
-        why="the left side bumper's rear sockets against the re-placed core. **Not solvable "
-        "by moving the bar**, and the arithmetic is why it is a waiver: Art. 9.4.2 fixes "
-        "the attachment pitch at 500 +-5 and the front tyre blocks the forward station, "
-        "so the rear socket has to land where the radiator is. §30.7 brought the core "
-        "in from 265 to 250 wide and down from z 497 to 408, which is 15 mm and 89 mm "
-        "in the right direction and not enough. §Chassis and §Bodywork own the bar",
-    ),
-    Defect(
-        a="chassis_side_bar_l",
-        b="radiator_tank_low",
-        gate="overlap",
-        measured=51,
-        issue="#190",
-        why="the same fact at the bar itself rather than at its socket",
-    ),
-    Defect(
         a="chassis_seat_strut_rear_r",
         b="engine_intake_boot",
         gate="overlap",
@@ -2903,6 +2940,28 @@ OPEN_DEFECTS: tuple[Defect, ...] = (
         why="the pump-to-crankcase hose passes under the battery, which moved inboard to "
         "x 143..228 to clear the re-routed intake boot. 18 pairs; the battery has one "
         "free axis left and it is forward, into the crankcase",
+    ),
+    # The hose's own fitting, in the same place for the same reason. These arrived
+    # with `_hose_fitting` and they are not a new fact about the kart: the battery
+    # sits on `engine_water_inlet`, so anything bolted to that boss is under it.
+    # Moving the battery forward clears all three at once, which is what the row
+    # above already says the fix is.
+    Defect(
+        a="engine_battery",
+        b="engine_inlet_neck",
+        gate="overlap",
+        measured=5,
+        issue="#190",
+        why="the crankcase inlet's port, under the same battery. 5 pairs -- the collar "
+        "only, because the neck runs inboard away from it",
+    ),
+    Defect(
+        a="engine_battery",
+        b="engine_inlet_hose_clamp",
+        gate="overlap",
+        measured=12,
+        issue="#190",
+        why="and that port's worm clamp, 16 mm further along the same hose",
     ),
     # **`drive_*`/`seat_shell` is deleted, and the corridor audit dissolved its whole
     # premise.** Wave 3 found 90 pairs on `drive_output_shaft`, 60 on
@@ -2982,15 +3041,6 @@ OPEN_DEFECTS: tuple[Defect, ...] = (
     # rather than declarations because none of them is a joint -- a fairing is not
     # welded to a frame loop -- and they are recorded per pair, with the number,
     # so the wave that owns the other part can see exactly what it has to clear.
-    Defect(
-        a="chassis_bumper_socket_side_upper_rear_l",
-        b="radiator_tank_low",
-        gate="overlap",
-        measured=107,
-        issue="#190",
-        why="the socket half of the same fact, recorded separately because it is "
-        "the part that would have to move if the radiator did not",
-    ),
     Defect(
         a="chassis_side_bar_upper_r",
         b="engine_starter",
@@ -3296,15 +3346,6 @@ OPEN_DEFECTS: tuple[Defect, ...] = (
         issue="#206",
         why="the right upper arm hangs at the 108.7 deg elbow the reach solve "
         "produced and grazes the head 2.36 mm",
-    ),
-    Defect(
-        a="radiator_hose_upper",
-        b="driver_upper_arm_r",
-        gate="driver",
-        measured=14.31,
-        issue="#206",
-        why="the rerouted upper hose cleared the chest (ADR-0055's worked "
-        "example) and now passes 14.31 mm through the drooped right upper arm",
     ),
 )
 

@@ -1301,13 +1301,17 @@ class KartParams:
         thickness   through the core, along the face's own normal
     """
 
-    radiator_height: float = 0.435
-    """Core length **up the slant**, tanks included. `sourced`: EM-01 and EM-02 are
-    both 435 (New-Line RS MAX 430). The old 0.432 was right for the wrong reason --
-    its docstring traced it to "17 in", which nobody sourced.
+    radiator_height: float = 0.420
+    """Core length **up the slant**, tanks included. `sourced`, and it is a
+    catalogue size: New-Line RS in size M is 245 x **420**. The KZ family runs
+    420-470 -- EM-01 and EM-02 are both 435, New-Line RS MAX 430 -- so 420 is the
+    short end of it and not an invented number. It was 435 (EM-01) and came down
+    with #190's attitude change: standing the core up raises its top, and 15 mm
+    off the length is what keeps that from climbing. The older 0.432 was right for
+    the wrong reason -- its docstring traced it to "17 in", which nobody sourced.
 
-    Not a vertical height: raked back, 432 mm along the slant is 354 mm of rise
-    and 248 mm of fore-and-aft run at this rake. The tanks are at the two ends
+    Not a vertical height: raked back, 420 mm along the slant is 322 mm of rise
+    and 270 mm of fore-and-aft run at this rake. The tanks are at the two ends
     of it, low-forward and high-rearward, with the tubes running between them,
     which is why this is the tube direction and `radiator_width` is the one the
     fins repeat along."""
@@ -1331,14 +1335,19 @@ class KartParams:
     within the measurement error — the size was right and only the placement was
     wrong."""
 
-    radiator_y: float = -0.235
-    """Fore-aft center. `estimated`. The core spans y -0.076 to -0.426, beside
+    radiator_y: float = -0.282
+    """Fore-aft center. `estimated`. The core spans y -0.147 to -0.417, beside
     the seat and well behind the kart's mid-point, which is inside Art. 5.3.1's
-    window of 10 to 550 mm ahead of the rear axle. It was 0.000, i.e. 250 mm too
-    far forward, which put it level with the driver's knees instead of the
-    driver's hip."""
+    window of 10 to 550 mm ahead of the rear axle -- 98 mm of margin at the rear
+    against the axle. It was 0.000 once, i.e. 282 mm too far forward, which put it
+    level with the driver's knees instead of the driver's hip.
 
-    radiator_z: float = 0.240
+    **47 mm of that is #190** -- see `radiator_rake`, which carries the whole
+    argument. The short version: the left rear side-bumper socket riser occupies
+    y -114 to -86, and this is what walks the low tank's bottom edge clear of
+    it."""
+
+    radiator_z: float = 0.270
     """Centre of the core, in the plane it is raked into. `derived`, and the
     derivation is two exact floors plus the raked core's true half-extent:
 
@@ -1352,16 +1361,29 @@ class KartParams:
         radiator_z = 69 + 3 + 167.9 = 240
 
     Was 0.320, which put the core's top at 497 -- **3 mm** under Art. 5.3.1's 500 mm
-    ceiling. At 240 the top is 407.9, with 92 mm of margin, and the low corner is
-    72.1: 3.1 mm above the tray.
+    ceiling. Then 240 by the solve above.
+
+    **270 is 30 mm above that floor, and the 30 mm is #190's** -- see
+    `radiator_rake`. Standing the core up drops its bottom edge, which lands it in
+    the lower side bar; the height goes back on to lift it clear. The measured
+    floor is 262 -- below that `chassis_side_bar_l` re-enters `radiator_tank_low`,
+    40 triangle pairs at 255 -- but 262 leaves the bar clearing the tank by
+    **1.7 mm**, measured, which is knife-edge: it is not an overlap, so no gate
+    fires, and the next millimetre anybody moves puts it back. 270 is the floor
+    plus 8 mm of margin. The tray floor is no longer the binding constraint; the
+    side bar is, and it sits higher.
+
+    Top edge is now **422 mm** including the tank, bottom 118.
 
     Residual disagreement, recorded rather than hidden: the photogrammetric top edge
-    is 375 ±20 and 408 is 13 mm above that bar. The two floors and the regulation
-    win, because the photograph's vertical figure is dominated by camera elevation
-    and monotone in it (371 at 24 deg, 387 at 8) while the rail and tray tops are
-    arithmetic."""
+    is 375 ±20 and 423 is 28 mm above that bar -- worse than the 13 mm the 240 solve
+    carried, and that is the price of closing #190 this way. The photograph's
+    vertical figure is dominated by camera elevation and monotone in it (371 at
+    24 deg, 387 at 8) while the floors are arithmetic, so it is the softer of the
+    two; but 28 mm is a real disagreement and the next person to touch this should
+    know it was paid deliberately."""
 
-    radiator_rake: float = 0.7854
+    radiator_rake: float = 0.6981
     """Radians from vertical, and **its own number**.
 
     This replaced `radiator_rake_delta`, which was *added to `seat_back_angle`*
@@ -1372,14 +1394,34 @@ class KartParams:
     the seat would have tipped the radiator 13° with nothing objecting. Decoupling
     it and correcting the seat had to land together, and this is the decoupling.
 
-    45 deg from vertical is `derived` as the one value two ranges share: the
-    height-budget solve gives 40 ±5 from vertical, and sourced kart practice tunes
-    45-60 from *horizontal*, i.e. 30-45 from vertical. 45 is the top of the first
-    and the bottom of the second.
+    **40 deg from vertical, and the change from 45 is what closes #190.** The
+    left rear side-bumper socket riser stood 64 mm inside `radiator_tank_low`, and
+    with it the core, the fin pack, the curtain and the lower side bar -- twelve
+    pairs, waived for milestones. Rake is the lever because it moves the tank's
+    bottom edge in *fore-aft* without moving the core's centre: the low tank's
+    fore-aft half-extent is (height/2) sin(rake), which is 154 mm at 45 deg and
+    140 at 40, and 14 mm is enough to walk it out of the socket's y band. The
+    other three radiator numbers moved to compensate rather than to fix -- see
+    `radiator_y`, `radiator_z`, `radiator_height`.
+
+    Measured alternatives, all worse. Moving the side-bar mount pair forward 48 mm
+    clears every radiator pair and preserves Art. 9.4.2's 500 mm pitch, but the
+    front socket then lands in `brake_master_bracket`, whose own docstring already
+    records the master as boxed in -- steering hoop forward, this socket rearward,
+    and x spent by #201. Master rearward 121 mm breaks its `sourced` CRG layout
+    (*"both red reservoir caps right at the pedal bracket"*); master outboard 65 mm
+    lands in the kingpin. Raising the core 116 mm with no rake change clears
+    everything and puts the top at 503. Dropping the lower bar under the tank puts
+    it inside `chassis_rail_l`.
+
+    Both ranges still hold at 40: the height-budget solve gives 40 ±5 from
+    vertical, and sourced kart practice tunes 45-60 from *horizontal*, i.e. 30-45
+    from vertical. 40 sits inside both, where 45 sat on the edge of each.
 
     Kart practice tunes the angle with ambient temperature -- 45° to horizontal
     below 20 °C, 55 at 20-30, up to 60 above -- in 5-degree steps, so
-    `--set=radiator_rake=0.698` is one step nearer vertical.
+    `--set=radiator_rake=0.6981` is the value this now holds, and 0.7854 is one
+    step further back.
     """
 
     # --- bodywork ----------------------------------------------------------

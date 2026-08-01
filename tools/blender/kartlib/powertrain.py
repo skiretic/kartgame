@@ -716,12 +716,136 @@ standard) plus 2 x 4 mm of three-ply wall. A photo reading gives 33, which is
 protective sleeving and must not be modelled as bare hose. Art. 5.3.1 rates the
 tubing at 150 C and 10 bar."""
 
-HOSE_UPPER_LOCAL: tuple[float, float, float] = (0.0, 0.85, 0.95)
-HOSE_LOWER_LOCAL: tuple[float, float, float] = (0.0, 0.85, -0.95)
+NECK_EMBED: float = 0.002
+"""How far a hose neck is sunk into the casting it leaves. `estimated`, and it is
+a modelling allowance rather than a dimension: a neck whose root plane is exactly
+the casting's face is two coplanar faces, which `joints.py` reads as an
+intersection once both sides are faceted. 2 mm is `CONTACT_TOLERANCE`."""
+
+NECK_ROOT_DIAMETER: float = 0.030
+"""The collar where the neck leaves the casting, and the only part of the neck
+the eye ever sees -- everything beyond it is under the hose. `estimated`, read
+off `eng_tm_kz10_dress.jpg`: the brass barbs standing out of the fuel pump and
+the crankcase all show a root collar noticeably wider than the shank the hose
+grips, which is what stops the hose being pushed on until it bottoms."""
+
+NECK_SHANK_DIAMETER: float = 0.021
+"""What the hose is stretched over. `derived`: `HOSE_DIAMETER` is a *sourced*
+20 mm ID, and a barb for 20 mm ID hose runs a millimetre over its bore so the
+rubber grips it. Invisible in the render by construction -- the 28 mm hose covers
+it -- and it is here so the neck is not a stepless peg."""
+
+NECK_LENGTH: float = 0.020
+"""Root face to neck tip. `estimated`. It has to be long enough that the clamp
+band lands on hose that is over shank rather than over fresh air, which puts the
+floor at `CLAMP_ALONG + CLAMP_WIDTH/2` = 20.5 mm of stand-off; 20 mm of neck plus
+2 mm of embed clears it."""
+
+NECK_EXPOSED: float = 0.008
+"""How much of the neck the hose does **not** cover.
+
+Without this the fix is only half a fix, and the render says so: with the hose
+starting at the casting face the neck is 100% inside the hose, so what you see is
+still a tube dissolving into a tank, now with a clamp floating on it. What makes a
+fitting read is the **step** -- collar, then a thinner stub, then the hose's cut
+end over it. 8 mm is enough to show the collar and a little shank at the distance
+a chase camera ever sees this, and short enough that the clamp at 16 mm is still
+on hose that is over shank."""
+
+CLAMP_ALONG: float = 0.016
+"""Where the worm-drive band sits, measured from the casting face along the hose.
+`estimated`. A clamp is fitted behind the barb ridge and clear of the collar, so
+it lands in the back half of the neck's grip length."""
+
+CLAMP_WIDTH: float = 0.009
+"""Band width. `estimated`, and it is the standard worm-drive band for a 20-32 mm
+range -- 9 mm is what the trade calls a 9 mm band. Nothing in this repo sources
+it; it is read off the proportion in `eng_tm_kz10_dress.jpg`, where the bands on
+the clear fuel lines are about a third of the hose's own diameter."""
+
+CLAMP_PROUD: float = 0.0015
+"""Band thickness over the hose. `estimated`, stainless strip."""
+
+PORT_MOUTHS: dict[str, tuple[tuple[float, float, float], tuple[float, float, float]]] = {
+    # port name -> (mouth, outward axis). Both in the frame the boss is built in,
+    # so the two on the leaning cylinder cluster are pre-lean and get `_lean`
+    # applied with the casting they belong to.
+    #
+    # **Every one of these was a hose control point sitting at a boss's CENTRE.**
+    # `WATER_OUTLET_LOCAL` is the middle of a Ø30 x 36 disc, so the top hose's last
+    # vertex was 18 mm inside its own outlet and the run left the boss heading
+    # *backwards over the head* -- 54 triangle pairs of neck and 44 of clamp buried
+    # in `engine_head`, and the hose itself had been declared `routed` against the
+    # head for milestones to cover the same overshoot. `engine_water_inlet` is the
+    # same story 14 mm deep, and the pump's was worse than either: the bottom hose
+    # ran up to a point on the drum's crown, so the fitting aimed straight down into
+    # the body.
+    #
+    # A fitting has to sit on the surface the hose actually meets, pointing the way
+    # the hose actually leaves. That is one line per port and it is the whole fix.
+    #
+    # The pump's two ports are also now the right two ports for a centrifugal pump:
+    # **axial in on the end face, radial out on the flank**. The inlet used to be on
+    # the crown, which is neither.
+    "engine_outlet": ((0.299, -0.311, 0.376), (0.0, -1.0, 0.0)),
+    "engine_inlet": ((0.226, -0.330, 0.165), (-1.0, 0.0, 0.0)),
+    "cooling_pump_axial": ((0.148, -0.386, 0.110), (-1.0, 0.0, 0.0)),
+    "cooling_pump_front": ((0.164, -0.356, 0.110), (0.0, 1.0, 0.0)),
+}
+
+CLAMP_HOUSING: tuple[float, float, float] = (0.015, 0.011, 0.009)
+"""The screw housing, along the hose x across x radially out. `estimated`. This
+is the part that makes a worm clamp read as a worm clamp rather than as a ring --
+a band alone is a ferrule, and the housing is the whole silhouette tell. Sized
+off the same photograph as `CLAMP_WIDTH`."""
+
+HOSE_PORT_LEAD: float = 0.034
+"""How far the hose runs straight out of a radiator port before it is allowed to
+bend. `derived`: `NECK_LENGTH` 20 plus `CLAMP_ALONG + CLAMP_WIDTH/2` clearance,
+rounded up so the band lands on straight hose. A hose that starts bending inside
+its own clamp is the tell that the fitting was drawn on afterwards."""
+
+HOSE_UPPER_LOCAL: tuple[float, float, float] = (0.0, 1.0, 0.90)
+HOSE_LOWER_LOCAL: tuple[float, float, float] = (0.0, 1.0, -0.90)
+"""**Width fraction 1.0: the ports are on the tanks' inboard END faces, and the
+hose leaves them along the core's own width axis.**
+
+At (0, 0.85, ±0.95) the hose's first vertex was 19 mm inside the tank, so the run
+emerged from the middle of a slab with no port, no collar and no clamp -- the
+defect `_hose_fitting` exists to close. A neck has to be concentric with the hose
+it carries, so the hose has to start where the neck's root is, and that is a
+surface. `crg_roadrebel_kz_side.webp` and New-Line's *"curved top tank inlet"*
+both put the ports on the tank ends.
+
+**The collar does not fit inside the end face, and that is declared rather than
+dodged.** A tank end is `radiator_thickness` x `RADIATOR_TANK_HEIGHT` = 40 x 22
+and `NECK_ROOT_DIAMETER` is 30, so the collar overhangs into the fin block and the
+end channel. That is not a collision: a kart radiator is **one brazed assembly**
+-- core, tanks, end channels and ports are furnace-brazed together -- so
+`joints.py` carries `welded` rows for the neck against all three. The steel worm
+clamp is a separate bolt-on item and is held clear of every one of them.
+
+The alternative was the tanks' 250 x 40 faces, where 30 mm fits with room. It was
+built and rejected: it aims the lower hose straight down into
+`chassis_seat_strut_front_l`, 76 triangle pairs across the hose and its clamp.
+That corner has no room, which is the same fact #190 is open on.
+
+Height fraction 0.90 rather than 0.95 keeps the collar's overhang symmetrical
+about the tank rather than hanging off its outer edge. The waypoints are
+untouched, so the driver clearances `HOSE_UPPER_ROUTE` was re-authored for still
+hold: they are measured at mid-run, not at the radiator."""
+
+HOSE_PORT_LEAD: float = 0.034
+"""How far the hose runs straight out of a radiator port before it is allowed to
+bend, along the port's own axis. `derived`: `NECK_LENGTH` 20 plus
+`CLAMP_ALONG + CLAMP_WIDTH/2`, rounded up so the band lands on straight hose. A
+hose that starts bending inside its own clamp is the tell that the fitting was
+drawn on afterwards. It is also what carries the clamp clear of the end
+channel -- along the width axis the band's own x extent is only
+`CLAMP_WIDTH`/2."""
 HOSE_UPPER_ROUTE: tuple[tuple[float, float, float], ...] = (
     (-0.170, -0.410, 0.388),
     (0.220, -0.404, 0.376),
-    (0.232, -0.228, 0.382),
 )
 """**This route was built through the driver's chest, and the driver is the datum
 that caught it.** `estimated` as a route, like the lower one.
@@ -871,7 +995,7 @@ say -- the fillet is why these are not the authored offsets:
 
 A hose cannot cross the spinning axle plane, so the upper goes above and behind it and
 the lower stays forward of it: 100.6 mm to `axle_rear` and 61.6 to the crown wheel."""
-WATER_OUTLET_LOCAL: tuple[float, float, float] = (0.299, -0.207, 0.376)
+WATER_OUTLET_LOCAL: tuple[float, float, float] = (0.299, -0.293, 0.376)
 """Hot water enters the **high** tank so the core drains downward, which New-Line's
 *"curved top tank inlet designed to evenly distribute water"* confirms is the inlet
 end; the cold return is the low run by construction, because the pump is at axle
@@ -1358,6 +1482,138 @@ def _tube_object(
     )
     build.set_parent(obj, root)
     return obj
+
+
+def _aim(direction: Vector) -> Matrix:
+    """A rotation carrying +X onto `direction`, for parts authored along an axis.
+
+    The antiparallel case is written out rather than left to
+    `rotation_difference`, which has to invent a perpendicular there. It is
+    deterministic either way -- there is no RNG in it -- but "deterministic" and
+    "the axis I meant" are different properties, and a neck that flips its seam
+    when a route is nudged past straight-back is a diff nobody can read.
+    """
+    unit = direction.normalized()
+    if unit.x < -0.99999:
+        return Matrix.Rotation(math.pi, 4, "Z")
+    return Vector((1.0, 0.0, 0.0)).rotation_difference(unit).to_matrix().to_4x4()
+
+
+def _hose_fitting(
+    name: str,
+    seat: Vector,
+    direction: Vector,
+    context: build.BuildContext,
+    collection: bpy.types.Collection,
+    root: bpy.types.Object,
+    casting: bpy.types.Material,
+    *,
+    standoff: float = 0.0,
+) -> None:
+    """The neck a hose is pushed onto and the worm-drive clamp that holds it there.
+
+    Every hose on this kart used to end by simply arriving at a casting: the tube
+    swept up to a point on the tank or the boss and stopped, with the last
+    centimetre of it *inside* the part it fed. Rendered, the hose dissolved into
+    the aluminium with no port, no collar and no clamp, and there was nothing to
+    say which end was the fitting. `joints.py` never objected because all six of
+    those terminations are declared `routed`, which is the kind for a hose that
+    *lies against* something -- so the gate was asking whether the hose touched
+    the tank, and it did.
+
+    Two parts, because that is two manufactured items:
+
+    * `<name>_neck` -- a cast or brazed port. Collar, shank, and a barb ridge near
+      the tip. Only the collar is ever visible; the rest is under the hose, and it
+      is modelled anyway so the silhouette at the tip is a hose over a step rather
+      than a hose over nothing.
+    * `<name>_clamp` -- band **and** screw housing in one mesh, because a worm
+      clamp is one part and splitting it would double the joint table for no
+      gain. Without the housing it reads as a ferrule.
+
+    `seat` is the point on the casting's face and `direction` is the way the hose
+    leaves it; both are taken off the hose's own route so the neck cannot drift
+    away from the tube it carries. Nothing here is sourced -- see the constants.
+
+    `standoff` slides the whole fitting along `direction`, and it exists because a
+    hose route's end point is authored to reach a boss and not to sit on its
+    *surface*: `WATER_INLET_BOSS` is a point in the crankcase's inlet, so a neck
+    rooted there starts 18 mm inside the casting and its clamp is buried. Gate 1
+    finds every one of those, and the number that clears it is a measurement off
+    the built mesh rather than a guess -- each caller says what its own value
+    clears.
+    """
+    aim = _aim(direction)
+    place = Matrix.Translation(seat + direction.normalized() * standoff) @ aim
+
+    root_r = NECK_ROOT_DIAMETER * 0.5
+    shank_r = NECK_SHANK_DIAMETER * 0.5
+    barb_r = shank_r + 0.0015
+    hose_r = HOSE_DIAMETER * 0.5
+
+    # Closed at both ends, so the winding gate covers it: an open sleeve would be
+    # exactly the class of part `genkart.py`'s signed-volume assert cannot check.
+    _lathe_object(
+        "%s_neck" % name,
+        [
+            (0.0, -NECK_EMBED),
+            (root_r, -NECK_EMBED),
+            (root_r, 0.004),
+            (shank_r, 0.006),
+            (shank_r, NECK_LENGTH - 0.006),
+            (barb_r, NECK_LENGTH - 0.003),
+            (shank_r, NECK_LENGTH),
+            (0.0, NECK_LENGTH),
+        ],
+        (0.0, 0.0, 0.0),
+        context,
+        collection,
+        root,
+        casting,
+        axis="X",
+        transform=place,
+    )
+
+    steel = context.material("stainless_polished")
+    band_r = hose_r + CLAMP_PROUD
+    bm = bmesh.new()
+    # A profile that never reaches the axis revolves into an annulus -- the band's
+    # bore, its outside and both edges. `_disc_profile`'s shape would give a solid
+    # plug instead and swallow the hose.
+    #
+    # **`close_profile=True` is what makes it watertight**, and that is not
+    # cosmetic: `genkart.py`'s signed-volume assert can only check closed meshes,
+    # so an open band would be added to the list of parts the winding gate skips.
+    # Every other ring clamp on this kart is on that list already -- the two
+    # bracket clamps, the exhaust hanger, the silencer bracket -- and the fix is
+    # one keyword, so there is no reason to make the list longer.
+    build.lathe(
+        bm,
+        [
+            (hose_r, CLAMP_ALONG - CLAMP_WIDTH * 0.5),
+            (band_r, CLAMP_ALONG - CLAMP_WIDTH * 0.5),
+            (band_r, CLAMP_ALONG + CLAMP_WIDTH * 0.5),
+            (hose_r, CLAMP_ALONG + CLAMP_WIDTH * 0.5),
+        ],
+        context.detail.exhaust_segments,
+        axis="X",
+        center=(0.0, 0.0, 0.0),
+        close_profile=True,
+    )
+    # The housing straddles the band and stands off it radially. Its own +Z is
+    # radially out in the neck's frame; which way round the kart that points is not
+    # a fact anybody has, so it is the same on all six and reads as a fitted set.
+    along, across, out = CLAMP_HOUSING
+    build.box(
+        bm,
+        (along, across, out),
+        (CLAMP_ALONG, 0.0, band_r + out * 0.5 - 0.001),
+    )
+    bm.transform(place)
+    clamp = build.object_from_bmesh(
+        "%s_hose_clamp" % name, bm, collection, material=steel, shade_smooth=False
+    )
+    build.set_parent(clamp, root)
 
 
 # --- engine mount ----------------------------------------------------------
@@ -1950,10 +2206,18 @@ def _head(
 
     _spark_plug(context, collection, root, head_top)
 
-    # Water outlet on the head's front face, inboard of the bore, where the top
-    # hose lands. Sharing the front face with the exhaust port is not a conflict:
-    # the port is on the *cylinder* at z 0.288 and this is on the head 88 mm
-    # above it. `HOSE_UPPER`'s last control point is this boss's mouth.
+    # Water outlet on the head's **rear** face, inboard of the bore. It was on the
+    # front face, 43 mm forward of `CYLINDER_AXIS_Y`, and the radiator is rearward
+    # and to the left -- so the top hose left the boss heading forward and then
+    # hairpinned straight back over the head. A Ø28 silicone hose does not turn
+    # like that, and it read as a kink in the viewport. Rear face, and the run
+    # sweeps.
+    #
+    # Sharing a face with the exhaust port is not a conflict either way: the port
+    # is on the *cylinder* at z 0.288 and this is on the head 88 mm above it.
+    # `PORT_MOUTHS["engine_outlet"]` carries this boss's mouth and its axis; the
+    # comment here used to claim `HOSE_UPPER`'s last control point was the mouth,
+    # and it was the boss's centre, which is the overshoot `_hose_fitting` found.
     _lathe_object(
         "engine_water_outlet",
         _disc_profile(0.015, 0.018),
@@ -3354,18 +3618,43 @@ def _radiator(
     # that `params.cylinder_lean` tips 25 degrees forward, so its mouth is wherever the
     # rotation puts it -- and a literal for the hose's engine end drifts 10 mm the
     # moment the lean changes, which is what gate 2 measured.
-    upper_engine = _lean(p) @ Vector(WATER_OUTLET_LOCAL)
-    for label, local, waypoints, fitting in (
-        ("upper", HOSE_UPPER_LOCAL, HOSE_UPPER_ROUTE, upper_engine),
-        ("lower", HOSE_LOWER_LOCAL, HOSE_LOWER_ROUTE, Vector(PUMP_SPINDLE) + Vector((0.0, 0.0, 0.030))),
+    lean = _lean(p)
+    for label, local, waypoints, ports in (
+        ("upper", HOSE_UPPER_LOCAL, HOSE_UPPER_ROUTE, ("radiator_inlet", "engine_outlet")),
+        ("lower", HOSE_LOWER_LOCAL, HOSE_LOWER_ROUTE, ("radiator_outlet", "cooling_pump_axial")),
     ):
         start = attach(local)
-        route = [tuple(start)]
+        # The port's axis is the core's own **width** axis, because that is the face
+        # the neck stands on -- see `HOSE_UPPER_LOCAL`. Taken off `basis` rather than
+        # written as a world vector, like every other number in this function: the
+        # radiator is not axis-aligned and a literal here would be wrong the moment
+        # `radiator_rake` moved.
+        outward = (
+            _radiator_world(basis, center, (0.0, half_width, 0.0)) - center
+        ).normalized()
+        radiator_port, engine_port = ports
+        # The engine end's mouth and axis, leaned with the casting where the casting
+        # leans. `engine_outlet` is on the head, which `cylinder_lean` tips; the pump
+        # does not lean, and rotating an axis by identity is free.
+        mouth, axis = PORT_MOUTHS[engine_port]
+        engine_leans = engine_port.startswith("engine_")
+        engine_mouth = lean @ Vector(mouth) if engine_leans else Vector(mouth)
+        engine_axis = (
+            (lean.to_3x3() @ Vector(axis)) if engine_leans else Vector(axis)
+        ).normalized()
+
+        # The hose starts `NECK_EXPOSED` out from the face, not on it, so the collar
+        # and a little shank stay visible under its cut end.
+        route = [
+            tuple(start + outward * NECK_EXPOSED),
+            tuple(start + outward * HOSE_PORT_LEAD),
+        ]
         # **Not `reversed()`.** Both lists are authored radiator-first, from the core's
         # own fitting toward the engine, which is the order the tube is swept in. It was
         # `reversed()` here, and `HOSE_LOWER_ROUTE`'s note has the four legs that built.
         route.extend(tuple(point) for point in waypoints)
-        route.append(tuple(fitting))
+        route.append(tuple(engine_mouth + engine_axis * HOSE_PORT_LEAD))
+        route.append(tuple(engine_mouth + engine_axis * NECK_EXPOSED))
         _tube_object(
             "radiator_hose_%s" % label,
             tuple(route),
@@ -3375,6 +3664,33 @@ def _radiator(
             root,
             hose_material,
             bend_radius=0.050,
+        )
+        # A port at each end, aimed off the route's own first and last leg rather
+        # than off a literal -- the upper hose's engine end is already derived
+        # through `cylinder_lean`, and a neck authored in world coordinates there
+        # would part company with its hose the next time the lean moved.
+        # `hose_material` is the wrong casting for the engine end and the right one
+        # nowhere: both radiator ports are aluminium and both engine-side ports are
+        # a casting, which is what the two entries in `ports` carry.
+        _hose_fitting(
+            radiator_port,
+            # `start`, not `route[0]`: the hose backs off by `NECK_EXPOSED` and the
+            # neck must not follow it, or the port floats off its own tank.
+            start,
+            outward,
+            context,
+            collection,
+            root,
+            alloy,
+        )
+        _hose_fitting(
+            engine_port,
+            engine_mouth,
+            engine_axis,
+            context,
+            collection,
+            root,
+            context.material("engine_cast"),
         )
 
 
@@ -3536,13 +3852,20 @@ def _cooling(
 
     # Out of the pump's *forward* face, because its top is where the bottom radiator
     # hose comes in and two hoses cannot share one port.
+    front_mouth, front_axis = PORT_MOUTHS["cooling_pump_front"]
+    inlet_mouth, inlet_axis = PORT_MOUTHS["engine_inlet"]
+    front_mouth, front_axis = Vector(front_mouth), Vector(front_axis).normalized()
+    inlet_mouth, inlet_axis = Vector(inlet_mouth), Vector(inlet_axis).normalized()
+    pump_engine_route = (
+        tuple(front_mouth + front_axis * NECK_EXPOSED),
+        tuple(front_mouth + front_axis * HOSE_PORT_LEAD),
+        (0.190, -0.348, 0.140),
+        tuple(inlet_mouth + inlet_axis * HOSE_PORT_LEAD),
+        tuple(inlet_mouth + inlet_axis * NECK_EXPOSED),
+    )
     _tube_object(
         "cooling_hose_pump_engine",
-        (
-            (BELT_PLANE_X - 0.026, spindle.y + 0.026, spindle.z),
-            (0.190, -0.348, 0.140),
-            WATER_INLET_BOSS,
-        ),
+        pump_engine_route,
         HOSE_DIAMETER,
         context,
         collection,
@@ -3550,3 +3873,11 @@ def _cooling(
         context.material("rubber_grip"),
         bend_radius=0.040,
     )
+    # The third hose gets the same two ports as the other two. Before this it was
+    # the worst of the six terminations to look at, because both of its ends land
+    # on small castings where there is nothing else for the eye to read.
+    for port, mouth, axis in (
+        ("cooling_pump_front", front_mouth, front_axis),
+        ("engine_inlet", inlet_mouth, inlet_axis),
+    ):
+        _hose_fitting(port, mouth, axis, context, collection, root, alloy)

@@ -4110,3 +4110,130 @@ The Blender MCP carried both iterations: the built .blend opened live in the
 GUI, flank/tray/volume measured off the mesh in place, Anthony's sign-off given
 on the live viewport rather than a published board. `genkart.sh` remained the
 only generator; the MCP session only ever read its output.
+
+## ADR-0064
+
+**A hose termination is a fitting, and the joint table has to say so.**
+
+Status: accepted, 2026-08-01. Supersedes nothing; amends ADR-0029's radiator
+attitude figures.
+
+### The defect
+
+Every hose on this kart ended by arriving at a casting: the swept tube ran up to
+a point on a tank or a boss and stopped, with its last centimetre *inside* the
+part it fed. Rendered, the hose dissolved into the aluminium with no port, no
+collar and no clamp. Anthony found it by eye in the viewport -- *"where the
+radiator hose attaches, it just blends right into the radiator, no clamp, no
+actual connection point"*.
+
+`joints.py` never objected, and the reason matters more than the fix. All six
+terminations were declared `kind="routed"`, which is the kind for a hose that
+*lies against* something. So the gate was asking whether the hose touched the
+tank, and it did -- 18 mm inside it. **A gate that checks contact cannot
+distinguish a joint from an overshoot.** The vocabulary had a word for what was
+actually there and nobody used it.
+
+### The root cause, which was worse than the symptom
+
+Every hose's end control point was the boss's **centre**, not its mouth.
+`WATER_OUTLET_LOCAL` is the middle of a Ø30 x 36 disc, so the top hose's last
+vertex sat 18 mm inside its own outlet and the run left the boss heading
+*backwards over the head*. Three joint rows existed to declare that overshoot --
+hose against head, hose against core, hose against crankcase -- and each read as
+a description of the kart rather than as the bug it was. The pump was worst: the
+bottom hose ran up to a point on the drum's crown, so the port faced straight
+down into the body.
+
+### The decision
+
+1. **`powertrain._hose_fitting` builds two parts per termination.** A `_neck`
+   (collar, shank, barb ridge) cast or brazed into the casting, and a
+   `_hose_clamp` -- band and screw housing in one mesh, because a worm clamp is
+   one manufactured item and the housing is the whole silhouette tell. Without
+   it a band reads as a ferrule.
+2. **`PORT_MOUTHS` carries each port's mouth and outward axis.** One line per
+   port. The hose leaves along that axis for `HOSE_PORT_LEAD` before it is
+   allowed to bend, and starts `NECK_EXPOSED` out from the face so the collar
+   stays visible under its cut end. A hose that begins bending inside its own
+   clamp is the tell that the fitting was drawn on afterwards.
+3. **The pump's ports are now the right two ports.** Axial suction on the end
+   face, radial discharge on the flank. The inlet was on the crown, which is
+   neither.
+4. **The head's water outlet moved to the rear face.** It was 43 mm forward of
+   `CYLINDER_AXIS_Y` while the radiator is rearward and to the left, so the hose
+   left the boss forward and hairpinned back over the head. A Ø28 silicone hose
+   does not turn like that.
+5. **Thirteen joint rows were deleted**, every one of them by the gate's own
+   measurement once the hoses stopped overshooting. They are the evidence the fix
+   landed, not collateral.
+
+### Consequence, recorded
+
+Radiator tank ends are `radiator_thickness` x `RADIATOR_TANK_HEIGHT` = 40 x 22
+and `NECK_ROOT_DIAMETER` is 30, so a port's collar overhangs into the fin block
+and the end channel. That is declared `welded` rather than dodged: a kart
+radiator is one furnace-brazed assembly. The steel clamp is a separate bolt-on
+item and gets no such row -- it has to keep its distance, and `HOSE_PORT_LEAD` is
+what buys it. The 250 x 40 tank faces fit the collar with room and were built and
+rejected: they aim the lower hose into `chassis_seat_strut_front_l`.
+
+It is also a third witness that `RADIATOR_TANK_HEIGHT` 22 mm is under-read.
+`notes_radiator.md` §1 already says the 16 px it came from was foreshortened. Not
+moved here -- that is a §30.7 change with the core's proportions hanging off it.
+
+## ADR-0065
+
+**#190's radiator cluster closed by attitude, not by placement.**
+
+Status: accepted, 2026-08-01.
+
+### The defect
+
+The left rear side-bumper socket riser stood 64 mm inside `radiator_tank_low`,
+and with it the core, the fin pack, the curtain and the lower side bar -- twelve
+part-pairs, waived under #190 for milestones and outliving the ticket, which is
+closed. `params.py` said the fix was that *"Spec §30.7 re-places the radiator"*.
+The radiator was re-placed (z 320 -> 240) and it did not clear it.
+
+### What was measured, and rejected
+
+| move | clears | cost |
+| --- | --- | --- |
+| side-bar mount pair forward 48 mm | all twelve | front socket lands in `brake_master_bracket`; the master's own docstring records it boxed in -- steering hoop forward, this socket rearward, x spent by #201. Master rearward 121 mm breaks its `sourced` CRG layout; outboard 65 mm lands in the kingpin |
+| radiator up 116 mm | all twelve | core top 387 -> 503 mm |
+| lower bar under the tank | -- | bar lands inside `chassis_rail_l` and `bodywork_sidepod_l` |
+| radiator 46 mm rearward alone | both sockets | `chassis_side_bar_l`/`radiator_tank_low` worsens 51 -> 132 pairs |
+
+### The decision
+
+**Move the attitude, not the placement.** Anthony's call, from the viewport:
+stand the core up and take the bottom back. Rake is the lever because it moves
+the low tank's bottom edge in *fore-aft* without moving the core's centre --
+the fore-aft half-extent is `(height/2) sin(rake)`, 154 mm at 45 deg and 140 at
+40, and 14 mm walks the tank out of the socket's y band. The other three numbers
+compensate rather than fix:
+
+    radiator_rake    45 deg  -> 40 deg from vertical   (inside the sourced 30-45)
+    radiator_y      -0.235   -> -0.282                 (47 mm rearward)
+    radiator_z       0.240   -> 0.270                  (30 mm up)
+    radiator_height  0.435   -> 0.420                  (New-Line RS size M)
+
+Standing it up drops the bottom into the lower side bar, so the height goes back
+on; the height raises the top, so the core shortens. 420 is a catalogue size, not
+an invented one -- the KZ family runs 420-470.
+
+Measured after: sockets clear by 40.3 and 38.8 mm, lower side bar by 8.6 mm, zero
+overlapping pairs. `radiator_z` 262 was the floor and left the bar 1.7 mm, which
+is knife-edge and fires no gate; 270 is that floor plus margin. Four waivers
+deleted -- three #190, and one #206 that went with the straighter upper hose,
+which no longer passes through the driver's right arm. Known-open 30 -> 15.
+
+### The price, paid deliberately
+
+The core's top edge is **422 mm** against photogrammetry of 375 +/- 20 -- 28 mm
+high, worse than the 13 mm the old solve carried. This is not a regulation
+question: this is not a licensed FIA product and the 500 mm ceiling is a guide
+here, not a wall. It is a **look** question, and it is recorded in
+`radiator_z`'s docstring so the next person knows it was bought rather than
+missed.
