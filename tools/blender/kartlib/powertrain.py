@@ -2661,7 +2661,12 @@ def _exhaust_centerline(
     forward = Vector((0.0, -1.0, 0.0))
     inward = Vector((-math.cos(tilt), 0.0, -math.sin(tilt)))
 
-    steps_per_cone = max(2, context.detail.exhaust_segments // 4)
+    # Was `// 4` -- 4 path steps per cone at low, 8 at high, which left the
+    # belly's fast taper reading as a stack of frustums and put a visible
+    # silhouette kink at the fat-cone junction. `// 2` doubles the longitudinal
+    # sampling at both details; the walk is arc-length exact at any density, so
+    # only the smoothness changes, never the developed length.
+    steps_per_cone = max(4, context.detail.exhaust_segments // 2)
     point = Vector(EXHAUST_INLET)
     turned = 0.0
     path: list[Vector] = [point.copy()]

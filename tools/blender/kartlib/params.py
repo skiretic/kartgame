@@ -1196,8 +1196,15 @@ class KartParams:
     Minimum sheet metal thickness is 0.75 mm if not otherwise specified in the
     HF."* So 1.0 clears the regulation floor."""
 
-    exhaust_segments: int = 16
-    exhaust_segments_high: int = 32
+    exhaust_segments: int = 24
+    exhaust_segments_high: int = 48
+    """Radial ring segments for the exhaust sweep, per detail level. Was 16/32.
+    The shipped glb is the LOW mesh (#19 bakes high onto it), and baked normals
+    hide shading facets but never silhouette ones: at 16 segments the belly's
+    ~Ø112 fat cone showed 22 mm silhouette flats in any close-up (part 4 of the
+    sculpt wave). 24 halves the chord error on the part of the kart with the
+    largest bare revolution; 48 at high keeps the bake source comfortably
+    finer than its target."""
 
     chain_x: float = 0.445
     """The chain plane, and **the side of the engine is the point.** `derived`,

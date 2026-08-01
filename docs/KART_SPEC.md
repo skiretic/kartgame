@@ -3366,6 +3366,13 @@ frusta and insetting the wall reproduces the HF's own stated internal volume at
 per cone gives 95.3° of total bend, against a photograph on the facing page
 showing about a right angle.
 
+Sampling (part 4 of the sculpt wave, no dimension moved): 24/48 radial segments
+and 8/24 path steps per cone at low/high detail, up from 16/32 and 4/8 — the
+shipped glb is the low mesh and baked normals cannot fix silhouettes, so the
+~Ø112 belly's 22 mm silhouette flats were geometry, not shading. The centerline
+walk is arc-length exact at any density, so the developed 674.6 mm is invariant
+under the change.
+
 | # | s start | s end | dia start | dia end | what |
 | --- | --- | --- | --- | --- | --- |
 | 1 | 0.0 | 67.7 | **44.5** | 47.0 | header stub; sensor boss at 25, spring tabs at ~70 |
