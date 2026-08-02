@@ -4399,3 +4399,132 @@ Front clamp area per wheel falls from 2124 mm² (4 × π × 13²) to **982 mm²*
 opposite side from CRG's. **This is a number a brake-bias tunable will sit on**,
 so it is recorded here rather than left to be rediscovered: the balance regulator
 is what trims it, and both makers ship one.
+
+## ADR-0068
+
+**Both caliper tangentials were measured over the wrong feature, and a
+scale-agreement check cannot catch that.**
+
+Status: accepted, 2026-08-02. Replaces the envelope figures ADR-0067 inherited.
+Issue #218.
+
+### The defect
+
+`CALIPER_REAR_LENGTH` was 138 mm and `CALIPER_FRONT_LENGTH` 103. Both came off
+`007-B4-69` p. 2, an exploded CAD projection, and both are about a third too long.
+
+The rear is the clearer error and it is two errors stacked. `007-B4-69` is
+**Freeline's rear on a Ø180 disc with 4 pistons and 4 pads** — not this kart's
+rear, which ADR-0067 kept as CRG `82/FR/11`, and which the piston constants'
+own docstring already warns anyone away from. On that drawing the 143.6 mm
+somebody read is the span **from the top hydraulic fitting's hex to the bottom
+one's**; the body alone is 82.6 × 57.2, ratio 1.44. So an envelope-over-plumbing
+was paired with a body width, and the result was a tangential-to-radial ratio of
+**2.51 where nothing in either maker's family is above 1.7**.
+
+**The guard that was in place could not have caught it.** The old docstring's
+evidence was that two disc scales taken off one drawing *"agree to 4.8%"*. A
+scale-agreement check tests the ruler, not what the ruler was laid against — the
+138 would have passed any scale check ever written, because the 138 was measured
+accurately, across the wrong two features.
+
+### The decision
+
+Measure each caliper on **its own maker's form**, and anchor the ruler inside the
+same photograph as the part.
+
+| | was | now | how |
+| --- | --- | --- | --- |
+| `CALIPER_REAR_LENGTH` | 0.138 | **0.104** | `derived`, ±4% |
+| `CALIPER_REAR_HEIGHT` | 0.055 | **0.064** | `derived`, ±4% |
+| `CALIPER_FRONT_LENGTH` | 0.103 | **0.087** | `derived`, ±3% |
+
+The rear ruler is a bridge, because `82/FR/11` p. 4 shoots both CRG calipers free
+and upright at one scale but carries no sourced dimension: the black CRG **front**
+caliper in that same photograph is also mounted on its sourced Ø150 disc twice, on
+p. 3 §B and in p. 1's group shot, where it measures 90.1, 89.2, 84.7–88.4 and
+87.1–92.1 mm long — mean 88.9, sd 3.0% — and it spans 133.6 px on p. 4, so that
+plate is **0.6654 mm/px**. The rear caliper's own two socket screws check it
+against a standard fastener rather than a second disc: 19.5 and 20.3 px across the
+counterbore is 13.0 and 13.5 mm against ISO 4762's 13.0 for an M8 head, 1.9% out.
+The bar is the wider **4%**, because p. 1 frames a Ø150 and the Ø195 in one shot
+and the two scale 4.2% apart — that is the document's real perspective error.
+
+The front is `007-BRKF-01` p. 4 at **5.1515 px/mm**, anchored on the sourced 66 mm
+axial spanning 340 px, with the mouth as the independent check at 33.6 mm against
+a derived 33. The block measures **87.2 mm** tangential, stable to 0.2 mm across
+silhouette thresholds. `_caliper_front_body`'s own docstring had already recorded
+88.1 off this page while the constant said 103.
+
+### The check that needed no ruler at all
+
+CRG's rear pad is 58 mm overall and its front 38 (§B), and `PAD_REAR_LENGTH` in
+this repo was already that sourced 58. A 104 mm body leaves 23 mm past each pad
+end and the 89 mm front body leaves 25.5 — **138 would leave 40**. A pad that does
+not fit under its own caliper is the cheapest possible test and it was available
+the whole time.
+
+`CALIPER_*_THICKNESS` is untouched. It was never a photograph measurement: the
+rear's 74 is 18.5 disc + 2 × 9 pad + 2 × 19 cylinder wall resting on a sourced
+18.5, and the front's 66 is confirmed exactly by the p. 4 photograph. Nothing on
+either form sees a caliper edge-on, so moving the scale does not move them.
+
+## ADR-0069
+
+**The front caliper's outboard cylinder boss is deliberately asymmetric, and the
+real part is not.**
+
+Status: accepted, 2026-08-02. Anthony's call. Issue #217.
+
+### The defect
+
+`joints.py` called the 7.0 mm between the front caliper's outboard face and the
+tire *"the binding clearance in the whole front assembly"*. That figure is exact
+for the caliper **body** — flank at x 478 against a tire face at 485 — and it went
+stale the moment #214 gave the caliper a cylinder boss standing proud of that
+flank. Measured off the exported glb, the real clearance was **1.0 mm**, and the
+binding neighbour was not the tire at all but `wheel_fl_rim`'s inner flange at
+487.5, at **3.50 mm**.
+
+#217 was filed as *"92 mm of part, 40 mm of room"*. That framing compares two
+different axes: the ~92 mm on the form is the caliper's **tangential** dimension,
+and the axial is 66, which the constants block already recorded as *"confirmed
+exactly by the p. 4 photograph"*. The caliper was never oversized.
+
+Then the same photograph said the boss itself was mismeasured. Against the ruler
+anchored on the sourced 66 mm axial, the left boss stands **10.9 mm** proud and the
+right **11.3**, against the 6.0 built — and the red cap adds **4.4** against 8.0.
+The two bosses are on opposite faces, so perspective skews them in opposite
+directions and their agreeing to 3.6% is the error bar. The wave that built the
+part had measured the same feature at 10.7 and 15.5 and recorded it in a **code
+comment** rather than moving the constant or filing it.
+
+### The decision
+
+Build the inboard boss at its measured 11 mm and cut the outboard one to **4**.
+
+A symmetric 11 mm boss reaches x 489.1 against the rim's 487.5 — a 1.6 mm
+interference, and 4.1 mm past the tire. So a correctly-built caliper does not fit
+this kart, and something had to give. What buys the asymmetry is that **the
+outboard half is never seen**: a 5-inch rim covers it completely, which Art. 8.7
+makes a rule rather than a habit, and the in-situ renders confirm it — from
+outboard with the wheel on, the caliper is not visible at all. The inboard boss is
+the one that faces the camera, and it has 47 mm of clear room.
+
+The rejected alternative was moving `DISC_FRONT_X` inboard, which is what that
+constant's own docstring already did once for the same class of reason. It is
+rejected here because the disc's tangs bolt to the hub's inboard flange at 435, so
+the hub travels with it, and both brake-hose endpoints are hand-tuned to the
+caliper halves.
+
+**This is an unsourced departure from a real part and is recorded as one.** The
+`estimated` classification carries the reason rather than hiding it, per §5 item
+10. The honest root cause is one level down and is not fixed here: our rim does
+not dish. Its inner bead flange is a plain ring at r 62–68 sitting at x 487.5,
+where a real 5-inch kart rim is dished to clear exactly this caliper. Fixing that
+is a wheels change and wants its own ticket.
+
+### After
+
+Outboard extreme 484 → **482**; rim clearance 3.50 → **5.50 mm**; tire 5.89 →
+6.46. Every declared joint still touches: pads 0.00, bracket 0.48, hose 0.03.

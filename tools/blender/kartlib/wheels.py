@@ -627,21 +627,64 @@ those plus about half a stroke, and a drill is a drill, so it does **not** scale
 with the disc. Slot width the same way: 87.9 mm2 of interior over a 31 mm arc is
 2.85 wide, so 3.7."""
 
-CALIPER_REAR_LENGTH: float = 0.138
-CALIPER_REAR_HEIGHT: float = 0.055
+CALIPER_REAR_LENGTH: float = 0.104
+CALIPER_REAR_HEIGHT: float = 0.064
 CALIPER_REAR_THICKNESS: float = 0.074
 CALIPER_REAR_CLOCK: float = 0.34907
-CALIPER_FRONT_LENGTH: float = 0.103
+CALIPER_FRONT_LENGTH: float = 0.087
 CALIPER_FRONT_HEIGHT: float = 0.062
 CALIPER_FRONT_THICKNESS: float = 0.066
 CALIPER_FRONT_CLOCK: float = 1.30900
-"""Caliper envelopes, all `estimated` at a stated 5% and measured off `007-B4-69`
-p. 2 inside a single orthographic projection: the front disc's sourced Ø150 spans
-200 px -> 0.750 mm/px and the rear's sourced Ø180 spans 252 px -> 0.714 mm/px, and
-**the two scales agree to 4.8%** derived from two different parts of one drawing.
-That agreement is the evidence the exploded view is drawn to a single scale, and 5%
-is the honest error bar. The through-thickness is not in the drawing at all and is
-built up from the parts: rear 18.5 disc + 2 x 9 pad + 2 x 19 cylinder wall = 74.
+"""Caliper envelopes. **Both tangentials were measured over the wrong thing and
+both were about a third too long**; #218 replaced them off each caliper's own
+maker's form, and the block this docstring replaced had already written down the
+disagreement four times without applying it.
+
+The rear is CRG's, `derived` at **4%** off CRG's own `82/FR/11`. p. 4's caliper
+panel shoots both CRG calipers free and upright at one scale but carries no sourced
+dimension, so the ruler is a bridge: the black CRG **front** caliper in that same
+photograph is also mounted on its sourced Ø150 disc twice, on p. 3 §B and in p. 1's
+group shot, where its min-area rect measures 90.1, 89.2, 84.7-88.4 and 87.1-92.1 mm
+long -- mean 88.9, sd 3.0% -- and it spans 133.6 px on p. 4, so that plate is
+**0.6654 mm/px**. The rear caliper's own two socket screws check it: 19.5 and 20.3
+px across the counterbore is 13.0 and 13.5 mm against ISO 4762's 13.0 for an M8
+head, 1.9% out. The bar is the wider **4%**, because p. 1 frames a Ø150 and the
+Ø195 in one shot and the two scale 4.2% apart. On that ruler the rear caliper is
+156.9 x 96.4 px = **104.4 tangential x 64.1 radial, ratio 1.63**.
+
+**The 138 x 55 this block used to carry was a different maker's caliper measured
+over its plumbing.** It came off `007-B4-69` p. 2, which is Freeline's rear on a
+Ø180 disc with 4 pistons and 4 pads -- not this kart's part, which is exactly what
+`CALIPER_REAR_PISTON_BORE`'s docstring warns about a few lines below. On that
+drawing 143.6 mm is the span from the top hydraulic fitting's hex to the bottom
+one's, while 57.2 is the body alone; body to body that caliper is 82.6 x 57.2,
+ratio 1.44, and 82.6 is what two 40 mm pads end to end need. An
+envelope-over-fittings paired with a body width is what produced a 2.51 where
+nothing in either family is above 1.7. **The check that needs no ruler at all**:
+CRG's rear pad is 58 mm overall and the front 38 (§B), and `PAD_REAR_LENGTH` here
+is already that 58 -- so a 104 body leaves 23 mm past each pad end and the 89 front
+body leaves 25.5, where 138 would leave 40.
+
+The front is Freeline's `007-BRKF-01`, `derived` at **3%**. Same page, same ruler as
+the boss figures: anchored on the sourced 66 mm axial spanning 340 px, **5.1515
+px/mm**, with the mouth as the independent check at 33.6 mm against a derived 33.
+The block's tangential measures **87.2 mm**, stable to 0.2 mm across silhouette
+thresholds, and `_caliper_front_body`'s own docstring had already recorded 88.1 off
+this page while the constant said 103. `007-BRKR-10` p. 2 item 3 reads 96.6 x 50.7.
+Four readings between 87 and 97 against a 103 that came off the same suspect
+exploded view is a pattern rather than a coin flip.
+
+`CALIPER_*_THICKNESS` is untouched by all of this because it was never a photograph
+measurement: rear 18.5 disc + 2 x 9 pad + 2 x 19 cylinder wall = 74, resting on the
+sourced 18.5, and the front's 66 is confirmed exactly by the p. 4 photograph.
+Nothing on either form sees a caliper edge-on, so the scale moving does not move
+them.
+
+**What the old block got wrong is worth keeping.** Its guard was that two disc
+scales off one drawing *"agree to 4.8%"* -- and a scale-agreement check cannot
+catch a feature-boundary error. The 138 was measured across two hydraulic fittings
+and would have passed any scale check ever written. What caught it was measuring
+the same part on a second document and a pad that did not fit under it.
 
 Clock angles are `estimated` at +-15 degrees. The rear sits near the **top** of the
 disc on a bracket bolted to the bearing cassette, tipped slightly forward of
@@ -649,19 +692,16 @@ vertical -- 20 degrees is the middle of what `crg_roadrebel_kz_detail11.webp` an
 `tonykart_racer401T_p03.jpg` support. The front sits on the upright **ahead of** the
 kingpin and roughly level with the axle, so 75 degrees forward of top.
 
+Which axis is which on p. 4 is settled by the mounted photographs and not by the
+pose: the front caliper's long axis lies along the disc's tangent when it is on the
+disc (L/W 1.65-1.70) and is vertical to within 0.5 degrees when it is lying free on
+p. 4, so p. 4's vertical is tangential. The rear caliper's mouth -- the dark
+scalloped band down its left edge -- opens radially inward and says the same thing
+about its horizontal.
+
 Shape, from the drawing and `tonykart_racer401T_p03.jpg`: an opposed-piston
 one-piece aluminium body with a waisted outline, externally finned across the top
-for cooling, a banjo on each half and a bleed nipple. Not a sliding caliper.
-
-**Two later measurements disagree with the in-plane pair and are recorded rather
-than applied.** `007-BRKR-10` p. 2 item 3 -- a Freeline caliper on that form's own
-sourced Ø150 disc, so a better-anchored plate than `007-B4-69` -- measures 96.6
-tangential x 50.7 radial, and `007-BRKF-01` p. 4 measures 88 tangential. Against
-this block's 103 x 62 that is -6%/-15% tangential and -18% radial. The axial 66 is
-confirmed exactly by the p. 4 photograph. Moving an `estimated` figure onto another
-`estimated` figure off an oblique photograph buys nothing, so the envelope stays
-and the built shape is driven by the sourced parts it must contain -- the 49.7 x 25
-pad, the 12 mm disc, the Ø25 piston -- not by these three numbers."""
+for cooling, a banjo on each half and a bleed nipple. Not a sliding caliper."""
 
 CALIPER_FRONT_PISTON_COUNT: int = 2
 CALIPER_FRONT_PISTON_BORE: float = 0.025
@@ -677,9 +717,10 @@ are correct and they are different parts. Anyone re-deriving the rear from
 `007-BRKR-10` because it is the Freeline form is reading the wrong maker's rear."""
 
 CALIPER_FRONT_BOSS_DIAMETER: float = 0.0317
-CALIPER_FRONT_BOSS_PROUD: float = 0.006
+CALIPER_FRONT_BOSS_PROUD: float = 0.011
+CALIPER_FRONT_BOSS_PROUD_OUTBOARD: float = 0.004
 CALIPER_FRONT_CAP_DIAMETER: float = 0.028
-CALIPER_FRONT_CAP_PROUD: float = 0.008
+CALIPER_FRONT_CAP_PROUD: float = 0.0044
 """The cylinder boss on each half's outer face, and the anodized cap closing it.
 
 `CALIPER_FRONT_BOSS_DIAMETER` is `derived`: `007-BRKR-10` p. 2 item 3 draws the
@@ -693,10 +734,42 @@ disc.** Its two socket screws measure 13.9 mm across the counterbore and 6.2 mm
 across the hex socket; ISO 4762 M8 is 13.0 and 6.0. Two features of two different
 parts agreeing to 7% is the error bar on everything measured off this plate.
 
-The cap is `estimated` off `007-BRKF-01` p. 4 at that photograph's ~15.3 px/mm --
-itself the mean of two rulers 10% apart, the 12 mm disc gap and the 49.7 pad -- and
-the proud figures are the weakest numbers in this block. The cap is red anodized;
-the boss and the body are black."""
+**The two proud figures were wrong by about a factor of two each, in opposite
+directions, and that is most of why the part rendered as a slab.** #218's review
+re-measured them off `007-BRKF-01` p. 4 against a ruler anchored on this block's own
+sourced 66 mm axial, which spans 340 px -- **5.1515 px/mm**. The scale checks
+against itself: the block's two flanks come back at 65.6 mm, 0.6% off the number
+that set the ruler. On it the left boss stands **10.9 mm** proud of its flank and
+the right one **11.3**, against the 6.0 built; the red cap adds **4.4** on top of
+its boss, against 8.0. The two bosses sit on opposite faces, so perspective skews
+them in opposite directions -- their agreeing to 3.6% is the error bar. The wave
+that built this part measured the same feature at 10.7 and 15.5 and recorded it in
+a comment in `_caliper_front_body` rather than moving the constant; two independent
+passes agreeing is why it moves now. Still `estimated`, because it is one oblique
+photograph, but it is no longer the weakest thing here.
+
+**`CALIPER_FRONT_BOSS_PROUD_OUTBOARD` is a fit compromise and not a measurement.**
+The real part is symmetric -- both bosses stand ~11 mm. This kart cannot have that:
+the disc plane is at `DISC_FRONT_X` 445, the body's outboard flank at 478, and an
+11 mm boss on it reaches 489.1 against `wheel_fl_rim`'s inner flange at 487.5. That
+is a 1.6 mm interference, and 4.1 mm past the tire's inner face at 485. So the
+outboard boss is cut to 4 mm and the inboard one built at its measured height. What
+buys the asymmetry is that the outboard half is **never seen** -- a 5-inch rim
+covers it completely, which Art. 8.7 makes a rule rather than a habit -- while the
+inboard boss is the one that faces the camera in every chase and cockpit view.
+
+`joints.py` used to call the 7.0 mm between the body's outboard flank and the tire
+*"the binding clearance in the whole front assembly"*. It was right about the body
+and predates the boss; the binding pair is the **rim** at 3.50 mm, not the tire at
+5.89, and with the outboard boss at 4 mm the outboard extreme moves 484 -> 482 and
+that clearance goes to 5.5. The symmetric alternative was to move `DISC_FRONT_X`
+inboard, which the disc's own docstring already did once for the same class of
+reason -- rejected here because the disc's tangs bolt to the hub's inboard flange
+at 435, so the hub travels with it. #217.
+
+The cap is `estimated`. The boss and the body are black; the cap is red anodized,
+and it stays the body's material because a second color needs a second object and a
+second object needs a joint declared for it."""
 
 CALIPER_FRONT_MOUTH_WIDTH: float = 0.033
 CALIPER_FRONT_MOUTH_DEPTH: float = 0.030
@@ -718,6 +791,7 @@ CALIPER_FRONT_NIPPLE_LENGTH: float = 0.015
 CALIPER_FRONT_BANJO_DIAMETER: float = 0.0085
 CALIPER_FRONT_BANJO_LENGTH: float = 0.015
 CALIPER_FRONT_CHAMFER: float = 0.010
+CALIPER_FRONT_CORNER_RELIEF: float = 0.008
 """The furniture, every figure `estimated` off `007-BRKF-01` p. 4 at ~15.3 px/mm.
 
 **The feature inventory in this block is what the photograph shows, and it is not
@@ -731,7 +805,27 @@ from the front.
 The bleed nipple is at the **top left**, hex base, angled up and outboard. The
 banjo is at the **bottom left**, brass against the black body. Both sit on the same
 half. The top two corners are chamfered at about 10 mm; the top face is flat and
-carries the `FL` badge and the homologation number."""
+carries the `FL` badge and the homologation number.
+
+**`CALIPER_FRONT_CORNER_RELIEF` is the shape this part was missing**, `estimated`,
+and it is why the built block read as a slab next to the rear caliper on #214's
+sheet 3. p. 4 looks straight at the 66 x 85 mm face and that face is **not flat**:
+a large circular form runs around the piston axis, tangent to both axial flanks --
+so Ø66, the block's own width -- and the rectangle's four corners fall away from it
+on angled facets. The part is a cylinder with four bolt pads on it, which is how
+these calipers are actually machined, and not the plain block the outline built.
+
+8 mm is the depth of that fall measured across the diagonal, and it is `estimated`
+rather than measured because **one view along the radial axis cannot give a depth**
+-- what the photograph fixes is that the corners are relieved and roughly how far
+in the cut reaches, not how deep it goes. The facets read at about 15 mm along each
+edge, and a 45 degree cut of that size is 8 mm proud-to-root.
+
+It is applied as a chamfer on the two **tangential** end faces rather than as a
+circular pocket, because this body is a prism extruded along tangential and a
+circle in the (axial x tangential) plane is not expressible in its outline. The
+four corners the chamfer cuts are the four the photograph shows. It also takes
+material *off* the outboard end, which is the direction #217 needs."""
 
 CALIPER_MOUNT_BOLT_DIAMETER: float = 0.008
 CALIPER_MOUNT_BOLT_HEAD_DIAMETER: float = 0.013
@@ -3020,10 +3114,42 @@ def _caliper_front_body(
             )
         )
 
+    def _simple(outline: list[tuple[float, float]]) -> bool:
+        """Does this closed polygon avoid crossing itself?
+
+        Every non-adjacent edge pair, by the sign of the four orientation
+        determinants. It is O(n^2) over ten points, which is nothing, and it is the
+        only thing that catches the failure it exists for: a polygon that folds
+        produces a face with a *negative* signed area and a reversed normal, and
+        #214 established that the shell stays watertight, the total signed volume
+        stays positive, the non-manifold count stays 0, and the part renders
+        correctly. Only a dihedral census finds one afterwards, as a 180.0 degree
+        edge. Cheaper to refuse to build it.
+        """
+
+        def turn(o, a, b):
+            return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])
+
+        count = len(outline)
+        for i in range(count):
+            p, q = outline[i], outline[(i + 1) % count]
+            for j in range(i + 1, count):
+                if j == i or (j + 1) % count == i or j == (i + 1) % count:
+                    continue
+                r, s = outline[j], outline[(j + 1) % count]
+                d1, d2 = turn(p, q, r), turn(p, q, s)
+                d3, d4 = turn(r, s, p), turn(r, s, q)
+                if ((d1 > 0) != (d2 > 0)) and ((d3 > 0) != (d4 > 0)):
+                    return False
+        return True
+
     def prism(
         outline: list[tuple[float, float]],
         caps: tuple[tuple[int, ...], ...],
         half_span: float,
+        relief: float = 0.0,
+        axially: frozenset = frozenset(),
+        radially: frozenset = frozenset(),
     ) -> None:
         """Extrude an (axial, radial) outline along the tangential axis.
 
@@ -3033,15 +3159,69 @@ def _caliper_front_body(
         decomposition into **convex** faces: the C is concave, and while the
         winding gate's fan sum is exact for any simple polygon, a concave n-gon is
         one more thing for the exporter's triangulator to get wrong for free.
+
+        `relief` chamfers both tangential ends, which is `CALIPER_FRONT_CORNER_RELIEF`
+        -- the four corners of the 66 x 85 face that p. 4 shows falling away from
+        the body's circular form. Four rings rather than two: the end ring carries
+        the named points pulled `relief` toward the block's centre, and a full-size
+        ring sits `relief` inboard of it.
+
+        **A point may be relieved along one axis and not the other, and which is
+        which is load-bearing.** The mouth's four points are in neither set: pulling
+        those in would narrow the slot at its ends, and the slot has to hold 12 mm
+        of disc and two 9 mm pads for its whole length -- a mouth that closes up at
+        the edges is a caliper that grips the disc's rim.
+
+        Points 6 and 9 are in `axially` **only**, and building them into `radially`
+        as well is what the first cut of this did. They sit on the mouth's roof
+        line rather than on a corner; dropping them `relief` below it while points 2
+        and 3 stay on it makes the top chamfer's own edge climb back through that
+        line at an axial station inside the mouth's half-width, and the six-sided
+        top cap folds into a bowtie -- 8.5 mm2 of signed area across a face that
+        should be 500, at a measured 180.000 degree dihedral against a 64.761
+        baseline. Nothing in the repo caught it: the mesh stayed watertight,
+        positively wound, manifold, chi +20 as declared, and rendered as exactly the
+        right part.
+
+        **`_simple` did not catch it either, and that is the interesting half.** The
+        authored outline in that state does not self-intersect -- the chamfer edge
+        misses the roof line by 0.5 mm -- so a fold test passes it honestly, and
+        `bevel` moves vertices by up to its own 4 mm offset afterwards and walks it
+        over. So `_simple` is a floor and not the guard; the caller asserts the
+        *clearance* that has to survive the bevel, which is the thing that would
+        have failed here.
         """
-        lo = [bm.verts.new(at(a, -half_span, v)) for a, v in outline]
-        hi = [bm.verts.new(at(a, +half_span, v)) for a, v in outline]
-        for index in range(len(outline)):
-            following = (index + 1) % len(outline)
-            bm.faces.new((lo[index], hi[index], hi[following], lo[following]))
+        if relief > 0.0:
+            spans = (
+                (-half_span, True),
+                (-half_span + relief, False),
+                (half_span - relief, False),
+                (half_span, True),
+            )
+        else:
+            spans = ((-half_span, False), (half_span, False))
+        rings = []
+        for span, inset in spans:
+            moved = []
+            for index, (a, v) in enumerate(outline):
+                if inset and index in axially:
+                    a -= math.copysign(relief, a)
+                if inset and index in radially:
+                    v -= math.copysign(relief, v)
+                moved.append((a, v))
+            assert _simple(moved), (
+                "the caliper's outline folds at tangential %+.4f -- a relieved point "
+                "has crossed an edge it does not share, which builds a bowtie no "
+                "gate in this repo can see" % span
+            )
+            rings.append([bm.verts.new(at(a, span, v)) for a, v in moved])
+        for lo, hi in zip(rings, rings[1:]):
+            for index in range(len(outline)):
+                following = (index + 1) % len(outline)
+                bm.faces.new((lo[index], hi[index], hi[following], lo[following]))
         for cap in caps:
-            bm.faces.new(tuple(lo[index] for index in cap))
-            bm.faces.new(tuple(hi[index] for index in reversed(cap)))
+            bm.faces.new(tuple(rings[0][index] for index in cap))
+            bm.faces.new(tuple(rings[-1][index] for index in reversed(cap)))
 
     def cylinder(
         axial_a: float,
@@ -3088,7 +3268,57 @@ def _caliper_front_body(
         ), "the caliper's outline repeats point %d, which is a zero-area side face" % (
             index
         )
-    prism(outline, ((0, 1, 2, 9), (4, 5, 6, 3), (9, 2, 3, 6, 7, 8)), half_length)
+    # The four corners of the 66 x 85 face, relieved. The whole outer boundary
+    # moves *axially* -- 1..4 are the mouth's own walls and roof, and a slot that
+    # narrows at its ends grips the disc's rim instead of clearing it. Only the four
+    # true corners move *radially*: 6 and 9 sit on the roof line, and taking them
+    # off it folds the top cap. See `prism`, which asserts rather than trusting it.
+    relieved_axially = frozenset((0, 5, 6, 7, 8, 9))
+    relieved_radially = frozenset((0, 5, 7, 8))
+    land = half_axial - half_mouth
+    assert CALIPER_FRONT_CORNER_RELIEF < land, (
+        "the corner relief at %.4f eats the whole %.4f land between the outer face "
+        "and the mouth wall, which folds the outline" % (CALIPER_FRONT_CORNER_RELIEF, land)
+    )
+    assert half_axial - chamfer - CALIPER_FRONT_CORNER_RELIEF > 0.0, (
+        "the relief and the top chamfer between them consume the top face"
+    )
+
+    # **The guard that matters, and `_simple` is not it.** Relieving 6 and 9
+    # radially leaves an outline that does not self-intersect -- it misses by 0.5 mm
+    # -- so a fold test passes it and `bevel` then walks it over the line, which is
+    # the same order of events that put 2,430 slivers on this part once before. What
+    # has to hold is a *clearance*: where the top chamfer's own edge crosses the
+    # mouth's roof line, it must clear the mouth by more than the bevel can move it.
+    # At `Detail.high` that offset is 4 mm and the built margin is 8.5.
+    def relieved(index: int) -> tuple[float, float]:
+        a, v = outline[index]
+        if index in relieved_axially:
+            a -= math.copysign(CALIPER_FRONT_CORNER_RELIEF, a)
+        if index in relieved_radially:
+            v -= math.copysign(CALIPER_FRONT_CORNER_RELIEF, v)
+        return a, v
+
+    for low_index, high_index in ((6, 7), (9, 8)):
+        (a0, v0), (a1, v1) = relieved(low_index), relieved(high_index)
+        if (v0 - roof) * (v1 - roof) >= 0.0:
+            continue
+        station = abs(a0 + (roof - v0) / (v1 - v0) * (a1 - a0))
+        assert station >= half_mouth + detail.bevel_width, (
+            "the top chamfer crosses the mouth's roof at axial %.4f, which clears "
+            "the %.4f mouth wall by %.4f -- less than the %.4f the bevel can move a "
+            "vertex, so this builds a bowtie no gate in this repo can see"
+            % (station, half_mouth, station - half_mouth, detail.bevel_width)
+        )
+
+    prism(
+        outline,
+        ((0, 1, 2, 9), (4, 5, 6, 3), (9, 2, 3, 6, 7, 8)),
+        half_length,
+        CALIPER_FRONT_CORNER_RELIEF,
+        relieved_axially,
+        relieved_radially,
+    )
     shells = 1
 
     # --- the two cylinders, opposed ---------------------------------------
@@ -3096,9 +3326,17 @@ def _caliper_front_body(
     # disc's own rubbing band (radial 0, which is the mean of 46 and 74.5). The
     # boss is sunk 8 mm into the leg it stands on so there is no coplanar face
     # where it meets it, and the cap is sunk 2 mm into the boss for the same
-    # reason. p. 4's left boss stands 55 px = 10.7 mm proud and the capped one 80
-    # px = 15.5 against the 6 and 6+8 built here; the constants are the weakest
-    # figures in the block and are not this function's to move.
+    # reason.
+    #
+    # **The two halves no longer stand equally proud, and the real part does.**
+    # #218's re-measurement put the boss at 10.9/11.3 mm against the 6.0 that had
+    # been built -- this function's own comment already recorded 10.7 and 15.5 and
+    # declined to move the constants -- and 11 mm on the outboard face reaches
+    # x 489.1 through `wheel_fl_rim`'s inner flange at 487.5. The inboard boss is
+    # built at its measured height because it is the one that faces the camera; the
+    # outboard one is cut to `CALIPER_FRONT_BOSS_PROUD_OUTBOARD` because a 5-inch
+    # rim covers it completely and nothing can ever see it. #217, and the constants
+    # block carries the reasoning.
     #
     # The running clearance `CALIPER_FRONT_MOUTH_WIDTH` carries over what it has to
     # hold: 33 - 12 disc - 2 x 9 pad = 3 mm, half of it each side. It is the figure
@@ -3109,9 +3347,14 @@ def _caliper_front_body(
     assert clearance > 0.0, "the mouth is narrower than the disc and two pads"
     for sign in (-1.0, 1.0):
         face = sign * half_axial
+        proud = (
+            CALIPER_FRONT_BOSS_PROUD
+            if sign == inboard
+            else CALIPER_FRONT_BOSS_PROUD_OUTBOARD
+        )
         cylinder(
             face - sign * 0.008,
-            face + sign * CALIPER_FRONT_BOSS_PROUD,
+            face + sign * proud,
             0.0,
             0.0,
             CALIPER_FRONT_BOSS_DIAMETER,
@@ -3124,12 +3367,12 @@ def _caliper_front_body(
             CALIPER_FRONT_PISTON_BORE,
         )
         shells += 2
-    # The anodized cap, **inboard**. Outboard it would reach x 492 against a tire
-    # whose inner face is at 485, and joints.py records that 7 mm as the binding
-    # clearance in the whole front assembly. Which half wears the cap is not
-    # something a photograph of a bare caliper can say, so the kart's own envelope
-    # decides it. It stays the body's material: a second color needs a second
-    # object, and a second object needs a joint declared for it.
+    # The anodized cap, **inboard**, on the boss that is built at its full measured
+    # height. Which half wears the cap is not something a photograph of a bare
+    # caliper can say, so the kart's own envelope decides it -- and now that the
+    # outboard boss is the cut-down one, the cap has to be on the other half or it
+    # would sit on a stub. It stays the body's material: a second color needs a
+    # second object, and a second object needs a joint declared for it.
     cap_base = inboard * (half_axial + CALIPER_FRONT_BOSS_PROUD - 0.002)
     cylinder(
         cap_base,

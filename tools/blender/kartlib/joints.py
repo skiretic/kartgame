@@ -923,9 +923,15 @@ JOINTS: tuple[Joint, ...] = (
         b="brake_caliper_fl_bracket",
         kind="bolted",
         why="4 bolt holes in a flange, 2 top 2 bottom, `sourced` off the drawing. "
-        "**And this is the pair spec §20.6.6 says to watch**: the caliper's outboard "
-        "face is 7.0 mm from the tire's inner face at x 485, which is the binding "
-        "clearance in the whole front assembly",
+        "**And this is the pair spec §20.6.6 says to watch** -- but it names the "
+        "wrong two parts, and it did from the moment #214 gave the caliper a "
+        "cylinder boss. The body's outboard flank is at 478 and the tire's inner "
+        "face at 485, so the 7.0 mm this line has always quoted is exact for the "
+        "*body*. What binds is the boss standing proud of that flank, and what it "
+        "binds against is `wheel_fl_rim`'s inner flange at 487.5, not the tire: "
+        "measured off the glb the caliper clears the rim by 3.50 mm and the tire by "
+        "5.89. #217 cut the outboard boss to 4 mm, which puts the outboard extreme "
+        "at 482 and that rim clearance at 5.5",
     ),
     Joint(
         a="brake_caliper_fr",
