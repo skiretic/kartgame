@@ -503,9 +503,12 @@ DISC_FRONT_PAD_INNER: float = 0.092
 DISC_FRONT_X: float = 0.445
 DISC_FRONT_TANG_COUNT: int = 3
 """Front discs, `sourced`: `82/FR/11` and `007-B4-69` agree on Ø150 +-1.5 x 12 +-1.
-One piece, no floating carrier, six curved slots, two rings of drilled holes, and
-**3 integral drive tangs at 120 degrees** on the inner bore that bolt to the front
-hub.
+One piece, no floating carrier, nine curved slots, two rings of nine drilled holes,
+and **3 integral drive tangs at 120 degrees** on the inner bore that bolt to the
+front hub. The face pattern is built -- see `DISC_SLOT_COUNT` for where each count
+was measured. It was **claimed and not built** until #214: this docstring said six
+slots and two hole rings while the mesh was a plain ring plus three tangs at Euler
+characteristic +6, which is three disjoint solids and not one hole.
 
 The plane at +-445 is `derived` and it is spec §20.6.6's own resolution of an
 interference the measurement pass found in itself. That pass boxed the disc at +-480
@@ -516,6 +519,113 @@ kingpin at +-320 there are 172.5 mm of clear spindle. Moving the *disc* 35 mm
 inboard and keeping the caliper symmetric about it is the physical answer -- an
 opposed-piston caliper has a piston on each side and cannot be offset 23 mm without
 the outboard half becoming 4 mm of aluminium."""
+
+DISC_PLATE_THICKNESS: float = 0.0035
+DISC_VENT_INNER_FRAC: float = 0.600
+DISC_PILLAR_PER_SECTOR: int = 2
+DISC_PILLAR_WIDTH: float = 0.007
+DISC_GROOVE_DEPTH: float = 0.0010
+DISC_RIM_CHAMFER: float = 0.0010
+"""The disc is **ventilated**, which on these forms means what it says: two
+friction plates with a cavity between them, not one drilled plate.
+
+`Disque ventilé / Ventilated disc` is ticked **Oui / Yes** on all three forms in
+`refs/` -- CRG `82/FR/11` (2005), Birel `007-B4-69` (2017) and Birel
+`007-BRKF-01` (2024) -- and all three give the same front disc, **Ø150 x 12 +-1**.
+That thickness is the one number that never moves, and it is also the one that
+made the part look wrong when it was built solid: 12 mm of steel across Ø150 is a
+1.26 kg chunk per corner, where 12 mm as two 3.5 mm plates around a 5 mm cavity is
+about half that and is what the sourced word *ventilated* has meant the whole time.
+
+This module's own docstring used to deny it, in these words: *"'Ventilated' on
+these forms means drilled and slotted through a single plate, not a two-plate
+vented rotor -- the drawing shows one plate."* That was an assertion, not a
+measurement, and the drawing it leans on is a **plan view**, which cannot show a
+cavity from directly above. Corroborated independently from the trade side, where
+solid sprint-kart rotors run 3-6 mm and **shifter karts run 10-12 mm ventilated** --
+so 12 mm is a vented number, and reading it as solid is what put three times too
+much steel in the model.
+
+`DISC_PLATE_THICKNESS` and the cavity are `estimated`: 3.5 + 5.0 + 3.5 sums to the
+sourced 12.0, and 3.5 mm is about the thinnest plate that still carries a 1.0 mm
+groove and a pad. The pillar count is `estimated` too, and deliberately inherits
+the face pattern's own **measured** nine-fold symmetry rather than inventing a
+number -- two per sector at two radii, 18 in all, standing in the gap between the
+drilled rings where they foul neither the drillings nor the grooves."""
+
+DISC_FRONT_BORE_RADIUS: float = 0.03375
+DISC_FRONT_LUG_INNER: float = 0.022
+DISC_FRONT_LUG_HALF_ANGLE: float = math.radians(14.0)
+DISC_LUG_BOLT_FRAC: float = 0.531
+DISC_LUG_BOLT_DIAMETER: float = 0.0075
+"""The front disc's open center: a scalloped bore with three tabs across it.
+
+`0.45 R` for the scallop and 0.531 R for the bolt circle are `derived` off the same
+`007-BRKR-10` CAD as the face pattern -- it puts the scallop at 0.483 R and the bolt
+at 0.531 R, and 0.45 buys the 0.9 mm the bolt hole's own edge needs at our smaller
+bolt diameter.
+
+**`DISC_FRONT_LUG_INNER` is `derived` from our hub and not from the form**, and it
+is the one place this part is not the photograph. The form's tabs stop at 0.40 R --
+Ø60 on a Ø150 disc -- because a real front hub carries a disc flange near Ø80.
+`HUB_FRONT_INBOARD_RADIUS` is 24 mm, itself `estimated`, so a faithful tab would
+bolt to 12 mm of fresh air. The tabs are run in to 22 mm instead, overlapping that
+flange by 2 mm, which keeps `joints.py`'s bolted joint real. The tabs are therefore
+longer in proportion than the form's. **The hub flange is the thing that is wrong**;
+see the note in `_front_brakes`."""
+
+DISC_SLOT_COUNT: int = 9
+DISC_SLOT_INNER_FRAC: float = 0.675
+DISC_SLOT_OUTER_FRAC: float = 0.950
+DISC_SLOT_WIDTH: float = 0.0037
+DISC_SLOT_SWEEP: float = math.radians(11.2)
+DISC_HOLE_INNER_FRAC: float = 0.757
+DISC_HOLE_OUTER_FRAC: float = 0.903
+DISC_HOLE_CLOCK_INNER: float = math.radians(7.1)
+DISC_HOLE_CLOCK_OUTER: float = math.radians(-6.8)
+DISC_HOLE_DIAMETER: float = 0.0040
+"""The disc face pattern, **measured off `007-BRKR-10` p. 2's exploded CAD** rather
+than counted off a photograph. Counts and pitch are `sourced`; radii are `derived`
+as fractions of the disc's own sourced radius; the two widths are `estimated`.
+
+That drawing rather than `007-BRKF-01`'s because the rear form's disc is drawn
+**orthographic** -- its nine slots come out at 40.0 degrees with no scatter, and
+both hole rings at 40.0 -- while the front form's is an oblique exploded view whose
+angles are foreshortened. The front's pattern was then confirmed to be the same
+one: its two hole rings sit at the same ratio to each other (0.840 against 0.837)
+and its own slots and rings land on nine sectors at 40 degrees. The photographs on
+both forms show one part carrying **both** homologation numbers, so front and rear
+really are one family at two diameters.
+
+Method: threshold the render to ink, flood the background in from the border, and
+every enclosed white region is a feature. Group by radius, and the angular pitch
+falls out of the centroids:
+
+    ring            n   r/R     pitch      what
+    outer holes     9   0.903   40.0 deg   drilled
+    slots           9   0.812   40.0 deg   curved, centroid radius
+    inner holes     9   0.757   40.0 deg   drilled
+    lug bolts       3   0.531   120.0 deg  one per drive tang
+
+One 40 degree sector repeats nine times: an inner hole 7.1 degrees one side of the
+slot, an outer hole 6.8 degrees the other. **Nine, not the six this module's
+docstring claimed and not the eight #214 read off the photo.** Three independent
+families agreeing on the same nine sectors is what makes it a measurement.
+
+`DISC_SLOT_SWEEP` is the slot's lean: its bounding box on that drawing is 26.8 mm
+radial by 15.4 mm tangential at a centroid radius of 79.2, so the slot's center
+line shifts 11.2 degrees between its inner and outer ends. Applied linearly in
+radius, which draws a spiral segment rather than a circular arc -- indistinguishable
+at 31 mm long, and the tangent never has to be solved for.
+
+The two widths are `estimated` because a CAD circle is an ink **outline**: its white
+interior is short of the real hole by one stroke. The rear drawing's holes measure
+Ø3.28 interior, and the front form's fitted photograph -- no stroke to subtract,
+scaled by the outer ring's own 0.903 R -- gives Ø3.39 on a Ø150 disc. Two
+measurements of two different parts landing within 0.11 mm is the evidence; Ø4.0 is
+those plus about half a stroke, and a drill is a drill, so it does **not** scale
+with the disc. Slot width the same way: 87.9 mm2 of interior over a 31 mm arc is
+2.85 wide, so 3.7."""
 
 CALIPER_REAR_LENGTH: float = 0.138
 CALIPER_REAR_HEIGHT: float = 0.055
@@ -1332,6 +1442,497 @@ def _annulus_profile(
     ]
 
 
+def _disc_face(
+    context: build.BuildContext,
+    bm: bmesh.types.BMesh,
+    plane: float,
+    outer_radius: float,
+    thickness: float,
+    *,
+    bore_radius: float,
+    lug_count: int = 0,
+    lug_inner_radius: float = 0.0,
+    lug_half_angle: float = 0.0,
+    lug_bolt_radius: float = 0.0,
+    lug_bolt_diameter: float = 0.0,
+) -> None:
+    """A ventilated brake disc as one closed shell: two plates, a cavity, pillars.
+
+    Same construction as `_rim_plate_vented` and for the same two reasons -- a
+    through-hole cannot come out of a lathe, and a boolean is banned by the
+    determinism rules. A closed outline in (radius, x) is revolved into a grid of
+    quads, faces are simply not emitted where a feature removes material, and the
+    resulting openings are stitched with walls. Every edge ends with exactly two
+    faces, so the winding gate's watertightness check covers the features instead
+    of skipping them.
+
+    The outline is a **C**, not a rectangle, because the disc is ventilated:
+
+        bore   +6 ------------------------------------------ rim, chamfered
+                                          +2.5 ----------- cavity mouth, open
+                  (solid to 0.60 R)       -2.5 -----------
+        bore   -6 ------------------------------------------
+
+    so the plate is 12 mm overall -- sourced, three forms -- while being two 3.5 mm
+    friction plates around a 5 mm cavity that is open at the rim and closed inboard
+    of the pads. See `DISC_PLATE_THICKNESS` for why the old solid reading was wrong.
+
+    **Four feature families, and one mechanism serves all of them.** A window is a
+    set of grid cells removed from *two* facing sheets at once, plus walls joining
+    those sheets around its boundary:
+
+        drilling   removes outer face and plate inner face -> a tunnel to the cavity
+        bolt hole  removes front face and back face        -> through the solid hub
+        pillar     removes the two CAVITY faces            -> leaves a column standing
+
+    The pillar is the same operation read backwards, which is why it costs no extra
+    code: taking the cavity's own two surfaces away and joining them leaves material
+    exactly where the cavity used to be.
+
+    **What makes the pattern affordable.** Four families sit at four radii and
+    overlap in angle -- the groove leans 11.2 degrees across its length and passes
+    between the two drilled rings, so at some radii a drilling and the groove want
+    the same station. A single fixed angular grid cannot express that, and it does
+    not have to: each radius places its own station angles, because the faces are
+    flat annuli and moving a vertex around its own ring changes no surface at all,
+    only where a boundary lands. At the two radii bounding a drilling its stations
+    sit exactly on that hole's edge; everywhere else the same stations are filler
+    and get pushed clear. The quads that result are skewed and coplanar, which is
+    invisible, and every feature edge is an exact station at both detail levels.
+
+    The lugs and the grooves come out of the same freedom in the other two
+    coordinates. The bore ring's *radius* varies by station, so the bore is
+    scalloped with three tabs. The front and back faces' *x* varies by station, so
+    a groove is a blind channel milled into the face -- which is what the
+    photographs show, a lit floor and a tapered end, and **not** a slot through the
+    plate. Building them as through-slots was this pass's own first mistake.
+
+    #212 lost two features to being shaded smooth into invisibility, so the walls
+    here are checked by dihedral rather than by eye.
+    """
+    detail = context.detail
+    before = (len(bm.verts), len(bm.edges), len(bm.faces))
+    half = thickness * 0.5
+    cavity = half - DISC_PLATE_THICKNESS
+    chamfer = DISC_RIM_CHAMFER
+    hole_a = DISC_HOLE_DIAMETER * 0.5
+    bolt_a = lug_bolt_diameter * 0.5
+    groove_half = DISC_SLOT_WIDTH * 0.5
+    assert cavity > 0.0, "plates thicker than the disc"
+
+    # **A disc with no tabs carries none of the tab's machinery.** The rear ring
+    # floats on bobbins and takes its torque through the carrier, so it has no drive
+    # lugs and no bolt holes -- and the two radii that bracket a bolt hole and the
+    # three stations that place a tab edge then bound nothing there. They were built
+    # anyway, as filler: 4 outline points and 3 stations per period, 1,440 vertices
+    # of surface that no feature sits on, on a part that with its two mates is a
+    # fifth of the kart's whole vertex count. Dropped when `lug_count` is zero. The
+    # shape does not move -- every feature edge is still its own locked station and
+    # the annuli between them are still flat.
+    radius_of = {
+        "bore": lug_inner_radius if lug_count else bore_radius,
+        "vent": DISC_VENT_INNER_FRAC * outer_radius,
+        "g_in": DISC_SLOT_INNER_FRAC * outer_radius,
+        "hin_lo": DISC_HOLE_INNER_FRAC * outer_radius - hole_a,
+        "hin_hi": DISC_HOLE_INNER_FRAC * outer_radius + hole_a,
+        "hout_lo": DISC_HOLE_OUTER_FRAC * outer_radius - hole_a,
+        "hout_hi": DISC_HOLE_OUTER_FRAC * outer_radius + hole_a,
+        "g_out": DISC_SLOT_OUTER_FRAC * outer_radius,
+        "rim_in": outer_radius - chamfer,
+        "rim": outer_radius,
+    }
+    if lug_count:
+        radius_of["bolt_lo"] = lug_bolt_radius - bolt_a
+        radius_of["bolt_hi"] = lug_bolt_radius + bolt_a
+
+    order = ["bore"]
+    if lug_count:
+        order += ["bolt_lo", "bolt_hi"]
+    order += ["vent", "g_in", "hin_lo", "hin_hi",
+              "hout_lo", "hout_hi", "g_out", "rim_in", "rim"]
+    for lo, hi in zip(order, order[1:]):
+        assert radius_of[lo] < radius_of[hi], (
+            "disc radii must increase: %s %.4f then %s %.4f"
+            % (lo, radius_of[lo], hi, radius_of[hi])
+        )
+    if lug_count:
+        assert bore_radius < radius_of["bolt_lo"], (
+            "the scalloped bore at %.4f reaches past the bolt band at %.4f"
+            % (bore_radius, radius_of["bolt_lo"])
+        )
+
+    # --- angular stations --------------------------------------------------
+    # Sixteen per period carry a feature edge, in this order -- thirteen with no
+    # tabs. Fillers scale with detail and go in the gaps; feature stations are
+    # identical at both densities because the surface between them is flat.
+    # `lug_a_out` stays whatever the disc is: it is station 0, the period's own
+    # anchor, and on a lugged disc it also happens to be the outer edge of the tab's
+    # side wall.
+    ROLES = ["lug_a_out"]
+    if lug_count:
+        ROLES.append("lug_a")
+    ROLES += ["hout_l", "hout_m", "hout_h",
+              "groove_l", "groove_l2", "groove_h2", "groove_h",
+              "hin_l", "hin_m", "hin_h"]
+    if lug_count:
+        ROLES += ["lug_b", "lug_b_out"]
+    ROLES += ["pillar_l", "pillar_h"]
+    ROLES = tuple(ROLES)
+    ROLE = {name: index for index, name in enumerate(ROLES)}
+    # A gap is a station that fillers go *after*. The one opening the period is
+    # `lug_a` where there is a tab and station 0 itself where there is not, so the
+    # leading gap keeps its filler either way and high detail stays even.
+    GAP_NAMES = ["hout_h", "groove_h", "hin_h", "pillar_h",
+                 "lug_a" if lug_count else "lug_a_out"]
+    if lug_count:
+        GAP_NAMES.append("lug_b_out")
+    GAPS = frozenset(ROLE[name] for name in GAP_NAMES)
+    fillers = max(0, detail.tire_segments // 32 - 1)
+    per_period = len(ROLES) + len(GAPS) * fillers
+    period_angle = 2.0 * math.pi / DISC_SLOT_COUNT
+    lug_period = DISC_SLOT_COUNT // lug_count if lug_count else 0
+    total = DISC_SLOT_COUNT * per_period
+    if not lug_count:
+        lug_half_angle = period_angle * 0.30
+    wall = period_angle * 0.030
+    offsets: dict[str, int] = {}
+    cursor = 0
+    for index, name in enumerate(ROLES):
+        offsets[name] = cursor
+        cursor += 1 + (fillers if index in GAPS else 0)
+
+    def is_lug_period(period: int) -> bool:
+        return bool(lug_count) and period % lug_period == 0
+
+    # Which stations a given radius genuinely bounds. Everything else there is
+    # filler and gets spread evenly between the locked ones, which is what keeps a
+    # single ascending order at every radius without moving a feature edge. The
+    # alternative -- computing all sixteen from their own geometry -- puts a
+    # drilling's hexagon 0.3 rad wide at the bore, where it means nothing, and the
+    # order collapses.
+    #
+    # **The bore is the exception, and it is the whole reason the two bolt bands
+    # lock the lug stations too.** That freedom rests on the ring being a flat
+    # annulus, and the bore's radius *varies by station* -- it is at the tab on a
+    # lug period and at the scallop everywhere else. A ring that steps radially is
+    # not flat, so its neighbor in the outline has to carry the same station angles
+    # across the step or the ribbon between them folds over itself. It did: with
+    # `bolt_lo` free, its `lug_b` sat 2.4 degrees ahead of the bore's while the
+    # stations there are 1.2 degrees apart, and the quad on the tab's trailing edge
+    # came out a **bowtie** -- self-intersecting, signed area negative, normal
+    # reversed, a 180.0 degree dihedral against both its neighbors. Eighteen of
+    # them, three tabs by three edges by two plates, and a render shows nothing
+    # because the disc is watertight and every other face is right.
+    GROOVE_STATIONS = ("groove_l", "groove_l2", "groove_h2", "groove_h")
+    LUG_STATIONS = ("lug_a", "lug_b", "lug_b_out") if lug_count else ()
+    LOCKS = {
+        "bore": LUG_STATIONS,
+        "vent": (),
+        "g_in": GROOVE_STATIONS,
+        "hin_lo": GROOVE_STATIONS + ("hin_l", "hin_m", "hin_h", "pillar_l", "pillar_h"),
+        "hin_hi": GROOVE_STATIONS + ("hin_l", "hin_m", "hin_h", "pillar_l", "pillar_h"),
+        "hout_lo": GROOVE_STATIONS + ("hout_l", "hout_m", "hout_h", "pillar_l", "pillar_h"),
+        "hout_hi": GROOVE_STATIONS + ("hout_l", "hout_m", "hout_h",
+                                     "pillar_l", "pillar_h"),
+        "g_out": GROOVE_STATIONS,
+        "rim_in": (),
+        "rim": (),
+    }
+    if lug_count:
+        LOCKS["bolt_lo"] = LUG_STATIONS + ("groove_l2", "groove_h2")
+        LOCKS["bolt_hi"] = LUG_STATIONS + ("groove_l2", "groove_h2")
+
+    def feature_angles(radius: float, bolt_band: bool) -> list[float]:
+        """Where each active station wants to be, relative to the period center, if
+        this radius were the one that bounds it.
+
+        Keyed by name and projected onto `ROLES` at the end, so a station the disc
+        does not have simply is not asked for -- the list this returns is positional
+        and a silent shift in it would move every feature at once."""
+        if bolt_band:
+            # These two radii bound a lug's bolt hole, so the middle group is that
+            # hole rather than the groove -- the groove has not started this far in.
+            core, core_w, lip = 0.0, bolt_a / radius, 0.0
+        else:
+            span = (radius - radius_of["g_in"]) / (
+                radius_of["g_out"] - radius_of["g_in"]
+            )
+            core = DISC_SLOT_SWEEP * (min(1.0, max(0.0, span)) - 0.5)
+            core_w = groove_half / radius
+            lip = core_w * 0.26
+        hex_w = 0.866 * hole_a / radius
+        gap = period_angle * 0.012
+        pillar_lo = lug_half_angle + wall + gap * 2.0
+        want = {
+            "lug_a_out": -(lug_half_angle + wall),
+            "lug_a": -lug_half_angle,
+            "hout_l": DISC_HOLE_CLOCK_OUTER - hex_w,
+            "hout_m": DISC_HOLE_CLOCK_OUTER,
+            "hout_h": DISC_HOLE_CLOCK_OUTER + hex_w,
+            "groove_l": core - core_w - lip,
+            "groove_l2": core - core_w,
+            "groove_h2": core + core_w,
+            "groove_h": core + core_w + lip,
+            "hin_l": DISC_HOLE_CLOCK_INNER - hex_w,
+            "hin_m": DISC_HOLE_CLOCK_INNER,
+            "hin_h": DISC_HOLE_CLOCK_INNER + hex_w,
+            "lug_b": lug_half_angle,
+            "lug_b_out": lug_half_angle + wall,
+            "pillar_l": pillar_lo,
+            "pillar_h": pillar_lo + DISC_PILLAR_WIDTH / radius,
+        }
+        return [want[name] for name in ROLES]
+
+    def ring_stations(key: str) -> list[tuple[float, bool]]:
+        """(angle, on a lug tab) for every station at one radius, in order."""
+        radius = radius_of[key]
+        bolt_band = bool(lug_count) and key in ("bolt_lo", "bolt_hi")
+        want = feature_angles(radius, bolt_band)
+        lower = want[0]
+        upper = lower + period_angle
+        # Station 0 anchors the period; the rest are anchors only where this radius
+        # bounds them.
+        anchors = [(0, lower)]
+        for name in LOCKS[key]:
+            anchors.append((ROLE[name], want[ROLE[name]]))
+        anchors.sort()
+        for (i0, v0), (i1, v1) in zip(anchors, anchors[1:]):
+            assert v0 < v1, (
+                "locked stations collide at %s: %s %.5f then %s %.5f"
+                % (key, ROLES[i0], v0, ROLES[i1], v1)
+            )
+        assert anchors[-1][1] < upper, "locked station past the period at %s" % key
+
+        placed = [0.0] * len(ROLES)
+        bounded = anchors + [(len(ROLES), upper)]
+        for (i0, v0), (i1, v1) in zip(bounded, bounded[1:]):
+            placed[i0] = v0
+            free = i1 - i0 - 1
+            for step in range(free):
+                placed[i0 + 1 + step] = v0 + (v1 - v0) * (step + 1) / (free + 1)
+
+        out: list[tuple[float, bool]] = []
+        for period in range(DISC_SLOT_COUNT):
+            center = (period + 0.5) * period_angle
+            lug_here = is_lug_period(period)
+            after = center + period_angle + lower
+            for index, angle in enumerate(placed):
+                # lug_a through lug_b inclusive stand on the tab; the two _out
+                # stations sit just off it, which is what puts the tab's side face
+                # on a real edge instead of a ramp.
+                on_tab = lug_here and ROLE["lug_a"] <= index <= ROLE["lug_b"]
+                out.append((center + angle, on_tab))
+                if index in GAPS:
+                    end = (center + placed[index + 1]) if index + 1 < len(placed) else after
+                    for step in range(fillers):
+                        share = (step + 1) / (fillers + 1)
+                        out.append(
+                            (center + angle + (end - center - angle) * share, on_tab)
+                        )
+        assert len(out) == total, "%d stations, expected %d" % (len(out), total)
+        for index in range(total - 1):
+            assert out[index][0] < out[index + 1][0], (
+                "stations out of order at %s, station %d: %.5f then %.5f"
+                % (key, index, out[index][0], out[index + 1][0])
+            )
+        return out
+
+    stations = {key: ring_stations(key) for key in radius_of}
+
+    # The guard for the fold above, written against the property rather than the
+    # symptom: wherever the bore's radius steps between two neighboring stations,
+    # the ring outboard of it must sit at those same two angles. A degenerate or
+    # reversed quad is not something the winding gate can see -- the shell stays
+    # watertight and its total signed volume stays positive -- so it is checked here.
+    if lug_count:
+        bore_ring, next_ring = stations["bore"], stations["bolt_lo"]
+        for a in range(total):
+            b = (a + 1) % total
+            if bore_ring[a][1] == bore_ring[b][1]:
+                continue  # no step across this cell
+            for index in (a, b):
+                assert abs(bore_ring[index][0] - next_ring[index][0]) < 1e-12, (
+                    "the bore steps radius at station %d and bolt_lo is %.5f rad "
+                    "away, so the quad between them folds"
+                    % (index, bore_ring[index][0] - next_ring[index][0])
+                )
+
+    # --- the outline -------------------------------------------------------
+    # (radius key, x, groove side, pass). Groove side +1/-1 marks a face the blind
+    # grooves are milled into; 0 leaves x alone. The pass -- front face, cavity
+    # front, cavity back, back face -- exists because four radii appear on all four
+    # of them and the windows below have to name one: a segment index is what a
+    # window is addressed by, and hardcoded integers were a landmine the moment two
+    # points left the list for the rear disc.
+    outline: list[tuple[str, float, int, str]] = [("bore", half, 0, "f")]
+    if lug_count:
+        outline += [("bolt_lo", half, 0, "f"), ("bolt_hi", half, 0, "f")]
+    outline += [
+        ("vent", half, 0, "f"), ("g_in", half, 0, "f"),
+        ("hin_lo", half, 1, "f"), ("hin_hi", half, 1, "f"),
+        ("hout_lo", half, 1, "f"), ("hout_hi", half, 1, "f"),
+        ("g_out", half, 0, "f"), ("rim_in", half, 0, "f"),
+        ("rim", half - chamfer, 0, "f"),
+        ("rim", cavity, 0, "cf"),
+        ("hout_hi", cavity, 0, "cf"), ("hout_lo", cavity, 0, "cf"),
+        ("hin_hi", cavity, 0, "cf"), ("hin_lo", cavity, 0, "cf"),
+        ("vent", cavity, 0, "cf"),
+        ("vent", -cavity, 0, "cb"),
+        ("hin_lo", -cavity, 0, "cb"), ("hin_hi", -cavity, 0, "cb"),
+        ("hout_lo", -cavity, 0, "cb"), ("hout_hi", -cavity, 0, "cb"),
+        ("rim", -cavity, 0, "cb"),
+        ("rim", -half + chamfer, 0, "b"), ("rim_in", -half, 0, "b"),
+        ("g_out", -half, 0, "b"),
+        ("hout_hi", -half, -1, "b"), ("hout_lo", -half, -1, "b"),
+        ("hin_hi", -half, -1, "b"), ("hin_lo", -half, -1, "b"),
+        ("g_in", -half, 0, "b"), ("vent", -half, 0, "b"),
+    ]
+    if lug_count:
+        outline += [("bolt_hi", -half, 0, "b"), ("bolt_lo", -half, 0, "b")]
+    outline += [("bore", -half, 0, "b")]
+    loop = len(outline)
+
+    # Where each (radius, pass) landed. A window names its segments through this
+    # rather than by number, so dropping the bolt bands shifts nothing.
+    at: dict[tuple[str, str], int] = {}
+    for index, (key, _x, _g, tag) in enumerate(outline):
+        assert (key, tag) not in at, (
+            "outline has %s twice on pass %s, so a window addressed by name would "
+            "take the second one silently" % (key, tag)
+        )
+        at[(key, tag)] = index
+
+    def groove_floor(a: int) -> bool:
+        """Is this station between a groove's two inner edges?"""
+        return offsets["groove_l2"] <= a % per_period < offsets["groove_h2"]
+
+    verts: list[list[bmesh.types.BMVert]] = []
+    for key, along, groove, _tag in outline:
+        ring: list[bmesh.types.BMVert] = []
+        for a, (angle, on_tab) in enumerate(stations[key]):
+            radius = radius_of[key]
+            if key == "bore" and lug_count and not on_tab:
+                radius = bore_radius
+            x = along
+            if groove and groove_floor(a):
+                x -= groove * DISC_GROOVE_DEPTH
+            ring.append(
+                bm.verts.new(
+                    Vector((plane + x, radius * math.cos(angle), radius * math.sin(angle)))
+                )
+            )
+        verts.append(ring)
+
+    # --- features ----------------------------------------------------------
+    skip: set[tuple[int, int]] = set()
+    walls: list[tuple] = []
+
+    def window(seg_a: int, seg_b: int, lo_a: int, lo_b: int, hi_a: int, hi_b: int,
+               cells: list[int]) -> None:
+        """Remove `cells` from two facing sheets and stitch the opening shut.
+
+        `seg_a`/`seg_b` are the outline segments carrying those sheets; `lo_*` and
+        `hi_*` are the outline points at the feature's two radii on each sheet.
+        """
+        for a in cells:
+            skip.add((seg_a, a))
+            skip.add((seg_b, a))
+        for a in cells:
+            b = (a + 1) % total
+            walls.append((verts[lo_a][a], verts[lo_b][a], verts[lo_b][b], verts[lo_a][b]))
+            walls.append((verts[hi_a][b], verts[hi_b][b], verts[hi_b][a], verts[hi_a][a]))
+        first, last = cells[0], (cells[-1] + 1) % total
+        walls.append((verts[lo_a][first], verts[hi_a][first],
+                      verts[hi_b][first], verts[lo_b][first]))
+        walls.append((verts[lo_b][last], verts[hi_b][last],
+                      verts[hi_a][last], verts[lo_a][last]))
+
+    # The outline is a closed loop, so two of its four passes run inward to outward
+    # and two run back. A feature's segment on a given pass is therefore named by
+    # whichever of its two radii that pass reaches first, and every window pairs one
+    # pass of each direction.
+    INWARD_OUT = ("f", "cb")
+
+    def bore_through(lo: str, hi: str, sheet: str, floor: str,
+                     cells: list[int]) -> None:
+        """One feature between the `sheet` pass and the `floor` pass, at the two
+        radii `lo` and `hi`."""
+
+        def first_on(tag: str) -> str:
+            return lo if tag in INWARD_OUT else hi
+
+        assert (sheet in INWARD_OUT) != (floor in INWARD_OUT), (
+            "a window needs one pass of each direction; %s and %s run the same way"
+            % (sheet, floor)
+        )
+        window(at[(first_on(sheet), sheet)], at[(first_on(floor), floor)],
+               at[(lo, sheet)], at[(lo, floor)],
+               at[(hi, sheet)], at[(hi, floor)], cells)
+
+    for period in range(DISC_SLOT_COUNT):
+        base = period * per_period
+        hin_cells = [base + offsets["hin_l"], base + offsets["hin_m"]]
+        hout_cells = [base + offsets["hout_l"], base + offsets["hout_m"]]
+        pillar_cells = [base + offsets["pillar_l"]]
+        # drillings: outer face -> plate inner face, both plates
+        bore_through("hin_lo", "hin_hi", "f", "cf", hin_cells)
+        bore_through("hout_lo", "hout_hi", "f", "cf", hout_cells)
+        bore_through("hin_lo", "hin_hi", "b", "cb", hin_cells)
+        bore_through("hout_lo", "hout_hi", "b", "cb", hout_cells)
+        # pillars: the cavity's own two faces, so material is left standing
+        bore_through("hin_lo", "hin_hi", "cf", "cb", pillar_cells)
+        if DISC_PILLAR_PER_SECTOR > 1:
+            bore_through("hout_lo", "hout_hi", "cf", "cb", pillar_cells)
+        # one bolt hole per tab, straight through the solid inner section
+        if is_lug_period(period):
+            bolt_cells = [base + offsets["groove_l2"]]
+            bore_through("bolt_lo", "bolt_hi", "f", "b", bolt_cells)
+
+    # --- faces -------------------------------------------------------------
+    for o in range(loop):
+        o_next = (o + 1) % loop
+        for a in range(total):
+            b = (a + 1) % total
+            if (o, a) in skip:
+                continue
+            bm.faces.new((verts[o][a], verts[o_next][a], verts[o_next][b], verts[o][b]))
+    for quad in walls:
+        bm.faces.new(quad)
+
+    # --- the part counts its own holes -------------------------------------
+    # #214's acceptance line, and the answer to `DISC_FRONT_TANG_COUNT`'s old
+    # docstring: a claim about the pattern that the mesh does not carry is caught
+    # here rather than believed. Euler characteristic over a closed shell is
+    # `2 - 2*genus`, and every tunnel through the shell is one handle.
+    #
+    # **A drilling is two handles, not one, and that is the honest count.** Each of
+    # the eighteen drilled positions is bored through the *front* plate into the
+    # cavity and again through the *back* plate, and the cavity is open at the rim,
+    # so outside and cavity are one connected region and each bore is its own
+    # tunnel. Reading the two rings of nine as eighteen handles is what predicted
+    # genus 40 against a measured 58 -- off by exactly the eighteen back-plate
+    # bores. The pillars are the same operation inverted and each still costs a
+    # handle: taking the cavity's two faces away and joining them leaves a column,
+    # and a column standing in a cavity is a handle in the shell around it.
+    handles = (
+        1                                          # the bore
+        + DISC_SLOT_COUNT * 2 * 2                  # two drilled rings, both plates
+        + DISC_SLOT_COUNT * DISC_PILLAR_PER_SECTOR  # vent pillars
+        + lug_count                                # one bolt hole per tab
+    )
+    grew = (
+        len(bm.verts) - before[0],
+        len(bm.edges) - before[1],
+        len(bm.faces) - before[2],
+    )
+    chi = grew[0] - grew[1] + grew[2]
+    assert chi == 2 - 2 * handles, (
+        "the disc built Euler characteristic %+d, which is genus %.1f, against the "
+        "%d holes this builder claims -- a feature is doubled, missing, or the "
+        "claim is wrong" % (chi, (2 - chi) / 2.0, handles)
+    )
+
+
 # --- rear bearings, cassettes and hubs -------------------------------------
 
 
@@ -1825,19 +2426,21 @@ def _rear_brake(context: build.BuildContext, collection: bpy.types.Collection) -
     )
     carrier.location = (0.0, axle_y, axle_z)
 
-    # The friction ring, floating on six bobbins.
+    # The friction ring, floating on six bobbins, and carrying the same face
+    # pattern as the front: `007-BRKR-10`'s own drawing is where the nine slots and
+    # the two rings of nine holes were measured, and its photograph shows one part
+    # stamped with both this form's number and the front's. It keeps its floating
+    # two-piece construction -- that is `007-B4-69`'s rear and the front form's is a
+    # one-piece -- so it takes no drive lugs: the carrier and the bobbins are what
+    # the torque goes through. Before #214 it was a plain washer at chi 0.
     bm = bmesh.new()
-    build.lathe(
+    _disc_face(
+        context,
         bm,
-        _annulus_profile(
-            DISC_REAR_DIAMETER * 0.5,
-            DISC_REAR_RING_INNER,
-            DISC_REAR_THICKNESS * 0.5,
-        ),
-        detail.tire_segments,
-        axis="X",
-        center=(DISC_REAR_X, 0.0, 0.0),
-        close_profile=True,
+        DISC_REAR_X,
+        DISC_REAR_DIAMETER * 0.5,
+        DISC_REAR_THICKNESS,
+        bore_radius=DISC_REAR_RING_INNER,
     )
     disc = build.object_from_bmesh(
         "brake_disc_rear", bm, collection, material=steel, shade_smooth=True
@@ -1982,34 +2585,29 @@ def _front_brakes(context: build.BuildContext, collection: bpy.types.Collection)
 
     pad_radius = (DISC_FRONT_PAD_OUTER + DISC_FRONT_PAD_INNER) * 0.25
     rotation = Matrix.Rotation(-CALIPER_FRONT_CLOCK, 4, "X")
-    ring_inner = DISC_FRONT_PAD_INNER * 0.5 - 0.006
-    tang_inner = 0.016
 
     for label, side in (("fl", -1.0), ("fr", 1.0)):
         plane = side * DISC_FRONT_X
 
+        # One piece: nine curved slots, two rings of nine drilled holes, and three
+        # integral drive tangs at 120 degrees reaching in to the hub's inboard
+        # flange, each with its own bolt hole. Until #214 this was a plain lathed
+        # ring plus three boxes -- Euler characteristic +6, which is three disjoint
+        # solids and not one drilling, under a docstring that claimed the pattern.
         bm = bmesh.new()
-        build.lathe(
+        _disc_face(
+            context,
             bm,
-            _annulus_profile(
-                DISC_FRONT_DIAMETER * 0.5, ring_inner, DISC_FRONT_THICKNESS * 0.5
-            ),
-            detail.tire_segments,
-            axis="X",
-            center=(plane, 0.0, 0.0),
-            close_profile=True,
+            plane,
+            DISC_FRONT_DIAMETER * 0.5,
+            DISC_FRONT_THICKNESS,
+            bore_radius=DISC_FRONT_BORE_RADIUS,
+            lug_count=DISC_FRONT_TANG_COUNT,
+            lug_inner_radius=DISC_FRONT_LUG_INNER,
+            lug_half_angle=DISC_FRONT_LUG_HALF_ANGLE,
+            lug_bolt_radius=DISC_LUG_BOLT_FRAC * DISC_FRONT_DIAMETER * 0.5,
+            lug_bolt_diameter=DISC_LUG_BOLT_DIAMETER,
         )
-        # Three integral drive tangs at 120 degrees, reaching in to the hub's
-        # inboard flange. `sourced` as shape off `007-B4-69` p. 2.
-        for index in range(DISC_FRONT_TANG_COUNT):
-            angle = 2.0 * math.pi * index / DISC_FRONT_TANG_COUNT
-            mid = (ring_inner + tang_inner) * 0.5
-            build.box(
-                bm,
-                (DISC_FRONT_THICKNESS, 0.018, ring_inner - tang_inner),
-                (plane, mid * math.cos(angle), mid * math.sin(angle)),
-                rotation=Matrix.Rotation(angle - math.pi * 0.5, 4, "X"),
-            )
         disc = build.object_from_bmesh(
             "brake_disc_%s" % label, bm, collection, material=steel, shade_smooth=True
         )
