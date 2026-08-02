@@ -2649,8 +2649,27 @@ All five are CIK-FIA homologation forms, already in `refs/kart-visual/`:
 | B1 | `007-BRKF-01` | Birel ART Freeline FL RR EVO, **BRK-F**, front circuit only, 2025–2027 | the master. Ø150 × 12, ventilated ticked, p. 4 close-ups of the disc face and the caliper, 2 pistons Ø25, pads 49.7 overall |
 | B2 | `007-BRKR-10` | Birel ART Freeline, **rear** | **the face pattern.** p. 2's exploded CAD is drawn *orthographic*, so its features come out on an exact pitch with no scatter |
 | B3 | `007-B4-69` | Birel ART / Free Line RR, *"BRAKING SYSTEM - (4WP)"*, gearbox category, 2017 | the caliper envelopes, measured inside one orthographic projection. 2 pistons front Ø25, 4 rear |
-| B4 | `82/FR/11` | C.R.G. VEN BK-05-125, all category, 4-wheel, 2005 | the set §20 adopts for the rear. 4 pistons front Ø26, 2 rear Ø32 |
+| B4 | `82/FR/11` | C.R.G. VEN BK-05-125, all category, 4-wheel, 2005 | the set §20 adopts for the rear. 4 pistons front Ø26, 2 rear Ø32. **p. 4's *Etriers* photograph is the only dead-on picture of this kart's actual rear caliper**, and is now the primary shape source for `wheels._caliper_body` — §5 item 10, it is a photograph and not prose |
 | B5 | `005-B2-97` | Righetti, 2WP | not yet read |
+
+**B1 contradicts itself, and the contradiction is load-bearing.** Its panel C
+shows two fitted photographs of a **waisted, two-ear** caliper — the same family
+as B2 p. 2 item 3 — while its panel D shows a **squarish machined block** with a
+red anodized cap. Only panel D carries the stamped `007-BRKF-01`, so panel D is
+the part the form is about and is what ADR-0067 adopts and what `wheels.py`
+builds. Recorded because the next reader will open panel C first, find a caliper
+that does not match the model, and "correct" the model toward the wrong picture.
+Same shape as the Art. 9.4 page-break trap: the form is not wrong, it is
+inconsistent, and only one half of it is the subject.
+
+**B2's §B describes Freeline's rear, which this kart does not have** — Ø150 × 12
+disc, 2 pistons at Ø25, pads 40/38/25. This kart's rear is B4's: Ø195 × 18.5 and
+Ø32. B2 is a ruler and a shape reference, never a dimension source for the rear.
+Its scale is **0.5291 mm/px**, anchored on its own §B's sourced Ø150 disc spanning
+283.5 px mid-stroke, and corroborated by a **standard fastener** rather than by a
+second disc: its socket screws measure 13.9 mm across the counterbore and 6.2
+across the hex against ISO 4762 M8's 13.0 and 6.0, so **7%** is the error bar on
+anything read off that plate.
 
 ### What the references settled
 

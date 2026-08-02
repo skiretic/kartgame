@@ -882,9 +882,20 @@ of the three parts here most likely to be left out.
 **2.0 mm, because 1.8 is a floor and not a practice.** Writing it as "1.8 mm max"
 would be the front matter's second defect exactly.
 
-Both run at z 79 and 73, in the 18 mm channel between the floor tray's top surface
-at 69 and `pedal_mount_?`'s bottom at 87. That channel is `derived` and it is the
-only clear route: at pad height the rod passes through the mount plate."""
+Both run at **z 112 and 106**, which is what these constants say and what the mesh
+builds.
+
+**This paragraph used to say 79 and 73, in an 18 mm channel between the floor
+tray's top at 69 and `pedal_mount_?`'s bottom at 87** -- a route 33 mm below where
+either rod has ever been built, describing a channel that does not contain them.
+Nothing measured it because nothing reads prose. The 138 mm the organ pedal moved
+`pedal_z` in §40.5 is the obvious suspect and the arithmetic does not quite close,
+so the honest statement is that the *clearance argument* for this height is
+unproven rather than wrong: the rods pass every gate today, and the sentence that
+justified their z does not survive contact with the constants above it. Fourth
+case of ADR-0066's family in this file's neighbourhood, after the disc's slots,
+the engine's webs and the front pad's four pistons -- and the first one found by
+an agent reading a block it did not own."""
 
 LINE_RADIUS: float = 0.003
 """Braided steel hose with banjo ends, `sourced` construction and `estimated`
