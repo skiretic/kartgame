@@ -2631,3 +2631,97 @@ Reference-backed observations against the current model (turntable
    real kart wears a flat z-band stripe.
 6. Magnesium rims are **spoked/vented, gold**, on every modern kart photo;
    ours are solid discs (the recorded teardrop-cutout omission).
+
+## The brakes — `KART_SPEC` §20.6, issue #214
+
+The disc was a washer and the caliper three boxes, under a docstring claiming six
+slots and two rings of holes that had never been built. Everything below is
+measured off the forms rather than counted off a product photograph, and the two
+readings this pass got *wrong* before it got them right are recorded with the
+right answer, because both were confident.
+
+### Documents
+
+All five are CIK-FIA homologation forms, already in `refs/kart-visual/`:
+
+| ref | form | what it is | what it settled |
+| --- | --- | --- | --- |
+| B1 | `007-BRKF-01` | Birel ART Freeline FL RR EVO, **BRK-F**, front circuit only, 2025–2027 | the master. Ø150 × 12, ventilated ticked, p. 4 close-ups of the disc face and the caliper, 2 pistons Ø25, pads 49.7 overall |
+| B2 | `007-BRKR-10` | Birel ART Freeline, **rear** | **the face pattern.** p. 2's exploded CAD is drawn *orthographic*, so its features come out on an exact pitch with no scatter |
+| B3 | `007-B4-69` | Birel ART / Free Line RR, *"BRAKING SYSTEM - (4WP)"*, gearbox category, 2017 | the caliper envelopes, measured inside one orthographic projection. 2 pistons front Ø25, 4 rear |
+| B4 | `82/FR/11` | C.R.G. VEN BK-05-125, all category, 4-wheel, 2005 | the set §20 adopts for the rear. 4 pistons front Ø26, 2 rear Ø32 |
+| B5 | `005-B2-97` | Righetti, 2WP | not yet read |
+
+### What the references settled
+
+1. **The face pattern is nine, and three independent families say so.** Measured
+   off B2 p. 2, which is the only one of the five drawn orthographic:
+
+   | ring | n | r/R | pitch |
+   | --- | --- | --- | --- |
+   | outer drillings | 9 | 0.903 | 40.0° |
+   | grooves | 9 | 0.812 (centroid) | 40.0° |
+   | inner drillings | 9 | 0.757 | 40.0° |
+   | lug bolts | 3 | 0.531 | 120.0° |
+
+   One 40° sector repeated nine times: the inner drilling sits +7.1° off the
+   groove, the outer −6.8°. Three families landing on the same nine sectors is
+   what makes it a measurement rather than a count off a photograph. The
+   docstring said **six** and the ticket said **eight**; both were guesses at a
+   picture, and the drive center is **3 lugs at 120°**, which
+   `DISC_FRONT_TANG_COUNT` had right from the start.
+
+2. **The curved features are blind grooves, not slots through the plate.** B1
+   p. 4's close-up shows a machined floor and a rounded end, with a black
+   through-drilling beside it for contrast. Art. 4.12.3 permits *grinding,
+   drilling, grooving* as three separate operations. The first build of this pass
+   made them through-slots and was wrong.
+
+3. **The disc is ventilated in the literal sense: two plates and a cavity.**
+   *Disque ventilé / Ventilated disc* is ticked **Oui / Yes** on B1, B3 and B4 —
+   a 2005 form and a 2024 one — and all three give the front disc as **Ø150 × 12
+   ±1**. That thickness is the one figure that never moves across nineteen years.
+   Corroborated from the trade side, where solid sprint rotors run 3–6 mm and
+   **shifter karts run 10–12 mm ventilated**. See ADR-0066 for why the repo
+   denied this for a milestone.
+
+4. **The front caliper is three different calipers and they were never one.**
+   B1 and B3 both say **2 pistons at Ø25**; B4 says **4 at Ø26**. §20 adopted the
+   B4 set whole on a consistency argument (CRG Road Rebel is this repo's primary
+   chassis reference) while the envelope in `wheels.py` was measured off B3 and
+   the shape is being built from B1's photograph. Resolved for the front in
+   favor of **B1**, 2 × Ø25 — Anthony's call, and it is the form the ticket
+   points at, the photograph the shape comes from, and the caliper the built
+   envelope already is. The rear stays B4. §20.6.1's table carries all three
+   columns and now says which is built.
+
+### What could not be sourced
+
+1. **The internal construction of the vent.** No form draws the cavity. The
+   3.5 + 5.0 + 3.5 split is `estimated` against the sourced 12.0 total, and 3.5
+   is about the thinnest plate that still carries a 1.0 mm groove and a pad face.
+   The pillar count inherits the face pattern's own measured nine-fold symmetry
+   rather than inventing a number.
+2. **The vane form.** Straight radial pillars are the simplest thing consistent
+   with a cast rotor; curved vanes are equally plausible and nothing here decides
+   it.
+3. **The front hub's disc flange.** B1's tabs stop at 0.40 R, which on our hub
+   would bolt to fresh air — `HUB_FRONT_INBOARD_RADIUS` is 24 mm and itself
+   `estimated`. The tabs are run in to 22 mm to keep the bolted joint real, which
+   makes them longer in proportion than the form's. **The hub is what is wrong
+   here, not the disc**, and it is recorded that way in `DISC_FRONT_LUG_INNER`.
+
+### The two readings this pass got wrong
+
+Both are worth keeping because both were argued confidently from evidence.
+
+1. **The venting, twice in one session.** Agreed the disc was vented before
+   looking; then looked at B1's rim at 600 dpi, saw one solid band, and argued the
+   opposite. The rim crops are **inconclusive, not decisive** — blown-out white on
+   a side-on view. The ticked box plus three matching thickness figures were the
+   stronger evidence and were sitting there the whole time. `params.py` had
+   carried the denial in these words: *"the drawing shows one plate"* — an
+   assertion resting on a **plan view**, which cannot show a cavity from above.
+2. **The slot count.** Six in the docstring, eight in the ticket, nine on the only
+   orthographic drawing of the five. A count off an oblique exploded view is not a
+   measurement.

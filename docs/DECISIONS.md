@@ -3114,7 +3114,7 @@ The separation matters more than the numbers. `circuit::` reads as "the FIA said
 so" and `circuit::ours::` reads as "we picked this", at the call site, without a
 comment. `src/core/circuit_reference.h` is the file, and it does for the circuit
 what `kz_audio_reference.h` does for the engine note: one owner for every external
-constant, with the unmeasured neighbours **named** rather than quietly filled in.
+constant, with the unmeasured neighbors **named** rather than quietly filled in.
 
 Two more figures live in the same namespace under the same rule. The
 **superelevation runoff length** — the regulation says banking changes are "to be
@@ -4237,3 +4237,165 @@ question: this is not a licensed FIA product and the 500 mm ceiling is a guide
 here, not a wall. It is a **look** question, and it is recorded in
 `radiator_z`'s docstring so the next person knows it was bought rather than
 missed.
+
+## ADR-0066
+
+**The front disc is ventilated, its face pattern is nine, and the builder counts
+its own holes.**
+
+Status: accepted, 2026-08-01. Amends `DISC_FRONT_TANG_COUNT`'s docstring and
+`DISC_PLATE_THICKNESS`'s, both of which asserted the opposite. Issue #214.
+
+### The defect
+
+`wheels.DISC_FRONT_TANG_COUNT` said the front disc was *"one piece, no floating
+carrier, six curved slots, two rings of drilled holes, and 3 integral drive tangs
+at 120 degrees."* Only the tangs existed. Measured against the live mesh:
+
+    brake_disc_fr     152 verts  chi +6   a ring plus three disjoint tangs
+    brake_disc_rear   128 verts  chi  0   a plain washer
+
+Euler characteristic +6 on one "part" is three separate solids and not one hole in
+sight. Third case of a docstring describing geometry nobody built, after #199's
+crease and #212's cast webs.
+
+### What was measured
+
+**The pattern is nine.** Off `007-BRKR-10` p. 2, the only orthographic drawing of
+the five brake forms in `refs/`: outer drillings 9 at r/R 0.903, grooves 9 at
+0.812, inner drillings 9 at 0.757, all on a 40.0° pitch, plus 3 lug bolts at
+0.531 and 120°. Three independent families on the same nine sectors. The
+docstring's six and the ticket's eight were both counted off an *oblique*
+exploded view.
+
+**The curved features are blind grooves.** `007-BRKF-01` p. 4 shows a machined
+floor and a rounded end, with a through-drilling beside it for contrast.
+Art. 4.12.3 lists grinding, drilling and grooving as three operations. This pass
+built them as through-slots first, which was wrong.
+
+**The disc is ventilated in the literal sense.** *Disque ventilé* is ticked
+**Oui/Yes** on all three forms that have the box — CRG `82/FR/11` (2005), Birel
+`007-B4-69` (2017), Birel `007-BRKF-01` (2024) — and all three give **Ø150 × 12
+±1**. `params.py` denied it in these words: *"'Ventilated' on these forms means
+drilled and slotted through a single plate, not a two-plate vented rotor -- the
+drawing shows one plate."* That is an assertion resting on a **plan view**, which
+cannot show a cavity from above. Same family as the six slots. Corroborated from
+the trade side: solid sprint rotors 3–6 mm, shifter karts 10–12 mm ventilated.
+
+### The decision
+
+12.00 mm overall as **3.5 plate + 5.0 cavity + 3.5 plate**, open at the rim and
+closed inboard at 0.60 R, with 18 pillars standing in the gap between the drilled
+rings. Nine blind grooves, two rings of nine drillings, three drive lugs on a
+scalloped bore with a bolt hole each. No booleans — a closed C-shaped outline in
+(radius, x) revolved into a grid, faces not emitted where a feature removes
+material, openings stitched with walls, which is `_rim_plate_vented`'s proven
+route and keeps the part watertight so the winding gate still covers it.
+
+Reading 12 mm as solid put **three times the steel in the model** — 1.26 kg per
+corner. Volume fell 162 → 114 cm³.
+
+### The gate this ships with, which matters more than the geometry
+
+**`_disc_face` asserts its own Euler characteristic.** The claim and the mesh are
+checked against each other at both detail levels, so the failure mode this ADR
+exists to fix cannot recur silently:
+
+    handles = 1 bore + 36 drillings + 18 pillars + lug_count bolt holes
+    assert chi == 2 - 2 * handles
+
+**A drilling is two handles, not one.** Each of the eighteen drilled positions is
+bored through the front plate into the cavity *and* through the back plate, and
+the cavity is open at the rim, so outside and cavity are one connected region and
+each bore is its own tunnel. Predicting eighteen gave genus 40 against a measured
+58 — off by exactly the eighteen back-plate bores. The mesh was right and the
+arithmetic was wrong, which is the opposite of the usual direction and is why the
+assert is written in terms of the construction rather than the part.
+
+### The trap found on the way, and its guard
+
+`brake_disc_fr` reported a **180.0° dihedral** and `brake_disc_rear` did not. Six
+faces, 2.453 mm² each, three tabs by two plates: **bowtie quads**, whose two edges
+cross so the polygon self-intersects and its signed area comes out negative.
+
+The builder rests on one freedom — *a radius places its own station angles,
+because the faces are flat annuli and moving a vertex around its own ring changes
+no surface.* **The bore is not a flat annulus.** Its radius steps between the tab
+(22 mm) and the scallop (33.75 mm), and with `bolt_lo`'s stations free its `lug_b`
+landed 2.4° ahead of the bore's while stations there are 1.2° apart. The ribbon
+between the two rings folded over itself.
+
+It is invisible to everything the repo had. The shell stayed **watertight**, the
+signed volume stayed **positive**, non-manifold count stayed **0**, and a render
+of a folded face at 2.4 mm² is a render of the correct disc. Only a dihedral
+census saw it, and only on the disc that has tabs.
+
+`bolt_lo` and `bolt_hi` now lock the lug stations, and the guard is written
+against the property rather than the symptom: **wherever a ring's radius steps
+between two stations, its neighbor in the outline must sit at those same two
+angles.** It carries a negative control — reverting the lock trips it at station 1,
+the leading edge, which skewed 0.34° and did *not* bowtie. Whole class, not the
+one symptom.
+
+### The price
+
+5,184 verts per disc at low detail, which is the shipped count: `kartlib/lod_stage.py`
+does not exist (#20) and Godot generates its own distance LODs on import
+(ADR-0025), so what is built is what ships. Three discs took the kart 68,222 →
+77,222. The rear ring has no tabs and no bolt holes, so the two radii bracketing a
+bolt hole and the three stations placing a tab edge bound nothing there and are
+dropped: 5,184 → 3,744, kart 77,222 → **75,782**.
+
+That trim is not free and the ADR says so. Every *feature* edge is exactly where
+it was — anchors are placed at their own computed angle and removing filler roles
+cannot move one — but the circle the features are cut from is now a 117-gon rather
+than a 144-gon, so the rear rim sits **12 µm** further in between vertices and its
+volume falls 0.025%. On a Ø195 disc that is nothing. It is recorded because
+"no shape change" was said before it was measured.
+
+## ADR-0067
+
+**The front brake circuit is the Freeline form, not the CRG one: 2 pistons at
+Ø25.**
+
+Status: accepted, 2026-08-01. Amends `KART_SPEC` §20.6's *"The CRG VEN set is
+adopted whole"* for the front only. Issue #214.
+
+### The defect
+
+The front caliper was three different calipers and nobody had chosen between them:
+
+| what | form | says |
+| --- | --- | --- |
+| the envelope `wheels.py` builds, 103 × 62 × 66 | `007-B4-69` Birel RR | 2 pistons Ø25 |
+| the set §20.6.1 adopts | `82/FR/11` CRG VEN | **4 pistons Ø26** |
+| the photograph #214 is built from, p. 4 | `007-BRKF-01` Freeline | 2 pistons Ø25 |
+
+Every figure was `sourced` and correctly cited. The defect is that they are three
+different parts and the model was taking one number from each. §20.6.1's table
+carried all three columns honestly; §20.7's caliper entry then wrote *"4 pistons
+per wheel at 26 mm bore"* citing **both** `82/FR/11` **and** `007-BRKF-01`, and
+`007-BRKF-01` does not say that. Same family as the pit-lane article number: a
+citation is a number, and a number nobody re-read is a number somebody inherited.
+
+### The decision
+
+**The front takes `007-BRKF-01` whole: 2 opposed pistons at Ø25, 2 pads.**
+Anthony's call. It is the form the ticket points at, the photograph the caliper's
+shape is being read off, and it agrees with the envelope already built from
+`007-B4-69`. Two of the three forms say 2 × Ø25; only CRG says otherwise.
+
+**The rear stays CRG `82/FR/11`**, 2 pistons at Ø32. A front-circuit-only
+homologation combined with another maker's rear is a real configuration —
+`007-BRKF-01` is literally half of Art. 9.6's *"BRKF + BRKR"* option — and
+Art. 8.6 makes brakes free in Group 1 anyway (ADR-0054), so nothing here is a
+regulation question.
+
+### The price
+
+Front clamp area per wheel falls from 2124 mm² (4 × π × 13²) to **982 mm²**
+(2 × π × 12.5²) against a rear of 1608 mm². The front-to-rear clamp ratio crosses
+1.0 and lands where Birel's own system puts it, which §20.6.1 already noted is the
+opposite side from CRG's. **This is a number a brake-bias tunable will sit on**,
+so it is recorded here rather than left to be rediscovered: the balance regulator
+is what trims it, and both makers ship one.

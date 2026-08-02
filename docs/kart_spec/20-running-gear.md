@@ -650,11 +650,22 @@ figures are settled and the differences are a real between-manufacturer spread.
   front-circuit-only form for the current 2025–2027 period, i.e. half of 9.6's
   "BRKF + BRKR" option.
 
-**The CRG VEN set is adopted whole** — rear Ø195 × 18.5, front Ø150 × 12, 2
-pistons rear at 32 mm, 4 pistons front at 26 mm — because CRG Road Rebel is
-already this repo's primary chassis reference and the VEN system is what that
-chassis wears. Anything in 180–206 rear / 140–150 front is a real KZ, so the
-choice is a consistency argument, not an accuracy one.
+**The CRG VEN set is adopted for the discs and the rear circuit** — rear Ø195 ×
+18.5, front Ø150 × 12, 2 pistons rear at 32 mm — because CRG Road Rebel is already
+this repo's primary chassis reference and the VEN system is what that chassis
+wears. Anything in 180–206 rear / 140–150 front is a real KZ, so the choice is a
+consistency argument, not an accuracy one.
+
+**The front caliper is the exception and takes `007-BRKF-01` whole: 2 opposed
+pistons at Ø25, 2 pads.** ADR-0067. This used to read *"adopted whole"* including
+4 pistons front at 26 mm, and the model was then taking one number from each of
+three different calipers — the envelope in `wheels.py` measured off `007-B4-69`
+(2 × Ø25), the piston count off `82/FR/11` (4 × Ø26), and the *shape* off
+`007-BRKF-01`'s p. 4 photograph (2 × Ø25). Every figure was correctly cited and
+they were never one part. Two of the three forms say 2 × Ø25. A front-circuit-only
+homologation over another maker's rear is a real configuration — `007-BRKF-01` is
+half of Art. 9.6's *"BRKF + BRKR"* option — and Art. 8.6 makes brakes free in
+Group 1 regardless (ADR-0054).
 
 ### 20.6.1 Hydraulics: two circuits, two pumps, one bore that never moves
 
@@ -665,9 +676,9 @@ choice is a consistency argument, not an accuracy one.
 | balance regulator | yes | **yes** | yes | `sourced` |
 | distributor | yes, `10.10659.00` | not listed | not listed | `sourced` |
 | front calipers | 2 | **2** | 2 | `sourced` |
-| front pistons | 2 per caliper | **4 per wheel** | 2 per caliper | `sourced` |
-| front caliper bore | 25 mm | **26 mm** | 25 mm | `sourced` |
-| front pads | 2 per caliper | **2 per wheel** | 2 per caliper | `sourced` |
+| front pistons | 2 per caliper | 4 per wheel | **2 per caliper** | `sourced` |
+| front caliper bore | 25 mm | 26 mm | **25 mm** | `sourced` |
+| front pads | 2 per caliper | 2 per wheel | **2 per caliper** | `sourced` |
 | rear calipers | 1 | **1** | — | `sourced` |
 | rear pistons | 4 | **2** | — | `sourced` |
 | rear caliper bore | 25 mm | **32 mm** | — | `sourced` |
@@ -677,12 +688,17 @@ choice is a consistency argument, not an accuracy one.
 **22 mm is the one figure identical across all three forms and across a 2005
 homologation and a 2024 one.** Treat it as settled.
 
-Clamp area per wheel, `derived`: front 4 × π × 13² = **2124 mm²**, rear
-2 × π × 16² = **1608 mm²**. Birel splits the piston count the opposite way (2
-front / 4 rear) and compensates with bore, landing at front 982 / rear 1963 — so
-the two makers put the front-to-rear clamp ratio on opposite sides of 1.0, which
-is exactly what the balance regulator exists to trim and is worth knowing before
-anyone hangs a brake-bias tunable off this.
+**Bold is what is built**, and it is no longer one column: the front circuit is
+`007-BRKF-01`'s and the rest is CRG's. ADR-0067.
+
+Clamp area per wheel, `derived` **as built**: front 2 × π × 12.5² = **982 mm²**,
+rear 2 × π × 16² = **1608 mm²**. Taking CRG's front instead would give 4 × π × 13²
+= 2124 mm². The two makers put the front-to-rear clamp ratio on **opposite sides
+of 1.0** — CRG 2124/1608 = **1.32**, Birel 982/1963 = **0.50** — and this kart, a
+Freeline front over a CRG rear, lands at **0.61**: Birel's side of 1.0, and its own
+number rather than either maker's. That is exactly what the balance regulator
+exists to trim, and it is the figure a brake-bias tunable will sit on, so it is
+stated here rather than left to be rediscovered.
 
 ### 20.6.2 Which side the rear disc is on
 
@@ -721,22 +737,52 @@ and not with the sprocket.
 | front pad overall length | 40 ±1.5 | **38 ±1.5** | — | `sourced` |
 | front pad friction height | 25 ±1.5 | — | — | `sourced` (`007-BRKF-01`) |
 
-"Ventilated" on these forms means drilled and slotted through a single plate, not
-a two-plate vented rotor — the drawing shows one plate. Art. 4.12.3 permits
-exactly that and only as the manufacturer made it.
+**"Ventilated" means ventilated.** *Disque ventilé / Ventilated disc* is ticked
+**Oui / Yes** on all three forms that carry the box — `82/FR/11` (2005),
+`007-B4-69` (2017), `007-BRKF-01` (2024) — and all three give the front disc as
+Ø150 × 12 ±1, a figure that does not move across nineteen years. This section used
+to deny it, in these words: *"'Ventilated' on these forms means drilled and slotted
+through a single plate, not a two-plate vented rotor — the drawing shows one
+plate."* The drawing it leans on is a **plan view**, which cannot show a cavity
+from above. Corroborated from the trade side, where solid sprint rotors run 3–6 mm
+and shifter karts run **10–12 mm ventilated**. ADR-0066; reading 12 mm as solid put
+three times the steel in the model, 1.26 kg per corner.
 
-**Patterns, read off the `007-B4-69` page-2 exploded CAD at 170 dpi.** `sourced`
-as shape, measured as count:
+Built as **3.5 plate + 5.0 cavity + 3.5 plate** (`estimated`, sums to the sourced
+12.0), open at the rim, closed inboard at 0.60 R, on 18 pillars.
 
-* **Rear disc** — floating two-piece. The outer friction ring carries **two
-  concentric rings of drilled holes** (~28 outer, ~14 inner) plus **12 radial
-  slots** alternating between them, and it hangs off a separate inner carrier on
-  **6 floating bobbins on a bolt circle** so the ring can expand. The carrier is a
-  lobed star whose bore clamps the axle-mounted hub. One bobbin position carries
-  the homologation-number boss required by Art. 4.12.3.
-* **Front disc** — one piece, no floating carrier. **6 curved slots**, two rings
-  of drilled holes, and **3 integral drive tangs at 120°** on the inner bore that
-  bolt to the front hub.
+**Patterns, measured off `007-BRKR-10` page 2 — not `007-B4-69`.** That drawing is
+the only one of the five brake forms drawn **orthographic**, so its features come
+out on an exact pitch with no scatter; `007-B4-69`'s and `007-BRKF-01`'s are
+oblique exploded views and a count off one of those is a guess. `sourced` as count
+and pitch, `derived` as radii:
+
+| ring | n | r/R | pitch |
+| --- | --- | --- | --- |
+| outer drillings | 9 | 0.903 | 40.0° |
+| grooves | 9 | 0.812 (centroid) | 40.0° |
+| inner drillings | 9 | 0.757 | 40.0° |
+| lug bolts | 3 | 0.531 | 120.0° |
+
+One 40° sector nine times: the inner drilling +7.1° off the groove, the outer
+−6.8°. Three independent families on the same nine sectors is what makes this a
+measurement. **This section previously said six curved slots and ~28/~14 holes**;
+both were read off an oblique view, and neither was ever built.
+
+* **Rear disc** — floating two-piece, and it carries the *same* pattern as the
+  front, scaled: nine blind grooves, two rings of nine drillings. It hangs off a
+  separate inner carrier on **6 floating bobbins on a bolt circle** so the ring can
+  expand, and takes no drive lugs — the carrier and the bobbins are what the torque
+  goes through. The carrier is a lobed star whose bore clamps the axle-mounted hub.
+  One bobbin position carries the homologation-number boss required by Art. 4.12.3.
+* **Front disc** — one piece, no floating carrier. Nine grooves, two rings of nine
+  drillings, and **3 integral drive tangs at 120°** on the inner bore that bolt to
+  the front hub, each with its own bolt hole.
+
+**The curved features are blind grooves, not slots through the plate.**
+`007-BRKF-01` p. 4's close-up shows a machined floor and a rounded end, with a
+black through-drilling beside it for contrast. Art. 4.12.3 lists *grinding,
+drilling, grooving* as three separate operations.
 
 ### 20.6.4 Master cylinders, pedal link, regulator
 
@@ -1169,9 +1215,15 @@ Cable-tied along the **upper** surface of the tubes, nothing under the floor tra
 | thickness, new | **18.5 ±1** | `sourced` | `82/FR/11` |
 | friction plane | x −260 ±25, y −525, z +147.5 | x `estimated`, y/z `derived` | §20.6.5 |
 | pad rubbing Ø, outer / inner | 194 / 136 | `sourced` | `82/FR/11` |
-| hole pattern | two concentric rings, ~28 outer + ~14 inner | `sourced` (shape), counted | `007-B4-69` p2 at 170 dpi |
-| slots | 12 radial, alternating between the rings | `sourced` (shape) | same |
+| construction | **ventilated**: 3.5 plate + 11.5 cavity + 3.5 plate | `sourced` (that it is vented) / `estimated` (the split) | sums to the sourced 18.5. ADR-0066 |
+| drillings | **two rings of 9**, r/R 0.757 and 0.903, Ø4 | `sourced` (count, pitch) / `derived` (radii) | `007-BRKR-10` p2, orthographic. **Not** `007-B4-69`, whose exploded view is oblique — the ~28/~14 this row used to carry was counted off it |
+| grooves | **9** curved blind grooves, same pattern as the front, scaled | `sourced` (count, pitch) | same. The rear form's photograph shows one part stamped with both this number and the front's |
+| drive | none — the ring floats on 6 bobbins and takes its torque through the carrier | `sourced` (shape) | `007-B4-69` p3 |
 | bottom edge | z **+50.0** | `derived` | 147.5 − 97.5. **Level with the rails: Art. 4.12.4 triggers** |
+
+Euler characteristic **−108**, genus 55 = 1 bore + 36 drillings + 18 pillars, and
+no bolt holes because there are no tabs. Until #214 it was chi 0 — a plain washer.
+ADR-0066.
 
 ### `brake_disc_rear_carrier`, `brake_disc_rear_hub`, `brake_disc_rear_bobbin_?` (8)
 **Status:** new
@@ -1215,18 +1267,35 @@ the disc does, which is the entire point of the article.
 | thickness, new | **12 ±1** | `sourced` | both forms |
 | plane | x ±445, y +525, z +140 | `derived` | §20.6.6 |
 | pad rubbing Ø, outer / inner | 149 / 92 | `sourced` | `82/FR/11` |
-| slots / holes | 6 curved slots, two rings of drilled holes | `sourced` (shape) | `007-B4-69` p2 |
-| drive | 3 integral tangs at 120° on the inner bore | `sourced` (shape) | same. One piece, no floating carrier |
+| construction | **ventilated**: 3.5 plate + 5.0 cavity + 3.5 plate | `sourced` (that it is vented) / `estimated` (the split) | *Disque ventilé* ticked on all three forms; the split sums to the sourced 12.0. ADR-0066 |
+| grooves | **9** curved blind grooves, r/R 0.675…0.950, 11.2° sweep | `sourced` (count, pitch) | `007-BRKR-10` p2, the only orthographic drawing. Blind, not through: `007-BRKF-01` p4 shows a machined floor and a rounded end |
+| drillings | **two rings of 9**, r/R 0.757 and 0.903, Ø4 | `sourced` (count, pitch) / `derived` (radii) | same. Inner +7.1° off the groove, outer −6.8° |
+| vent pillars | 18, two per sector between the drilled rings | `estimated` | inherits the measured nine-fold symmetry rather than inventing a count |
+| drive | 3 integral tangs at 120° on a scalloped bore, one bolt hole each | `sourced` (shape) | same. One piece, no floating carrier |
 | bottom edge | z +65 | `derived` | clear of the rails |
+
+**Euler characteristic is the acceptance, and the builder asserts it.** genus 58 =
+1 bore + 36 drillings (eighteen positions, bored through *both* plates into a
+cavity that is open at the rim) + 18 pillars + 3 bolt holes, so chi = **−114**;
+the rear, with no bolt holes, is −108. Until #214 this part was chi +6 — a ring
+plus three disjoint tangs — under a docstring claiming six slots and two rings of
+holes. ADR-0066.
 
 ### `brake_caliper_fl`, `brake_caliper_fr`, `brake_caliper_f?_bracket`, `brake_pad_f?_?` (8)
 **Status:** new
 **Attaches to:** caliper → `brake_disc_f?` (via the pads, seated), `brake_caliper_f?_bracket` (bolted, 4-bolt flange), `brake_line_front` (routed); bracket → `knuckle_f?` (bolted)
 **Envelope:** none. Art. 4.12.5 puts rain covers on the **stub axle**, which confirms the bracket belongs to the knuckle and not to the rim.
 **Verification:** gate 1, gate 2 — **and this is the pair to watch.** The caliper's outboard face at x ±478 clears the tire's inner face at ±485 by 7.0 mm, which is inside the 2.0 mm CONTACT_TOLERANCE's neighborhood and is a gate-1 failure the moment the disc plane moves outboard.
-103 × 62 × ~66, **4 pistons per wheel at 26 mm bore, 2 pads at 38 mm overall and
-25 mm friction height** (`sourced`, `82/FR/11` and `007-BRKF-01`). Clamp area
-2124 mm² per wheel (`derived`). Position and clock angle: §20.6.6.
+103 × 62 × ~66, **2 opposed pistons at Ø25, 2 pads at 49.7 mm overall, 47.7 mm
+friction length and 25 mm friction height** (`sourced`, `007-BRKF-01`). Clamp area
+**982 mm²** per wheel (`derived`). Position and clock angle: §20.6.6.
+
+This entry used to read *"4 pistons per wheel at 26 mm bore, 2 pads at 38 mm
+overall"* citing **both** `82/FR/11` **and** `007-BRKF-01`. `007-BRKF-01` says
+neither of those numbers — the 4 × Ø26 and the 38 mm pad are CRG's alone, and the
+citation had collected a second form it did not come from. ADR-0067 resolves the
+front to `007-BRKF-01` whole. Same family as the pit-lane article number: a
+citation is a number, and a number nobody re-read is a number somebody inherited.
 
 ---
 
