@@ -904,9 +904,11 @@ JOINTS: tuple[Joint, ...] = (
         a="brake_disc_fl",
         b="brake_pad_fl_?",
         kind="seated",
-        why="**4 pistons at 26 mm bore and 2 pads at 38 mm** per wheel, `sourced` off "
-        "`82/FR/11` and `007-BRKF-01`. Clamp area 2124 mm2. Per corner rather than "
-        "as a glob, because the left pads do not reach the right disc",
+        why="**2 pistons at 25 mm bore and 2 pads at 49.7 mm** per wheel, `sourced` off "
+        "`007-BRKF-01` §B. Clamp area 982 mm2. Per corner rather than "
+        "as a glob, because the left pads do not reach the right disc. ADR-0067 -- "
+        "this line cited `82/FR/11` as well and quoted its 4 x 26, which is CRG's "
+        "front and not the caliper this kart carries",
     ),
     Joint(a="brake_disc_fr", b="brake_pad_fr_?", kind="seated", why="the right corner"),
     Joint(

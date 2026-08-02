@@ -651,21 +651,145 @@ kingpin and roughly level with the axle, so 75 degrees forward of top.
 
 Shape, from the drawing and `tonykart_racer401T_p03.jpg`: an opposed-piston
 one-piece aluminium body with a waisted outline, externally finned across the top
-for cooling, a banjo on each half and a bleed nipple. Not a sliding caliper."""
+for cooling, a banjo on each half and a bleed nipple. Not a sliding caliper.
+
+**Two later measurements disagree with the in-plane pair and are recorded rather
+than applied.** `007-BRKR-10` p. 2 item 3 -- a Freeline caliper on that form's own
+sourced Ø150 disc, so a better-anchored plate than `007-B4-69` -- measures 96.6
+tangential x 50.7 radial, and `007-BRKF-01` p. 4 measures 88 tangential. Against
+this block's 103 x 62 that is -6%/-15% tangential and -18% radial. The axial 66 is
+confirmed exactly by the p. 4 photograph. Moving an `estimated` figure onto another
+`estimated` figure off an oblique photograph buys nothing, so the envelope stays
+and the built shape is driven by the sourced parts it must contain -- the 49.7 x 25
+pad, the 12 mm disc, the Ø25 piston -- not by these three numbers."""
+
+CALIPER_FRONT_PISTON_COUNT: int = 2
+CALIPER_FRONT_PISTON_BORE: float = 0.025
+CALIPER_REAR_PISTON_COUNT: int = 2
+CALIPER_REAR_PISTON_BORE: float = 0.032
+"""Piston counts and bores, both `sourced` and from **two different makers** by
+ADR-0067: the front off `007-BRKF-01` §B (*"Nombre de pistons 2 par etrier,
+O alesage de l'etrier 25 mm"*), the rear off CRG `82/FR/11`.
+
+Freeline's own rear form `007-BRKR-10` says 2 x O25 on a O150 disc, which is **not**
+what this kart's rear is -- the rear is CRG's O195 disc and O32 bore. Both readings
+are correct and they are different parts. Anyone re-deriving the rear from
+`007-BRKR-10` because it is the Freeline form is reading the wrong maker's rear."""
+
+CALIPER_FRONT_BOSS_DIAMETER: float = 0.0317
+CALIPER_FRONT_BOSS_PROUD: float = 0.006
+CALIPER_FRONT_CAP_DIAMETER: float = 0.028
+CALIPER_FRONT_CAP_PROUD: float = 0.008
+"""The cylinder boss on each half's outer face, and the anodized cap closing it.
+
+`CALIPER_FRONT_BOSS_DIAMETER` is `derived`: `007-BRKR-10` p. 2 item 3 draws the
+cylinder as a clean circle whose interior floods to 60 x 60 px at an area of 2815
+px2, which is a circle to within 0.4%, and the plate's ruler is **0.5291 mm/px**
+from its own §B Ø150 disc spanning 283.5 px mid-stroke. That is 31.7 mm around a
+sourced Ø25 bore, so a 3.35 mm wall.
+
+**The plate's scale is corroborated by a standard fastener rather than by a second
+disc.** Its two socket screws measure 13.9 mm across the counterbore and 6.2 mm
+across the hex socket; ISO 4762 M8 is 13.0 and 6.0. Two features of two different
+parts agreeing to 7% is the error bar on everything measured off this plate.
+
+The cap is `estimated` off `007-BRKF-01` p. 4 at that photograph's ~15.3 px/mm --
+itself the mean of two rulers 10% apart, the 12 mm disc gap and the 49.7 pad -- and
+the proud figures are the weakest numbers in this block. The cap is red anodized;
+the boss and the body are black."""
+
+CALIPER_FRONT_MOUTH_WIDTH: float = 0.033
+CALIPER_FRONT_MOUTH_DEPTH: float = 0.030
+"""The slot that straddles the disc, axial then radial.
+
+Width is `derived` from what has to fit: 12 disc + 2 x 9 pad = 30, plus 3 of running
+clearance. It is corroborated at 33 mm measured off `007-BRKF-01` p. 4, which is the
+strongest agreement anywhere in this block because the photograph looks straight
+into the mouth.
+
+Depth is `derived` from the disc: the friction band runs 74.5 out to 46 in, so 28.5
+mm of disc has to disappear into the slot, and 30 clears it."""
+
+CALIPER_FRONT_PIN_DIAMETER: float = 0.004
+CALIPER_FRONT_PIN_COLLAR_DIAMETER: float = 0.012
+CALIPER_FRONT_PIN_COLLAR_LENGTH: float = 0.015
+CALIPER_FRONT_NIPPLE_HEX: float = 0.0065
+CALIPER_FRONT_NIPPLE_LENGTH: float = 0.015
+CALIPER_FRONT_BANJO_DIAMETER: float = 0.0085
+CALIPER_FRONT_BANJO_LENGTH: float = 0.015
+CALIPER_FRONT_CHAMFER: float = 0.010
+"""The furniture, every figure `estimated` off `007-BRKF-01` p. 4 at ~15.3 px/mm.
+
+**The feature inventory in this block is what the photograph shows, and it is not
+what the ticket's prose said.** There is **one** transverse pad pin, not two, and
+there is **no bridge and no tie bolt**: a single Ø4 pin crosses the mouth at
+mid-depth, protrudes past both halves, and carries a machined collar at its centre
+with a hex socket in it. The body is one piece. Read as *"a bridge across the mouth
+on two pad pins with a bolt head centred"*, which is the pin plus its collar seen
+from the front.
+
+The bleed nipple is at the **top left**, hex base, angled up and outboard. The
+banjo is at the **bottom left**, brass against the black body. Both sit on the same
+half. The top two corners are chamfered at about 10 mm; the top face is flat and
+carries the `FL` badge and the homologation number."""
+
+CALIPER_MOUNT_BOLT_DIAMETER: float = 0.008
+CALIPER_MOUNT_BOLT_HEAD_DIAMETER: float = 0.013
+CALIPER_MOUNT_BOLT_PITCH: float = 0.066
+"""M8 socket screws through the body into the bracket, `sourced` as a **standard
+fastener** -- the counterbore and socket measured off `007-BRKF-01`'s companion
+plate identify ISO 4762 M8 to 7%, and a bolt is a bolt, so the head does not scale
+with the caliper.
+
+The 66 mm pitch is measured on `007-BRKR-10` p. 2's **rear** caliper and is
+therefore a proportion carried across parts, not a figure for this one. It is here
+so a builder has a defensible spacing rather than an invented one; the front
+caliper's own bolts face inboard and are not visible in any photograph on file."""
 
 PAD_REAR_LENGTH: float = 0.058
-PAD_FRONT_LENGTH: float = 0.038
+PAD_FRONT_LENGTH: float = 0.0497
+PAD_FRONT_FRICTION_LENGTH: float = 0.0477
 PAD_FRONT_HEIGHT: float = 0.025
+PAD_FRONT_BACKING_HEIGHT: float = 0.045
 PAD_THICKNESS: float = 0.009
-"""**2 pistons at 32 mm rear, 4 pistons at 26 mm front**, 2 pads per wheel either
-way, all `sourced` off `82/FR/11`. Clamp area per wheel, `derived`: front
-4 x pi x 13^2 = **2124 mm2**, rear 2 x pi x 16^2 = **1608 mm2**.
+"""**2 pistons at 25 mm front, 2 pistons at 32 mm rear**, 2 pads per wheel either
+way. ADR-0067: the front is Freeline `007-BRKF-01` and the rear stays CRG
+`82/FR/11`, so the two halves of this block cite two different forms on purpose.
 
-Birel splits the piston count the opposite way -- 2 front / 4 rear -- and
-compensates with bore, landing at front 982 / rear 1963. So the two makers put the
-front-to-rear clamp ratio on **opposite sides of 1.0**, which is exactly what the
-balance regulator exists to trim and is worth knowing before anyone hangs a
-brake-bias tunable off this."""
+Front, all `sourced` off `007-BRKF-01` §B read directly: overall pad length
+**49.7**, friction length **47.7**, friction height **25**, each +-1.5. Rear
+`PAD_REAR_LENGTH` is CRG's 58. Clamp area per wheel, `derived`: front
+2 x pi x 12.5^2 = **982 mm2**, rear 2 x pi x 16^2 = **1608 mm2** -- the front-to-rear
+ratio is 0.61 and sits **below 1.0**, which is the side Birel's own system puts it
+on and the opposite side from CRG's 4 x 26 front. That is what the balance
+regulator trims, and it is the number a brake-bias tunable will sit on.
+
+**This block asserted 4 pistons at 26 mm and a 2124 mm2 front clamp for a
+milestone**, sourced correctly off `82/FR/11` and describing a caliper this kart
+does not have. ADR-0066's family, third case.
+
+`PAD_FRONT_BACKING_HEIGHT` is `estimated` and is the one front pad figure §B does
+not give. The p. 4 pad photograph is near dead-on and its silhouette spans 485 x
+439 px; taking the horizontal as the sourced 49.7 gives 0.1025 mm/px and a
+backing plate **45 mm** tall against a 25 mm friction height. The 20 mm surplus is
+one edge of the plate, not a border all round: the strongly-arched edge is the
+**inner** radius (tighter arc = smaller radius), so the ear that carries the
+lightening holes reaches *inward* past the friction material toward the caliper's
+pad pin, and the friction band sits against the outer-radius edge where the disc's
+own 28.5 mm band is."""
+
+PAD_FRONT_HOLE_COUNT: int = 3
+PAD_FRONT_HOLE_DIAMETER: float = 0.0052
+PAD_FRONT_HOLE_PITCH: float = 0.0113
+"""Three lightening holes in a straight row across the pad's inner ear, `sourced`
+for the count off the `007-BRKF-01` p. 4 photograph and `estimated` for the two
+lengths on the same 0.1025 mm/px scale as `PAD_FRONT_BACKING_HEIGHT`.
+
+The holes measure 195-215 px against a drawn 5 mm block of 195 px, so **5.2 mm**
+with the spread of the three as the error bar -- the lit interior of a hole in a
+photograph is its opening plus a chamfer highlight, so this is an upper bound on
+the drill. Pitch 11.3 leaves 6.1 mm of plate between holes, which is what makes the
+row read as three holes rather than a slot."""
 
 MASTER_BORE: float = 0.022
 MASTER_BODY_DIAMETER: float = 0.032
