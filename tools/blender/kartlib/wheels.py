@@ -3606,6 +3606,474 @@ def _pedal_plate_y(p: P.KartParams, z: float) -> float:
     return p.pedal_pivot_y - math.tan(p.pedal_arm_rake) * (z - p.pedal_pivot_z)
 
 
+# --- shapes only the hydraulics needs --------------------------------------
+#
+# Everything below is measured off `007-BRKR-10` p. 2, the exploded orthographic
+# plate, at **0.5291 mm/px**. That scale is the plate's own: its section B's
+# `sourced` Ø150 rear disc spans 283.5 px mid-stroke, and it is corroborated by
+# the plate's ISO 4762 M8 socket screws measuring 13.9 mm across the counterbore
+# and 6.2 across the hex against a nominal 13.0 and 6.0. **7% is the honest error
+# bar** on anything read off it, and every figure below carries that.
+#
+# The plate is better anchored than `007-B4-69`, which is what the `MASTER_*`
+# envelope was `estimated` off at lower scale confidence -- its own docstring says
+# so. Where the two disagree the constant wins here and the disagreement is
+# reported as a measurement rather than edited away (#214).
+
+
+def _fluted_lathe(
+    bm: bmesh.types.BMesh,
+    profile: list[tuple[float, float]],
+    stations: int,
+    flutes: int,
+    depth: float,
+    *,
+    axis: str = "Z",
+    center: tuple[float, float, float] = (0.0, 0.0, 0.0),
+) -> None:
+    """`build.lathe`, with the radius scalloped into `flutes` axial grip ribs.
+
+    A reservoir cap and a balance-regulator knob are both **grip** parts: what
+    makes them read as something a thumb turns is the flutes, and a flute drawn
+    as anything but real vertices is erased twice over -- once by the resample and
+    once by `object_from_bmesh`'s 40 degree smooth angle, which is the #199 sidepod
+    failure exactly. So `stations` is a multiple of `flutes` with at least two
+    stations per flute at *both* detail levels, and the built dihedral at a crest
+    is the acceptance rather than the control points.
+
+    `depth` is the fraction of the radius the trough drops: peaks stay at exactly
+    the profile radius, so the part's envelope is the profile's and a caller that
+    sized a cap against its neighbour keeps the number it sized.
+    """
+    if len(profile) < 2 or stations < 3 or flutes < 1:
+        return
+    origin = Vector(center)
+    axis_index = {"X": 0, "Y": 1, "Z": 2}[axis]
+    radial = [(axis_index + 1) % 3, (axis_index + 2) % 3]
+
+    rings: list[list[bmesh.types.BMVert] | bmesh.types.BMVert] = []
+    for radius, along in profile:
+        if abs(radius) < 1e-9:
+            position = [0.0, 0.0, 0.0]
+            position[axis_index] = along
+            rings.append(bm.verts.new(origin + Vector(position)))
+            continue
+        ring: list[bmesh.types.BMVert] = []
+        for step in range(stations):
+            angle = 2.0 * math.pi * step / stations
+            # Peak at angle 0 and every 2*pi/flutes after it; the trough is a full
+            # cosine below, so the crest is a genuine tangent break at any station
+            # count that is not a multiple of 2 x flutes.
+            scale = 1.0 - depth * 0.5 * (1.0 - math.cos(flutes * angle))
+            position = [0.0, 0.0, 0.0]
+            position[axis_index] = along
+            position[radial[0]] = math.cos(angle) * radius * scale
+            position[radial[1]] = math.sin(angle) * radius * scale
+            ring.append(bm.verts.new(origin + Vector(position)))
+        rings.append(ring)
+
+    for index in range(len(rings) - 1):
+        lower, upper = rings[index], rings[index + 1]
+        lower_is_point = isinstance(lower, bmesh.types.BMVert)
+        upper_is_point = isinstance(upper, bmesh.types.BMVert)
+        if lower_is_point and upper_is_point:
+            continue
+        if lower_is_point:
+            for step in range(stations):
+                following = (step + 1) % stations
+                bm.faces.new((lower, upper[following], upper[step]))
+        elif upper_is_point:
+            for step in range(stations):
+                following = (step + 1) % stations
+                bm.faces.new((lower[step], lower[following], upper))
+        else:
+            for step in range(stations):
+                following = (step + 1) % stations
+                bm.faces.new(
+                    (lower[step], lower[following], upper[following], upper[step])
+                )
+
+
+def _chamfered_box(
+    bm: bmesh.types.BMesh,
+    size: tuple[float, float, float],
+    center: tuple[float, float, float],
+    chamfer: float,
+) -> None:
+    """`build.box` with all twelve edges chamfered, in the mesh rather than after.
+
+    Needed because the master cylinder cannot go through `build.bevel_object` at
+    all -- see `_brake_hydraulics` -- and a machined block with perfectly sharp
+    edges catches no highlight, which is the reason `Detail.low` carries a bevel
+    width in the first place.
+
+    Six inset face quads, twelve edge quads and eight corner triangles: V 24,
+    E 48, F 26, so `V - E + F` is 2 and the shell is closed by construction.
+    """
+    half = [size[0] * 0.5, size[1] * 0.5, size[2] * 0.5]
+    limit = min(half) * 0.45
+    cut = min(chamfer, limit)
+    origin = Vector(center)
+    signs = (-1.0, 1.0)
+
+    # verts[(sx, sy, sz)][axis]: the corner's three vertices, one pushed out to
+    # each of the three faces meeting there.
+    verts: dict[tuple[float, float, float], list[bmesh.types.BMVert]] = {}
+    for sx in signs:
+        for sy in signs:
+            for sz in signs:
+                trio = []
+                for axis in range(3):
+                    offset = [
+                        sx * (half[0] - (0.0 if axis == 0 else cut)),
+                        sy * (half[1] - (0.0 if axis == 1 else cut)),
+                        sz * (half[2] - (0.0 if axis == 2 else cut)),
+                    ]
+                    trio.append(bm.verts.new(origin + Vector(offset)))
+                verts[(sx, sy, sz)] = trio
+
+    def face(corners: list[tuple[tuple[float, float, float], int]]) -> None:
+        bm.faces.new(tuple(verts[key][axis] for key, axis in corners))
+
+    for sx in signs:
+        ring = [(-1.0, -1.0), (-1.0, 1.0), (1.0, 1.0), (1.0, -1.0)]
+        if sx > 0.0:
+            ring = list(reversed(ring))
+        face([((sx, sy, sz), 0) for sy, sz in ring])
+    for sy in signs:
+        ring = [(-1.0, -1.0), (1.0, -1.0), (1.0, 1.0), (-1.0, 1.0)]
+        if sy > 0.0:
+            ring = list(reversed(ring))
+        face([((sx, sy, sz), 1) for sx, sz in ring])
+    for sz in signs:
+        ring = [(-1.0, -1.0), (-1.0, 1.0), (1.0, 1.0), (1.0, -1.0)]
+        if sz > 0.0:
+            ring = list(reversed(ring))
+        face([((sx, sy, sz), 2) for sx, sy in ring])
+
+    # The twelve chamfer strips: each joins the two faces that share the edge. The
+    # written order gives a normal proportional to `(-sb, -sa)` where the box's own
+    # outward direction there is `(sa, sb)`, so it is right exactly when the two
+    # signs differ -- the same trap `build.box`'s comment records, and the same
+    # check catches it: the signed volume came out at 29% of L x W x H.
+    for sy in signs:
+        for sz in signs:
+            order = [((-1.0, sy, sz), 1), ((1.0, sy, sz), 1),
+                     ((1.0, sy, sz), 2), ((-1.0, sy, sz), 2)]
+            face(list(reversed(order)) if sy * sz > 0.0 else order)
+    for sx in signs:
+        for sz in signs:
+            order = [((sx, -1.0, sz), 2), ((sx, 1.0, sz), 2),
+                     ((sx, 1.0, sz), 0), ((sx, -1.0, sz), 0)]
+            face(list(reversed(order)) if sx * sz > 0.0 else order)
+    for sx in signs:
+        for sy in signs:
+            order = [((sx, sy, -1.0), 0), ((sx, sy, 1.0), 0),
+                     ((sx, sy, 1.0), 1), ((sx, sy, -1.0), 1)]
+            face(list(reversed(order)) if sx * sy > 0.0 else order)
+
+    for sx in signs:
+        for sy in signs:
+            for sz in signs:
+                order = [0, 1, 2]
+                if sx * sy * sz < 0.0:
+                    order = [0, 2, 1]
+                bm.faces.new(tuple(verts[(sx, sy, sz)][axis] for axis in order))
+
+
+def _chamfered_cylinder(
+    radius: float, half_length: float, chamfer: float
+) -> list[tuple[float, float]]:
+    """`_cylinder_profile` with a chamfer where each end cap meets the barrel.
+
+    Same reason as `_chamfered_box`: the master's barrel is a lathe on a part
+    that cannot be beveled afterwards, so the chamfer is authored.
+    """
+    return [
+        (0.0, -half_length),
+        (radius - chamfer, -half_length),
+        (radius, -half_length + chamfer),
+        (radius, half_length - chamfer),
+        (radius - chamfer, half_length),
+        (0.0, half_length),
+    ]
+
+
+def _plate_with_holes(
+    bm: bmesh.types.BMesh,
+    origin: Vector,
+    along: Vector,
+    normal: Vector,
+    half_width: float,
+    length: float,
+    thickness: float,
+    holes: list[tuple[float, float]],
+    segments: int,
+) -> None:
+    """A flat stadium-outlined plate with round **through** holes.
+
+    The master cylinder's clevis arm has two holes in it and the balance
+    regulator's ends are drilled tabs. A blind pocket from each face would pass
+    every gate this repo has -- watertight, positive volume, zero non-manifold
+    edges -- and would be the `DISC_FRONT_TANG_COUNT` defect again: a docstring
+    describing a drilling nobody built. `V - E + F` is the check, and each real
+    hole is a handle worth **-2**.
+
+    Construction, because the naive one does not work: the plate is cut into one
+    **cell per hole** at the midpoints between them, and each cell is an annulus
+    triangulated radially about its own hole. The two cells share the cut line as
+    a single edge with **no interior vertices**, which is what keeps the seam
+    manifold -- two independently resampled boundaries would not have matched
+    there. The outer loop is walked counter-clockwise and each outer point is
+    paired with the inner point at its own unwrapped angle about the hole center,
+    so the radial quads cannot cross as long as the cell boundary is star-shaped
+    about that center. That is asserted rather than assumed.
+
+    `origin` is the center of the s=0 end cap; the plate runs to s=`length` along
+    `along`, both ends capped by a semicircle of `half_width`.
+    """
+    if not holes:
+        return
+    across = normal.cross(along).normalized()
+    holes = sorted(holes)
+    cuts = [
+        (holes[index][0] + holes[index + 1][0]) * 0.5 for index in range(len(holes) - 1)
+    ]
+    side_steps = max(2, segments // 3)
+    arc_steps = max(4, segments // 2)
+
+    # One vertex pair per boundary coordinate, so the cut corners two cells share
+    # really are one vertex and the seam has two faces on every edge.
+    cache: dict[tuple[float, float], tuple[bmesh.types.BMVert, bmesh.types.BMVert]] = {}
+
+    def plate_vert(s: float, w: float) -> tuple[bmesh.types.BMVert, bmesh.types.BMVert]:
+        key = (s, w)
+        if key not in cache:
+            middle = origin + along * s + across * w
+            cache[key] = (
+                bm.verts.new(middle + normal * (thickness * 0.5)),
+                bm.verts.new(middle - normal * (thickness * 0.5)),
+            )
+        return cache[key]
+
+    def run(a: tuple[float, float], b: tuple[float, float], steps: int) -> list:
+        """`steps` points from a up to but not including b."""
+        return [
+            (a[0] + (b[0] - a[0]) * i / steps, a[1] + (b[1] - a[1]) * i / steps)
+            for i in range(steps)
+        ]
+
+    def cap(s: float, first: float, last: float, steps: int) -> list:
+        return [
+            (
+                s + half_width * math.cos(first + (last - first) * i / steps),
+                half_width * math.sin(first + (last - first) * i / steps),
+            )
+            for i in range(steps)
+        ]
+
+    for index, (hole_s, hole_radius) in enumerate(holes):
+        low = cuts[index - 1] if index > 0 else None
+        high = cuts[index] if index < len(cuts) else None
+        outline: list[tuple[float, float]] = []
+        seam: list[bool] = []  # edge i -> i+1 is a cut and carries no rim face
+
+        start_s = low if low is not None else 0.0
+        end_s = high if high is not None else length
+        outline += run((start_s, -half_width), (end_s, -half_width), side_steps)
+        seam += [False] * side_steps
+        if high is None:
+            outline += cap(length, -math.pi * 0.5, math.pi * 0.5, arc_steps)
+            seam += [False] * arc_steps
+        else:
+            # The cut edge: its two corners and nothing between them.
+            outline.append((high, -half_width))
+            seam.append(True)
+        outline += run((end_s, half_width), (start_s, half_width), side_steps)
+        seam += [False] * side_steps
+        if low is None:
+            outline += cap(0.0, math.pi * 0.5, math.pi * 1.5, arc_steps)
+            seam += [False] * arc_steps
+        else:
+            outline.append((low, half_width))
+            seam.append(True)
+
+        count = len(outline)
+        angles: list[float] = []
+        previous = 0.0
+        for step, (s, w) in enumerate(outline):
+            raw = math.atan2(w, s - hole_s)
+            if step == 0:
+                previous = raw
+            else:
+                previous += (raw - previous + math.pi) % (2.0 * math.pi) - math.pi
+            angles.append(previous)
+        turned = angles[-1] - angles[0] + (
+            (math.atan2(outline[0][1], outline[0][0] - hole_s) - angles[-1] + math.pi)
+            % (2.0 * math.pi)
+            - math.pi
+        )
+        # Star-shaped about the hole center and walked once around: anything else
+        # folds the radial quads over each other and reads as a correct plate.
+        assert abs(turned - 2.0 * math.pi) < 1e-6, (
+            "plate cell %d is not star-shaped about its hole: turned %.4f rad"
+            % (index, turned)
+        )
+
+        outer = [plate_vert(s, w) for s, w in outline]
+        inner = [
+            plate_vert(
+                hole_s + hole_radius * math.cos(angle),
+                hole_radius * math.sin(angle),
+            )
+            for angle in angles
+        ]
+        for step in range(count):
+            following = (step + 1) % count
+            pf, pb = outer[step]
+            qf, qb = inner[step]
+            nf, nb = outer[following]
+            mf, mb = inner[following]
+            bm.faces.new((pf, nf, mf, qf))       # front annulus
+            bm.faces.new((pb, qb, mb, nb))       # back annulus
+            bm.faces.new((qf, qb, mb, mf))       # hole wall, facing its own axis
+            if not seam[step]:
+                bm.faces.new((pf, pb, nb, nf))   # outer rim
+
+
+def _coil_spring(
+    bm: bmesh.types.BMesh,
+    start: Vector,
+    axis: Vector,
+    mean_radius: float,
+    wire_radius: float,
+    turns: float,
+    length: float,
+    detail: build.Detail,
+) -> None:
+    """A helical wire, swept. The regulator's return spring is visible on the form
+    and is the one part of it that says *spring* rather than *tube*."""
+    direction = axis.normalized()
+    seed = min(
+        (Vector((1.0, 0.0, 0.0)), Vector((0.0, 1.0, 0.0)), Vector((0.0, 0.0, 1.0))),
+        key=lambda candidate: abs(candidate.dot(direction)),
+    )
+    u = (seed - direction * seed.dot(direction)).normalized()
+    v = direction.cross(u)
+    steps = max(6, detail.tube_segments) * int(turns)
+    path = [
+        start
+        + direction * (length * i / steps)
+        + u * (mean_radius * math.cos(2.0 * math.pi * turns * i / steps))
+        + v * (mean_radius * math.sin(2.0 * math.pi * turns * i / steps))
+        for i in range(steps + 1)
+    ]
+    build.sweep_tube(bm, path, wire_radius, max(5, detail.tube_segments // 3))
+
+
+def _line_end(
+    bm: bmesh.types.BMesh,
+    tip: Vector,
+    direction: Vector,
+    detail: build.Detail,
+) -> None:
+    """The crimped ferrule and swivel nut a braided hose terminates in.
+
+    `007-BRKF-01` p. 4's *Tuyaux / Lines* cell photographs one, and the whole cell
+    is the fitting rather than the hose: reading left to right it is a **hex nut**,
+    a thin flanged collar, a plain **ferrule** carrying the rolled homologation
+    numbers, then the braid. So the three figures below are ratios to the hose's
+    own diameter, measured off that photograph and `estimated` in absolute terms
+    because the cell carries no scale:
+
+        ferrule    1.24 x hose OD, 1.51 x its own OD long   (510/410, 770/510 px)
+        collar     1.37 x hose OD, 0.37 x hose OD long
+        hex nut    1.56 x hose OD across flats              (640/410 px)
+
+    On a 6 mm hose that is a Ø7.4 ferrule and a 9.4 mm hex, which is a kart brake
+    fitting: M10x1 with a 10 mm spanner on it.
+
+    `direction` points **out** of the hose, and the assembly **protrudes nothing**:
+    the nut's outer face is the hose's own last point and everything else stacks up
+    behind it. That is not tidiness. Built the other way round -- ferrule over the
+    braid, nut beyond the end -- the rear hose's 7.8 mm of nut landed inside
+    `brake_caliper_rear_bracket`, a pair `joints.py` does not declare and gate 1
+    refuses. The port a hose screws into is at the hose's end, so the nut is too.
+    """
+    out = direction.normalized()
+    hose = LINE_RADIUS * 2.0
+    nut = hose * 1.30
+    collar = nut + hose * 0.37
+    build.sweep_tube(
+        bm,
+        [tip - out * collar, tip - out * (hose * 1.24 * 1.51 + collar)],
+        hose * 1.24 * 0.5,
+        detail.tube_segments,
+    )
+    build.sweep_tube(
+        bm,
+        [tip - out * collar, tip - out * nut],
+        hose * 1.37 * 0.5,
+        detail.tube_segments,
+    )
+    # Six segments *is* the hex: `sweep_tube` places its first vertex at angle 0
+    # of a transported frame, so the clocking is arbitrary but reproducible, and
+    # across-flats is 2 x R x cos(30).
+    build.sweep_tube(
+        bm,
+        [tip - out * nut, tip],
+        hose * 1.56 * 0.5 / math.cos(math.pi / 6.0),
+        6,
+    )
+
+
+def _master_port(label: str) -> tuple[Vector, Vector, Vector, float]:
+    """Where a pump's outlet union stands, which way it points, and how far.
+
+    Returns the hose's approach point, the point on the body's own surface, the
+    outward unit direction and the proud length. Both `_brake_hydraulics` and
+    `_brake_lines` read all four, so the union and the hose it feeds cannot drift
+    apart -- which is the whole failure the `wheel.get("steer")` entry in
+    CLAUDE.md is about: two halves of one contract, written twice. The approach
+    point is returned rather than repeated in the route for the same reason.
+
+    Each port is the **hose's own terminal leg**, backed up to where that leg
+    crosses the body. A union pointing anywhere else puts a hose through a right
+    angle in zero length.
+    """
+    if label == "front":
+        # The front circuit leaves the distributor, runs down outboard of the
+        # bracket upstand and comes onto the body's rear face from behind. Two
+        # figures here are measured rather than chosen. The leg has to cross that
+        # face **near the axis**, not near its rim: backed up 8 mm the union's
+        # root then still sits inside the Ø32 barrel, and a tangential approach
+        # puts the root 2 mm outside it, floating. And the whole port sits at
+        # z 100 rather than 97 because `chassis_bumper_socket_side_lower_front_l`
+        # is a sleeve at x -222..-158, y +386..+414, **z 40..94** and the union's
+        # tip lands inside that y band -- 3 mm of air above it is the only escape
+        # that does not shorten the union to nothing.
+        far = Vector((-0.2400, 0.4460, 0.1015))
+        near = Vector((-0.2120, 0.4230, 0.1005))
+    else:
+        # The rear circuit's first leg is #201's own: it must cross y +400 at
+        # x -147.7 to stay 10 mm inboard of the side bumper socket's riser, so
+        # the union is placed on that line rather than the line on the union.
+        far = Vector((MASTER_REAR_X, MASTER_Y - 0.055, MASTER_Z))
+        near = Vector((-0.132, 0.380, 0.092))
+    out = (near - far).normalized()
+    # Where the leg leaves the body's rear face at y = MASTER_Y - length/2.
+    face_y = MASTER_Y - MASTER_BODY_LENGTH * 0.5
+    surface = far + out * ((face_y - far.y) / out.y)
+    # The rear union is 10 mm proud rather than 13, and the 3 mm is the #201
+    # clearance the `MASTER_*` docstring calls load-bearing: rearward of about
+    # y +482 the pump meets `chassis_bumper_socket_side_upper_front_l`'s riser,
+    # whose band ends at y +414. The body's own tail is at +425 and is not the
+    # part at risk -- the union is, and at 13 mm proud its tip crosses +414 and
+    # the measured pair gap falls from 11.02 mm to 2.03. Ten puts it back to 2.72
+    # for three millimeters of fitting nobody can see behind the pump.
+    return far, surface, out, 0.010 if label == "rear" else 0.013
+
+
 def _brake_hydraulics(
     context: build.BuildContext, collection: bpy.types.Collection
 ) -> None:
@@ -3644,29 +4112,190 @@ def _brake_hydraulics(
     )
     build.bevel_object(bracket, detail)
 
-    for label, station in (("front", MASTER_FRONT_X), ("rear", MASTER_REAR_X)):
+    # **The whole pump is one object.** Reservoir, cap, clevis arm, union and
+    # bleed nipple are shells inside `brake_master_?` rather than parts of their
+    # own, because every one of them would otherwise land inside a `joints.py`
+    # glob nobody wrote for it -- `brake_master_*` already matches
+    # `brake_master_bracket`, which is why the bracket's two joints are written
+    # per cylinder. A new name there is a cross product, not a part. #212.
+    #
+    # The stack above the body is `007-BRKR-10`'s, in its own proportions:
+    #
+    #     cap        rows  22..45   Ø39.7 x 12.7    fluted, 10 ribs
+    #     reservoir  rows  46..97   Ø31.7 x 27.5
+    #     neck       rows  98..109  Ø25.4 x  6.3
+    #     mount step rows 110..127  47.6 wide x  9.5
+    #     mount step rows 128..143  58.2 wide x  7.9
+    #     body       rows 143..218  40.2 tall, 129.1 long overall
+    #
+    # Heights and diameters are scaled by **different** factors and that is the
+    # measurement, not a fudge. `MASTER_TOWER_TOP_Z - (MASTER_Z + body radius)` is
+    # 63.0 mm of budget above the body against the plate's 64.0, so heights scale
+    # by 0.984 and the constant is right to 1.6%. Diameters scale by
+    # `MASTER_TOWER_DIAMETER / 31.7` = 0.883, i.e. the constant is 12% under the
+    # plate. `MASTER_BODY_DIAMETER` is the one that really disagrees: 32 against a
+    # measured 40.2, **20% under**, three times the plate's 7% error bar. Reported
+    # rather than edited -- the constant is not this function's to move.
+    body_top = MASTER_Z + MASTER_BODY_DIAMETER * 0.5
+    height = (MASTER_TOWER_TOP_Z - body_top) / 0.0640
+    girth = MASTER_TOWER_DIAMETER / 0.0317
+    step_lower_top = body_top + 0.0079 * height
+    step_upper_top = step_lower_top + 0.0095 * height
+    neck_top = step_upper_top + 0.0063 * height
+    reservoir_top = neck_top + 0.0275 * height
+
+    port_ribs = 10
+    for label, station, arm_offset in (
+        # Both clevis arms face **outboard**, as a balance bar needs them to, but
+        # at different offsets and that is forced arithmetic rather than style.
+        # The bodies are 37 mm apart (§20.6.4 wants 45) and Ø32, so there are 5 mm
+        # of air between them: the rear pump's arm has to stay inside its own
+        # barrel's silhouette at 14 mm or it lands in the front pump, a pair
+        # `joints.py` does not declare. The front pump's has 20 mm and spends it,
+        # because `brake_pushrod` ends at x -231 and 20 mm outboard is exactly
+        # there -- so Art. 4.12.2's mandatory link now pulls the lever it is meant
+        # to pull instead of ending against a barrel.
+        ("front", MASTER_FRONT_X, -0.020),
+        ("rear", MASTER_REAR_X, -0.014),
+    ):
+        chamfer = max(0.0008, detail.bevel_width * 0.5)
         bm = bmesh.new()
         build.lathe(
             bm,
-            _cylinder_profile(MASTER_BODY_DIAMETER * 0.5, MASTER_BODY_LENGTH * 0.5),
+            _chamfered_cylinder(
+                MASTER_BODY_DIAMETER * 0.5, MASTER_BODY_LENGTH * 0.5, chamfer
+            ),
             detail.tube_segments,
             axis="Y",
             center=(station, MASTER_Y, MASTER_Z),
         )
+
+        # The reservoir's two-step machined mount. Its lower step reaches 4 mm into
+        # the barrel rather than resting on the barrel's top tangent line, where a
+        # box on a cylinder touches along a line and shows daylight either side.
+        for width, low, high in (
+            (0.0582 * girth, body_top - 0.004, step_lower_top),
+            (0.0476 * girth, step_lower_top, step_upper_top),
+        ):
+            _chamfered_box(
+                bm,
+                (MASTER_BODY_DIAMETER, width, high - low),
+                (station, MASTER_Y, (low + high) * 0.5),
+                chamfer,
+            )
+
+        # Neck and reservoir as one stepped lathe: on the form it is a single
+        # translucent moulding with a shoulder, not two parts.
+        build.lathe(
+            bm,
+            [
+                (0.0, step_upper_top),
+                (0.0254 * girth * 0.5, step_upper_top),
+                (0.0254 * girth * 0.5, neck_top),
+                (MASTER_TOWER_DIAMETER * 0.5, neck_top),
+                (MASTER_TOWER_DIAMETER * 0.5, reservoir_top),
+                (0.0, reservoir_top),
+            ],
+            detail.tube_segments,
+            axis="Z",
+            center=(station, MASTER_Y, 0.0),
+        )
+
+        # The cap. Ten ribs, `estimated` off the `007-BRKF-01` p. 4 photograph --
+        # five panel boundaries are visible across the front half of a cap whose
+        # silhouette spans 950 px, so ten around. Two stations per rib at low
+        # detail and three at high, which is what keeps the crest a real edge at
+        # both densities instead of a shading artifact that only exists at one.
+        cap_radius = 0.0397 * girth * 0.5
+        cap_stations = port_ribs * max(2, detail.tube_segments // port_ribs)
+        _fluted_lathe(
+            bm,
+            [
+                (0.0, reservoir_top),
+                (cap_radius, reservoir_top),
+                (cap_radius, MASTER_TOWER_TOP_Z - 0.0018),
+                (cap_radius * 0.90, MASTER_TOWER_TOP_Z),
+                (0.0, MASTER_TOWER_TOP_Z),
+            ],
+            cap_stations,
+            port_ribs,
+            0.14,
+            axis="Z",
+            center=(station, MASTER_Y, 0.0),
+        )
+
+        # The clevis arm: a flat plate leaning 31.0 degrees off vertical toward the
+        # outlet end, 15.0 wide, with the tip cap concentric with its upper hole --
+        # all four read straight off the plate (left edge marching 42 px across 70
+        # rows; a 33 px horizontal cut at cos 31; holes at 45.0 and 59.3 from the
+        # pivot; tip 67.2 out, which is 59.3 + the 7.5 half width). Thickness is
+        # the one figure here that is `estimated`: an orthographic side view cannot
+        # show it, so 5.0 comes off the photograph's edge-to-face ratio of about a
+        # third of the plate's width.
+        #
+        # The pivot is at y +538.5 rather than the plate's +516, because
+        # `brake_pushrod` ends at y +542 and a lever nobody can reach is worse than
+        # a lever 22 mm off its drawing.
+        arm_thickness = 0.0050
+        arm_half_width = 0.0075
+        pivot = Vector((station + arm_offset, 0.5385, PUSHROD_Z))
+        lean = math.radians(31.0)
+        arm_along = Vector((0.0, -math.sin(lean), math.cos(lean)))
+        _plate_with_holes(
+            bm,
+            pivot,
+            arm_along,
+            Vector((1.0, 0.0, 0.0)),
+            arm_half_width,
+            0.0593,
+            arm_thickness,
+            [(0.0450, 0.0030), (0.0593, 0.0030)],
+            detail.tube_segments,
+        )
+        # The pin the arm swings on, from the arm's outer face into the barrel.
         build.sweep_tube(
             bm,
             [
-                (station, MASTER_Y, MASTER_Z),
-                (station, MASTER_Y, MASTER_TOWER_TOP_Z),
+                pivot - Vector((arm_thickness * 0.5, 0.0, 0.0)),
+                Vector((station, pivot.y, pivot.z)),
             ],
-            MASTER_TOWER_DIAMETER * 0.5,
+            0.0097 * 0.5,
             detail.tube_segments,
         )
-        master = build.object_from_bmesh(
+
+        # The outlet union, on the line the hose actually leaves along.
+        _approach, surface, out, proud = _master_port(label)
+        build.sweep_tube(
+            bm, [surface - out * 0.008, surface + out * (proud * 0.45)], 0.0058,
+            detail.tube_segments,
+        )
+        build.sweep_tube(
+            bm, [surface + out * (proud * 0.40), surface + out * proud], 0.0040,
+            detail.tube_segments,
+        )
+
+        # The bleed nipple, standing on the body's rear shoulder. Ø6.5 across
+        # flats, the same figure `CALIPER_FRONT_NIPPLE_HEX` carries, because it is
+        # the same part at the other end of the same circuit.
+        nipple = Vector((station, MASTER_Y - 0.045, body_top - 0.004))
+        build.sweep_tube(
+            bm,
+            [nipple, nipple + Vector((0.0, 0.0, 0.011))],
+            0.0065 * 0.5 / math.cos(math.pi / 6.0),
+            6,
+        )
+
+        # **Not beveled, and it cannot be.** `build.bevel_object` tears any plate
+        # carrying a through-hole: measured on this arm alone it turns a closed
+        # `chi -2` shell into 76 boundary edges at low detail and 64 at high, at
+        # every plate size and thickness tried, and the torn part then drops
+        # silently out of the winding gate's census as "not watertight". No part
+        # in this repo with a hole in it goes through that call -- `_disc_face`'s
+        # discs do not either -- so the chamfers above are authored instead.
+        build.object_from_bmesh(
             "brake_master_%s" % label, bm, collection, material=alloy,
             shade_smooth=True,
         )
-        build.bevel_object(master, detail)
 
     # Art. 4.12.2's doubled link: a clevis rod and a 2.0 mm cable beside it, both
     # running from the brake pedal's own plate into both cylinders -- which is what a
@@ -3699,18 +4328,118 @@ def _brake_hydraulics(
     # centerline rather than on top of it, because `chassis_bumper_socket_side_*_l`
     # occupies the rail's outboard side at y -100 and the regulator has to sit where
     # the rear hose already runs.
+    #
+    # `007-BRKF-01` p. 4's *Régulateur complet* cell is six things and the body is
+    # only one of them: a black forked body, a **threaded rod straight through it**,
+    # a compression spring on the rod, a spherical rod end, a **knurled black knob**
+    # on one end and a drilled silver tab at each end. Until #214 this was a plain
+    # Ø24 barrel, which is the *body* and nothing else -- and a barrel is exactly
+    # what a brake bias adjuster does not look like.
+    #
+    # Everything hangs off `REGULATOR_RADIUS` and `REGULATOR_LENGTH` as ratios,
+    # `estimated`, because the photograph carries no scale and the constants are
+    # the only anchor. The rod is a third of the body, which is what the picture
+    # reads; the knob matches the body's diameter, which it also reads.
+    #
+    # **The knob goes on the rear end, and both directions were measured before
+    # choosing.** Forward there are 6 mm: `chassis_bumper_socket_side_*_rear_l` is
+    # a sleeve and a riser at y -114..-86 sharing this part's x band (-360..-296
+    # against the regulator's -307..-283) and a knob on that end put 136 triangle
+    # pairs into it. Rearward there are 39: `radiator_bracket_lower_clamp` starts
+    # at y -213.1. So the assembly ends at -206.5, which is 6.6 mm clear of the
+    # clamp and 12.6 of the bracket -- and #190's `brake_*`/`radiator_*` waiver is
+    # not touched.
+    regulator_z = P.rail_z(p) + 0.020
+    axis_y = Vector((0.0, 1.0, 0.0))
+    rod_radius = REGULATOR_RADIUS * 0.333
+    rear_face = REGULATOR_Y - REGULATOR_LENGTH * 0.5
+    front_face = REGULATOR_Y + REGULATOR_LENGTH * 0.5
+    knob_radius = REGULATOR_RADIUS
+    knob_ribs = 8
+    knob_stations = knob_ribs * max(2, detail.tube_segments // knob_ribs)
+    knob_back = rear_face - 0.0165
+    knob_front = knob_back - 0.010
+
     bm = bmesh.new()
     build.lathe(
         bm,
         _cylinder_profile(REGULATOR_RADIUS, REGULATOR_LENGTH * 0.5),
         detail.tube_segments,
         axis="Y",
-        center=(REGULATOR_X, REGULATOR_Y, P.rail_z(p) + 0.020),
+        center=(REGULATOR_X, REGULATOR_Y, regulator_z),
     )
-    regulator = build.object_from_bmesh(
+    # The rod runs the whole length and out both ends, which is what makes the
+    # thing read as an adjuster rather than as a bracket. Its forward end stops at
+    # y -118, four millimeters short of that socket.
+    build.sweep_tube(
+        bm,
+        [
+            (REGULATOR_X, knob_front + 0.006, regulator_z),
+            (REGULATOR_X, -0.118, regulator_z),
+        ],
+        rod_radius,
+        detail.tube_segments,
+    )
+    _coil_spring(
+        bm,
+        Vector((REGULATOR_X, rear_face - 0.0015, regulator_z)),
+        -axis_y,
+        rod_radius + 0.0022,
+        0.0009,
+        5.0,
+        0.010,
+        detail,
+    )
+    # The lock nut against the knob: six segments is the hex, as at the hose ends.
+    build.sweep_tube(
+        bm,
+        [
+            (REGULATOR_X, knob_back + 0.0050, regulator_z),
+            (REGULATOR_X, knob_back + 0.0005, regulator_z),
+        ],
+        rod_radius * 1.55 / math.cos(math.pi / 6.0),
+        6,
+    )
+    _fluted_lathe(
+        bm,
+        [
+            (0.0, knob_back),
+            (knob_radius * 0.86, knob_back),
+            (knob_radius, knob_back - 0.003),
+            (knob_radius, knob_front + 0.002),
+            (knob_radius * 0.88, knob_front),
+            (0.0, knob_front),
+        ],
+        knob_stations,
+        knob_ribs,
+        0.16,
+        axis="Y",
+        center=(REGULATOR_X, 0.0, regulator_z),
+    )
+    # **One drilled tab, not the form's two, and it points inboard.** The form has
+    # a clevis on each end of the rod; here the forward end is inside that bumper
+    # socket's y band and the rear end is under the knob, so an axial tab exists at
+    # neither. This one stands off the body's inboard flank and is the anchor the
+    # `brake_balance_regulator`/`chassis_rail_l` joint already claims. The missing
+    # second tab is a known omission rather than a silent one.
+    _plate_with_holes(
+        bm,
+        Vector((REGULATOR_X + REGULATOR_RADIUS - 0.002, REGULATOR_Y, regulator_z)),
+        Vector((1.0, 0.0, 0.0)),
+        Vector((0.0, 1.0, 0.0)),
+        0.0055,
+        0.011,
+        0.0035,
+        [(0.011, 0.0025)],
+        detail.tube_segments,
+    )
+    build.object_from_bmesh(
         "brake_balance_regulator", bm, collection, material=alloy, shade_smooth=True
     )
-    build.bevel_object(regulator, detail)
+    # **Not beveled, deliberately.** `detail.bevel_width` is 4 mm at high detail and
+    # the spring wire is 1.8 mm across -- the same trap CLAUDE.md records for a 4 mm
+    # panel, one order of magnitude worse. `brake_pushrod_link` at Ø2 is unbeveled
+    # for the same reason and is the precedent.
 
     # The distributor, on the bracket's upstand. Birel-only; the weakest-sourced
     # part in the section, and recorded rather than dropped.
@@ -3732,11 +4461,27 @@ def _brake_lines(context: build.BuildContext, collection: bpy.types.Collection) 
     Both are cable-tied along the **upper** surface of the chassis tubes and neither
     crosses under the floor tray, which is the rule that keeps them out of Art.
     4.12.6's territory and off the skid plates.
+
+    **Every free end now terminates in a fitting**, which is what `007-BRKF-01`
+    p. 4's *Tuyaux* cell is a photograph of: a ferrule crimped over the braid, a
+    collar and a swivel nut. Before #214 both hoses simply stopped, and a brake
+    hose that stops is a piece of string. See `_line_end` for the three ratios.
+
+    The **routes are unchanged** except at the two pump ends, and those moved for
+    one reason: the union has to be on the line the hose already leaves along, or
+    the hose turns a right angle in no distance. #201's constraint on the rear run
+    -- cross y +400 at x -147.7, ten millimeters inboard of the side bumper
+    socket's riser at -158 -- is preserved exactly, because the new first point is
+    *on the old first leg* rather than beside it.
     """
     p = context.params
     detail = context.detail
     steel = context.material("axle_steel")
     segments = max(6, detail.tube_segments // 2)
+    front_approach, front_surface, front_out, front_proud = _master_port("front")
+    _rear_approach, rear_surface, rear_out, rear_proud = _master_port("rear")
+    front_port = front_surface + front_out * front_proud
+    rear_port = rear_surface + rear_out * rear_proud
 
     caliper_y = P.front_axle_y(p) + 0.075
     # Both ends land on a caliper **half** at x +-470 rather than on the disc's own
@@ -3774,18 +4519,45 @@ def _brake_lines(context: build.BuildContext, collection: bpy.types.Collection) 
             (-0.060, 0.690, 0.106),
             (-0.100, 0.600, 0.107),
             (-0.100, 0.535, 0.108),
-            (-0.200, 0.512, 0.128),
-            (-0.230, 0.508, 0.124),
+            # **The crossing moved forward of the pumps rather than over them.**
+            # It used to dive from y +535 to +512 at z 128, which was "over both
+            # master bodies (tops at z 117) and outside both towers" -- and #214
+            # gave each pump a reservoir mount 32 mm across topping out at z 134
+            # and a clevis arm reaching from y +504 to +542 at z 105..169. Over
+            # them is 64 triangle pairs into `brake_master_rear`, a pair
+            # `joints.py` does not declare; climbing above the arms means arching
+            # over the caps at z 180. Forward of them is clean air: the barrels
+            # stop at z 117, both pivot pins and `brake_pushrod` run at z 112, and
+            # nothing else is between y +545 and the pedal.
+            (-0.150, 0.548, 0.120),
+            (-0.235, 0.551, 0.126),
             (DISTRIBUTOR_X, MASTER_Y, MASTER_Z),
         ],
         [
+            # Was a 31 mm dash straight from the distributor into the front body's
+            # flank, ending on its axis where nothing can be seen and no union can
+            # stand. It now runs down **outboard** of the bracket upstand -- which
+            # is the tie `joints.py` already declares -- and comes onto the body's
+            # rear face from behind, which is where the plate puts the outlet.
             (DISTRIBUTOR_X, MASTER_Y, MASTER_Z),
-            (MASTER_FRONT_X, MASTER_Y - 0.008, MASTER_Z),
+            tuple(front_approach),
+            tuple(front_port),
         ],
     )
     bm = bmesh.new()
     for run in front_runs:
         build.sweep_tube(bm, run, LINE_RADIUS, segments)
+    # Three free ends on the front circuit: both caliper banjos and the pump. The
+    # direction is taken off the hose's own last leg rather than authored, so a
+    # re-route cannot leave a ferrule pointing the wrong way -- the failure the
+    # `wheel.get("steer")` entry in CLAUDE.md is the worked example of.
+    for run, index, step in (
+        (front_runs[0], 0, 1),
+        (front_runs[0], -1, -2),
+        (front_runs[2], -1, -2),
+    ):
+        tip = Vector(run[index])
+        _line_end(bm, tip, tip - Vector(run[step]), detail)
     build.object_from_bmesh(
         "brake_line_front", bm, collection, material=steel, shade_smooth=True
     )
@@ -3796,7 +4568,10 @@ def _brake_lines(context: build.BuildContext, collection: bpy.types.Collection) 
     # their 500 mm pitch, so the outboard side of that rail is not available to a
     # hose. It stays above the rail's tube top at z 65 and above the pan's at 69.
     rear_run = [
-        (MASTER_REAR_X, MASTER_Y - 0.055, MASTER_Z),
+        # The union's tip, which sits **on the old first leg** rather than beside
+        # it -- the point moved 25.8 mm down the same line, so the y +400 crossing
+        # below is arithmetically unchanged at x -147.7.
+        tuple(rear_port),
         # -0.132, was -0.140: with the rear cylinder at -175 (#201) the first
         # leg crossed y 400 at x -159, inside the side bumper socket's riser at
         # -158..-186. Bending to -132 crosses at -150, 8 mm inboard of it.
@@ -3808,11 +4583,30 @@ def _brake_lines(context: build.BuildContext, collection: bpy.types.Collection) 
         (REGULATOR_X, REGULATOR_Y, 0.076),
         (-0.290, -0.300, 0.082),
         (-0.320, -0.450, 0.130),
-        (-0.345, -0.470, 0.190),
-        (-0.370, -0.480, 0.2225),
+        # **The banjo end is now on the rear caliper's banjo port**, which is a
+        # position in the caliper's own frame rather than a world point: the
+        # caliper is centered on the pad radius at `CALIPER_REAR_CLOCK`, so its
+        # local (v, w) axes are the world (y, z) turned 20 degrees, and the port
+        # is at v +25, w +6 on the inboard half's outer face at u +36.75.  That
+        # works out to (-363.25, -471.24, +222.11).
+        #
+        # The old end at (-370, -480, +222.5) is v +16.63, w +3.37 in that frame,
+        # 16.97 mm off the piston axis -- inside the cylinder boss, invisible
+        # because `joints.py` declares the pair `routed` and no gate measures where
+        # inside a part a routed hose stops. It also fouled
+        # `brake_caliper_rear_bracket` once the fitting existed: that plate is at
+        # x -375.5..-315, y -512..-482, and a Ø9.4 nut on a leg this oblique
+        # bulges 5.3 mm sideways of its own axis, so 2 mm of bare-hose clearance
+        # became 3.3 mm of overlap. The port clears the same plate by 10.8 mm in y,
+        # so both problems have the same answer.
+        (-0.345, -0.462, 0.190),
+        (-0.36325, -0.47124, 0.22211),
     ]
     bm = bmesh.new()
     build.sweep_tube(bm, rear_run, LINE_RADIUS, segments)
+    for index, step in ((0, 1), (-1, -2)):
+        tip = Vector(rear_run[index])
+        _line_end(bm, tip, tip - Vector(rear_run[step]), detail)
     build.object_from_bmesh(
         "brake_line_rear", bm, collection, material=steel, shade_smooth=True
     )
