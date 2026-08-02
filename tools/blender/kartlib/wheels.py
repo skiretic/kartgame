@@ -2917,6 +2917,548 @@ def _rear_brake(context: build.BuildContext, collection: bpy.types.Collection) -
 # --- the front brakes ------------------------------------------------------
 
 
+def _caliper_front_body(
+    bm: bmesh.types.BMesh,
+    detail: build.Detail,
+    plane: float,
+    side: float,
+    axle_y: float,
+    axle_z: float,
+    radius: float,
+    clock: float,
+) -> int:
+    """Freeline `007-BRKF-01`: a one-piece machined block with a slot through it.
+
+    **Not `_caliper_body`, and the two must not be merged.** That builder is the
+    rear's externally finned CRG caliper -- two boxes and a bridge over the disc.
+    This one is a different part off a different form: a squarish black block,
+    plain on the outside, with the top two corners chamfered, one cylinder boss on
+    each outer face and a single transverse pad pin. Every dimension below is from
+    the constants block above; what this function chooses is where each feature
+    sits, and that is read off `007-BRKF-01` p. 4 at **5.15 px/mm** -- the body
+    spans 340 px across its sourced 66 mm axial. Three other features on that page
+    check the ruler: the 33 mm mouth reads 165 px (32.0), the block's tangential
+    reads 454 px (88.1, which is the figure the constants block recorded), and one
+    pad edge-on reads 235 px (45.6 against a sourced 49.7, so 8% -- the pads are
+    the furthest thing from the lens and the worst of the four).
+
+    The frame, and getting it wrong is invisible until the caliper straddles
+    nothing:
+
+        axial       across the kart, +-`CALIPER_FRONT_THICKNESS`/2 about the disc
+        tangential  the direction the disc travels, `CALIPER_FRONT_LENGTH` long
+        radial      out from the axle; the slot opens *inward*, toward the axle
+
+    Axial is a **world** axis and the two corners are mirror images, so anything
+    that is not symmetric about the disc's plane -- the cap, the bleed nipple, the
+    banjo -- is placed through `inboard`, which is `-side`. Built without it the
+    left caliper's cap came out at x -492, through `wheel_fl_rim` and 51 triangles
+    of `wheel_fl_tire`, while the right one was correct: a mirrored part is only
+    half wrong, so half the gate output is what a sign error looks like here.
+
+    p. 4 looks along the **radial** axis from the axle side, so its horizontal is
+    axial and its vertical is tangential. Read the other way round -- vertical as
+    radial -- the block comes out 88 mm tall on a 150 mm disc and the pad's sourced
+    49.7 mm becomes its height.
+
+    **One closed shell per feature, in one bmesh.** They interpenetrate on purpose:
+    a boss is sunk into the half it stands on, the cap is sunk into the boss, and
+    the pin runs through both halves. Overlap inside a single object is invisible
+    to gate 1 -- which is about pairs of *parts* -- and every shell is watertight
+    and positively wound on its own, so the winding gate still covers all of it.
+    The return value is the shell count, because Euler characteristic over a
+    multi-shell mesh is `2 x shells` and the caller asserts it rather than trusting
+    this list.
+    """
+    segments = max(8, detail.tube_segments)
+    inboard = -side
+    half_axial = CALIPER_FRONT_THICKNESS * 0.5
+    half_mouth = CALIPER_FRONT_MOUTH_WIDTH * 0.5
+    half_height = CALIPER_FRONT_HEIGHT * 0.5
+    half_length = CALIPER_FRONT_LENGTH * 0.5
+    chamfer = CALIPER_FRONT_CHAMFER
+
+    # The slot's blind end sits where the top chamfer starts: a roof milled up
+    # inside the chamfer is not a roof, and stopping there is what leaves a band of
+    # open slot above the disc's rim for the pad pin to cross. That puts it at
+    # radius 81.25 on a Ø150 disc, and `CALIPER_FRONT_MOUTH_DEPTH`'s 30 mm of
+    # engagement is then a floor this has to clear rather than the thing that sets
+    # it -- the slot swallows 35.2 mm of disc, measured from the pads' own inner
+    # rubbing radius.
+    roof = half_height - chamfer
+    disc_rim = DISC_FRONT_DIAMETER * 0.5 - radius
+    assert roof > disc_rim, (
+        "the mouth roof at %.4f is inside the disc's rim at %.4f" % (roof, disc_rim)
+    )
+    assert (
+        radius + roof - DISC_FRONT_PAD_INNER * 0.5 >= CALIPER_FRONT_MOUTH_DEPTH
+    ), "the slot swallows %.4f m of disc against the %.4f the mouth is derived from" % (
+        radius + roof - DISC_FRONT_PAD_INNER * 0.5,
+        CALIPER_FRONT_MOUTH_DEPTH,
+    )
+
+    sin_c, cos_c = math.sin(clock), math.cos(clock)
+
+    def at(axial: float, tangential: float, radial: float) -> Vector:
+        """A point in the caliper's own frame, in world coordinates."""
+        return Vector(
+            (
+                plane + axial,
+                axle_y + (radius + radial) * sin_c + tangential * cos_c,
+                axle_z + (radius + radial) * cos_c - tangential * sin_c,
+            )
+        )
+
+    def prism(
+        outline: list[tuple[float, float]],
+        caps: tuple[tuple[int, ...], ...],
+        half_span: float,
+    ) -> None:
+        """Extrude an (axial, radial) outline along the tangential axis.
+
+        The outline runs counter-clockwise in (axial, radial), which in this
+        right-handed frame gives every side quad an outward normal and the
+        `-half_span` cap the outline's own order. `caps` is the outline's
+        decomposition into **convex** faces: the C is concave, and while the
+        winding gate's fan sum is exact for any simple polygon, a concave n-gon is
+        one more thing for the exporter's triangulator to get wrong for free.
+        """
+        lo = [bm.verts.new(at(a, -half_span, v)) for a, v in outline]
+        hi = [bm.verts.new(at(a, +half_span, v)) for a, v in outline]
+        for index in range(len(outline)):
+            following = (index + 1) % len(outline)
+            bm.faces.new((lo[index], hi[index], hi[following], lo[following]))
+        for cap in caps:
+            bm.faces.new(tuple(lo[index] for index in cap))
+            bm.faces.new(tuple(hi[index] for index in reversed(cap)))
+
+    def cylinder(
+        axial_a: float,
+        axial_b: float,
+        tangential: float,
+        radial: float,
+        diameter: float,
+        sides: int = 0,
+    ) -> None:
+        build.sweep_tube(
+            bm,
+            [at(axial_a, tangential, radial), at(axial_b, tangential, radial)],
+            diameter * 0.5,
+            sides or segments,
+        )
+
+    # --- the body ----------------------------------------------------------
+    # A C in section: two legs either side of the slot, joined over the disc's rim.
+    # Points 6 and 9 are where the roof's line meets each outer face -- and because
+    # the roof *is* the line the chamfer starts on, they are the chamfer's own
+    # corners as well. Written as separate points they were coincident to the
+    # nanometer, which gave the prism two zero-length edges and four zero-area side
+    # quads, and `bmesh.ops.bevel` then turned those into 2,430 sliver faces and a
+    # 180.000 degree dihedral -- a bowtie's signature, arrived at from the other
+    # direction. Merged rather than defended, and the assert below is the guard.
+    outline = [
+        (-half_axial, -half_height),           # 0
+        (-half_mouth, -half_height),           # 1
+        (-half_mouth, roof),                   # 2
+        (half_mouth, roof),                    # 3
+        (half_mouth, -half_height),            # 4
+        (half_axial, -half_height),            # 5
+        (half_axial, roof),                    # 6  == (half_axial, B - chamfer)
+        (half_axial - chamfer, half_height),   # 7
+        (-half_axial + chamfer, half_height),  # 8
+        (-half_axial, roof),                   # 9  == (-half_axial, B - chamfer)
+    ]
+    for index in range(len(outline)):
+        following = (index + 1) % len(outline)
+        assert (
+            abs(outline[index][0] - outline[following][0])
+            + abs(outline[index][1] - outline[following][1])
+            > 1e-6
+        ), "the caliper's outline repeats point %d, which is a zero-area side face" % (
+            index
+        )
+    prism(outline, ((0, 1, 2, 9), (4, 5, 6, 3), (9, 2, 3, 6, 7, 8)), half_length)
+    shells = 1
+
+    # --- the two cylinders, opposed ---------------------------------------
+    # §B: *"Nombre de pistons 2 par etrier"* -- so one per half, on the axis of the
+    # disc's own rubbing band (radial 0, which is the mean of 46 and 74.5). The
+    # boss is sunk 8 mm into the leg it stands on so there is no coplanar face
+    # where it meets it, and the cap is sunk 2 mm into the boss for the same
+    # reason. p. 4's left boss stands 55 px = 10.7 mm proud and the capped one 80
+    # px = 15.5 against the 6 and 6+8 built here; the constants are the weakest
+    # figures in the block and are not this function's to move.
+    #
+    # The running clearance `CALIPER_FRONT_MOUTH_WIDTH` carries over what it has to
+    # hold: 33 - 12 disc - 2 x 9 pad = 3 mm, half of it each side. It is the figure
+    # the piston stands proud by, which is what puts the piston crown *on* the
+    # pad's backing rather than 1.5 mm off it -- and `joints.py` declares the
+    # caliper and the pad touch.
+    clearance = CALIPER_FRONT_MOUTH_WIDTH - DISC_FRONT_THICKNESS - 2.0 * PAD_THICKNESS
+    assert clearance > 0.0, "the mouth is narrower than the disc and two pads"
+    for sign in (-1.0, 1.0):
+        face = sign * half_axial
+        cylinder(
+            face - sign * 0.008,
+            face + sign * CALIPER_FRONT_BOSS_PROUD,
+            0.0,
+            0.0,
+            CALIPER_FRONT_BOSS_DIAMETER,
+        )
+        cylinder(
+            sign * (half_mouth + 0.004),
+            sign * (half_mouth - clearance * 0.5),
+            0.0,
+            0.0,
+            CALIPER_FRONT_PISTON_BORE,
+        )
+        shells += 2
+    # The anodized cap, **inboard**. Outboard it would reach x 492 against a tire
+    # whose inner face is at 485, and joints.py records that 7 mm as the binding
+    # clearance in the whole front assembly. Which half wears the cap is not
+    # something a photograph of a bare caliper can say, so the kart's own envelope
+    # decides it. It stays the body's material: a second color needs a second
+    # object, and a second object needs a joint declared for it.
+    cap_base = inboard * (half_axial + CALIPER_FRONT_BOSS_PROUD - 0.002)
+    cylinder(
+        cap_base,
+        cap_base + inboard * (CALIPER_FRONT_CAP_PROUD + 0.002),
+        0.0,
+        0.0,
+        CALIPER_FRONT_CAP_DIAMETER,
+    )
+    shells += 1
+
+    # --- the pad pin -------------------------------------------------------
+    # **One pin, not two, and there is no bridge**: p. 4's "bridge on two pins" is
+    # this pin crossing the mouth with its collar seen end-on. It stands proud of
+    # both faces by one pin diameter -- p. 4 measures 7.2 mm, which would put the
+    # outboard tip at x 485.5 and inside the tire -- and it comes out grazing the
+    # Ø31.7 boss, 0.03 mm off its upper edge at 15.85. That is not a coincidence
+    # anybody arranged and it is what p. 4 shows: the pin emerges from each face
+    # just above the cylinder.
+    #
+    # **It crosses over the disc's rim, not through the disc.** A pin anywhere
+    # inside the slot is a pin through 12 mm of cast iron: this disc is solid from
+    # its bore at 33.75 out to 75, and it has a drive tang at 20 degrees which is
+    # where this caliper sits. Built at the pads' own hole row it was 98
+    # intersecting triangle pairs against `brake_disc_f?` -- and a pin that is
+    # clear in the built pose and fouls a tang a fifth of a turn later would not
+    # even be that. So it sits midway between the rim and the roof, which is the
+    # only band in the slot the disc never reaches.
+    pin_radial = (disc_rim + roof) * 0.5
+    assert (
+        pin_radial - CALIPER_FRONT_PIN_DIAMETER * 0.5 > disc_rim
+        and pin_radial + CALIPER_FRONT_PIN_DIAMETER * 0.5 < roof
+    ), "the pad pin at %.4f does not fit between the disc's rim and the roof" % (
+        pin_radial
+    )
+    pin_end = half_axial + CALIPER_FRONT_PIN_DIAMETER
+    cylinder(
+        -pin_end,
+        pin_end,
+        0.0,
+        pin_radial,
+        CALIPER_FRONT_PIN_DIAMETER,
+        sides=max(6, segments // 2),
+    )
+    shells += 1
+    # **The pin's collar is not built, and the reason is arithmetic.** p. 4 shows a
+    # machined collar at the pin's centre with a hex socket in it, and there is
+    # nowhere on this kart to put one: at Ø`CALIPER_FRONT_PIN_COLLAR_DIAMETER` it
+    # reaches 6 mm either side of the pin, so wherever the pin clears the disc
+    # radially the collar does not, and it straddles the disc's plane by
+    # construction. `CALIPER_FRONT_PIN_COLLAR_LENGTH` is 15 mm against a disc gap
+    # of `DISC_FRONT_THICKNESS` = 12 on top of that. Both figures are `estimated`
+    # and the collar measures 11.6 long x 12.2 across on p. 4 at 5.15 px/mm; what
+    # is missing is a pin radius the collar can live at, which this geometry does
+    # not have. Left out rather than drawn wrong -- #212's lesson is that an
+    # unbuilt feature must not be described as built.
+
+    # --- the fittings ------------------------------------------------------
+    # Bleed nipple at the top, banjo at the bottom, both on the inboard face and
+    # both on the same tangential end, which is what p. 4 shows. Angled 30 degrees
+    # off the axial so neither ends flush against the face it grows out of. The
+    # tangential station is 34 mm from centre -- two thirds out on the 103 mm
+    # block -- which keeps both of them clear of `brake_caliper_*_bracket`'s own
+    # +-16 mm tangential band.
+    fitting_t = -0.034
+    lean_a = inboard * math.cos(math.radians(30.0))
+    lean_v = math.sin(math.radians(30.0))
+    base_a = inboard * (half_axial - 0.004)
+    # The bleed screw: a hex with a barbed spigot on the end of it. Two pieces,
+    # because one tapered cylinder reads as neither. `CALIPER_FRONT_NIPPLE_HEX` is
+    # across the flats, and a six-sided sweep is sized across the corners, so the
+    # sweep radius is that over 2 cos(30).
+    hex_length = CALIPER_FRONT_NIPPLE_LENGTH * 0.55
+    barb_length = CALIPER_FRONT_NIPPLE_LENGTH - hex_length
+    hex_tip = (base_a + hex_length * lean_a, 0.020 + hex_length * lean_v)
+    build.sweep_tube(
+        bm,
+        [at(base_a, fitting_t, 0.020), at(hex_tip[0], fitting_t, hex_tip[1])],
+        CALIPER_FRONT_NIPPLE_HEX / (2.0 * math.cos(math.radians(30.0))),
+        6,
+    )
+    build.sweep_tube(
+        bm,
+        [
+            at(hex_tip[0] - 0.001 * lean_a, fitting_t, hex_tip[1] - 0.001 * lean_v),
+            at(
+                hex_tip[0] + barb_length * lean_a,
+                fitting_t,
+                hex_tip[1] + barb_length * lean_v,
+            ),
+        ],
+        CALIPER_FRONT_NIPPLE_HEX * 0.30,
+        max(6, segments // 2),
+    )
+    # The banjo, brass against the black body on p. 4 and the same material here
+    # for the reason the cap is.
+    build.sweep_tube(
+        bm,
+        [
+            at(base_a, fitting_t, -0.020),
+            at(
+                base_a + CALIPER_FRONT_BANJO_LENGTH * lean_a,
+                fitting_t,
+                -0.020 - CALIPER_FRONT_BANJO_LENGTH * lean_v,
+            ),
+        ],
+        CALIPER_FRONT_BANJO_DIAMETER * 0.5,
+        segments,
+    )
+    return shells + 3
+
+
+def _pad_hole_row() -> float:
+    """The radius the front pad's row of lightening holes sits on.
+
+    Derived rather than measured, and named rather than inlined because it is the
+    one figure on this pad that no constant states. `PAD_FRONT_BACKING_HEIGHT` is
+    45 and the friction material is 25 tall against the plate's outer edge, so the
+    ear is the 20 mm of bare plate below it and the row sits on the ear's own
+    mid-height: 10.0 mm off the inner edge, leaving 7.4 mm of plate under a Ø5.2
+    hole and the same above it.
+
+    `007-BRKF-01` p. 4's pad photograph puts it at **7.7 mm** -- 485 px across the
+    sourced 49.7 mm overall length is 9.759 px/mm, and the three hole centres sit
+    75 px off the arched edge's crest. The 2.3 mm disagreement is inside that
+    photograph's own error bar and the derived figure is the one that cannot drift
+    when a constant moves.
+    """
+    return (
+        DISC_FRONT_PAD_OUTER * 0.5
+        - PAD_FRONT_BACKING_HEIGHT
+        + (PAD_FRONT_BACKING_HEIGHT - PAD_FRONT_HEIGHT) * 0.5
+    )
+
+
+def _pad_plate(
+    bm: bmesh.types.BMesh,
+    detail: build.Detail,
+    plane: float,
+    axle_y: float,
+    axle_z: float,
+    clock: float,
+    sign: float,
+) -> None:
+    """One front pad: a flat plate with three drilled holes through its inner ear.
+
+    `PAD_FRONT_BACKING_HEIGHT` is 45 mm against a sourced friction height of 25,
+    and the 20 mm surplus is one edge of the plate rather than a border all round.
+    So the plate's **outer** edge sits on the disc's own rubbing band at 74.5 and
+    the ear reaches 45 mm inward from there, to 29.5. The row of three Ø5.2 holes
+    is on that ear, at `_pad_hole_row`. They are lightening holes and nothing hangs
+    on them: the caliper's pad pin cannot reach this radius without going through
+    the disc, and does not try.
+
+    The plate is one solid with three tunnels through it, so its Euler
+    characteristic is `2 - 2 x 3 = -4` and this function asserts it. A pad built as
+    three boxes with holes drawn on would be +6 and read identically in any render,
+    which is the mistake `DISC_FRONT_TANG_COUNT` spent a milestone in.
+
+    **Construction, and why it is not a grid.** Each hole gets a column of the
+    plate to itself, bounded halfway to its neighbors, and the column's perimeter
+    is sampled at the same count as the hole's circle so the two stitch into one
+    ring of quads. Adjacent columns share their dividing edge exactly -- same two
+    corners, same `rows` steps, same uniform parameter, resolved through one
+    rounded memo -- so the plate is one manifold surface rather than three touching
+    ones. That sharing is the whole trick, and the Euler assert below is what
+    catches it failing: a column boundary that misses its neighbor's by a float
+    leaves three shells at chi +6 and a render that shows nothing.
+
+    The arched inner edge p. 4 shows is **not built**. Its sagitta measures 5.4 mm
+    on the 49.7 chord -- an arc of radius 59.6, which is neither of the pad's own
+    radii and is not derivable from anything in this module. It wants a constant of
+    its own; the plate is straight-edged until it has one.
+    """
+    before = (len(bm.verts), len(bm.edges), len(bm.faces))
+    rows = max(3, detail.tube_segments // 2)
+    columns = max(2, detail.tube_segments // 3)
+    half_length = PAD_FRONT_LENGTH * 0.5
+    outer = DISC_FRONT_PAD_OUTER * 0.5
+    inner = outer - PAD_FRONT_BACKING_HEIGHT
+    hole_radius = PAD_FRONT_HOLE_DIAMETER * 0.5
+    hole_row = _pad_hole_row()
+    axial_lo = sign * DISC_FRONT_THICKNESS * 0.5
+    axial_hi = axial_lo + sign * PAD_THICKNESS
+    if sign < 0.0:
+        axial_lo, axial_hi = axial_hi, axial_lo
+
+    sin_c, cos_c = math.sin(clock), math.cos(clock)
+
+    def at(axial: float, tangential: float, station: float) -> Vector:
+        return Vector(
+            (
+                plane + axial,
+                axle_y + station * sin_c + tangential * cos_c,
+                axle_z + station * cos_c - tangential * sin_c,
+            )
+        )
+
+    # Hole centres at `PAD_FRONT_HOLE_PITCH`, centered on the plate; column walls
+    # halfway between them. The narrowest column is one pitch wide, so the thinnest
+    # web between a hole and a column wall is `pitch/2 - hole radius` = 3.05 mm.
+    centers = [
+        PAD_FRONT_HOLE_PITCH * (index - (PAD_FRONT_HOLE_COUNT - 1) * 0.5)
+        for index in range(PAD_FRONT_HOLE_COUNT)
+    ]
+    walls = [-half_length]
+    walls += [
+        (centers[index] + centers[index + 1]) * 0.5
+        for index in range(PAD_FRONT_HOLE_COUNT - 1)
+    ]
+    walls.append(half_length)
+    assert min(walls[index + 1] - walls[index] for index in range(len(walls) - 1)) > (
+        2.0 * hole_radius
+    ), "a hole is wider than the column that carries it"
+
+    memo: dict[tuple[int, int, int], bmesh.types.BMVert] = {}
+
+    def vertex(tangential: float, station: float, face: int) -> bmesh.types.BMVert:
+        """A plate-surface vertex, shared between columns that both want it.
+
+        Keyed on the rounded position so a column's right edge and its neighbor's
+        left edge resolve to one vertex. Rounding to the nanometer rather than
+        comparing floats: both sides compute the same expression from the same two
+        corners, so the values are bit-identical, and the key is only insurance.
+        """
+        key = (int(round(tangential * 1e9)), int(round(station * 1e9)), face)
+        if key not in memo:
+            memo[key] = bm.verts.new(
+                at(axial_lo if face == 0 else axial_hi, tangential, station)
+            )
+        return memo[key]
+
+    def perimeter(left: float, right: float) -> list[tuple[float, float]]:
+        """One column's boundary, counter-clockwise in (tangential, station).
+
+        The two vertical edges carry `rows` steps at uniform parameter and the two
+        horizontal ones `columns`, so two neighbors sampling their shared edge from
+        opposite directions land on the same points.
+        """
+        points: list[tuple[float, float]] = []
+        for step in range(columns):
+            points.append((left + (right - left) * step / columns, inner))
+        for step in range(rows):
+            points.append((right, inner + (outer - inner) * step / rows))
+        for step in range(columns):
+            points.append((right + (left - right) * step / columns, outer))
+        for step in range(rows):
+            points.append((left, outer + (inner - outer) * step / rows))
+        return points
+
+    interior = set(walls[1:-1])
+    for index, center in enumerate(centers):
+        left, right = walls[index], walls[index + 1]
+        ring = perimeter(left, right)
+        count = len(ring)
+        angles = [
+            math.atan2(station - hole_row, tangential - center)
+            for tangential, station in ring
+        ]
+        # The bowtie guard, and it is the same property `_disc_face` asserts about
+        # its bore: the outer ring and the inner one are matched station for
+        # station, so if the angular order ever reversed, the quad between them
+        # would fold into a self-intersecting face that is invisible to every other
+        # check on this kart.
+        for step in range(count):
+            turn = (angles[(step + 1) % count] - angles[step]) % (2.0 * math.pi)
+            assert 0.0 < turn < math.pi, (
+                "the pad's column %d turns %.4f rad between perimeter stations %d "
+                "and %d, so the ring quad there folds" % (index, turn, step, step + 1)
+            )
+        bore = [
+            (
+                center + hole_radius * math.cos(angle),
+                hole_row + hole_radius * math.sin(angle),
+            )
+            for angle in angles
+        ]
+        for step in range(count):
+            following = (step + 1) % count
+            outer_a, outer_b = ring[step], ring[following]
+            bore_a, bore_b = bore[step], bore[following]
+            # The two sheets, each a ring of quads between the column's boundary
+            # and its hole. Face 1 is the +axial side and takes the (tangential,
+            # station) order as built; face 0 is reversed.
+            bm.faces.new(
+                (
+                    vertex(*outer_a, 1),
+                    vertex(*outer_b, 1),
+                    vertex(*bore_b, 1),
+                    vertex(*bore_a, 1),
+                )
+            )
+            bm.faces.new(
+                (
+                    vertex(*bore_a, 0),
+                    vertex(*bore_b, 0),
+                    vertex(*outer_b, 0),
+                    vertex(*outer_a, 0),
+                )
+            )
+            # The bore wall, normal pointing into the hole.
+            bm.faces.new(
+                (
+                    vertex(*bore_a, 0),
+                    vertex(*bore_a, 1),
+                    vertex(*bore_b, 1),
+                    vertex(*bore_b, 0),
+                )
+            )
+            # The plate's own edge -- skipped on a column wall, which is interior
+            # material and gets no face at all.
+            shared = (
+                abs(outer_a[0] - outer_b[0]) < 1e-12 and outer_a[0] in interior
+            )
+            if not shared:
+                bm.faces.new(
+                    (
+                        vertex(*outer_a, 0),
+                        vertex(*outer_b, 0),
+                        vertex(*outer_b, 1),
+                        vertex(*outer_a, 1),
+                    )
+                )
+
+    # The plate counts its own holes, `_disc_face`'s acceptance line applied to a
+    # part a tenth its size. One solid with `PAD_FRONT_HOLE_COUNT` tunnels through
+    # it is genus 3, so chi is -4; three columns that failed to share their walls
+    # would be three shells at +6 and would render identically.
+    grew = (
+        len(bm.verts) - before[0],
+        len(bm.edges) - before[1],
+        len(bm.faces) - before[2],
+    )
+    chi = grew[0] - grew[1] + grew[2]
+    assert chi == 2 - 2 * PAD_FRONT_HOLE_COUNT, (
+        "the pad built Euler characteristic %+d against the %d drilled holes it "
+        "claims -- %+d is what three unjoined columns give, and no render "
+        "distinguishes them" % (chi, PAD_FRONT_HOLE_COUNT, 2 * PAD_FRONT_HOLE_COUNT)
+    )
+
+
 def _front_brakes(context: build.BuildContext, collection: bpy.types.Collection) -> None:
     """Two discs, two calipers, two brackets and four pads.
 
@@ -2933,7 +3475,6 @@ def _front_brakes(context: build.BuildContext, collection: bpy.types.Collection)
     detail = context.detail
 
     pad_radius = (DISC_FRONT_PAD_OUTER + DISC_FRONT_PAD_INNER) * 0.25
-    rotation = Matrix.Rotation(-CALIPER_FRONT_CLOCK, 4, "X")
 
     for label, side in (("fl", -1.0), ("fr", 1.0)):
         plane = side * DISC_FRONT_X
@@ -2962,33 +3503,56 @@ def _front_brakes(context: build.BuildContext, collection: bpy.types.Collection)
         )
         disc.location = (0.0, axle_y, axle_z)
 
+        # **`_caliper_front_body`, not `_caliper_body`.** The rear's finned CRG
+        # caliper and this Freeline block are different parts off different forms,
+        # and the front one was drawn as two featureless boxes and a bridge until
+        # #214: no mouth, no cylinders, no pin, no chamfer. See ADR-0067.
         bm = bmesh.new()
-        _caliper_body(
+        shells = _caliper_front_body(
             bm,
+            detail,
             plane,
+            side,
             axle_y,
             axle_z,
-            CALIPER_FRONT_THICKNESS,
-            CALIPER_FRONT_LENGTH,
-            CALIPER_FRONT_HEIGHT,
-            DISC_FRONT_THICKNESS,
             pad_radius,
             CALIPER_FRONT_CLOCK,
+        )
+        assert (
+            len(bm.verts) - len(bm.edges) + len(bm.faces) == 2 * shells
+        ), "the caliper built %d shell(s) worth of surface and reported %d" % (
+            (len(bm.verts) - len(bm.edges) + len(bm.faces)) // 2,
+            shells,
         )
         caliper = build.object_from_bmesh(
             "brake_caliper_%s" % label, bm, collection, material=alloy
         )
-        build.bevel_object(caliper, detail)
+        # **Beveled at 1.10 rad rather than the default 0.52**, measured at high
+        # detail over the same mesh:
+        #
+        #     limit   faces   max dihedral   zero-area   reversed
+        #     none      264       90.001         0          0
+        #     0.52     2632      168.816         6          3
+        #     1.10     2352       69.140         2          0
+        #
+        # The default beveled this part's own features to death: a 4 mm offset --
+        # what `Detail.high` uses -- is wider than the *inradius* of a
+        # `CALIPER_FRONT_NIPPLE_HEX` bleed screw, so its cap collapsed to a
+        # zero-area sixteen-gon and took three faces' winding with it. 1.10 rad
+        # skips everything under 63 degrees, which is the hex's own corners and the
+        # authored 10 mm chamfer, and still breaks every 90 degree edge on the
+        # block. The two survivors are the bleed screw's Ø3.9 barb caps, which no
+        # limit reaches and no size inside the sourced hex would save.
+        build.bevel_object(caliper, detail, limit_angle=1.10)
 
-        pad_offset = (DISC_FRONT_THICKNESS + PAD_THICKNESS) * 0.5
-        pad_y, pad_z = _clocked(pad_radius, CALIPER_FRONT_CLOCK)
+        # Two pads, one each side of the friction plane, each a 49.7 x 45 plate
+        # with three drilled holes through its inner ear. **Not beveled**: at high
+        # detail `build.bevel_object` uses a 4 mm offset, and a 4 mm chamfer on
+        # both mouths of a Ø5.2 hole through a 9 mm plate is a funnel, not a hole.
         for index, sign in ((0, -1.0), (1, 1.0)):
             bm = bmesh.new()
-            build.box(
-                bm,
-                (PAD_THICKNESS, PAD_FRONT_LENGTH, PAD_FRONT_HEIGHT),
-                (plane + sign * pad_offset, axle_y + pad_y, axle_z + pad_z),
-                rotation=rotation,
+            _pad_plate(
+                bm, detail, plane, axle_y, axle_z, CALIPER_FRONT_CLOCK, sign
             )
             build.object_from_bmesh(
                 "brake_pad_%s_%d" % (label, index), bm, collection, material=plastic
