@@ -2447,44 +2447,263 @@ def _caliper_body(
     disc_thickness: float,
     radius: float,
     clock: float,
+    *,
+    piston_bore: float = CALIPER_REAR_PISTON_BORE,
+    detail: build.Detail | None = None,
 ) -> None:
-    """An opposed-piston caliper: two halves and a bridge, straddling the disc.
+    """The **rear** caliper: two waisted finned halves, a bridge, bosses, fittings.
+
+    **This builder is the rear's alone.** The front is `_caliper_front_body`, built
+    against a different maker's form -- ADR-0067 puts a Freeline front on a CRG
+    rear, so nothing here is shared by accident. Until that split lands,
+    `_front_brakes` still calls this, which is why every dimension below comes off
+    the arguments and only the piston bore has a rear default.
 
     **Not a solid box, and that is geometry rather than detail.** A solid body of
     the drawing's `thickness` spans the disc's own plane, so it encloses whatever
     else sits at that plane inside its radial band -- measured, the rear one
     swallowed 9 mm of `brake_disc_rear_carrier` and the front one 6.5 mm of the
     friction ring. A real caliper is a C: two halves either side of the disc, each
-    carrying pistons, joined by a bridge over the disc's outer edge. Built that way
-    the caliper touches the disc **only through its pads**, which is what
-    `joints.py` declares.
+    carrying a piston, joined by a bridge over the disc's outer edge. Built that
+    way the caliper touches the disc **only through its pads**, which is what
+    `joints.py` declares, and the bridge is what leaves that true.
 
     Each half's thickness is `derived` from the parts rather than authored:
-    `(thickness - disc - 2 x pad) / 2` is 18.75 mm at the rear and 18.0 at the
-    front, against the ~19 mm cylinder wall spec §20.6.7 builds the 74 out of.
+    `(thickness - disc - 2 x pad) / 2` is 18.75 mm at the rear, against the ~19 mm
+    cylinder wall spec §20.6.7 builds the 74 out of. That 18.75 is now spent
+    **12.75 of slab plus a 6 mm cylinder boss**, so the wall is still 18.75 where
+    the piston is and the envelope's 74 is still the envelope: nothing on this part
+    stands proud of `CALIPER_REAR_THICKNESS` except the two fittings, which are
+    plumbing and are not body.
+
+    Shape, and what it was read off. Two references, in this order:
+
+    * `82/FR/11` p. 4's *Etriers* photograph is **this caliper**, dead-on, at its
+      own homologation number -- the silver one; the black one beside it is the
+      4-piston front this kart does not have. Its outline is an hourglass: full
+      radial height at the two ends, pinched in the middle on both edges, with
+      fastener ears at all four corners and the mouth's jaws scalloped around the
+      pistons. Ratios only, and coarse ones: the part is 140 px tall in a 227 x 174
+      thumbnail, measured by thresholding the JPEG `pdfimages` pulls out of the
+      form, which gives a core body of 1.69 tangential-to-radial and a waist that
+      takes 25% out of the middle.
+    * `007-BRKR-10` p. 2 item 3 is a *Freeline* rear on a Ø150 disc, so its
+      **absolute dimensions belong to another part** and only its proportions and
+      its feature inventory are usable here -- 0.5291 mm/px, 7% error bar. What it
+      gives: two M8 socket screws on a 66 mm pitch lying on the body's own
+      centre-line at +-33 mm, one cylinder circle per half rather than two, and a
+      mouth 33 mm deep whose closed end sits within 1.3 mm of the piston's centre.
+      That last agreement is what identifies the big circle as the **cylinder**
+      boss and not the central through-boss `joints.py` reads it as.
+
+    The waist is 4.0 mm on the outer edge and 3.5 on the inner, both `estimated`,
+    and it is one smooth pinch rather than the photograph's scalloped jaws: the
+    photograph's own pinch is 25% of the body height and this envelope cannot have
+    it. `CALIPER_REAR_HEIGHT` is 55 against a Ø38.7 cylinder boss, so the boss
+    already eats 70% of the height where the real part's eats 48%, and a 25% waist
+    would leave 1.2 mm of aluminium around the bore. 14% is what fits, and the
+    assert below is what will say so if either number moves. **The 55 is the
+    figure to doubt, not the waist** -- read off `82/FR/11` p. 4 the body is 1.69
+    long-to-radial and this envelope is 2.51.
+
+    Fins, `estimated` at 8 blades: the caliper is externally finned across the top
+    for cooling -- `tonykart_racer401T_p03.jpg` is the clearest of them, a comb of
+    blades at roughly 10 mm pitch standing off the body. They are cut *into* the
+    envelope rather than added onto it: the bridge's own outer 6 mm is the fin
+    band, so the top of the caliper is still `radius + height/2` and the comb is
+    real geometry rather than a groove that shades away. #212's cast webs at 5 mm
+    are the reason the blades are 7 mm thick and 6 proud -- `bevel_object` spends
+    4 mm at high detail, and a feature thinner than twice that comes back rounded
+    to nothing and reads as the plain part it replaced.
     """
-    half_each = (thickness - disc_thickness - 2.0 * PAD_THICKNESS) * 0.5
-    offset = disc_thickness * 0.5 + PAD_THICKNESS + half_each * 0.5
+    steps = max(4, (detail.bend_segments if detail is not None else 6) // 2)
     rotation = Matrix.Rotation(-clock, 4, "X")
-    offset_y, offset_z = _clocked(radius, clock)
-    for sign in (-1.0, 1.0):
-        build.box(
-            bm,
-            (half_each, length, height),
-            (plane + sign * offset, axle_y + offset_y, axle_z + offset_z),
-            rotation=rotation,
+    # Full `tube_segments` rather than the half the bobbins get: at 6 the Ø38.7
+    # cylinder boss is a **hexagon**, and it is the largest single feature on the
+    # face -- rendered, it read as a machined hex plate rather than a bore.
+    segments = max(12, detail.tube_segments if detail is not None else 12)
+
+    # --- the axial stack, from the disc's plane outward --------------------
+    half_each = (thickness - disc_thickness - 2.0 * PAD_THICKNESS) * 0.5
+    mouth = disc_thickness * 0.5 + PAD_THICKNESS   # each half's inner face
+    face = mouth + half_each                       # and its outer, = the envelope
+    proud = CALIPER_FRONT_BOSS_PROUD
+    slab = face - proud
+    assert slab - mouth > 0.005, (
+        "the slab is %.1f mm thick once the boss takes its %.1f -- there is no "
+        "cylinder wall left" % ((slab - mouth) * 1000.0, proud * 1000.0)
+    )
+
+    # The boss's wall is `derived` from the two front constants that were measured
+    # together on one plate: a Ø31.7 boss around a Ø25 bore is 3.35 mm of aluminium,
+    # and a wall does not scale with the bore it surrounds -- it is what the
+    # casting needs. Ø32 + 2 x 3.35 = 38.7 at the rear.
+    wall = (CALIPER_FRONT_BOSS_DIAMETER - CALIPER_FRONT_PISTON_BORE) * 0.5
+    boss_radius = piston_bore * 0.5 + wall
+
+    # --- the outline, in (tangential, radial) about the pad's mean radius ---
+    a = length * 0.5
+    h = height * 0.5
+    cap = length * 0.25          # the elliptical ends' tangential semi-axis
+    straight = a - cap
+    waist_outer = height * 0.073
+    waist_inner = height * 0.064
+    assert h - waist_outer - boss_radius > 0.003, (
+        "the waist leaves %.1f mm of body around a Ø%.1f cylinder boss"
+        % ((h - waist_outer - boss_radius) * 1000.0, boss_radius * 2000.0)
+    )
+
+    def to_world(u: float, v: float, w: float) -> tuple[float, float, float]:
+        """(axial, tangential, radial) about the caliper's own centre -> world.
+
+        The part is clocked, so **no measurement of it may be taken along a world
+        axis**: `max(z)` over a body tipped 20 degrees is a corner, not the top.
+        Everything below is authored in this frame and mapped once.
+        """
+        return (
+            plane + u,
+            axle_y + (radius + w) * math.sin(clock) + v * math.cos(clock),
+            axle_z + (radius + w) * math.cos(clock) - v * math.sin(clock),
         )
-    # The bridge, just inside the halves' outer edge and clear of the disc's rim:
-    # inner radius `radius + height/2 - 0.010` against a disc that reaches
-    # `pad_outer/2`, which is 2.5 mm at the rear and 6 mm at the front.
-    bridge_radius = radius + height * 0.5 - 0.005
-    bridge_y, bridge_z = _clocked(bridge_radius, clock)
+
+    def bump(v: float) -> float:
+        """1 at mid-length, 0 where the end caps begin, and C1 at both."""
+        if abs(v) >= straight:
+            return 0.0
+        return 0.5 * (1.0 + math.cos(math.pi * v / straight))
+
+    # Walked counter-clockwise in (v, w) from the leading tip, which is what makes
+    # the prism's side quads face outward -- see `prism`.
+    outline: list[tuple[float, float]] = []
+    for step in range(steps):
+        angle = 0.5 * math.pi * step / steps
+        outline.append((straight + cap * math.cos(angle), h * math.sin(angle)))
+    for step in range(2 * steps + 1):
+        v = straight * (1.0 - step / steps)
+        outline.append((v, h - waist_outer * bump(v)))
+    for step in range(1, 2 * steps):
+        angle = math.pi * (0.5 + step / (2 * steps))
+        outline.append((-straight + cap * math.cos(angle), h * math.sin(angle)))
+    for step in range(2 * steps + 1):
+        v = straight * (step / steps - 1.0)
+        outline.append((v, -(h - waist_inner * bump(v))))
+    for step in range(1, steps):
+        angle = 1.5 * math.pi + 0.5 * math.pi * step / steps
+        outline.append((straight + cap * math.cos(angle), h * math.sin(angle)))
+
+    # The two fan hubs sit on the axis, so the outline has to be star-shaped about
+    # it or a cap triangle folds. It is, by construction -- the waist is a fraction
+    # of the half-height and the caps are ellipses about the same centre -- and
+    # this is the assert that says so if the waist is ever authored past it. Same
+    # family as #214's bowtie: a fold has positive area from one side and is
+    # invisible to every other check.
+    for (v0, w0), (v1, w1) in zip(outline, outline[1:] + outline[:1]):
+        assert v0 * w1 - v1 * w0 > 0.0, (
+            "the caliper outline folds between (%.4f, %.4f) and (%.4f, %.4f)"
+            % (v0, w0, v1, w1)
+        )
+
+    def prism(u0: float, u1: float) -> None:
+        """Extrude the outline between two axial stations, capped by fans.
+
+        `u1 > u0` in world x and the outline is counter-clockwise in (v, w), which
+        together fix the winding: the side quad's normal comes out as the outline
+        edge's own outward 2D normal, and the caps take the two axial directions.
+        """
+        assert u1 > u0, "prism stations out of order"
+        low = [bm.verts.new(to_world(u0, v, w)) for v, w in outline]
+        high = [bm.verts.new(to_world(u1, v, w)) for v, w in outline]
+        count = len(outline)
+        for index in range(count):
+            following = (index + 1) % count
+            bm.faces.new((low[index], low[following], high[following], high[index]))
+        hub_low = bm.verts.new(to_world(u0, 0.0, 0.0))
+        hub_high = bm.verts.new(to_world(u1, 0.0, 0.0))
+        for index in range(count):
+            following = (index + 1) % count
+            bm.faces.new((hub_low, low[following], low[index]))
+            bm.faces.new((hub_high, high[index], high[following]))
+
+    def stud(u0: float, u1: float, v: float, w: float, diameter: float,
+             sides: int = 0) -> None:
+        """A boss on the axis through (v, w). `sides=6` is a hex across flats."""
+        count = sides if sides else segments
+        # A swept circle's radius is its circumradius, so a hex quoted across the
+        # flats is 2/sqrt(3) bigger than the flat spacing suggests.
+        outer = diameter * 0.5 * (2.0 / math.sqrt(3.0) if sides == 6 else 1.0)
+        build.sweep_tube(bm, [to_world(u0, v, w), to_world(u1, v, w)], outer, count)
+
+    # --- the two halves, and the cylinder boss on each ----------------------
+    # The slab is the waisted prism; the boss is a cylinder standing on it out to
+    # the envelope's own face, centred on the piston -- **one per half**, because
+    # `82/FR/11` reads 2 pistons per wheel and this is an opposed caliper. Two
+    # circles per half is the 4-piston front, which is a different part.
+    for sign in (-1.0, 1.0):
+        prism(*sorted((sign * mouth, sign * slab)))
+        stud(*sorted((sign * slab, sign * face)), 0.0, 0.0, boss_radius * 2.0)
+
+    # --- the bridge over the disc's rim, and the fins on top of it ----------
+    # Inner face at `radius + height/2 - 0.010`, which is 2.5 mm clear of a rear
+    # disc that reaches `pad_outer/2` -- measured on the built mesh at 2.50 mm, and
+    # it is the number that keeps `joints.py`'s pads-only claim true. The outer
+    # 6 mm of the envelope is the fin band, so the bridge is the 4 mm between them.
+    bridge_lo = h - 0.010
+    bridge_hi = h - 0.006
     build.box(
         bm,
-        (thickness, length * 0.8, 0.010),
-        (plane, axle_y + bridge_y, axle_z + bridge_z),
+        (2.0 * slab, length * 0.8, bridge_hi - bridge_lo),
+        to_world(0.0, 0.0, (bridge_lo + bridge_hi) * 0.5),
         rotation=rotation,
     )
+    fin_count = 8
+    fin_span = length * 0.75
+    fin_pitch = fin_span / fin_count
+    fin_thickness = 0.007
+    assert fin_thickness < fin_pitch, "the fins meet and there is no comb"
+    for index in range(fin_count):
+        v = fin_span * ((index + 0.5) / fin_count - 0.5)
+        build.box(
+            bm,
+            (2.0 * slab, fin_thickness, h - bridge_hi),
+            to_world(0.0, v, (bridge_hi + h) * 0.5),
+            rotation=rotation,
+        )
+
+    # --- the two mounting bolts --------------------------------------------
+    # M8 socket screws at the sourced 66 mm pitch, but carried **out to the
+    # bridge**. `007-BRKR-10` draws them on the body's own centre-line, which on
+    # this envelope is r 82.5 -- and a bolt there would have to cross the disc,
+    # which reaches to within 12.5 mm of the outer edge. At the bridge's r 102 the
+    # bolt is 4.5 mm outboard of the rim; its Ø13 head still dips 2 mm below it,
+    # which is nothing, because the head sits 22 mm off the disc's plane. The
+    # bracket's arm reaches r 108, so the joint is real at that radius.
+    bolt_w = (bridge_lo + bridge_hi) * 0.5
+    for sign in (-1.0, 1.0):
+        for side in (-1.0, 1.0):
+            stud(*sorted((side * slab, side * face)),
+                 sign * CALIPER_MOUNT_BOLT_PITCH * 0.5, bolt_w,
+                 CALIPER_MOUNT_BOLT_HEAD_DIAMETER)
+
+    # --- the plumbing, both on the inboard half -----------------------------
+    # `007-BRKF-01` p. 4 has the nipple and the banjo on the same half, and this is
+    # the half the hose can reach: `brake_line_rear` arrives from **inboard** along
+    # the left rail and ends at local (v +16.6, w +3.4), which is inside the
+    # cylinder boss's own footprint. The banjo is set just clear of it at v +25.
+    # The nipple goes at v -40 because the caliper is tipped 20 degrees forward, so
+    # the trailing end is the high one and that is where the air collects.
+    inboard = 1.0 if plane < 0.0 else -1.0
+    banjo_v, banjo_w = 0.025, 0.006
+    stud(*sorted((inboard * slab, inboard * (slab + CALIPER_FRONT_BANJO_LENGTH))),
+         banjo_v, banjo_w, CALIPER_FRONT_BANJO_DIAMETER)
+    stud(*sorted((inboard * slab, inboard * (slab + 0.003))),
+         banjo_v, banjo_w, CALIPER_MOUNT_BOLT_HEAD_DIAMETER)
+    nipple_v, nipple_w = -0.040, 0.014
+    hex_length = CALIPER_FRONT_NIPPLE_LENGTH * (2.0 / 3.0)
+    stud(*sorted((inboard * slab, inboard * (slab + hex_length))),
+         nipple_v, nipple_w, CALIPER_FRONT_NIPPLE_HEX, sides=6)
+    stud(*sorted((inboard * (slab + hex_length),
+                  inboard * (slab + CALIPER_FRONT_NIPPLE_LENGTH))),
+         nipple_v, nipple_w, CALIPER_FRONT_PIN_DIAMETER)
 
 
 def _rear_brake(context: build.BuildContext, collection: bpy.types.Collection) -> None:
@@ -2603,7 +2822,11 @@ def _rear_brake(context: build.BuildContext, collection: bpy.types.Collection) -
         )
         bobbin.location = (0.0, axle_y, axle_z)
 
-    # The caliper, straddling the disc at the pad's mean radius.
+    # The caliper, straddling the disc at the pad's mean radius. It is centred on
+    # that radius rather than on the disc's, which is what puts the piston over the
+    # middle of the friction band -- 82.5 mm, so the body spans r 55..110 and the
+    # disc's own rim at 97.5 is 12.5 mm inside the caliper's outer edge. That is
+    # the fact the bridge is built around.
     pad_radius = (DISC_REAR_PAD_OUTER + DISC_REAR_PAD_INNER) * 0.25
     rotation = Matrix.Rotation(-CALIPER_REAR_CLOCK, 4, "X")
     bm = bmesh.new()
@@ -2618,6 +2841,8 @@ def _rear_brake(context: build.BuildContext, collection: bpy.types.Collection) -
         DISC_REAR_THICKNESS,
         pad_radius,
         CALIPER_REAR_CLOCK,
+        piston_bore=CALIPER_REAR_PISTON_BORE,
+        detail=detail,
     )
     caliper = build.object_from_bmesh(
         "brake_caliper_rear", bm, collection, material=alloy
