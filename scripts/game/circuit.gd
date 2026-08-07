@@ -31,6 +31,14 @@ extends Node3D
 ##   --mesh=true         load the generated `.glb` for the visual track; false
 ##                       draws the collider's own triangles instead, which is what
 ##                       to use when the question is whether the two agree
+##   --ai=0              how many AI karts to put on the grid beside the player,
+##                       in the slots after the player's. ROADMAP M7
+##   --ai-solo=false     true drives the *timed* kart with an AI instead of a
+##                       `PlayerDriver`, so a session can be measured without a
+##                       human. `tools/verify/ai.sh` is the caller
+##   --ai-grip=0.98      how much of the envelope the AI's line uses, 0..1 — the
+##                       difficulty tier, and the only thing that distinguishes
+##                       one. 1.0 is the reference line
 ##   --session=practice  practice, qualifying, heat, super_heat or final
 ##   --laps=3            override the session's scheduled limit
 ##   --steer-gamma=3.0   the steering input curve, through the tuning registry
@@ -199,6 +207,12 @@ var _ghost_saved_s := -1.0
 ## written beside it.
 var _ghost_target_s := -1.0
 var _pause_stack: ScreenStack
+
+## ROADMAP M7. The solved line every AI on this circuit follows, the extra rigs
+## on the grid, and whether the *timed* kart is one of them.
+var _ai_line: KartRacingLine
+var _ai_rigs: Array[KartRig] = []
+var _ai_solo := false
 
 
 ## What `_ready()` builds, in order, so a loading screen can name the step it is
@@ -715,22 +729,130 @@ func _collider_visual(node_name: String, faces: PackedVector3Array, surface: int
 	return visual
 
 
+## How much of the envelope an AI's line uses when nothing says otherwise.
+##
+## **estimated, and it is the whole of the difficulty knob.** Not 1.0: the
+## reference line is a quasi-static optimum with no margin anywhere, and a
+## controller with no margin arrives at every corner exactly on the limit and on
+## the wrong side of any error. 0.98 is two percent of somewhere to put the
+## mistakes. `line_probe.gd --case=grip` is where the monotonicity of this
+## number is measured; `ai.sh --case=tiers` is where a lap time is put on it.
+const AI_DEFAULT_GRIP_USAGE := 0.98
+
+## The station spacing the AI's line is solved at. `line_probe.gd`'s, unchanged:
+## 1.5 m puts 1,024 stations on Valdirone, which is the class's maximum grid.
+const AI_LINE_SPACING := 1.5
+
+
 func _build_kart() -> void:
 	var slot := clampi(Cmdline.as_int(_args, "grid", 1), 1, maxi(1, _track.grid_count())) - 1
+	# The line first, because an `AiDriver` reads every ceiling off it at `_ready`
+	# and a driver handed a line later would spend its first frames pushing
+	# neutral and printing that it had nothing to follow.
+	_ai_solo = Cmdline.as_bool(_args, "ai-solo", false)
+	var ai_count := maxi(0, Cmdline.as_int(_args, "ai", 0))
+	if _ai_solo or ai_count > 0:
+		_build_racing_line()
+
 	_spawn = _track.grid_transform(slot, KartRig.SPAWN_LIFT)
-	_kart = _rig.build(self, _spawn, _args)
+	_kart = _rig.build(self, _spawn, _args, _ai_solo)
 	_driver = _rig.driver
+	if _rig.ai_driver != null:
+		_bind_ai(_rig.ai_driver)
+
+	# The rest of the grid. Slots after the player's, so `--grid=1 --ai=3` fills
+	# 2, 3 and 4 and nobody is spawned inside anybody.
+	#
+	# **No standings, no overtaking and no kart-to-kart contact.** Those are
+	# tickets rather than half a feature: `GAMEDESIGN.md` §13's rule is that a
+	# stubbed mode reads worse than an absent one, and a field of karts that
+	# cannot race each other is exactly that. What this is, and all it is, is
+	# other karts on the circuit driving it properly.
+	for index in ai_count:
+		var ai_slot := clampi(slot + 1 + index, 0, maxi(0, _track.grid_count() - 1))
+		var rig := KartRig.new()
+		var body := rig.build(
+			self, _track.grid_transform(ai_slot, KartRig.SPAWN_LIFT), {}, true, false
+		)
+		if body == null or rig.ai_driver == null:
+			continue
+		body.name = "AiKart%d" % (index + 1)
+		rig.ai_driver.name = "AiDriver%d" % (index + 1)
+		_bind_ai(rig.ai_driver)
+		_ai_rigs.append(rig)
 
 	# Whatever the driver last chose, then whatever this command says. The rule that
 	# matters is `assist_settings.gd`'s: a stored preference is skipped whenever
 	# input is scripted, because a `user://settings.cfg` nobody mentioned must never
 	# move a validation number or a published still.
 	_assists = AssistSettings.apply(_kart, _args)
+	if _ai_solo:
+		# **An AI kart drives with the assists off, and that is not a preference.**
+		# `KartBody.auto_shift` defaults on (#40, so an unassisted first lap in a
+		# KZ does not end in a stall on the grid) and `AiDriver` runs its own
+		# shift hysteresis. Two shifters on one gearbox is not "belt and braces":
+		# measured, the kart reached sixth at 72 km/h with **15 shifts in five
+		# seconds** and spun on the exit of the start straight. The AI is a
+		# complete driver — it feathers its own clutch off the line too — so it
+		# gets the gearbox to itself.
+		#
+		# Set here rather than after `_build_session`, because
+		# `SessionRunner.configure()` copies the session's flags back onto the
+		# kart and `_build_session` reads them off the kart to fill the session.
+		# Setting it later would be overwritten by the session's own copy.
+		_kart.auto_shift = false
+		# **`auto_clutch` stays ON, and that is not an oversight.** `drivetrain.h`
+		# does not blend the assist with the driver's lever, it *replaces* it —
+		# `lever = auto_clutch_lever(...)` — and the assist maps onto
+		# `free_play..bite_end`, the range where the lever does anything, while a
+		# manual 0..1 maps onto the whole travel. So the AI's own feather sat in
+		# dead travel: measured, gear 1, throttle wide open, **0.19 km/h** after
+		# ten seconds on the grid. The assist's first line is the anti-stall and
+		# CLAUDE.md's #40 note says why it defaults on — an unassisted first lap
+		# in a KZ ends in a stall. The AI is a driver, not a clutch model.
 
 	_physics_draw = PhysicsDraw.new()
 	_physics_draw.name = "PhysicsDraw"
 	add_child(_physics_draw)
 	_physics_draw.set_target(_kart)
+
+
+## Solve the line this circuit's AI drivers follow, once, and share it.
+##
+## One line for however many AI karts there are, because they are all the same
+## tier and `KartRacingLine` is a `RefCounted` that nothing mutates after
+## `solve()`. Re-solving it per kart would cost 38 ms each for an identical
+## answer.
+##
+## The line is solved against the **selected layout**: `KartTrack.sample()`
+## already answers in the current layout's frame, so driving reversed needs no
+## special case here and gets the reversed line for free.
+func _build_racing_line() -> void:
+	_ai_line = KartRacingLine.new()
+	var usage := clampf(
+		Cmdline.as_float(_args, "ai-grip", AI_DEFAULT_GRIP_USAGE), 0.05, 1.0
+	)
+	_ai_line.set_grip_usage(usage)
+	if not _ai_line.build_from_course(_track, AI_LINE_SPACING):
+		push_error("the racing line refused this course; the AI will not drive")
+		_ai_line = null
+		return
+	_build_ms["racing_line"] = 0.0
+
+
+## Hand a driver everything it needs and nothing it does not.
+##
+## The course is the `KartTrack` itself, duck typed on `length()` and `project()`
+## exactly as `SessionRunner.configure()` duck types its own — and for the same
+## reason, which is that `KartTrack` is a GDExtension `RefCounted` and
+## `TrackLayout` is a GDScript `Node3D` and the two cannot share a base class.
+func _bind_ai(driver: AiDriver) -> void:
+	if _ai_line == null:
+		return
+	driver.set_course(_track)
+	# After the course, because `set_line` re-reads the ceilings and the useful
+	# error message is the one that names only what is still missing.
+	driver.line = _ai_line
 
 
 func _build_tuning() -> void:
@@ -1246,6 +1368,11 @@ func _process(_delta: float) -> void:
 	if _hud != null:
 		_hud.text = _hud_text()
 	_rig.update_wheel_visuals()
+	# The AI karts steer too, and their front wheels have to show it. This is
+	# issue #183's `steer_angle` defect one kart over: a kart whose wheels never
+	# move reads as a kart that is not steering.
+	for rig in _ai_rigs:
+		rig.update_wheel_visuals()
 
 
 func _physics_process(_delta: float) -> void:
@@ -1325,6 +1452,13 @@ func _respawn() -> void:
 	# been invalidated here.
 	if _runner != null:
 		_runner.notify_respawn()
+	# And so does the AI, for the same reason and the same one it applies to: a
+	# station hint after a teleport confines the next search to a window the kart
+	# is no longer in and returns the nearest point of it with every appearance
+	# of success. A shift confirmed against the corner the kart used to be in
+	# goes the same way.
+	if _rig.ai_driver != null:
+		_rig.ai_driver.reset()
 
 
 func _set_camera_mode(mode: String) -> void:

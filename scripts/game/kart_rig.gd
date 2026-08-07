@@ -54,7 +54,13 @@ const SPAWN_LIFT := 0.12
 ## Everything the caller gets back, so a scene holds one object rather than seven
 ## loose references it has to keep in step.
 var kart: KartBody
+## The driver node. **An `AiDriver` is a `PlayerDriver`** — it derives from it so
+## that `SessionRunner.configure()`, whose `driver` argument is statically typed,
+## can time an AI lap through exactly the path a human's goes through. So this
+## field is the right type either way and `ai_driver` below is the narrowed one.
 var driver: PlayerDriver
+## The same node when this rig was built with `ai = true`, else null. ROADMAP M7.
+var ai_driver: AiDriver
 var wheel_pivots: Array[Node3D] = []
 var wheel_rest_yaw := PackedFloat32Array()
 var engine_voice: Object
@@ -66,7 +72,20 @@ var wind_voice: Object
 ##
 ## `spawn` is the body transform, already lifted — the caller owns where the road
 ## is and this class does not know what a track is.
-func build(parent: Node3D, spawn: Transform3D, args: Dictionary) -> KartBody:
+##
+## `ai` swaps the `PlayerDriver` for an `AiDriver` and nothing else. The caller
+## still has to hand that driver a solved line and a course — this class does not
+## know what a racing line is, for the same reason it does not know what a track
+## is, and an `AiDriver` with neither pushes neutral and says so once.
+##
+## `listener` is false for every kart that is not the one being watched. Godot
+## has exactly one audio listener and issue #160 measured what happens when the
+## choice is left to whichever `Camera3D` is current: the level swings 20.7 dB.
+## Two `AudioListener3D`s in one scene is the same defect with a second cause, so
+## a grid of AI karts gets engines and no ears.
+func build(
+	parent: Node3D, spawn: Transform3D, args: Dictionary, ai := false, listener := true
+) -> KartBody:
 	kart = KartBody.new()
 	kart.name = "Kart"
 	# Set before `add_child`, because `KartBody::_ready` captures its spawn from
@@ -92,8 +111,12 @@ func build(parent: Node3D, spawn: Transform3D, args: Dictionary) -> KartBody:
 
 	# The driver. ADR-0040: the body is handed its input rather than fetching it, so
 	# a scene without this node is a kart nobody can drive.
-	driver = PlayerDriver.new()
-	driver.name = "Driver"
+	if ai:
+		ai_driver = AiDriver.new()
+		driver = ai_driver
+	else:
+		driver = PlayerDriver.new()
+	driver.name = "AiDriver" if ai else "Driver"
 	parent.add_child(driver)
 	driver.kart_path = driver.get_path_to(kart)
 
@@ -109,8 +132,10 @@ func build(parent: Node3D, spawn: Transform3D, args: Dictionary) -> KartBody:
 	# The listener, at the driver's head. Issue #160: without it Godot falls back to
 	# whichever `Camera3D` is current, which was measured to swing the level 20.7 dB
 	# as the chase camera moves — so the mix changed every time somebody pressed V,
-	# and only one of the two mixes was ever judged.
-	EngineVoiceRig.attach_listener(kart)
+	# and only one of the two mixes was ever judged. Exactly one kart in a scene
+	# gets one; see `listener` in this function's own header.
+	if listener:
+		EngineVoiceRig.attach_listener(kart)
 
 	# Scripted input, for stills and for anything with no keyboard. Held constant for
 	# the whole run, so the same command produces the same still. A valid

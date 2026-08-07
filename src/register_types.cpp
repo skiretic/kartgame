@@ -13,6 +13,7 @@
 #include "session/kart_session.h"
 #include "track/kart_track.h"
 #include "tuning/tuning_registry.h"
+#include "vehicle/ai_driver.h"
 #include "vehicle/kart_body.h"
 #include "vehicle/player_driver.h"
 
@@ -53,6 +54,14 @@ void initialize_kartgame_module(ModuleInitializationLevel p_level) {
 	// the two are one wiring change and shipping half of it is a game that cannot
 	// be driven.
 	GDREGISTER_CLASS(kartgame::PlayerDriver);
+
+	// The AI at the controls, ROADMAP M7 — ADR-0040's third producer, emitting the
+	// same `DriverInput` through the same door.
+	//
+	// **After `PlayerDriver`, and that is a requirement rather than tidiness.**
+	// `AiDriver` derives from it, and `GDREGISTER_CLASS` on a class whose parent
+	// is not yet in `ClassDB` fails.
+	GDREGISTER_CLASS(kartgame::AiDriver);
 
 	// The M8 audio boundary probe. Issue #81, ADR-0035.
 	//
