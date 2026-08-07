@@ -1025,17 +1025,50 @@ private:
 	double rear_traction_torque(const double normal_load[CORNER_COUNT],
 			double forward_speed, double h) const {
 		double ceiling = 0.0;
+		bool any_loaded = false;
 		for (int corner = CORNER_RL; corner <= CORNER_RR; ++corner) {
 			const double load = normal_load[corner];
 			if (load <= 0.0) {
 				continue;
 			}
+			any_loaded = true;
 			const double grip = contact_[corner].surface_grip > 0.0
 					? contact_[corner].surface_grip
 					: 0.0;
 			ceiling += tire_[corner].longitudinal.friction_at(load) * load * grip *
 					rolling_radius(corner);
 		}
+
+		// **No rear tire is carrying anything, so there is nothing to protect and
+		// the limiter switches off entirely** — `NO_TRACTION_LIMIT`, not a ceiling
+		// of zero.
+		//
+		// The distinction is the whole of this guard and the two cases are not
+		// alike. "Both rear tires are loaded and can carry almost nothing" is ice,
+		// and clamping the crank to that is exactly what the limiter is for — the
+		// zero ceiling there is a real answer, which is why the sentinel is
+		// `< 0.0` and not `<= 0.0`. "Neither rear tire is in contact" is not an
+		// answer at all: the sum ran over an empty set. Reading the empty sum as a
+		// clamp cuts the engine precisely when no tire is present to be protected,
+		// and a kart in the air then makes no torque, no revs and no noise.
+		//
+		// It reached the tree because the case is invisible from the road: the
+		// pre-existing airborne test enters the air at 20 m/s in fourth, so its
+		// axle is already turning and coasts down through the jump while the
+		// engine is dragged along by a locked clutch. `isfinite` passes on that
+		// whatever the drivetrain does. Asked from **rest** the same rig reported
+		// 0 rad/s, 0 rpm and a 0 N m limit — see `test_vehicle.cpp`'s "airborne
+		// from rest, the engine still revs", which is the assertion the older
+		// subcase was missing.
+		//
+		// Found by `tools/verify/audio.sh`, which is not a physics gate at all: a
+		// bare `KartBody` never touches ground, so the strangled engine could not
+		// reach the revs an upshift needs and three commanded shifts produced zero
+		// gearbox clacks. Two agents' work, each green in its own worktree.
+		if (!any_loaded) {
+			return NO_TRACTION_LIMIT;
+		}
+
 		if (!(h > 0.0)) {
 			return ceiling;
 		}

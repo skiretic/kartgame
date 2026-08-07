@@ -53,6 +53,13 @@
 namespace kart::core {
 
 // One substep of driver intent.
+// "The solver did not supply a traction ceiling, so do not limit anything."
+//
+// Any negative value means this; the constant exists so the sentinel is written
+// down once. See `DrivetrainInput::axle_traction_torque` for why it is negative
+// rather than zero — zero is a legitimate answer and the two must not collide.
+inline constexpr double NO_TRACTION_LIMIT = -1.0;
+
 struct DrivetrainInput {
 	double throttle = 0.0; // 0..1
 	double clutch = 0.0; // 0..1, 1 = lever fully pulled, fully disengaged
@@ -86,7 +93,12 @@ struct DrivetrainInput {
 	// welded the crank to a wheel doing 8.7x road speed, and the auto-shift's
 	// "what will the engine be doing in the next gear" guard computed its answer
 	// from the same spinning axle and upshifted into a continuing burnout.
-	double axle_traction_torque = -1.0;
+	//
+	// Spelled `NO_TRACTION_LIMIT` rather than `-1.0` because it is now written in
+	// two files — the solver returns it and this file tests for it — and a
+	// sentinel duplicated as a literal is one edit away from the two halves
+	// disagreeing about what "not supplied" means.
+	double axle_traction_torque = NO_TRACTION_LIMIT;
 
 	double dt = 0.0; // seconds
 };

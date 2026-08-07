@@ -1487,6 +1487,67 @@ TEST_CASE("airborne, and a ground query that misses on every corner") {
 				<< rig.vehicle.telemetry().engine_rpm << " rpm");
 	}
 
+	// **The subcase above cannot fail, and this one is why it had to be written.**
+	// It enters the air at 20 m/s in fourth, so the axle is already turning at
+	// ~147 rad/s and the 137 rad/s it reports is that axle *coasting down* — the
+	// engine is being driven by the wheels through a locked clutch, not driving
+	// them. `isfinite` on a coasting axle is true whatever the drivetrain does.
+	//
+	// Asked from rest, the same question has only one right answer: a kart whose
+	// rear wheels are off the ground revs freely and spins them up. That is the
+	// sound every kart video opens with. It is also the case the traction limiter
+	// added for issue #137 gets wrong, because its ceiling is a sum over *loaded*
+	// corners and an airborne corner contributes nothing — so a limiter that reads
+	// a zero ceiling as "transmit no torque" cuts the engine exactly when the tire
+	// it is protecting is not there to protect.
+	//
+	// The two zeros are different questions and the limiter has to tell them
+	// apart: "these tires can carry nothing" is a clamp, "there are no tires in
+	// contact" is no clamp at all.
+	// Note what this may NOT do: `engage(1, 0.0)`. That locks a running engine to
+	// a stationary axle, which `engine.h` is right to call a stall — "idling in
+	// gear against a closed clutch lever is a stall" — and a stalled engine makes
+	// no torque for reasons that have nothing to do with traction. Asking a
+	// stalled engine to rev measures the stall. So the kart enters the air with
+	// the engine already running, and the question becomes the sharper one:
+	// **do the free wheels accelerate, or merely coast?** A ratio, not a level,
+	// so it cannot be satisfied by the entry speed.
+	SUBCASE("airborne under power, the free wheels spin UP rather than coasting") {
+		Rig rig;
+		rig.configure();
+		rig.settle();
+		rig.vehicle.engage(1, 5.0);
+		rig.ground_present = false;
+		const double entry = rig.vehicle.axle_speed();
+		REQUIRE(entry > 1.0);
+
+		DriverInput input;
+		input.throttle = 1.0;
+		input.clutch = 0.0;
+
+		for (int tick = 0; tick < 120; ++tick) {
+			rig.step(input);
+			REQUIRE(rig.finite());
+			for (int corner = 0; corner < CORNER_COUNT; ++corner) {
+				REQUIRE_FALSE(rig.vehicle.telemetry().wheel[corner].grounded);
+			}
+		}
+
+		const double after = rig.vehicle.axle_speed();
+		MESSAGE("airborne in first, 1.0 s at full throttle: axle "
+				<< entry << " -> " << after << " rad/s ("
+				<< (after / entry) << "x), " << rig.vehicle.telemetry().engine_rpm
+				<< " rpm, traction limit " << rig.vehicle.traction_torque() << " N m");
+
+		// Nothing resists a wheel in the air but the axle's own inertia and the
+		// reflected crank, so a second of full throttle in first is a large
+		// multiple. A kart whose engine was cut coasts: the ratio sits at 1.0 and
+		// drifts down. The threshold is deliberately far from both.
+		CHECK(after > entry * 2.0);
+		// And the limiter must have switched off rather than clamped to zero.
+		CHECK(rig.vehicle.traction_torque() < 0.0);
+	}
+
 	SUBCASE("every ray reports a miss while the kart is on the ground") {
 		Rig rig;
 		rig.configure();
