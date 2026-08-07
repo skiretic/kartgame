@@ -3,7 +3,9 @@
 
 #include "audio/state_seqlock.h"
 #include "core/audio_state.h"
+#include "core/roll_audio.h"
 #include "core/scrub_wind.h"
+#include "core/shift_audio.h"
 
 #include <godot_cpp/classes/audio_frame.hpp>
 #include <godot_cpp/classes/audio_stream.hpp>
@@ -69,9 +71,19 @@ public:
 	// Which layer this stream renders. Named rather than a bool because a third
 	// noise layer is already on the roadmap — §12's surface-dependent rolling, issue
 	// #85 — and `is_wind = false` would be a poor way to say "rolling".
+	//
+	// **The third and fourth arrived, and the enum is why it cost nothing.** #83's
+	// shift and clutch layer and #85's surface rolling are both filtered noise
+	// driven by solver state, which is what this class already is; they are two more
+	// values here and two more synths on the playback rather than two more class
+	// pairs. The values are a wire format in the same weak sense the surface
+	// integers are — a scene sets `layer` by number through `ClassDB` — so a value
+	// is never reused for a different layer.
 	enum Layer : int {
 		LAYER_SCRUB = 0,
 		LAYER_WIND = 1,
+		LAYER_SHIFT = 2,
+		LAYER_ROLL = 3,
 	};
 
 	virtual godot::Ref<godot::AudioStreamPlayback> _instantiate_playback() const override;
@@ -133,9 +145,44 @@ public:
 	void set_wind_speed_exponent(double p_exponent);
 	double get_wind_speed_exponent() const;
 
+	// The shift/clutch layer's knobs, issue #83. Same contract as the six above:
+	// atomics on the stream, re-read every mix block, named exactly as their
+	// `core/tuning.h` keys so the rig forwards a `tuning_changed` with no lookup
+	// table.
+	void set_clutch_gain(double p_gain);
+	double get_clutch_gain() const;
+	void set_clack_center_hz(double p_hz);
+	double get_clack_center_hz() const;
+	void set_clack_q(double p_q);
+	double get_clack_q() const;
+	void set_clutch_center_hz(double p_hz);
+	double get_clutch_center_hz() const;
+	void set_clutch_full_slip(double p_rads);
+	double get_clutch_full_slip() const;
+
+	// `Gearbox::shift_time`, pushed by `KartBody` rather than compiled in.
+	//
+	// **The solver owns this number and the synth is only told it.** A synth that
+	// included `gearbox.h` would be a second reader of a tunable, and would keep
+	// playing 65 ms clacks after somebody moved it — `ShiftAudioConfig` says the
+	// same thing at its own field. Not a `core/tuning.h` key, so it has no setter
+	// on the rig's forwarding table; it is pushed once when the voice is resolved.
+	void set_shift_time(double p_seconds);
+	double get_shift_time() const;
+
+	// The rolling layer's knobs, issue #85.
+	void set_roll_cutoff_hz(double p_hz);
+	double get_roll_cutoff_hz() const;
+	void set_roll_db_per_doubling(double p_db);
+	double get_roll_db_per_doubling() const;
+	void set_roll_rough_brightness(double p_scale);
+	double get_roll_rough_brightness() const;
+
 	// The whole config as the synths want it, assembled from the atomics above.
 	// Audio-thread call, on the block boundary.
 	kart::core::ScrubWindConfig tuning_config() const;
+	kart::core::ShiftAudioConfig shift_config() const;
+	kart::core::RollAudioConfig roll_config() const;
 
 	// What the audio thread is doing, for the telemetry panel. Same shape and same
 	// caveat as `EngineVoiceStream::voice_stats`: a snapshot of relaxed counters and
@@ -171,6 +218,21 @@ private:
 	std::atomic<double> _wind_cutoff_per_ms{ kart::core::ScrubWindConfig().wind_cutoff_hz_per_ms };
 	std::atomic<double> _wind_speed_exponent{ kart::core::ScrubWindConfig().wind_speed_exponent };
 
+	// #83's and #85's, seeded from their own config defaults for the same reason and
+	// with the same consequence: a stream nobody tunes sounds exactly as
+	// `shift_audio.h` and `roll_audio.h` say it should, and neither number is
+	// retyped here.
+	std::atomic<double> _clutch_gain{ kart::core::ShiftAudioConfig().clutch_gain };
+	std::atomic<double> _clack_center_hz{ kart::core::ShiftAudioConfig().clack_center_hz };
+	std::atomic<double> _clack_q{ kart::core::ShiftAudioConfig().clack_q };
+	std::atomic<double> _clutch_center_hz{ kart::core::ShiftAudioConfig().clutch_center_hz };
+	std::atomic<double> _clutch_full_slip{ kart::core::ShiftAudioConfig().clutch_full_slip_rads };
+	std::atomic<double> _shift_time{ kart::core::ShiftAudioConfig().shift_time_s };
+
+	std::atomic<double> _roll_cutoff_hz{ kart::core::RollAudioConfig().cutoff_at_reference_hz };
+	std::atomic<double> _roll_db_per_doubling{ kart::core::RollAudioConfig().db_per_speed_doubling };
+	std::atomic<double> _roll_rough_brightness{ kart::core::RollAudioConfig().rough_brightness };
+
 	mutable std::atomic<int64_t> _mix_calls{ 0 };
 	mutable std::atomic<int64_t> _render_ns_total{ 0 };
 	mutable std::atomic<int64_t> _render_frames_total{ 0 };
@@ -178,6 +240,10 @@ private:
 	mutable std::atomic<int32_t> _worst_block_frames{ 0 };
 	mutable std::atomic<double> _mix_rate{ 0.0 };
 	mutable std::atomic<double> _level{ 0.0 };
+	// The shift layer's clack count and the rolling layer's curb rate. See
+	// `voice_stats` for why a level alone is not a usable fingerprint for either.
+	mutable std::atomic<int64_t> _strikes{ 0 };
+	mutable std::atomic<double> _rumble_hz{ 0.0 };
 };
 
 // The playback half. Owns one of each synth and does nothing else.
@@ -221,6 +287,15 @@ private:
 	godot::Ref<NoiseVoiceStream> _stream;
 	kart::core::ScrubSynth _scrub;
 	kart::core::WindSynth _wind;
+	// Four synths per playback where there were two, for the reason the two were
+	// there: Godot may instantiate several playbacks from one stream, and two
+	// playbacks sharing a synth share its filter state and its PRNG — which is not
+	// two voices but one voice rendered twice into the same state. The three a
+	// playback is not rendering cost their own footprint and nothing else; that is
+	// still cheaper than a branch on a pointer, and far cheaper than four class
+	// pairs.
+	kart::core::ShiftSynth _shift;
+	kart::core::RollSynth _roll;
 	float _scratch[SCRATCH_FRAMES] = {};
 
 	// The last snapshot that read cleanly, held so an exhausted retry budget repeats

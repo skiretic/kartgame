@@ -115,7 +115,25 @@ var _mix_rate := 48000.0
 var _tick_hz := 120.0
 
 
+## Master trim while the probe runs, dB.
+##
+## **Every figure this probe reports is computed upstream of Master and none of
+## them move**, which is what makes this safe rather than a compromise. The cost
+## figures come out of `voice_stats`, timed inside `_mix` before the sample reaches
+## a bus at all; the gains and the layer are read back off the stream. Master's
+## volume is the last thing in the chain and touches none of it.
+##
+## It is here because a probe is not a demo. These runs go through real speakers on
+## a real desk -- `audio_level_probe.gd` has carried the same constant for the same
+## reason since ADR-0039, and this file and `scrub_cost_probe.gd` were the two that
+## did not. Verified rather than assumed: see the note in the report.
+const MASTER_TRIM_DB := -60.0
+
+
 func _initialize() -> void:
+	# Before anything is built, so no block is ever rendered at full level. The
+	# cost figures are timed inside `_mix` and are upstream of every bus volume.
+	AudioServer.set_bus_volume_db(AudioServer.get_bus_index("Master"), MASTER_TRIM_DB)
 	var args := Cmdline.parse()
 	_seconds = maxf(Cmdline.as_float(args, "seconds", DEFAULT_SECONDS), 0.25)
 

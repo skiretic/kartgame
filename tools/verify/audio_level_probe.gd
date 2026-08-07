@@ -663,14 +663,32 @@ func _record() -> void:
 		10.0 * (log(maxf(total, 1.0e-18)) / log(10.0)),
 		_db(_peak), _frames,
 	])
-	# The rpm is read off the solver and the partial count off the audio thread's own
-	# read-back, so a report that claimed an operating point the synth never saw
-	# would disagree with itself. `voice_stats` carries no rpm -- `KartBody` does.
+	# The operating point, read off the AUDIO THREAD's own read-back rather than off
+	# the solver, so a report that claimed an operating point the synth never saw
+	# would disagree with itself.
+	#
+	# **Two defects fixed here, and the comment was one of them.** It used to say
+	# "`voice_stats` carries no rpm -- `KartBody` does", which stopped being true
+	# when `render_rpm` was added: the probe was reading the solver's rpm and calling
+	# it the synth's, which is exactly the disagreement the sentence claims to
+	# prevent. And `stats.get("partials", 0)` is CLAUDE.md's `Dictionary.get` trap --
+	# `wheel.get("steer")` drew a zero forever and steered the front wheels straight
+	# through every corner for a milestone. `partials` happens to exist today, so
+	# this was not yet lying; it was one rename away from lying silently and forever.
+	#
+	# Indexed with `[]` now, because both keys are a contract. A renamed key has to
+	# fail loudly rather than print a confident zero. Both are still guarded by
+	# `has()` first, because a build where the extension is absent legitimately has
+	# no stats at all and that is a missing section, not a wrong number.
 	if _cells[_cell][0].begins_with("4 ") and _engine_stream != null and _kart != null:
 		var stats: Dictionary = _engine_stream.call("voice_stats")
-		_rig_note = "%.0f rpm, %d partials, voice_gain %.2f" % [
-			_kart.get_engine_rpm(), int(stats.get("partials", 0)),
-			EngineVoiceRig.VOICE_GAIN]
+		if stats.has("partials") and stats.has("render_rpm"):
+			_rig_note = "%.0f rpm (audio thread), %d partials, voice_gain %.2f" % [
+				stats["render_rpm"], int(stats["partials"]), EngineVoiceRig.VOICE_GAIN]
+		else:
+			# Named rather than defaulted. A section that cannot say which operating
+			# point it measured is a section whose number means nothing.
+			_rig_note = "voice_stats is missing partials or render_rpm -- operating point unknown"
 
 
 ## dBFS, with a floor so that a silent cell prints a number instead of `-inf`.

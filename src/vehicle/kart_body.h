@@ -360,10 +360,21 @@ public:
 	// driver's head and is not a source in the world at all. `scrub_wind.h` has the
 	// argument; the consequence here is that a scene mounts three players and this
 	// class publishes the same `EngineAudioInput` to each.
+	//
+	// **Five now, not three.** #83's shift-and-clutch layer and #85's surface
+	// rolling are two more `NoiseVoiceStream`s, and they go in two more places: the
+	// gearbox is at the engine and the rolling noise is at the contact patches. All
+	// five are `NoiseVoiceStream` bar the engine note, and all five receive the same
+	// `EngineAudioInput` -- which is exactly why the struct carries `shifting`,
+	// `clutch_slip`, `speed_ms` and `surface` alongside the rpm.
 	void set_scrub_voice_player(const godot::NodePath &p_path);
 	godot::NodePath get_scrub_voice_player() const;
 	void set_wind_voice_player(const godot::NodePath &p_path);
 	godot::NodePath get_wind_voice_player() const;
+	void set_shift_voice_player(const godot::NodePath &p_path);
+	godot::NodePath get_shift_voice_player() const;
+	void set_roll_voice_player(const godot::NodePath &p_path);
+	godot::NodePath get_roll_voice_player() const;
 
 	// **The steering curve used to live here and now lives on `PlayerDriver`.**
 	// ADR-0036 said it was a controller property and gave the derivation;
@@ -516,6 +527,10 @@ private:
 	godot::Ref<NoiseVoiceStream> scrub_voice_;
 	godot::NodePath wind_voice_path_;
 	godot::Ref<NoiseVoiceStream> wind_voice_;
+	godot::NodePath shift_voice_path_;
+	godot::Ref<NoiseVoiceStream> shift_voice_;
+	godot::NodePath roll_voice_path_;
+	godot::Ref<NoiseVoiceStream> roll_voice_;
 
 	// What was served to the solver last tick, per corner: the latch's storage and
 	// the debug-draw getters' source.

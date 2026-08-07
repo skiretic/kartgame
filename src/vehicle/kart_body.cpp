@@ -122,6 +122,12 @@ void KartBody::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_wind_voice_player", "path"),
 			&KartBody::set_wind_voice_player);
 	ClassDB::bind_method(D_METHOD("get_wind_voice_player"), &KartBody::get_wind_voice_player);
+	ClassDB::bind_method(D_METHOD("set_shift_voice_player", "path"),
+			&KartBody::set_shift_voice_player);
+	ClassDB::bind_method(D_METHOD("get_shift_voice_player"), &KartBody::get_shift_voice_player);
+	ClassDB::bind_method(D_METHOD("set_roll_voice_player", "path"),
+			&KartBody::set_roll_voice_player);
+	ClassDB::bind_method(D_METHOD("get_roll_voice_player"), &KartBody::get_roll_voice_player);
 	ClassDB::bind_method(D_METHOD("engine_mount_position"), &KartBody::engine_mount_position);
 	ClassDB::bind_method(D_METHOD("rear_axle_position"), &KartBody::rear_axle_position);
 	ClassDB::bind_method(D_METHOD("driver_head_position"), &KartBody::driver_head_position);
@@ -135,6 +141,12 @@ void KartBody::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "wind_voice_player", PROPERTY_HINT_NODE_PATH_VALID_TYPES,
 						"AudioStreamPlayer3D,AudioStreamPlayer"),
 			"set_wind_voice_player", "get_wind_voice_player");
+	ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "shift_voice_player", PROPERTY_HINT_NODE_PATH_VALID_TYPES,
+						"AudioStreamPlayer3D,AudioStreamPlayer"),
+			"set_shift_voice_player", "get_shift_voice_player");
+	ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "roll_voice_player", PROPERTY_HINT_NODE_PATH_VALID_TYPES,
+						"AudioStreamPlayer3D,AudioStreamPlayer"),
+			"set_roll_voice_player", "get_roll_voice_player");
 
 	ClassDB::bind_method(D_METHOD("set_jacking_enabled", "enabled"),
 			&KartBody::set_jacking_enabled);
@@ -357,6 +369,20 @@ void KartBody::_ready() {
 	resolve_engine_voice();
 	resolve_noise_voice(scrub_voice_path_, scrub_voice_, "scrub_voice_player");
 	resolve_noise_voice(wind_voice_path_, wind_voice_, "wind_voice_player");
+	resolve_noise_voice(shift_voice_path_, shift_voice_, "shift_voice_player");
+	resolve_noise_voice(roll_voice_path_, roll_voice_, "roll_voice_player");
+
+	// The shift layer needs `Gearbox::shift_time`, and the solver owns it.
+	//
+	// **Pushed here rather than compiled into the synth**, which is the join this
+	// project keeps failing to make: `shift_audio.h` carries a default so a synth
+	// nobody tells is right rather than zero, and without this line that default
+	// would be the only value it ever had -- a knob moved in `gearbox.h` and a
+	// gearshift that kept the old duration, silently. Same family as `settings.cfg`
+	// storing `assist_auto_shift` that no scene ever loaded.
+	if (shift_voice_.is_valid()) {
+		shift_voice_->set_shift_time(vehicle_.drivetrain.gearbox.shift_time);
+	}
 
 	wall_start_usec_ = Time::get_singleton()->get_ticks_usec();
 	tick_count_ = 0;
@@ -725,6 +751,34 @@ NodePath KartBody::get_wind_voice_player() const {
 	return wind_voice_path_;
 }
 
+void KartBody::set_shift_voice_player(const NodePath &p_path) {
+	shift_voice_path_ = p_path;
+	if (is_inside_tree()) {
+		resolve_noise_voice(shift_voice_path_, shift_voice_, "shift_voice_player");
+		// Re-pushed on every resolve and not only at `_ready`, because a scene may
+		// mount this player after the body has entered the tree -- `EngineVoiceRig`
+		// does exactly that.
+		if (shift_voice_.is_valid()) {
+			shift_voice_->set_shift_time(vehicle_.drivetrain.gearbox.shift_time);
+		}
+	}
+}
+
+NodePath KartBody::get_shift_voice_player() const {
+	return shift_voice_path_;
+}
+
+void KartBody::set_roll_voice_player(const NodePath &p_path) {
+	roll_voice_path_ = p_path;
+	if (is_inside_tree()) {
+		resolve_noise_voice(roll_voice_path_, roll_voice_, "roll_voice_player");
+	}
+}
+
+NodePath KartBody::get_roll_voice_player() const {
+	return roll_voice_path_;
+}
+
 // One lump's position, by name.
 //
 // Looked up by name rather than by index. The table is edited — the lead ballast
@@ -1022,7 +1076,8 @@ void KartBody::publish_engine_audio() {
 	// a scrub layer -- a replay viewer, a probe -- is legal, and requiring the
 	// engine voice to exist before the tires could be heard would be a coupling
 	// nothing asked for.
-	if (engine_voice_.is_null() && scrub_voice_.is_null() && wind_voice_.is_null()) {
+	if (engine_voice_.is_null() && scrub_voice_.is_null() && wind_voice_.is_null() &&
+			shift_voice_.is_null() && roll_voice_.is_null()) {
 		return;
 	}
 
@@ -1106,10 +1161,18 @@ void KartBody::publish_engine_audio() {
 		}
 	}
 
-	// The same struct to all three. `noise_voice.h` says why they share a payload
+	// The same struct to all five. `noise_voice.h` says why they share a payload
 	// rather than each getting its own: the fields are computed once here, and a
 	// second payload type would be a second place for the aggregation rule above to
 	// be restated.
+	//
+	// **Nothing was added to `EngineAudioInput` for #83 or #85**, and that is worth
+	// recording rather than being quietly pleased about. The struct already carried
+	// `shifting`, `gear`, `clutch_slip`, `throttle`, `speed_ms` and `surface`,
+	// every one of them filled from `VehicleTelemetry` above, because whoever wrote
+	// it wrote the fields the tickets would need and said so in the comments. The
+	// POD rule -- no pointer, no container, nothing with a non-trivial copy,
+	// because it crosses a thread boundary -- is therefore untouched.
 	if (engine_voice_.is_valid()) {
 		engine_voice_->publish(audio);
 	}
@@ -1118,6 +1181,12 @@ void KartBody::publish_engine_audio() {
 	}
 	if (wind_voice_.is_valid()) {
 		wind_voice_->publish(audio);
+	}
+	if (shift_voice_.is_valid()) {
+		shift_voice_->publish(audio);
+	}
+	if (roll_voice_.is_valid()) {
+		roll_voice_->publish(audio);
 	}
 }
 

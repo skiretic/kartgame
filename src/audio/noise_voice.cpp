@@ -31,8 +31,10 @@ void NoiseVoiceStream::_bind_methods() {
 
 	BIND_ENUM_CONSTANT(LAYER_SCRUB);
 	BIND_ENUM_CONSTANT(LAYER_WIND);
+	BIND_ENUM_CONSTANT(LAYER_SHIFT);
+	BIND_ENUM_CONSTANT(LAYER_ROLL);
 
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "layer", PROPERTY_HINT_ENUM, "Scrub,Wind"),
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "layer", PROPERTY_HINT_ENUM, "Scrub,Wind,Shift,Roll"),
 			"set_layer", "get_layer");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "gain", PROPERTY_HINT_RANGE, "0.0,1.0,0.01"),
 			"set_gain", "get_gain");
@@ -62,6 +64,40 @@ void NoiseVoiceStream::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "scrub_full_speed"), "set_scrub_full_speed", "get_scrub_full_speed");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "wind_cutoff_per_ms"), "set_wind_cutoff_per_ms", "get_wind_cutoff_per_ms");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "wind_speed_exponent"), "set_wind_speed_exponent", "get_wind_speed_exponent");
+
+	// #83's and #85's, on the same contract.
+	ClassDB::bind_method(D_METHOD("set_clutch_gain", "gain"), &NoiseVoiceStream::set_clutch_gain);
+	ClassDB::bind_method(D_METHOD("get_clutch_gain"), &NoiseVoiceStream::get_clutch_gain);
+	ClassDB::bind_method(D_METHOD("set_clack_center_hz", "hz"), &NoiseVoiceStream::set_clack_center_hz);
+	ClassDB::bind_method(D_METHOD("get_clack_center_hz"), &NoiseVoiceStream::get_clack_center_hz);
+	ClassDB::bind_method(D_METHOD("set_clack_q", "q"), &NoiseVoiceStream::set_clack_q);
+	ClassDB::bind_method(D_METHOD("get_clack_q"), &NoiseVoiceStream::get_clack_q);
+	ClassDB::bind_method(D_METHOD("set_clutch_center_hz", "hz"), &NoiseVoiceStream::set_clutch_center_hz);
+	ClassDB::bind_method(D_METHOD("get_clutch_center_hz"), &NoiseVoiceStream::get_clutch_center_hz);
+	ClassDB::bind_method(D_METHOD("set_clutch_full_slip", "rads"), &NoiseVoiceStream::set_clutch_full_slip);
+	ClassDB::bind_method(D_METHOD("get_clutch_full_slip"), &NoiseVoiceStream::get_clutch_full_slip);
+	ClassDB::bind_method(D_METHOD("set_shift_time", "seconds"), &NoiseVoiceStream::set_shift_time);
+	ClassDB::bind_method(D_METHOD("get_shift_time"), &NoiseVoiceStream::get_shift_time);
+	ClassDB::bind_method(D_METHOD("set_roll_cutoff_hz", "hz"), &NoiseVoiceStream::set_roll_cutoff_hz);
+	ClassDB::bind_method(D_METHOD("get_roll_cutoff_hz"), &NoiseVoiceStream::get_roll_cutoff_hz);
+	ClassDB::bind_method(D_METHOD("set_roll_db_per_doubling", "db"),
+			&NoiseVoiceStream::set_roll_db_per_doubling);
+	ClassDB::bind_method(D_METHOD("get_roll_db_per_doubling"), &NoiseVoiceStream::get_roll_db_per_doubling);
+	ClassDB::bind_method(D_METHOD("set_roll_rough_brightness", "scale"),
+			&NoiseVoiceStream::set_roll_rough_brightness);
+	ClassDB::bind_method(D_METHOD("get_roll_rough_brightness"), &NoiseVoiceStream::get_roll_rough_brightness);
+
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "clutch_gain"), "set_clutch_gain", "get_clutch_gain");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "clack_center_hz"), "set_clack_center_hz", "get_clack_center_hz");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "clack_q"), "set_clack_q", "get_clack_q");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "clutch_center_hz"), "set_clutch_center_hz", "get_clutch_center_hz");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "clutch_full_slip"), "set_clutch_full_slip", "get_clutch_full_slip");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "shift_time"), "set_shift_time", "get_shift_time");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "roll_cutoff_hz"), "set_roll_cutoff_hz", "get_roll_cutoff_hz");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "roll_db_per_doubling"),
+			"set_roll_db_per_doubling", "get_roll_db_per_doubling");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "roll_rough_brightness"),
+			"set_roll_rough_brightness", "get_roll_rough_brightness");
 }
 
 void NoiseVoiceStream::publish(const kart::core::EngineAudioInput &p_input) {
@@ -77,7 +113,13 @@ void NoiseVoiceStream::set_layer(int p_layer) {
 	// the render branch as "not wind" and silently produce a scrub layer on a stream
 	// the scene mounted as something else, which is a defect that only shows up as
 	// wind being audible from another kart's position.
-	const int32_t layer = (p_layer == LAYER_WIND) ? LAYER_WIND : LAYER_SCRUB;
+	//
+	// A range test rather than the old two-way compare against `LAYER_WIND`: with
+	// four layers, "anything that is not wind is scrub" would have quietly turned
+	// `LAYER_ROLL` into a scrub layer.
+	const int32_t layer = (p_layer >= LAYER_SCRUB && p_layer <= LAYER_ROLL)
+			? static_cast<int32_t>(p_layer)
+			: static_cast<int32_t>(LAYER_SCRUB);
 	_layer.store(layer, std::memory_order_relaxed);
 }
 
@@ -150,6 +192,114 @@ double NoiseVoiceStream::get_wind_speed_exponent() const {
 	return _wind_speed_exponent.load(std::memory_order_relaxed);
 }
 
+// #83's five and the shift duration. Clamped for the same reason the six above are:
+// a caller that bypasses the registry cannot put a filter somewhere the arithmetic
+// does not survive. `shift_time` has a floor rather than a zero because a zero
+// would make the clack's decay time constant zero and its envelope `exp(-inf)`.
+void NoiseVoiceStream::set_clutch_gain(double p_gain) {
+	_clutch_gain.store(p_gain < 0.0 ? 0.0 : (p_gain > 1.0 ? 1.0 : p_gain), std::memory_order_relaxed);
+}
+
+double NoiseVoiceStream::get_clutch_gain() const {
+	return _clutch_gain.load(std::memory_order_relaxed);
+}
+
+void NoiseVoiceStream::set_clack_center_hz(double p_hz) {
+	_clack_center_hz.store(p_hz < 20.0 ? 20.0 : (p_hz > 12000.0 ? 12000.0 : p_hz),
+			std::memory_order_relaxed);
+}
+
+double NoiseVoiceStream::get_clack_center_hz() const {
+	return _clack_center_hz.load(std::memory_order_relaxed);
+}
+
+void NoiseVoiceStream::set_clack_q(double p_q) {
+	_clack_q.store(p_q < 0.05 ? 0.05 : (p_q > 40.0 ? 40.0 : p_q), std::memory_order_relaxed);
+}
+
+double NoiseVoiceStream::get_clack_q() const {
+	return _clack_q.load(std::memory_order_relaxed);
+}
+
+void NoiseVoiceStream::set_clutch_center_hz(double p_hz) {
+	_clutch_center_hz.store(p_hz < 20.0 ? 20.0 : (p_hz > 12000.0 ? 12000.0 : p_hz),
+			std::memory_order_relaxed);
+}
+
+double NoiseVoiceStream::get_clutch_center_hz() const {
+	return _clutch_center_hz.load(std::memory_order_relaxed);
+}
+
+void NoiseVoiceStream::set_clutch_full_slip(double p_rads) {
+	_clutch_full_slip.store(p_rads < 1.0 ? 1.0 : (p_rads > 5000.0 ? 5000.0 : p_rads),
+			std::memory_order_relaxed);
+}
+
+double NoiseVoiceStream::get_clutch_full_slip() const {
+	return _clutch_full_slip.load(std::memory_order_relaxed);
+}
+
+void NoiseVoiceStream::set_shift_time(double p_seconds) {
+	_shift_time.store(p_seconds < 0.001 ? 0.001 : (p_seconds > 1.0 ? 1.0 : p_seconds),
+			std::memory_order_relaxed);
+}
+
+double NoiseVoiceStream::get_shift_time() const {
+	return _shift_time.load(std::memory_order_relaxed);
+}
+
+void NoiseVoiceStream::set_roll_cutoff_hz(double p_hz) {
+	_roll_cutoff_hz.store(p_hz < 20.0 ? 20.0 : (p_hz > 12000.0 ? 12000.0 : p_hz),
+			std::memory_order_relaxed);
+}
+
+double NoiseVoiceStream::get_roll_cutoff_hz() const {
+	return _roll_cutoff_hz.load(std::memory_order_relaxed);
+}
+
+void NoiseVoiceStream::set_roll_db_per_doubling(double p_db) {
+	_roll_db_per_doubling.store(p_db < 0.0 ? 0.0 : (p_db > 40.0 ? 40.0 : p_db),
+			std::memory_order_relaxed);
+}
+
+double NoiseVoiceStream::get_roll_db_per_doubling() const {
+	return _roll_db_per_doubling.load(std::memory_order_relaxed);
+}
+
+void NoiseVoiceStream::set_roll_rough_brightness(double p_scale) {
+	_roll_rough_brightness.store(p_scale < 1.0 ? 1.0 : (p_scale > 8.0 ? 8.0 : p_scale),
+			std::memory_order_relaxed);
+}
+
+double NoiseVoiceStream::get_roll_rough_brightness() const {
+	return _roll_rough_brightness.load(std::memory_order_relaxed);
+}
+
+kart::core::ShiftAudioConfig NoiseVoiceStream::shift_config() const {
+	kart::core::ShiftAudioConfig config;
+	// `gain` is the clack, because the clack is what a driver means by "how loud is
+	// the gearshift". The clutch gets its own knob rather than sharing, because the
+	// two are audible at completely different moments and balancing them against
+	// each other is exactly what #160's mixing pass exists to do.
+	config.clack_gain = _gain.load(std::memory_order_relaxed);
+	config.clutch_gain = _clutch_gain.load(std::memory_order_relaxed);
+	config.clack_center_hz = _clack_center_hz.load(std::memory_order_relaxed);
+	config.clack_q = _clack_q.load(std::memory_order_relaxed);
+	config.clutch_center_hz = _clutch_center_hz.load(std::memory_order_relaxed);
+	config.clutch_full_slip_rads = _clutch_full_slip.load(std::memory_order_relaxed);
+	config.shift_time_s = _shift_time.load(std::memory_order_relaxed);
+	return config;
+}
+
+kart::core::RollAudioConfig NoiseVoiceStream::roll_config() const {
+	kart::core::RollAudioConfig config;
+	config.roll_gain = _gain.load(std::memory_order_relaxed);
+	config.cutoff_at_reference_hz = _roll_cutoff_hz.load(std::memory_order_relaxed);
+	config.db_per_speed_doubling = _roll_db_per_doubling.load(std::memory_order_relaxed);
+	config.rough_brightness = _roll_rough_brightness.load(std::memory_order_relaxed);
+	return config;
+}
+
 kart::core::ScrubWindConfig NoiseVoiceStream::tuning_config() const {
 	kart::core::ScrubWindConfig config;
 	const double gain = _gain.load(std::memory_order_relaxed);
@@ -182,6 +332,20 @@ Dictionary NoiseVoiceStream::voice_stats() const {
 	// HUD row that makes "scrub signals grip loss before the visuals do" checkable
 	// while driving rather than only by ear — #84's first acceptance criterion.
 	d["level"] = _level.load(std::memory_order_relaxed);
+
+	// The shift layer's own two read-backs, published from the audio thread.
+	//
+	// `strikes` is the count of clacks struck since `reset_stats`, and it is the
+	// fingerprint `tools/verify/audio.sh` demands: a sabotage that stops shifts
+	// being detected has to show up as this not moving. A level alone would not do,
+	// because a probe can reach a level several ways and only one of them is "a
+	// shift happened".
+	//
+	// `rumble_hz` is the curb rate the rolling layer is running at, `v / lambda`,
+	// so the gate can compare it against the same arithmetic done independently
+	// rather than against a number this class printed about itself.
+	d["strikes"] = _strikes.load(std::memory_order_relaxed);
+	d["rumble_hz"] = _rumble_hz.load(std::memory_order_relaxed);
 
 	// Per frame, because the block size is the device's choice and the frame period
 	// is the deadline's unit.
@@ -235,7 +399,19 @@ Ref<AudioStreamPlayback> NoiseVoiceStream::_instantiate_playback() const {
 }
 
 String NoiseVoiceStream::_get_stream_name() const {
-	return get_layer() == LAYER_WIND ? String("Wind noise") : String("Tire scrub");
+	// ASCII only. `godot::String` decodes a bare `const char *` as Latin-1, so a
+	// non-ASCII character in a literal here arrives as mojibake -- CLAUDE.md's entry,
+	// found once as `at defaults Ã¢ nothing has been tuned`.
+	switch (get_layer()) {
+		case LAYER_WIND:
+			return String("Wind noise");
+		case LAYER_SHIFT:
+			return String("Shift and clutch");
+		case LAYER_ROLL:
+			return String("Surface rolling");
+		default:
+			return String("Tire scrub");
+	}
 }
 
 double NoiseVoiceStream::_get_length() const {
@@ -266,6 +442,19 @@ void NoiseVoicePlayback::bind(const Ref<NoiseVoiceStream> &p_stream, double p_sa
 	}
 	_scrub.configure(config, _rate);
 	_wind.configure(config, _rate);
+	// The other two, on the same terms: same rate, their own defaults, and the
+	// stream's live knobs where it has them. All four are configured whatever the
+	// layer is, so a scene that flips `layer` after `play()` gets the other layer
+	// rather than an unconfigured one -- the property `bind`'s own comment already
+	// claimed for the first two.
+	kart::core::ShiftAudioConfig shift;
+	kart::core::RollAudioConfig roll;
+	if (_stream.is_valid()) {
+		shift = _stream->shift_config();
+		roll = _stream->roll_config();
+	}
+	_shift.configure(shift, _rate);
+	_roll.configure(roll, _rate);
 	_last_good = kart::core::EngineAudioInput();
 }
 
@@ -288,14 +477,26 @@ int32_t NoiseVoicePlayback::_mix(AudioFrame *p_buffer, float p_rate_scale, int32
 
 	// The live knobs, re-read every block. `engine_voice.cpp` records the defect
 	// that capturing a gain at bind time caused, and this file is not going to
-	// reintroduce it: two relaxed atomic loads, far below anything the worst-block
-	// figure can see.
-	const bool is_wind = _stream->get_layer() == NoiseVoiceStream::LAYER_WIND;
-	const kart::core::ScrubWindConfig config = _stream->tuning_config();
-	if (is_wind) {
-		_wind.set_tuning(config);
-	} else {
-		_scrub.set_tuning(config);
+	// reintroduce it: a handful of relaxed atomic loads, far below anything the
+	// worst-block figure can see.
+	//
+	// **Only the selected layer's config is assembled.** Building all four every
+	// block would be four times the atomic loads for three configs nothing reads,
+	// on the thread with the deadline.
+	const int layer = _stream->get_layer();
+	switch (layer) {
+		case NoiseVoiceStream::LAYER_WIND:
+			_wind.set_tuning(_stream->tuning_config());
+			break;
+		case NoiseVoiceStream::LAYER_SHIFT:
+			_shift.set_tuning(_stream->shift_config());
+			break;
+		case NoiseVoiceStream::LAYER_ROLL:
+			_roll.set_tuning(_stream->roll_config());
+			break;
+		default:
+			_scrub.set_tuning(_stream->tuning_config());
+			break;
 	}
 
 	// One seqlock read per block, which is the rate ADR-0035 costed at 4.6 ns.
@@ -308,10 +509,19 @@ int32_t NoiseVoicePlayback::_mix(AudioFrame *p_buffer, float p_rate_scale, int32
 		// Budget exhausted. Repeat the last good tick rather than render a torn one.
 		input = _last_good;
 	}
-	if (is_wind) {
-		_wind.publish(input);
-	} else {
-		_scrub.publish(input);
+	switch (layer) {
+		case NoiseVoiceStream::LAYER_WIND:
+			_wind.publish(input);
+			break;
+		case NoiseVoiceStream::LAYER_SHIFT:
+			_shift.publish(input);
+			break;
+		case NoiseVoiceStream::LAYER_ROLL:
+			_roll.publish(input);
+			break;
+		default:
+			_scrub.publish(input);
+			break;
 	}
 
 	const int64_t start_ns = now_ns();
@@ -321,10 +531,19 @@ int32_t NoiseVoicePlayback::_mix(AudioFrame *p_buffer, float p_rate_scale, int32
 		if (chunk > SCRATCH_FRAMES) {
 			chunk = SCRATCH_FRAMES;
 		}
-		if (is_wind) {
-			_wind.render(_scratch, chunk);
-		} else {
-			_scrub.render(_scratch, chunk);
+		switch (layer) {
+			case NoiseVoiceStream::LAYER_WIND:
+				_wind.render(_scratch, chunk);
+				break;
+			case NoiseVoiceStream::LAYER_SHIFT:
+				_shift.render(_scratch, chunk);
+				break;
+			case NoiseVoiceStream::LAYER_ROLL:
+				_roll.render(_scratch, chunk);
+				break;
+			default:
+				_scrub.render(_scratch, chunk);
+				break;
 		}
 		// Mono to both channels. The player above this owns panning and distance; a
 		// synth that panned itself would fight it. For the wind layer that player is a
@@ -343,7 +562,31 @@ int32_t NoiseVoicePlayback::_mix(AudioFrame *p_buffer, float p_rate_scale, int32
 	stream->_mix_calls.fetch_add(1, std::memory_order_relaxed);
 	stream->_render_ns_total.fetch_add(render_ns, std::memory_order_relaxed);
 	stream->_render_frames_total.fetch_add(p_frames, std::memory_order_relaxed);
-	stream->_level.store(is_wind ? _wind.level() : _scrub.level(), std::memory_order_relaxed);
+	// The level the layer settled at. For the shift layer that is the CLUTCH level
+	// and not the clack envelope: the clack is an impulse that has decayed to
+	// nothing by the time anything reads this, so publishing it would put a zero on
+	// the HUD after every shift and read as a dead layer. `strikes` below is how a
+	// reader sees the clack at all.
+	double level = 0.0;
+	switch (layer) {
+		case NoiseVoiceStream::LAYER_WIND:
+			level = _wind.level();
+			break;
+		case NoiseVoiceStream::LAYER_SHIFT:
+			level = _shift.clutch_level();
+			stream->_strikes.store(_shift.strikes(), std::memory_order_relaxed);
+			break;
+		case NoiseVoiceStream::LAYER_ROLL:
+			level = _roll.level();
+			stream->_rumble_hz.store(
+					kart::core::RollSynth::rumble_hz_for(input.surface, input.speed_ms),
+					std::memory_order_relaxed);
+			break;
+		default:
+			level = _scrub.level();
+			break;
+	}
+	stream->_level.store(level, std::memory_order_relaxed);
 
 	// The worst block, kept with a compare-exchange so that two playbacks reporting
 	// into one stream cannot lose the larger of them. The block size is stored with

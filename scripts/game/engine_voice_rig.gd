@@ -134,6 +134,67 @@ const VOLUME_DB := 0.0
 const SCRUB_GAIN := 0.035
 const WIND_GAIN := 0.030
 
+## The shift/clutch and rolling layers' gains, linear. Issues #83 and #85.
+##
+## **Balance, not level**, on the same terms as the two above: `MASTER_GAIN_DB`
+## owns the level. `src/core/shift_audio.h` and `src/core/roll_audio.h` carry the
+## same values as their config defaults with the reasoning attached, and this file
+## applies them rather than being a second owner.
+##
+## All three are **estimated and owed an ear**, and all three were set against a
+## stated audibility criterion rather than by taste. The full sweeps and the
+## reasoning live with the constants in `src/core/shift_audio.h` and
+## `src/core/roll_audio.h`; the short version:
+##
+##   * **clack 0.20.** At the 0.055 this started at, the engagement transient sat
+##     +9.6 dB over its own background against +10.1 dB for the engine's torque cut
+##     alone — the layer was making the shift very slightly *less* prominent than
+##     no layer at all. At 0.20 it is +15.4 dB, with a stem peak of -10.6 dBFS,
+##     level with the engine note for the 9 ms the impact lasts.
+##   * **clutch 0.09.** At 0.030 the stem peaked at -24.1 dBFS, 14 dB under the
+##     note on a launch — present in a meter and not in a room. 0.09 puts it about
+##     4 dB under.
+##   * **rolling 0.09.** Chosen as the smallest value that makes the four surfaces
+##     distinguishable: level spread across asphalt / curb / grass / dirt at a
+##     constant 20 m/s goes from **0.03 dB before this change to 3.94 dB**, and the
+##     spectral centroid spread from 81 Hz to 2168 Hz. It is also the layer that
+##     costs the most headroom, and it is a game-feel decision rather than a
+##     physical one — a real driver cannot hear their tires over a KZ at all.
+##
+## Both of the first two started an order lower and were **measured to be
+## inaudible**, which is the failure that matters more than being too loud: a layer
+## nobody can hear is a layer that did not ship. #160's mixing pass owns the final
+## balance.
+const CLACK_GAIN := 0.20
+const CLUTCH_GAIN := 0.09
+const ROLL_GAIN := 0.09
+
+## Where the rolling emitter sits, and how it falls off.
+##
+## At the rear axle with the scrub, because rolling noise comes off the contact
+## patches and the scrub layer already made that call for the same reason — one
+## layer for four corners, so putting it at one wheel would place it wrong three
+## quarters of the time.
+##
+## **A shorter reach than the scrub's**, which is the one number here with an
+## argument rather than a preference behind it. M8's acceptance criterion is that an
+## opponent is locatable by ear, and what locates them is the engine note. Rolling
+## noise from a kart two corners away would be a wash of hiss with no information
+## in it, competing with the cue that does carry information. 30 m is about the
+## distance at which a kart is still a distinct thing rather than part of the field.
+const ROLL_UNIT_SIZE := 2.0
+const ROLL_MAX_DISTANCE := 30.0
+
+## The gearbox emitter, at the engine mount.
+##
+## The gearbox on a KZ is bolted to the engine and shares its cases, so the clack
+## comes from where the note does — `KartBody.engine_mount_position()` serves both,
+## and the shift layer reusing it means the two cannot drift apart. A shift heard
+## from a different place than the engine it interrupts is the kind of thing nobody
+## can name and everybody notices.
+const SHIFT_UNIT_SIZE := 3.0
+const SHIFT_MAX_DISTANCE := 90.0
+
 ## Where the scrub emitter sits, and how it falls off.
 ##
 ## At the middle of the rear axle rather than at any one contact patch: there is one
@@ -335,7 +396,65 @@ static func attach_noise(kart: KartBody) -> Array:
 
 	kart.scrub_voice_player = NodePath("ScrubVoice")
 	kart.wind_voice_player = NodePath("WindVoice")
-	return [scrub_stream, wind_stream]
+
+	# The shift/clutch layer, at the engine mount, and the rolling layer, at the rear
+	# axle. Issues #83 and #85.
+	#
+	# **Built here rather than in a third function**, and `kart_rig.gd` needs no edit
+	# for them: it reads `noise[0]` and `noise[1]` and a longer array is invisible to
+	# it. That was the constraint — `kart_rig.gd`, `circuit.gd` and `test_track.gd`
+	# are all owned elsewhere — and it is also the right shape, because these two are
+	# noise layers on the same class as the two above and a scene that wants tire
+	# scrub wants rolling noise.
+	#
+	# Failure of either is silence for that layer and nothing else. `LAYER_SHIFT = 2`
+	# and `LAYER_ROLL = 3`; the C++ side clamps anything out of range to scrub, so a
+	# wrong value here is a misplaced layer rather than undefined behavior.
+	var shift_stream: AudioStream = ClassDB.instantiate("NoiseVoiceStream")
+	var roll_stream: AudioStream = ClassDB.instantiate("NoiseVoiceStream")
+	if shift_stream == null or roll_stream == null:
+		return [scrub_stream, wind_stream, null, null]
+	shift_stream.set("layer", 2)
+	shift_stream.set("gain", CLACK_GAIN)
+	shift_stream.set("clutch_gain", CLUTCH_GAIN)
+	roll_stream.set("layer", 3)
+	roll_stream.set("gain", ROLL_GAIN)
+
+	var shift_player := AudioStreamPlayer3D.new()
+	shift_player.name = "ShiftVoice"
+	shift_player.stream = shift_stream
+	shift_player.bus = bus
+	shift_player.volume_db = VOLUME_DB
+	shift_player.unit_size = SHIFT_UNIT_SIZE
+	shift_player.max_distance = SHIFT_MAX_DISTANCE
+	shift_player.position = kart.engine_mount_position()
+	kart.add_child(shift_player)
+	shift_player.autoplay = true
+	if shift_player.is_inside_tree():
+		shift_player.play()
+
+	var roll_player := AudioStreamPlayer3D.new()
+	roll_player.name = "RollVoice"
+	roll_player.stream = roll_stream
+	roll_player.bus = bus
+	roll_player.volume_db = VOLUME_DB
+	roll_player.unit_size = ROLL_UNIT_SIZE
+	roll_player.max_distance = ROLL_MAX_DISTANCE
+	roll_player.position = kart.rear_axle_position()
+	kart.add_child(roll_player)
+	roll_player.autoplay = true
+	if roll_player.is_inside_tree():
+		roll_player.play()
+
+	# Assigned AFTER `add_child`, same as the two above: the setter resolves the path
+	# relative to the kart and re-reads the stream, and `KartBody.set_shift_voice_player`
+	# also pushes `Gearbox::shift_time` into the stream at that moment. Assigning
+	# before the player is in the tree would leave the synth on its compiled default
+	# duration — which is the same value today and would silently stop being so the
+	# moment anybody tunes the gearbox.
+	kart.shift_voice_player = NodePath("ShiftVoice")
+	kart.roll_voice_player = NodePath("RollVoice")
+	return [scrub_stream, wind_stream, shift_stream, roll_stream]
 
 
 ## Route the five audio tunables from a `KartTuning` into this voice.
@@ -356,9 +475,32 @@ static func attach_noise(kart: KartBody) -> Array:
 ## `src/core/tuning.h` carries the same three values and the same reasoning, and
 ## this file is where they are applied rather than a second owner of them.
 static func bind_tuning(tuning: Node, stream: Object, player: AudioStreamPlayer3D,
-		scrub_stream: Object = null, wind_stream: Object = null) -> void:
+		scrub_stream: Object = null, wind_stream: Object = null,
+		shift_stream: Object = null, roll_stream: Object = null) -> void:
 	if tuning == null or player == null:
 		return
+
+	# **The two new layers are found rather than passed, and that is deliberate.**
+	# `circuit.gd:754` and `test_track.gd:643` are the only two callers and neither
+	# is owned here, so the signature could not grow a required parameter — the two
+	# optional ones above exist for a future caller that wants to be explicit, and
+	# every current caller passes neither.
+	#
+	# Looking them up off the player's own parent is sound because that parent is the
+	# `KartBody` and `attach_noise` above is what named the nodes. If a scene mounted
+	# its own shift layer under a different name it simply is not tuned, which is the
+	# same degradation the whole rig already has for a missing stream: silence or a
+	# default, never an error.
+	var kart := player.get_parent()
+	if shift_stream == null and kart != null:
+		var found := kart.get_node_or_null("ShiftVoice") as AudioStreamPlayer3D
+		if found != null:
+			shift_stream = found.stream
+	if roll_stream == null and kart != null:
+		var found_roll := kart.get_node_or_null("RollVoice") as AudioStreamPlayer3D
+		if found_roll != null:
+			roll_stream = found_roll.stream
+
 	var apply := func(key: String, value: float, _owner: int) -> void:
 		match key:
 			# The master, and the one row here that is not a property of a node or a
@@ -396,6 +538,23 @@ static func bind_tuning(tuning: Node, stream: Object, player: AudioStreamPlayer3
 			"wind_cutoff_per_ms", "wind_speed_exponent":
 				if wind_stream != null:
 					wind_stream.set(key, value)
+			# #83's and #85's. `clack_gain` and `roll_gain` land on each stream's
+			# `gain`, because `gain` is what a `NoiseVoiceStream` calls its own layer
+			# level whatever the layer is; everything else is named identically on
+			# both sides so the key passes straight through.
+			"clack_gain":
+				if shift_stream != null:
+					shift_stream.set("gain", value)
+			"clutch_gain", "clack_center_hz", "clack_q", "clutch_center_hz", \
+			"clutch_full_slip":
+				if shift_stream != null:
+					shift_stream.set(key, value)
+			"roll_gain":
+				if roll_stream != null:
+					roll_stream.set("gain", value)
+			"roll_cutoff_hz", "roll_db_per_doubling", "roll_rough_brightness":
+				if roll_stream != null:
+					roll_stream.set(key, value)
 			# Every other key belongs to the vehicle or the controller and is
 			# applied by the registry itself. Not an error, and not silent either:
 			# falling through here is the normal case for the nine that are not
