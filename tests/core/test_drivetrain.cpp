@@ -531,3 +531,146 @@ TEST_CASE("engine speed stays finite and inside its limits through everything") 
 	// driver, put it there.
 	CHECK(highest_rpm < 20000.0);
 }
+
+// ---------------------------------------------------------------------------
+// The traction assist. Issue #137, and ADR-0071's "the real defect is upstream:
+// drivetrain and clutch torque at launch and corner exit".
+//
+// `DrivetrainInput::axle_traction_torque` is the torque the rear tires can
+// actually put down, supplied by the solver because nothing in this file can
+// compute it. The assist cuts crank torque so the axle is never asked for more.
+// These tests are about the *contract* — what the field means, what the sentinel
+// means, and what the switch does — not about the launch, which needs a tire
+// model and is measured in `test_vehicle.cpp`.
+
+namespace {
+
+// One substep at a stated traction limit, from a standing start in first gear
+// with the engine already in its band. Returns the axle torque delivered.
+double axle_torque_at_limit(double limit, bool assist_on = true, double throttle = 1.0) {
+	Drivetrain drive;
+	drive.assists.traction_clutch = assist_on;
+	// Get the engine into the band and the gearbox into first the way a launch
+	// does, with no limit in force, so every run below starts from one state.
+	DrivetrainOutput warmed;
+	for (int substep = 0; substep < 240; ++substep) {
+		DrivetrainInput warm;
+		warm.throttle = 1.0;
+		warm.axle_speed = 0.0;
+		warm.dt = SUBSTEP;
+		warmed = drive.step(warm);
+	}
+	INFO("warmed to " << warmed.engine_rpm << " rpm, gear " << warmed.gear << ", axle "
+					  << warmed.axle_torque << " N m");
+
+	DrivetrainInput input;
+	input.throttle = throttle;
+	input.axle_speed = 0.0;
+	input.axle_traction_torque = limit;
+	input.dt = SUBSTEP;
+	return drive.step(input).axle_torque;
+}
+
+} // namespace
+
+TEST_CASE("the traction assist caps the axle at the limit the solver supplied") {
+	// Far above anything the drivetrain can produce in first: no cut, and this is
+	// the control that proves the cases below are the assist and not the gearbox.
+	const double uncapped = axle_torque_at_limit(10000.0);
+	REQUIRE(uncapped > 1.0);
+
+	// A limit inside what it wanted binds, and binds *at* the limit rather than
+	// somewhere near it — the whole point of expressing the cut at the crank and
+	// multiplying back up by the same ratio.
+	for (const double limit : { 50.0, 120.0, 250.0 }) {
+		if (limit >= uncapped) {
+			continue;
+		}
+		const double capped = axle_torque_at_limit(limit);
+		MESSAGE("limit " << limit << " N m -> axle " << capped << " N m (uncapped "
+						 << uncapped << ")");
+		// Relative, explicitly. `doctest::Approx(x).epsilon(e)` compares against
+		// `e * (scale + max(|a|,|b|))` with scale defaulting to 1.0, so it is not a
+		// relative tolerance and would pass this at almost any value.
+		CHECK(std::fabs(capped - limit) / limit < 1e-6);
+	}
+}
+
+TEST_CASE("a traction limit of zero is a real limit and not a missing one") {
+	// **This is the regression that cost an entire iteration.** The guard was
+	// `axle_traction_torque > 0.0`, which reads as "supplied", and zero is exactly
+	// what the solver returns when the rear axle is already past its peak slip
+	// ratio and the correct drive torque is none. Treating it as "no information"
+	// switched the assist off in the one case it exists for, and the measured
+	// launch burnout was unchanged to three significant figures — which reads like
+	// an assist that does not work rather than like a sentinel collision.
+	const double zero = axle_torque_at_limit(0.0);
+	MESSAGE("limit 0 N m -> axle " << zero << " N m");
+	CHECK(std::fabs(zero) < 1e-9);
+
+	// And the negative sentinel really does mean "not supplied", so a caller that
+	// has never heard of this field gets the old behavior exactly.
+	const double unsupplied = axle_torque_at_limit(-1.0);
+	CHECK(unsupplied > 1.0);
+	CHECK(unsupplied == axle_torque_at_limit(10000.0));
+
+	// The default is the sentinel, which is what makes that true by construction.
+	CHECK(DrivetrainInput().axle_traction_torque < 0.0);
+}
+
+TEST_CASE("the traction assist is an assist and switches off with the others") {
+	const double limit = 40.0;
+	const double assisted = axle_torque_at_limit(limit, true);
+	const double unassisted = axle_torque_at_limit(limit, false);
+	MESSAGE("limit " << limit << " N m: assist on " << assisted << ", assist off "
+					 << unassisted);
+	CHECK(std::fabs(assisted - limit) / limit < 1e-6);
+	// Switched off, the driver gets the torque he asked for and the burnout he
+	// asked for with it. Issue #38 wants that mistake available.
+	CHECK(unassisted > limit * 1.5);
+
+	// `auto_clutch` off must take it with it: it is one assist, and a kart with
+	// the clutch assist disabled that still had hidden traction control would be
+	// the worst of both.
+	Drivetrain drive;
+	drive.assists.auto_clutch = false;
+	CHECK(drive.assists.traction_clutch); // on by default, but gated by auto_clutch
+}
+
+TEST_CASE("the traction assist never touches engine braking") {
+	// Closed throttle in gear: the crank torque is negative and no traction assist
+	// has any business making it less negative. A cut that applied here would show
+	// up as a kart that will not slow down off the throttle.
+	Drivetrain drive;
+	for (int substep = 0; substep < 240; ++substep) {
+		DrivetrainInput warm;
+		warm.throttle = 1.0;
+		warm.axle_speed = 60.0;
+		warm.dt = SUBSTEP;
+		drive.step(warm);
+	}
+
+	DrivetrainInput coast;
+	coast.throttle = 0.0;
+	coast.axle_speed = 60.0;
+	coast.dt = SUBSTEP;
+	coast.axle_traction_torque = 0.0; // the harshest limit there is
+	const double with_limit = drive.step(coast).axle_torque;
+
+	Drivetrain other;
+	for (int substep = 0; substep < 240; ++substep) {
+		DrivetrainInput warm;
+		warm.throttle = 1.0;
+		warm.axle_speed = 60.0;
+		warm.dt = SUBSTEP;
+		other.step(warm);
+	}
+	DrivetrainInput coast_free = coast;
+	coast_free.axle_traction_torque = -1.0;
+	const double without_limit = other.step(coast_free).axle_torque;
+
+	MESSAGE("engine braking: limit 0 -> " << with_limit << " N m, no limit -> "
+										  << without_limit << " N m");
+	CHECK(without_limit < 0.0);
+	CHECK(with_limit == without_limit);
+}

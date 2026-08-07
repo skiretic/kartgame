@@ -2163,3 +2163,109 @@ TEST_CASE("a surface grip multiplier scales the grip and nothing else") {
 	CHECK(grass.vehicle.telemetry().wheel[CORNER_RR].normal_load > 0.0);
 	CHECK(grass.finite());
 }
+
+// The launch, and issue #137's actual defect.
+//
+// ADR-0071 recorded #137 as a spin and named the upstream cause as drivetrain
+// torque at launch and corner exit, with the measurement that made the case:
+// **the kart spent 1.49 s above a rear slip ratio of 0.5 and 1.18 s above 1.0,
+// peaking at 8.68**, which is a burnout and not a launch. A tire asked to
+// transmit torque at 8.7x road speed returns about half its peak force, and the
+// old friction ellipse then let it keep most of its lateral force as well, which
+// is what made the donut survivable and the spin irreversible.
+//
+// This is the regression test for that number. It is deliberately a *bound* and
+// not a target: `vehicle.h`'s traction limit exists to stop a runaway, not to
+// hold a slip target, and the gain sweep recorded there shows that driving the
+// wheelspin to zero costs two seconds of 0-100. Some wheelspin off the line is
+// correct for a 170 kg kart with 14.69:1 in first.
+TEST_CASE("a full-throttle launch spins the rear tires without running away") {
+	Rig rig;
+	rig.configure();
+	rig.settle();
+
+	DriverInput input;
+	input.throttle = 1.0;
+
+	int above_half = 0;
+	int above_one = 0;
+	double peak_slip = 0.0;
+	double reached_100 = -1.0;
+	for (int tick = 0; tick < 720; ++tick) {
+		rig.step(input);
+		REQUIRE(rig.finite());
+		const double slip = rig.vehicle.telemetry().wheel[CORNER_RL].slip_ratio;
+		if (slip > peak_slip) {
+			peak_slip = slip;
+		}
+		if (slip > 0.5) {
+			++above_half;
+		}
+		if (slip > 1.0) {
+			++above_one;
+		}
+		if (reached_100 < 0.0 && rig.forward_speed() >= kmh_to_ms(100.0)) {
+			reached_100 = double(tick) * TICK;
+		}
+	}
+
+	MESSAGE("launch: peak rear slip ratio " << peak_slip << ", " << above_half * TICK
+											<< " s above 0.5, " << above_one * TICK
+											<< " s above 1.0, 0-100 in " << reached_100 << " s");
+
+	// The two the old solver failed. It measured 8.68 and 1.18 s.
+	CHECK(peak_slip < 4.0);
+	CHECK(above_one * TICK < 0.5);
+
+	// Both rear wheels are one shaft (#33), so they cannot disagree about any of
+	// it. This is here rather than in its own case because a traction limit that
+	// somehow acted on one wheel would satisfy every bound above.
+	CHECK(rig.vehicle.telemetry().wheel[CORNER_RL].slip_ratio ==
+			doctest::Approx(rig.vehicle.telemetry().wheel[CORNER_RR].slip_ratio).epsilon(0.05));
+
+	// And it must still be a *launch*. A traction limit that closed the burnout by
+	// refusing to deliver torque would pass both bounds above and never reach
+	// 100 km/h at all — which is exactly what capping the clutch capacity did
+	// (22.8 m in ten seconds), so this is not hypothetical.
+	REQUIRE(reached_100 > 0.0);
+	CHECK(reached_100 < 5.0);
+}
+
+// The traction limit is published so a gate can say whether it was binding
+// rather than infer it from a slip ratio that has several causes.
+TEST_CASE("the traction limit is a real torque and is quiet when it is not needed") {
+	Rig rig;
+	rig.configure();
+	rig.settle();
+
+	// Standing still, the limit is the two rear tires' capacity and is positive:
+	// a zero here would be the sentinel collision `test_drivetrain.cpp` covers,
+	// arriving from the other end.
+	DriverInput idle;
+	rig.step(idle);
+	const double at_rest = rig.vehicle.traction_torque();
+	MESSAGE("traction limit at rest: " << at_rest << " N m at the axle");
+	CHECK(at_rest > 0.0);
+
+	// Order of magnitude, against the arithmetic rather than against itself:
+	// ~2.05 friction on ~1,000 N of static rear load through a ~0.13 m radius is
+	// a couple of hundred N m. A limit an order out either way is a units error,
+	// which is the failure this catches and a tolerance-free comparison would not.
+	CHECK(at_rest > 100.0);
+	CHECK(at_rest < 800.0);
+
+	// Cruising in a straight line with the tires nowhere near their peak, the
+	// limit must be well above what the drivetrain is actually delivering — the
+	// assist is not supposed to be in the loop at all there.
+	rig.vehicle.engage(5, 30.0);
+	rig.linear_velocity = -rig.basis_z * 30.0;
+	DriverInput cruise;
+	cruise.throttle = 0.5;
+	for (int tick = 0; tick < 120; ++tick) {
+		rig.step(cruise);
+	}
+	const double cruising = rig.vehicle.traction_torque();
+	const double delivered = rig.vehicle.telemetry().axle_torque;
+	MESSAGE("at 30 m/s: limit " << cruising << " N m, delivered " << delivered << " N m");
+	CHECK(cruising > delivered * 1.5);
+}

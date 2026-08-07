@@ -59,6 +59,35 @@ struct DrivetrainInput {
 	bool shift_up = false; // a request, true for one substep
 	bool shift_down = false;
 	double axle_speed = 0.0; // rad/s of the solid rear axle, from the solver
+
+	// The most torque the rear tires can transmit to the road right now, N m at
+	// the axle. **Negative means "not supplied"**, in which case the traction
+	// assist below does nothing and this file behaves exactly as it did before it
+	// existed. The solver fills it, because it is the only thing that knows the
+	// current normal loads, the surface, and how much of the friction circle the
+	// lateral force has already spent.
+	//
+	// The sentinel is negative rather than zero, and that is not a style choice.
+	// It was `<= 0.0` for one measured iteration, and **zero is the single most
+	// important value this field takes**: it is what the solver returns when the
+	// rear axle is already past its peak slip ratio and the correct amount of drive
+	// torque is none at all. Treating it as "no information" switched the assist off
+	// in exactly the case it exists for, and the launch burnout was unchanged to
+	// three significant figures — 1.49 s above a slip ratio of 0.5 before and after,
+	// which reads exactly like an assist that does not work rather than like a
+	// sentinel collision. Same family as `Dictionary.get(key, default)` hiding a
+	// renamed key: a sentinel that overlaps a legitimate value hides it forever.
+	//
+	// **This is the signal the assists were missing, and its absence is #137.**
+	// Every loop in this file used to close on `axle_speed`, and `axle_speed` is
+	// not road speed once the tires are spinning: it is the *wheelspin*. So the
+	// auto-clutch read a rising axle as a kart that was accelerating and kept
+	// feeding the lever in, `can_lock` saw the axle "catch up" to the engine and
+	// welded the crank to a wheel doing 8.7x road speed, and the auto-shift's
+	// "what will the engine be doing in the next gear" guard computed its answer
+	// from the same spinning axle and upshifted into a continuing burnout.
+	double axle_traction_torque = -1.0;
+
 	double dt = 0.0; // seconds
 };
 
@@ -82,14 +111,48 @@ struct DrivetrainAssists {
 	// Auto-clutch. The lever is moved across the clutch's working range in
 	// proportion to how far the engine is into its powerband, which sounds
 	// arbitrary and is not: it makes the clutch's capacity meet the engine's
-	// torque curve at a stable point. Below 8,000 rpm the engine makes less than
-	// the clutch can hold at that lever position, so it accelerates; above about
-	// 10,500 the clutch can hold more than the engine makes, so it is pulled
-	// back. The launch therefore settles near 10,500 rpm with the clutch slipping
-	// — which is what a KZ driver does by hand, and it is not a coincidence:
-	// both are looking for the same equilibrium.
+	// torque curve at a stable point.
+	//
+	// **This used to end "the launch therefore settles near 10,500 rpm with the
+	// clutch slipping — which is what a KZ driver does by hand", and it does not.**
+	// Measured on the shipped launch: the engine ramps monotonically from 1,911 to
+	// 10,411 rpm over 0.67 s, mean 6,068, and then the clutch **locks** at 0.73 s
+	// and 1.14 m/s. It settles nowhere. The equilibrium the paragraph describes is
+	// real arithmetic — capacity at 10,500 rpm is 22.5 N m against about 26 N m of
+	// engine torque, so the crossing is nearer 11,500 — but the launch never gets
+	// there, because the rear tires break traction first and the *axle* accelerates
+	// up to meet the engine instead of the other way round. `can_lock` then sees a
+	// synchronized clutch and welds the crank to a wheel doing 8.7x road speed.
+	// Fourth case of a docstring describing behavior nobody built; the traction
+	// assist below is what closed it.
 	double clutch_in_start_rpm = 8000.0;
 	double clutch_in_full_rpm = 13000.0;
+
+	// **The traction half of the auto-clutch.** Issue #137's launch, which is a
+	// necessary part of #137 and is not the whole of it — the ticket is still open
+	// and the skidpad still departs. See the ADR.
+	//
+	// The rpm schedule above is a feed-forward: it decides how hard to clamp the
+	// plates from how far the engine is into its band, and it cannot see the road.
+	// That is fine right up until the rear tires let go, at which point every
+	// number it is reading becomes a description of the wheelspin rather than of
+	// the kart, and it keeps feeding the lever in against a wheel that has already
+	// stopped transmitting. Measured on a full-throttle launch before this existed:
+	// the rear axle blew through its peak slip ratio in **75 ms**, reached 8.68x
+	// road speed, and stayed above a slip ratio of 1.0 for **1.18 s**. After:
+	// 2.08x, and 0.22 s.
+	//
+	// So the assist also holds the torque below what the tires can actually take.
+	// `DrivetrainInput::axle_traction_torque` is that number and `vehicle.h`'s
+	// `rear_traction_torque` computes it; the rule here is one line with no
+	// constant in it — do not ask the rear tires for more than they can transmit.
+	//
+	// It is an **assist** and it is switched with the rest of them. With
+	// `auto_clutch` off nothing here runs, and a driver who dumps the lever at
+	// 10,000 rpm gets the burnout he asked for, which is the behavior issue #38
+	// wants available. What it must never become is a hidden traction limit on the
+	// unassisted car.
+	bool traction_clutch = true;
 
 	// Once locked the clutch stays locked down to here, which is what keeps the
 	// kart drivable at walking pace instead of the clutch popping open every time
@@ -183,7 +246,39 @@ public:
 			throttle = 0.0;
 		}
 
-		const double engine_torque = engine.torque(rpm, throttle);
+		double engine_torque = engine.torque(rpm, throttle);
+
+		// **The traction assist, and issue #137's fix.** See
+		// `DrivetrainAssists::traction_clutch` and `DrivetrainInput::axle_traction_torque`.
+		//
+		// It is a **torque cut at the crank**, which is both what real traction
+		// control does — it pulls ignition or fuel, it does not touch the clutch —
+		// and, measured, the only actuator here that does not cost more than it
+		// buys. Capping the *clutch capacity* instead was tried first and is
+		// falsified: it holds the pack open, `reflected_inertia` is zero for a
+		// slipping clutch by construction, and the low-speed longitudinal clamp in
+		// `vehicle.h` is inversely proportional to that inertia — so the tire force
+		// ceiling collapsed from 1,270 N to about 600 N per rear corner and 0-100
+		// went **4.50 s -> 6.04 s** while the burnout it was aimed at did close. A
+		// torque cut leaves the lock state, the reflected inertia and the clamp
+		// exactly where they were.
+		//
+		// `ratio` converts the axle-side limit to the crank side, which is the side
+		// every torque in this branch is expressed on, and it is the same ratio the
+		// torque is multiplied by on the way out — so capping the crank at
+		// `axle_traction_torque / ratio` caps the axle at `axle_traction_torque` and
+		// at nothing else.
+		//
+		// Only ever downward and only ever on drive. A negative `engine_torque` is
+		// engine braking, which no traction assist has any business touching.
+		if (assists.auto_clutch && assists.traction_clutch &&
+				input.axle_traction_torque >= 0.0 && ratio > 0.0 && engine_torque > 0.0) {
+			const double crank_limit = input.axle_traction_torque / ratio;
+			if (crank_limit < engine_torque) {
+				engine_torque = crank_limit;
+			}
+		}
+
 		const double slip = engine_speed_ - driveline_speed;
 
 		// Three ways to be disconnected: neutral, mid-shift with the dogs out,
@@ -229,8 +324,23 @@ public:
 				output.clutch_slip = 0.0;
 			} else {
 				locked_ = false;
-				const double transmitted =
+				double transmitted =
 						clutch.slipping_torque(lever, slip, engine.inertia, dt);
+				// **The same cut, on the other branch, and it is not optional.** A
+				// slipping clutch transmits its *capacity*, which does not depend on
+				// engine torque at all — so cutting the crank alone limits the axle
+				// only while the plates are locked, and a launch is precisely the case
+				// where they are not. Modeled as the assist feathering the lever,
+				// which is what the driver it stands in for is doing with his left
+				// hand, rather than as the plates transmitting less than they are
+				// clamped for.
+				if (assists.auto_clutch && assists.traction_clutch &&
+						input.axle_traction_torque >= 0.0 && ratio > 0.0 && transmitted > 0.0) {
+					const double crank_limit = input.axle_traction_torque / ratio;
+					if (crank_limit < transmitted) {
+						transmitted = crank_limit;
+					}
+				}
 				engine_speed_ += (engine_torque - transmitted) / engine.inertia * dt;
 				output.axle_torque = transmitted * ratio;
 				// Zero on purpose. A slipping clutch is a torque source, not a

@@ -526,6 +526,9 @@ public:
 
 	// Back to the grid.
 	void reset() {
+		rear_forward_speed_[0] = 0.0;
+		rear_forward_speed_[1] = 0.0;
+		rear_reflected_ = 0.0;
 		axle_speed_ = 0.0;
 		front_speed_[0] = 0.0;
 		front_speed_[1] = 0.0;
@@ -555,6 +558,12 @@ public:
 	}
 
 	// --- read-only state, for tests and telemetry -----------------------------
+
+	// The traction limit the drivetrain was handed on the last substep, N m at the
+	// axle. See `rear_traction_torque`. Read-only and for gates: `drive.sh` and
+	// `tire_probe.gd` both need to be able to say whether the limit was binding
+	// rather than infer it from a slip ratio that has several causes.
+	double traction_torque() const { return traction_torque_; }
 
 	// The solid rear axle. One number, by construction — issue #33's first
 	// acceptance criterion is that the two rear wheel speeds are identical at all
@@ -712,12 +721,30 @@ private:
 		// 5. The drivetrain, once per substep, told the axle speed it must answer
 		//    against. It does not own the axle — the tires do, and only this file
 		//    knows what they are doing.
+		//
+		//    **And it is now also told what the tires can take.** ADR-0071 named the
+		//    drivetrain's torque at launch and corner exit as #137's real defect, and
+		//    the specific thing missing was this: every assist in `drivetrain.h`
+		//    closed its loop on `axle_speed`, which stops being road speed the moment
+		//    the tires let go. The one number it needed and could not compute is the
+		//    torque the rear tires can actually put down, because that depends on the
+		//    normal loads, the surface and how much of the friction circle the lateral
+		//    force has already spent — three things only this file knows.
+		//
+		//    The lateral term is one substep stale (4.2 ms), because the tires are
+		//    solved in section 6 and the drivetrain has to answer first. That is a lag
+		//    and not an approximation of the wrong thing: at 240 Hz the lateral force
+		//    at a rear contact patch cannot move far in one substep, and the
+		//    alternative — solving the tires twice — costs more than the error.
 		DrivetrainInput drive_input;
 		drive_input.throttle = clamp01(input.throttle);
 		drive_input.clutch = clamp01(input.clutch);
 		drive_input.shift_up = deliver_shift && input.shift_up;
 		drive_input.shift_down = deliver_shift && input.shift_down;
 		drive_input.axle_speed = axle_speed_;
+		drive_input.axle_traction_torque = rear_traction_torque(
+				normal_load, body.linear_velocity.dot(to_world(body, Vec3(0.0, 0.0, -1.0))), h);
+		traction_torque_ = drive_input.axle_traction_torque;
 		drive_input.dt = h;
 		const DrivetrainOutput drive = drivetrain.step(drive_input);
 
@@ -865,6 +892,8 @@ private:
 			if (rear) {
 				tire_reaction_rear += force.longitudinal * radius;
 				rear_rolling_torque += rolling_torque;
+				// Kept for the next substep's traction limit. See section 5.
+				rear_forward_speed_[corner == CORNER_RL ? 0 : 1] = forward_speed;
 			} else {
 				integrate_front_wheel(corner, force.longitudinal * radius, rolling_torque,
 						brake, h);
@@ -897,6 +926,10 @@ private:
 			const double capacity = brake * brake_torque_rear;
 			const double brake_torque = brake_axle_torque(axle_speed_, other, inertia, capacity, h);
 			axle_speed_ += (other + brake_torque) / inertia * h;
+			// Carried for the next substep's traction limit: `rear_traction_torque`
+			// needs the inertia the axle will be swinging, and only this block knows
+			// whether the clutch was locked and therefore geared into it.
+			rear_reflected_ = drive.reflected_inertia;
 		}
 
 		// 8. Aerodynamic drag, at the center of mass. `ARCHITECTURE.md` §6: light
@@ -914,6 +947,141 @@ private:
 		telemetry_.shifting = drive.shifting;
 		telemetry_.over_rev = drive.over_rev;
 		telemetry_.frame_warp = warp_;
+	}
+
+	// The torque the two rear tires can put down right now, N m at the axle.
+	//
+	// This is the signal `drivetrain.h`'s traction assist closes its loop on, and
+	// the whole of #137 is that it did not exist. `ceiling` is what the two rear
+	// tires can carry at their current loads — `mu(N) * N * grip * r` — and the
+	// convergence term below is what actually regulates. No constant is introduced
+	// and no coefficient is invented: every quantity is already in `tire.h` or
+	// already measured this tick. The capacities of the two tire curves are the same
+	// function of load, measured bit-identical over 50-2000 N, so
+	// `longitudinal.friction_at` here is not a choice between two numbers.
+	//
+	// **Deducting the lateral force to make `ceiling` a friction circle was tried
+	// and is falsified.** The argument for it is good — a kart leaving a corner has
+	// most of its rear grip pointing sideways, so a flat `mu * N` over-permits
+	// mid-corner drive — and it measures worse anyway, because the convergence term
+	// already catches every case the circle was meant to catch and the circle then
+	// keeps cutting after the axle is back under control. It moved a settled corner
+	// that this repo has published numbers for, 25 m/s at 0.60 lock, from **100.2
+	// km/h on a 45.5 m radius to 76.6 km/h on 26.0 m**, while changing the launch by
+	// nothing at all: 0-100 4.41 s, top speed 140.0 km/h and 0.42 s above a slip
+	// ratio of 0.5 either way, to three figures. A term that only moves the figures
+	// it was not aimed at is not carrying its weight.
+	//
+	// ## Why the ceiling alone is not enough, measured
+	//
+	// The first version of this returned the circle-limited peak and nothing else,
+	// and it **did not work**: 1.49 s above a slip ratio of 0.5 before and 1.49 s
+	// after, peak slip ratio 8.68 before and 9.15 after. The reason is that a tire
+	// only *delivers* its peak force at its peak slip ratio. Handing the axle
+	// exactly the peak force therefore puts it at a **marginal** equilibrium — the
+	// slip sits at the top of the curve where the derivative is zero, any overshoot
+	// crosses onto the falling side where more slip means less force, and it runs
+	// away from there. Measured on a launch, the axle crossed its peak slip ratio in
+	// **75 ms**, which is nine substeps: there is no feed-forward that survives that.
+	//
+	// So the limit also converges the axle *onto* that peak rather than merely
+	// permitting it:
+	//
+	//     tau = ceiling + f * I * (target_speed - axle_speed) / h
+	//
+	// which is the same argument `clutch.h` makes for its own convergence clamp and
+	// `KartVehicle::step` makes for the low-speed tire clamp — a torque that cannot
+	// overshoot the state it is aiming at cannot oscillate about it — and `f` is
+	// `SLIP_CONVERGENCE_FRACTION` for the reason argued at its declaration: pure
+	// deadbeat is marginal rather than stable, and this loop carries a one-substep
+	// lag on top of that.
+	//
+	// **It introduces no constant of its own.** The target is `tire.h`'s own
+	// `longitudinal_peak_slip`, the standstill floor is `SLIP_REFERENCE_SPEED`, and
+	// the damping is `SLIP_CONVERGENCE_FRACTION`. All three are read; none is chosen
+	// here. The damping was swept afterwards rather than assumed, and the value that
+	// needed no new constant is also the best one on every acceptance figure — a
+	// stiffer loop regulates the slip harder and accelerates the kart *less*, which
+	// is worth stating because it is the opposite of the obvious expectation:
+	//
+	//     gain   0-100 s   top km/h   peak slip ratio   s above k=0.5
+	//     0.5      4.41      140.0         2.67             0.42
+	//     1.0      4.66      139.4         1.26             0.39
+	//     2.0      5.08      138.2         0.82             0.38
+	//     4.0      5.66      135.9         0.51             0.34
+	//     8.0      6.41      132.1         0.47             0.00
+	//
+	// So driving the wheelspin to zero is **not** the objective and chasing it costs
+	// two seconds. The loop is there to stop a runaway, not to hold a slip target.
+	//
+	// **The base term is `ceiling` and not the tire's last reaction torque**, and
+	// that distinction was worth 4.50 s against a kart that would not leave the
+	// line. Written against last substep's measured reaction it **deadlocks at
+	// rest**: the tires have made no force yet, so the allowance is nearly zero, so
+	// the torque is cut to nearly zero, so the tires make no force — measured, the
+	// kart covered 22.8 m in ten seconds and never reached 100 km/h. `ceiling` is
+	// what the tire *will* make once it is at the target slip, which is the quantity
+	// the loop is aiming at, and it is available without integrating anything.
+	double rear_traction_torque(const double normal_load[CORNER_COUNT],
+			double forward_speed, double h) const {
+		double ceiling = 0.0;
+		for (int corner = CORNER_RL; corner <= CORNER_RR; ++corner) {
+			const double load = normal_load[corner];
+			if (load <= 0.0) {
+				continue;
+			}
+			const double grip = contact_[corner].surface_grip > 0.0
+					? contact_[corner].surface_grip
+					: 0.0;
+			ceiling += tire_[corner].longitudinal.friction_at(load) * load * grip *
+					rolling_radius(corner);
+		}
+		if (!(h > 0.0)) {
+			return ceiling;
+		}
+
+		// The axle speed at which the rear tires sit exactly at their peak slip
+		// ratio. Below `SLIP_REFERENCE_SPEED` the slip ratio's own denominator is
+		// floored, so the target slip *velocity* floors with it — which is what
+		// keeps a standing start from being told to hold zero wheelspin and never
+		// move.
+		const double radius = rolling_radius(CORNER_RL);
+		if (!(radius > 0.0)) {
+			return ceiling;
+		}
+
+		// **Measured against the FASTER rear wheel, and that is the whole of why
+		// this does not eat the kart's character.** The two rear wheels are one
+		// shaft (#33), so in a corner the inside one is turning faster than its own
+		// road speed by construction — it is being over-driven, it spends grip
+		// longitudinally that it no longer has for cornering, and *that scrub is the
+		// defining kart dynamic* `ARCHITECTURE.md` §6 asks for. A traction limit
+		// referred to the body's own forward speed cannot tell that scrub from a
+		// burnout and suppresses both: measured, it took a full-lock left-hander at
+		// 6.5 m/s from 1.217 g down to 0.568 g and took three tests red, including
+		// the one whose entire subject is the scrub.
+		//
+		// Referring the target to the faster wheel's road speed separates them. The
+		// axle cannot turn slower than the fastest wheel is rolling without dragging
+		// it, so "the axle is past what the fastest wheel can accept" is wheelspin
+		// and nothing else, while the inside wheel is left free to be over-driven by
+		// as much as the cornering geometry demands. No constant is added.
+		const double outer = rear_forward_speed_[0] > rear_forward_speed_[1]
+				? rear_forward_speed_[0]
+				: rear_forward_speed_[1];
+		const double reference =
+				std::fabs(outer) > SLIP_REFERENCE_SPEED ? std::fabs(outer) : SLIP_REFERENCE_SPEED;
+		const double target_speed =
+				(outer + tire_[CORNER_RL].longitudinal_peak_slip * reference) / radius;
+		(void)forward_speed;
+
+		const double inertia = axle_inertia_ + rear_reflected_;
+		const double admissible = ceiling +
+				SLIP_CONVERGENCE_FRACTION * inertia * (target_speed - axle_speed_) / h;
+		if (admissible < 0.0) {
+			return 0.0;
+		}
+		return admissible < ceiling ? admissible : ceiling;
 	}
 
 	// The frame's warp coordinate, in closed form.
@@ -1175,6 +1343,21 @@ private:
 
 	// The integrated state. Four doubles and the drivetrain's own, and that is the
 	// complete list of what a replay has to reproduce.
+	// The previous substep's road speed under each rear tire, m/s, RL then RR.
+	// `rear_traction_torque` refers its slip target to the faster of the two; see
+	// there for why the body's own forward speed is the wrong reference. Not
+	// integrated state and not part of the replay contract -- a one-substep carry,
+	// because the drivetrain has to answer before the tires are solved.
+	double rear_forward_speed_[2] = { 0.0, 0.0 };
+
+	// The reflected engine inertia that was at the axle on the previous substep.
+	// Same one-substep carry as `rear_forward_speed_` and the same reason:
+	// `rear_traction_torque` runs before the drivetrain has answered.
+	double rear_reflected_ = 0.0;
+
+	// The last substep's traction limit, published by `traction_torque()`.
+	double traction_torque_ = 0.0;
+
 	double axle_speed_ = 0.0; // rad/s. **One** number for both rear wheels — #33.
 	double front_speed_[2] = { 0.0, 0.0 }; // rad/s, FL and FR
 	double steer_position_ = 0.0; // normalized, rate limited
