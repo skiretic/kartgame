@@ -539,9 +539,9 @@ Effort: M
 - Checkpoint volumes, lap counting, lap and sector timing. **Lap and sector timing landed at M5** — #180 wired `track.json`'s authored marks into the session runner and ADR-0051 is the design; what is left here is the *volumes*, since a checkpoint is a station in arc length today and a kart that leaves the road entirely still passes one
 - **Race sessions as configurations of M3c's session runner** — grid, countdown, racing, finished, results. This line read "race states" and was a state machine for one mode; `ARCHITECTURE.md` §17 has why that ordering was wrong
 - Track-limits detection, lap invalidation, respawn with rejoin cooldown. The off-track *definition* is the FIA's — all four wheels past the white line — and the penalty is **ours**, because the regulations attach none to it
-- Replay recording: seed + input stream + tick count
+- [x] Replay recording: seed + input stream + tick count. `replay.h` held the whole format from M3c and **nothing could reach it** -- `KartReplay` is the binding, the Godot-side file I/O and the round trip, 2026-08-07
 - Ghost recording: transform stream plus input stream; playback and rendering
-- **Determinism harness:** state hash every N ticks, replay re-sim must match. Into CI from here on.
+- [x] **Determinism harness:** state hash every N ticks, replay re-sim must match. **Accepted**: 3,000 ticks re-simulated in a second process, 3,000 of 3,000 checkpoints agree at `5553b5dc163c7e8b`; `replay.sh --break` catches 5 of 5, including a one-code (1.53e-5) throttle perturbation that diverges 26 ticks later. Not in CI -- see the CI note in M0
 - HUD: speed, RPM, **gear**, lap, position, timing, sector deltas
 - Settings menu, save and load of settings and best laps
 
@@ -553,8 +553,8 @@ Effort: M
 
 ## M7 — AI
 
-- Racing-line generation by curvature minimization from the track spline
-- Quasi-static speed profile with backward and forward braking-point passes, **gear-aware** — a KZ's narrow powerband means the profile has to know what gear the exit is taken in
+- [x] Racing-line generation by curvature minimization from the track spline. Valdirone's curvature integral 0.538 -> 0.357, tightest radius 15.00 -> 19.86 m, 2026-08-07
+- [x] Quasi-static speed profile with backward and forward braking-point passes, **gear-aware** — a KZ's narrow powerband means the profile has to know what gear the exit is taken in. Top speed lands at 145.8 km/h inside `kz_reference.h`'s 135-145 band without being told the band exists. **Its grip ceiling is read from `tire.h` at run time and its gates are relations, never absolute lap times**, so #137's eventual fix improves it rather than invalidating it
 - Pure-pursuit steering, PID speed control, shift logic, emitting the standard input struct
 - Difficulty scaling: lookahead, throttle discipline, grip ceiling, mistake injection
 - Local occupancy sampling for overtaking and avoidance
@@ -569,7 +569,7 @@ Effort: L
 ## M8 — Audio
 
 - `AudioStreamGenerator` fed from C++ DSP on the audio thread
-- **Engine synthesis:** RPM-driven harmonic stack, load-shaped envelopes, noise layer, comb-filtered exhaust resonance. A 125cc two-stroke at 13,000 rpm is a distinctive, unforgiving target — thin and screaming, with an audible transition on and off the pipe.
+- [x] **Engine synthesis:** RPM-driven harmonic stack, load-shaped envelopes, noise layer, comb-filtered exhaust resonance. A 125cc two-stroke at 13,000 rpm is a distinctive, unforgiving target — thin and screaming, with an audible transition on and off the pipe. **The stack's ceiling was fixed in Hz, so the note could not brighten with rpm and measured `centroid ~ f0^0.21` against 0.49-1.27 for real tuned pipes — duller with revs than a chainsaw.** Ceiling is a harmonic count now, 0.89. ADR-0071's sibling work, 2026-08-07
 - Shift and clutch sounds driven by drivetrain state
 - Tire scrub from slip magnitude, wind from speed
 - Surface-dependent impacts and rolling
