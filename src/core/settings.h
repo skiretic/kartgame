@@ -42,6 +42,19 @@
 
 namespace kart::core {
 
+// **Still 1 after the M5f comfort keys landed, and that is a decision.**
+//
+// `profile.h` bumps on every format change because an older build that cannot read
+// a `best` record files the whole career under `.corrupt.1`. Nothing in this file
+// can do that: an unknown key is skipped with a note, a missing key keeps its
+// default, and a file that will not parse at all is never moved aside. So adding
+// keys is safe in both directions by construction — a v1 build reading a file with
+// `field_of_view_deg` in it skips one line and draws a menu, which is the exact
+// outcome the best-effort policy was chosen for.
+//
+// There is also no settings migration chain for a number to drive. Bumping would
+// be a version nobody reads, changing on a schedule nobody can act on, and
+// `parse` would still have to tolerate every combination of keys regardless.
 inline constexpr int SETTINGS_FORMAT_VERSION = 1;
 
 // The camera rigs a settings file can name. `scripts/game/` owns what each one
@@ -82,6 +95,42 @@ inline constexpr double SETTINGS_MAX_VOLUME_DB = 6.0;
 inline constexpr double SETTINGS_MIN_DEADZONE = 0.0;
 inline constexpr double SETTINGS_MAX_DEADZONE = 0.5;
 
+// --- ARCHITECTURE.md §18's comfort options ------------------------------------
+//
+// §18 asks for six things and five of them are here; full input remapping is the
+// sixth and is a screen rather than a value, so it is not in this struct.
+//
+// **Field of view is a trim in degrees, not an absolute.** §18 says "FOV slider
+// per camera rig" and the two rigs do not share a number: `chase_camera.gd` runs
+// 62 to 78 degrees and `cockpit_camera.gd` runs 74 to 92, because a chase view
+// already shows the kart moving through the world and a cockpit view has only the
+// road going past. An absolute setting would have to pick one of those and derive
+// the other, which is a second owner of a relationship both files already state.
+// A trim added to both keeps each rig's own tuning and its own kick and still gives
+// a player the one control they actually want.
+//
+// +-20 degrees, which is generous rather than measured: it lands the chase rig at
+// 42-98 and the cockpit at 54-112, both still projections a person can drive from.
+// Estimated, per CLAUDE.md's three-way rule — there is no source for a comfortable
+// FOV range and this is a judgement about what stays usable.
+inline constexpr double SETTINGS_MIN_FOV_TRIM_DEG = -20.0;
+inline constexpr double SETTINGS_MAX_FOV_TRIM_DEG = 20.0;
+
+// Head motion, camera shake and motion blur are all **multipliers on the shipped
+// intensity**, so 1.0 is what the rigs were tuned at and 0.0 is fully off — §18
+// asks for "including full off" in as many words, and for motion blur it asks for
+// a toggle, which 0.0 is.
+//
+// The ceiling is 2.0 rather than 1.0 for one reason per setting. Head motion and
+// shake: a driver who wants more motion is as legitimate as one who wants less,
+// and a slider that only subtracts reads as an apology. Motion blur: the
+// multiplier scales `motion_blur.gd`'s 180-degree shutter, and 2.0 is exactly the
+// 360-degree shutter that file already documents as the maximum meaningful value —
+// a shutter that never closes. So the ceiling is derived there and merely shared
+// by the other two.
+inline constexpr double SETTINGS_MIN_INTENSITY = 0.0;
+inline constexpr double SETTINGS_MAX_INTENSITY = 2.0;
+
 inline double settings_clamp(double value, double low, double high) {
 	if (!(value == value)) { // NaN
 		return low > 0.0 || high < 0.0 ? low : 0.0;
@@ -95,13 +144,21 @@ inline double settings_clamp(double value, double low, double high) {
 	return value;
 }
 
-// The five settings, at the defaults a fresh install runs.
+// The eleven settings, at the defaults a fresh install runs.
 //
 // Assists both default **on** — issue #40, and `ARCHITECTURE.md` §19's
 // "unplayable for newcomers" risk with the mitigation removed. The deadzone
 // default is `project.godot`'s 0.15 for the steer actions. The volume trim is
 // ADR-0039's measured Master trim, made a preference at 0.0 here because the
 // trim itself lives on the bus and this is the player's offset from it.
+//
+// **Every comfort default is the value its consumer already shipped**, which is
+// the property that matters more than any of the individual numbers: a player who
+// never opens the settings screen must get the same picture they got before it
+// existed. A trim of 0.0 and a multiplier of 1.0 are that statement written down,
+// and `horizon_lock` is false because `cockpit_camera.gd` follows the body's roll
+// today and turning that off by default would be a silent art change shipped under
+// the heading of an accessibility option.
 //
 // The clamping setters exist because a slider cannot produce an out-of-range
 // value but a hand-edited file can, and one bad number must not cost the rest
@@ -113,12 +170,45 @@ struct Settings {
 	double master_volume_db = 0.0;
 	double steer_deadzone = 0.15;
 
+	// ARCHITECTURE.md §18's comfort block. See the constants above for what each
+	// range is and where it came from.
+	double field_of_view_deg = 0.0;
+	double head_motion = 1.0;
+	double shake = 1.0;
+	bool horizon_lock = false;
+	double motion_blur = 1.0;
+
+	// ADR-0052 §4, and it defaults **on**: pausing strikes the lap in flight.
+	//
+	// On is the honest default because the alternative is a lap time set with the
+	// game stopped in the middle of it, and a records screen has no way to show
+	// that unless the record says so — which is what issue #186's flag on the saved
+	// best is for. A player may turn it off; the best they then set is marked.
+	bool pause_invalidates_lap = true;
+
 	void set_master_volume_db(double db) {
 		master_volume_db = settings_clamp(db, SETTINGS_MIN_VOLUME_DB, SETTINGS_MAX_VOLUME_DB);
 	}
 
 	void set_steer_deadzone(double deadzone) {
 		steer_deadzone = settings_clamp(deadzone, SETTINGS_MIN_DEADZONE, SETTINGS_MAX_DEADZONE);
+	}
+
+	void set_field_of_view_deg(double degrees) {
+		field_of_view_deg =
+				settings_clamp(degrees, SETTINGS_MIN_FOV_TRIM_DEG, SETTINGS_MAX_FOV_TRIM_DEG);
+	}
+
+	void set_head_motion(double scale) {
+		head_motion = settings_clamp(scale, SETTINGS_MIN_INTENSITY, SETTINGS_MAX_INTENSITY);
+	}
+
+	void set_shake(double scale) {
+		shake = settings_clamp(scale, SETTINGS_MIN_INTENSITY, SETTINGS_MAX_INTENSITY);
+	}
+
+	void set_motion_blur(double scale) {
+		motion_blur = settings_clamp(scale, SETTINGS_MIN_INTENSITY, SETTINGS_MAX_INTENSITY);
 	}
 
 	bool set_camera(int value) {
@@ -137,9 +227,38 @@ inline constexpr const char *SETTINGS_PREAMBLE =
 		"# profile.save -- a career that will not parse must still leave a menu a\n"
 		"# player can read. See src/core/settings.h, ADR-0042.\n";
 
-// The whole document is ASCII by construction — five keys, two words and three
+// The whole document is ASCII by construction — twelve keys, five words and six
 // numbers — so a byte count of the buffer is a character count of the file.
-inline constexpr int SETTINGS_TEXT_CHARS = 512;
+//
+// **512 was sized for five keys and is no longer enough**, so here is the
+// arithmetic rather than another round number. Every line is `key`, one space, the
+// widest value, a newline; a `format_value` number is at most `-60.000000`, ten
+// characters.
+//
+//     preamble                                                        200
+//     settings_version 1                                    17 + 1 + 1 +  1 =  20
+//     assist_auto_clutch false                              18 + 1 + 5 +  1 =  25
+//     assist_auto_shift false                               17 + 1 + 5 +  1 =  24
+//     camera cockpit                                         6 + 1 + 7 +  1 =  15
+//     master_volume_db -60.000000                           16 + 1 + 10 + 1 =  28
+//     steer_deadzone 0.500000                               14 + 1 + 10 + 1 =  26
+//     field_of_view_deg -20.000000                          17 + 1 + 10 + 1 =  29
+//     head_motion 2.000000                                  11 + 1 + 10 + 1 =  23
+//     shake 2.000000                                         5 + 1 + 10 + 1 =  17
+//     horizon_lock false                                    12 + 1 + 5 +  1 =  19
+//     motion_blur 2.000000                                  11 + 1 + 10 + 1 =  23
+//     pause_invalidates_lap false                           21 + 1 + 5 +  1 =  28
+//                                                                        ------
+//                                                                          477
+//
+// The preamble is 197 characters and is counted at 200. 477 plus the terminator is
+// 478, which 512 would just clear — and "just clears it" is how a buffer gets
+// overrun by the next key somebody adds. 768 is the next size with room for
+// roughly ten more keys, and `settings_format` returns -1 rather than truncating
+// if it is ever wrong. A unit test formats the widest possible `Settings` and
+// asserts the measured length against this constant, so the arithmetic above is
+// checked rather than trusted.
+inline constexpr int SETTINGS_TEXT_CHARS = 768;
 
 // Declaration order, fixed, one key per line, every number through `tuning.h`'s
 // `format_value` so a deadzone and a tunable are quantized to the same 1e-6
@@ -191,6 +310,39 @@ inline int settings_format(const Settings &settings, char *out, int cap) {
 	}
 	put("steer_deadzone ");
 	put(number);
+	put("\n");
+
+	// ARCHITECTURE.md §18's comfort block, in declaration order like everything
+	// above it.
+	if (format_value(settings.field_of_view_deg, number, static_cast<int>(sizeof(number))) < 0) {
+		return -1;
+	}
+	put("field_of_view_deg ");
+	put(number);
+	put("\n");
+	if (format_value(settings.head_motion, number, static_cast<int>(sizeof(number))) < 0) {
+		return -1;
+	}
+	put("head_motion ");
+	put(number);
+	put("\n");
+	if (format_value(settings.shake, number, static_cast<int>(sizeof(number))) < 0) {
+		return -1;
+	}
+	put("shake ");
+	put(number);
+	put("\n");
+	put("horizon_lock ");
+	put(settings.horizon_lock ? "true" : "false");
+	put("\n");
+	if (format_value(settings.motion_blur, number, static_cast<int>(sizeof(number))) < 0) {
+		return -1;
+	}
+	put("motion_blur ");
+	put(number);
+	put("\n");
+	put("pause_invalidates_lap ");
+	put(settings.pause_invalidates_lap ? "true" : "false");
 	put("\n");
 
 	if (overflow) {
@@ -390,6 +542,54 @@ inline void settings_parse(const char *text, int len, Settings &out, SettingsPar
 				++report.applied;
 			} else {
 				report.note(line_number, SettingsProblem::NotANumber, key, key_len);
+			}
+		} else if (profile_text_equals(key, key_len, "field_of_view_deg")) {
+			if (parse_value(value, value_len, number)) {
+				out.set_field_of_view_deg(number);
+				++report.applied;
+			} else {
+				report.note(line_number, SettingsProblem::NotANumber, key, key_len);
+			}
+		} else if (profile_text_equals(key, key_len, "head_motion")) {
+			if (parse_value(value, value_len, number)) {
+				out.set_head_motion(number);
+				++report.applied;
+			} else {
+				report.note(line_number, SettingsProblem::NotANumber, key, key_len);
+			}
+		} else if (profile_text_equals(key, key_len, "shake")) {
+			if (parse_value(value, value_len, number)) {
+				out.set_shake(number);
+				++report.applied;
+			} else {
+				report.note(line_number, SettingsProblem::NotANumber, key, key_len);
+			}
+		} else if (profile_text_equals(key, key_len, "horizon_lock")) {
+			if (profile_text_equals(value, value_len, "true")) {
+				out.horizon_lock = true;
+				++report.applied;
+			} else if (profile_text_equals(value, value_len, "false")) {
+				out.horizon_lock = false;
+				++report.applied;
+			} else {
+				report.note(line_number, SettingsProblem::NotABool, key, key_len);
+			}
+		} else if (profile_text_equals(key, key_len, "motion_blur")) {
+			if (parse_value(value, value_len, number)) {
+				out.set_motion_blur(number);
+				++report.applied;
+			} else {
+				report.note(line_number, SettingsProblem::NotANumber, key, key_len);
+			}
+		} else if (profile_text_equals(key, key_len, "pause_invalidates_lap")) {
+			if (profile_text_equals(value, value_len, "true")) {
+				out.pause_invalidates_lap = true;
+				++report.applied;
+			} else if (profile_text_equals(value, value_len, "false")) {
+				out.pause_invalidates_lap = false;
+				++report.applied;
+			} else {
+				report.note(line_number, SettingsProblem::NotABool, key, key_len);
 			}
 		} else {
 			report.note(line_number, SettingsProblem::UnknownKey, key, key_len);

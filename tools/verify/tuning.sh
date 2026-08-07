@@ -3,7 +3,13 @@
 # What has been tuned away from its sourced default, and by how much.
 #
 #     tools/verify/tuning.sh                        audit the defaults
-#     tools/verify/tuning.sh --preset=path/to.tune  audit one preset
+#     tools/verify/tuning.sh --preset=path/to.tuning  audit one preset
+#
+# `.tuning`, not `.tune`. This line and CLAUDE.md's command table both said
+# `.tune` for a milestone while `tuning_panel.gd:71` has always written
+# `PRESET_EXTENSION := ".tuning"`. Harmless so far, because `--preset=` takes any
+# path -- but a preset picker built off the documented spelling would list an
+# empty directory and report it as "no presets saved".
 #     tools/verify/tuning.sh --check                the gate
 #
 # `ARCHITECTURE.md` §19 names unbounded vehicle tuning as the live risk, and

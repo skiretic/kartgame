@@ -41,12 +41,19 @@ func build() -> void:
 		margin.add_theme_constant_override("margin_" + side, 56)
 	add_child(margin)
 
+	# **The cards flank the backdrop; they do not sit on it.** The plate puts one
+	# at each edge with the vignette visible between them, and the first build
+	# centered the pair — which laid both cards across the kart's bodywork and
+	# made the paddock read as a menu with a photograph behind it rather than as a
+	# place with a menu in it. The expanding spacer is what holds them apart.
 	var columns := HBoxContainer.new()
-	columns.alignment = BoxContainer.ALIGNMENT_CENTER
-	columns.add_theme_constant_override("separation", 24)
+	columns.add_theme_constant_override("separation", 0)
 	margin.add_child(columns)
 
 	columns.add_child(_where_you_go())
+	var gap := Control.new()
+	gap.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	columns.add_child(gap)
 	columns.add_child(_where_you_are())
 
 
@@ -178,10 +185,22 @@ func _state_lines() -> PackedStringArray:
 	])
 	for index: int in mini(profile.best_count(), 3):
 		var best: Dictionary = profile.best_at(index)
+		# **Indexed with `[]`, not `get(key, default)`, because these keys are a
+		# contract.** This line read `best.get("track_id", "?")` and there is no
+		# `track_id` in `KartProfile::best_at` — it publishes `track` — so every
+		# row would have shown `?` for the circuit, forever, silently. That is the
+		# exact shape `kart_body.cpp` warns about a few lines above the Dictionary
+		# it fills, and the same one that pinned `valdirone.tscn`'s front wheels
+		# dead straight through every corner for a milestone.
+		#
+		# `layout` and `kart_class` are **ints**, so they go through the session's
+		# own spellers rather than being interpolated raw — printed straight they
+		# read `0` and `1` where they mean `forward` and `KZ2`.
 		lines.append("%s %s %s   %s" % [
-			best.get("track_id", "?"), best.get("layout", "?"),
-			best.get("kart_class", "?"),
-			SessionRunner.format_time(float(best.get("lap_time_s", -1.0))),
+			best["track"],
+			KartSession.layout_name(int(best["layout"])),
+			KartSession.kart_class_name(int(best["kart_class"])).to_upper(),
+			SessionRunner.format_time(float(best["lap_time_s"])),
 		])
 	return lines
 

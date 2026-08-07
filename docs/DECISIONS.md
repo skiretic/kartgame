@@ -4528,3 +4528,104 @@ is a wheels change and wants its own ticket.
 
 Outboard extreme 484 → **482**; rim clearance 3.50 → **5.50 mm**; tire 5.89 →
 6.46. Every declared joint still touches: pads 0.00, bracket 0.48, hose 0.03.
+
+## ADR-0070 — Five things the shell build decided that the mockups could not
+
+2026-08-06. ADR-0052 settled the shell's behavior and ADR-0053 its structure, and
+between them they answered almost everything. Five questions only appeared once
+the code existed, and each was resolved against a measurement.
+
+**1. Menu input is consumed in `_input()`, because the engine is already a second
+focus walker.** ADR-0053 §2 gave menus their own `[input]` entries so the two
+contexts would be separable. What nobody had checked is that Godot's own
+`ui_up/down/left/right` are **already bound to the identical event set** — arrow
+key, joypad buttons 11-14 and both left-stick half-axes — and that the engine
+walks focus on them inside the `Viewport`'s GUI pass, which runs after `_input()`
+and before `_unhandled_input()`. A stack reading its directions in
+`_unhandled_input` therefore moves the selection twice on every press, and the
+second move is invisible in the code that causes it. `ScreenStack` reads all six
+in `_input()` and calls `set_input_as_handled()`, so there is exactly one walker.
+The two bindings that are genuinely new are **Cross and Circle**: `ui_accept` is
+Enter/KP-Enter/Space and `ui_cancel` is Escape, and neither carries a face
+button. That gap is the whole of what ADR-0053 §2 was closing.
+
+**2. The shell's type scale divides by 900; the in-race HUD keeps dividing by
+1080.** `window/stretch/mode="canvas_items"` with `aspect="expand"` pins the
+viewport *height* at `viewport_height`, so the shell's divisor is exactly 1.0 in
+the shipped game at every window size. Dividing by 1080 instead would multiply
+the whole shell by 0.833 and render the plate's 10 px column heads at 8.3 — the
+bug `project.godot`'s `[display]` comment is the receipt for. `driving_hud.gd`
+and `timing_hud.gd` keep their own /1080 because they were tuned by eye at the
+size it produces, and "fixing" the divisor would silently resize a HUD nobody
+asked to change. The two conventions coexist deliberately and both files say so.
+
+**3. The results sheet's `Spd` column is a speed-trap reading, not a lap
+maximum.** One station, one sample, at `measurements()["longest_straight_at"]`
+plus half the straight. A lap maximum is a different measurement wearing the
+sheet's label: a driver comparing their figure against a real timing sheet's trap
+speed would be comparing two unlike things and the sheet gives no clue which it
+shows. The station is derived from the circuit, so it follows a re-authored
+track. On Valdirone the longest straight runs *through* the start line, which
+puts the trap at 5.5 m — correct, and a thinner margin against tick ordering than
+it looks, so `trap_station_m()` is public for the next circuit's author to check.
+
+**4. The paddock backdrop is the Valdirone grid, staged from assets that already
+exist.** A parked camera at the pole slot with `valdirone_nuova.glb`, `kart.glb`
+and `look_env.gd` — zero new Blender modules, and #188's generated paddock
+replaces one function later. Two numbers are derived rather than chosen. The
+camera sits at **6.62 m**: the two cards flank the vignette, so the middle third
+of the frame must hold the machine, and at a 42° vertical FOV the visible height
+is `2 · 6.62 · tan 21°` = 5.08 m, putting a 1.15 m kart at 23% of frame height.
+The first build sat at 4.05 m — 37%, nose cropped, both cards across the
+bodywork. And the kart is **dropped onto the built mesh**, because
+`grid_transform()` returns a *spawn* pose carrying `KartRig.SPAWN_LIFT`: a
+physics kart settles out of it and a static mesh keeps it forever, measured at
+120 mm of daylight under the tires. The drop is barycentric ray-triangle against
+the `.glb` actually drawn, not against `KartTrack.sample()`, because the sampler
+returns the centerline and the pole slot is 3 m to the side where crossfall has
+taken the asphalt lower. A physics settle — which `circuit_probe.gd` does at 40
+stations — is unavailable here: `shell_probe.gd` check 9b forbids any simulation
+state under `ShellRoot`, and that assertion is what M6's determinism harness
+rests on.
+
+`--backdrop=flat` is the second mode and is not a debug convenience. A fresh
+worktree has no `assets/generated/`, so a gate needing the `.glb`s could not run
+where agents actually work; it is what makes the shell probe a structural gate
+rather than an integration test wearing one.
+
+**5. The `best` record has a spelling for "no ghost", and the profile format is
+version 2.** The setup screen offers "Ghost: off / personal best", and with it off
+`set_best` returned false: `profile_is_slug` is false on `len <= 0`, and
+`is_valid()` and the binder agreed, so a lap time set on the first session anybody
+drives silently did not save. The record is space-separated tokens and an empty
+trailing token is not a token, so the sentinel is **`-`** — the one character
+that cannot collide, because `profile_is_slug_within` already refuses a slug
+beginning with it. In memory "no ghost" is an empty `ghost_id`; `-` is converted
+at `format_profile` and at the binder and never reaches memory, so nothing
+downstream can resolve `user://ghosts/-.ghost`. The same pass adds #186's
+`pause_forgiven` as an **optional sixth token written only when true**, which is
+what keeps every record a version 1 profile could hold byte-identical — proved:
+the four `best` lines in `tests/data/saves/v1.save` are reproduced by the current
+writer, sha256-identical. `ProfileKeySpec.token_count` became
+`token_min`/`token_max` to express that.
+
+**The version bump to 2 is required even though the writer's bytes did not
+move**, and the classification rule is not "did the writer change" but "can an
+older build destroy a save it cannot read": a v2 file with a no-ghost best is
+`BadIdentifier` to a v1 reader, which files an intact career under
+`profile.save.corrupt.1`. `FutureVersion` exists to prevent exactly that and only
+a version number produces it. **`SETTINGS_FORMAT_VERSION` deliberately stays 1**:
+settings loading is best-effort by design, so an older build reading a newer file
+skips a line and still draws a menu, and there is no migration chain a number
+could drive.
+
+**Consequences.**
+
+- ROADMAP M5f ticks the shell scene, the theme, menu input, #186 and the shell
+  probe. The season calendar (ADR-0053 §4), the flag generator (#187) and paddock
+  stage 1 (#188) are **not** in this push and stay open.
+- `tools/verify/shell.sh` joins the gate list, with `--break`'s twelve negative
+  controls. The wave found six checks in the first cut of the probe that could
+  not fail; a gate without inverted-exit sabotage modes is not trusted here.
+- Ten screens are built to plate fidelity and **unjudged**. ADR-0053 §3 stands:
+  numbers gate structure, Anthony's eye gates looks.

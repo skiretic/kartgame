@@ -25,16 +25,25 @@ get tidied up.
 | File | Version | Notes |
 | --- | --- | --- |
 | `v1.save` | 1 | Hand-authored, the start of the history. See below. |
+| `v2.save` | 2 | Hand-authored. The `-` no-ghost sentinel and `pause_forgiven`. |
 
 `v1.save` is the honest start of a history rather than an invented past. It was
 written by hand — a real file with real values, typed out, not produced by
 `format_profile` — and committing it is what makes it a capture. Nothing has been
-regenerated since.
+regenerated since, and the bump to version 2 did not touch it.
 
-There is no `v2.save` or `v3.save`, and there will not be until versions 2 and 3
-actually exist. Inventing a fictional old version to have something to migrate
-would put a fake file in a directory whose entire value is that its files are
-real.
+`v2.save` was hand-authored the same way, for the same reason, and it exists
+because version 2's two additions to the `best` record cannot appear in a v1
+capture: the `-` no-ghost sentinel and the optional `pause_forgiven` token are the
+whole content of the bump, so a corpus without a file carrying them would not
+exercise the thing that changed. It holds all four combinations — ghost with and
+without the flag, no ghost with and without it — because the writer's decision is a
+product of two independent booleans and testing three of the four corners is how
+the fourth stays broken.
+
+There is no `v3.save`, and there will not be until version 3 actually exists.
+Inventing a fictional version to have something to migrate would put a fake file in
+a directory whose entire value is that its files are real.
 
 ## Adding a file when the version bumps
 
@@ -56,10 +65,17 @@ When `PROFILE_FORMAT_VERSION` goes from N to N+1:
 
 ## The byte-identity assertion, and why a comment is a format change
 
-`test_profile.cpp` asserts that `v1.save` is **byte-identical** to what
-`format_profile` produces from the profile it parses to. That is deliberately
+`test_profile.cpp` asserts that the **newest** corpus file is byte-identical to
+what `format_profile` produces from the profile it parses to. That is deliberately
 strict: it means changing anything the writer emits, down to a word in the comment
 preamble, fails the suite until the version is bumped and a new file is captured.
+
+An **older** file cannot satisfy that assertion — its `version` line is by
+definition not the current one — so the test for an older file asserts the next
+strongest thing: that the writer's output differs from the capture in the version
+line and **nowhere else**. That is a real statement about the 1 -> 2 migration
+rather than a weakening of the rule. A migration that quietly re-rounded a lap time
+or dropped a standings row fails it on the byte where it did so.
 
 ADR-0042 chose to bump on *every* format change rather than only on incompatible
 ones, because the alternative asks somebody to correctly classify a change as

@@ -35,6 +35,53 @@ TEST_CASE("the defaults are the documented defaults") {
 	CHECK(fresh.camera == SettingsCamera::Chase);
 	CHECK(fresh.master_volume_db == 0.0);
 	CHECK(fresh.steer_deadzone == 0.15); // project.godot's steer-action deadzone
+
+	// ARCHITECTURE.md §18's comfort block. **Every one of these is the value its
+	// consumer already shipped**, which is the property that matters more than the
+	// individual numbers: a player who never opens the settings screen must get
+	// exactly the picture they got before the screen existed. A trim of zero and a
+	// multiplier of one are that written down.
+	CHECK(fresh.field_of_view_deg == 0.0);
+	CHECK(fresh.head_motion == 1.0);
+	CHECK(fresh.shake == 1.0);
+	CHECK(fresh.horizon_lock == false); // cockpit_camera.gd follows the body today
+	CHECK(fresh.motion_blur == 1.0); // motion_blur.gd's 180-degree shutter, unscaled
+
+	CHECK(fresh.pause_invalidates_lap); // ADR-0052 §4
+}
+
+TEST_CASE("the widest possible settings file fits SETTINGS_TEXT_CHARS") {
+	// The header carries the arithmetic; this checks it rather than trusting it.
+	// 512 was sized for five keys and the M5f comfort block took the document past
+	// it, which is the kind of overrun that shows up as a settings file silently
+	// refusing to save.
+	Settings widest;
+	widest.auto_clutch = false;
+	widest.auto_shift = false;
+	widest.camera = SettingsCamera::Cockpit; // the longest camera name
+	widest.set_master_volume_db(SETTINGS_MIN_VOLUME_DB); // -60.000000, ten characters
+	widest.set_steer_deadzone(SETTINGS_MAX_DEADZONE);
+	widest.set_field_of_view_deg(SETTINGS_MIN_FOV_TRIM_DEG); // -20.000000
+	widest.set_head_motion(SETTINGS_MAX_INTENSITY);
+	widest.set_shake(SETTINGS_MAX_INTENSITY);
+	widest.horizon_lock = false; // `false` is a character longer than `true`
+	widest.set_motion_blur(SETTINGS_MAX_INTENSITY);
+	widest.pause_invalidates_lap = false;
+
+	static char text[SETTINGS_TEXT_CHARS];
+	const int length = settings_format(widest, text, SETTINGS_TEXT_CHARS);
+	REQUIRE(length > 0);
+	MESSAGE("widest settings document: " << length << " of " << SETTINGS_TEXT_CHARS
+										 << " characters");
+	// Room for roughly ten more keys. A buffer that only just clears is a buffer the
+	// next key overruns.
+	CHECK(length < SETTINGS_TEXT_CHARS - 200);
+
+	// And it refuses rather than truncating when the buffer genuinely is too small,
+	// which is the property that makes the margin above a comfort rather than a
+	// requirement.
+	static char cramped[64];
+	CHECK(settings_format(widest, cramped, static_cast<int>(sizeof(cramped))) < 0);
 }
 
 TEST_CASE("the text round-trips to byte-identical text") {
@@ -43,6 +90,15 @@ TEST_CASE("the text round-trips to byte-identical text") {
 	settings.camera = SettingsCamera::Cockpit;
 	settings.set_master_volume_db(-12.5);
 	settings.set_steer_deadzone(0.22);
+	// Every comfort key moved off its default too, so a key the formatter or the
+	// parser dropped shows up as a value that came back at the default rather than
+	// as an equality that was true before the round trip started.
+	settings.set_field_of_view_deg(-7.5);
+	settings.set_head_motion(0.4);
+	settings.set_shake(1.75);
+	settings.horizon_lock = true;
+	settings.set_motion_blur(0.0);
+	settings.pause_invalidates_lap = false;
 
 	static char first[SETTINGS_TEXT_CHARS];
 	const int first_length = settings_format(settings, first, SETTINGS_TEXT_CHARS);
@@ -51,7 +107,9 @@ TEST_CASE("the text round-trips to byte-identical text") {
 	Settings parsed;
 	SettingsParse report;
 	settings_parse(first, first_length, parsed, report);
-	CHECK(report.applied == 5);
+	// Eleven keys, and `settings_version` is not one of them — it is read by the
+	// version branch, which returns before `applied` is touched.
+	CHECK(report.applied == 11);
 	CHECK(report.seen_version);
 	CHECK(report.declared_version == SETTINGS_FORMAT_VERSION);
 	CHECK(report.note_count == 0);
@@ -61,6 +119,12 @@ TEST_CASE("the text round-trips to byte-identical text") {
 	CHECK(parsed.camera == settings.camera);
 	CHECK(parsed.master_volume_db == settings.master_volume_db);
 	CHECK(parsed.steer_deadzone == settings.steer_deadzone);
+	CHECK(parsed.field_of_view_deg == settings.field_of_view_deg);
+	CHECK(parsed.head_motion == settings.head_motion);
+	CHECK(parsed.shake == settings.shake);
+	CHECK(parsed.horizon_lock == settings.horizon_lock);
+	CHECK(parsed.motion_blur == settings.motion_blur);
+	CHECK(parsed.pause_invalidates_lap == settings.pause_invalidates_lap);
 
 	static char second[SETTINGS_TEXT_CHARS];
 	const int second_length = settings_format(parsed, second, SETTINGS_TEXT_CHARS);

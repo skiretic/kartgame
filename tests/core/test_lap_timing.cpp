@@ -276,6 +276,89 @@ TEST_CASE("the first reason to spoil a lap is the one reported") {
 	CHECK_FALSE(timer.last().is_valid());
 }
 
+TEST_CASE("a pause strikes the lap in flight without swallowing it") {
+	// ADR-0052 §4 and mockup plate 8. **The kart is not frozen** — an ADR-0052 pause
+	// keeps the world running and gates input at the driver — so the lap keeps timing
+	// and simply stops counting.
+	//
+	// The failure this guards against is the one this class has already had: a lap
+	// that can never close. A cut over the first mark once left `next_mark_` at 1
+	// while the arming condition only accepted a consumed mark, and the driver got no
+	// lap on the screen and no reason. So the assertions here are not just "the reason
+	// came out right" — they are that the lap *closes*, that the timer's own count
+	// went up, and that the next lap is clean.
+	const double length = 1200.0;
+	LapTimer timer;
+	timer.begin(three_sectors(length), STEP);
+	drive_lap(timer, 25.0, length); // out lap
+	REQUIRE(timer.laps_completed() == 1);
+
+	SUBCASE("struck mid-lap, the lap still runs to the line and closes") {
+		drive(timer, 0.0, 500.0, 25.0, length);
+		CHECK(timer.progress().reason == LapInvalidReason::Valid);
+
+		timer.strike_paused();
+		CHECK(timer.progress().reason == LapInvalidReason::Paused);
+		// Nothing else moved. The kart is where it was and the timer is still running.
+		CHECK(timer.progress().distance_m == doctest::Approx(500.0).epsilon(0.001));
+
+		const int ticks = drive(timer, 500.0, length, 25.0, length);
+		CHECK(ticks > 0);
+		CHECK(timer.laps_completed() == 2);
+		CHECK(timer.last().reason == LapInvalidReason::Paused);
+		CHECK_FALSE(timer.last().is_valid());
+		CHECK(timer.last().time_s > 0.0);
+		CHECK(timer.invalid_lap_count() == 2); // the out lap and this one
+		CHECK(timer.valid_lap_count() == 0);
+
+		// And the next lap is ordinary. A strike that left the marks or the travel
+		// counter disturbed would show up here as a lap that never closes.
+		drive_lap(timer, 25.0, length);
+		CHECK(timer.laps_completed() == 3);
+		CHECK(timer.last().is_valid());
+		CHECK(timer.valid_lap_count() == 1);
+	}
+	SUBCASE("struck before the first mark, the lap still closes") {
+		// The exact shape of the bug the header argues about, driven at the one place
+		// it was reachable: struck at 50 m, before the mark at 400. `strike_paused`
+		// touches no mark state at all, so `next_mark_` is still 1 and the *travel*
+		// arm is what closes the lap — which is the `||` that fixed the original.
+		drive(timer, 0.0, 50.0, 25.0, length);
+		timer.strike_paused();
+		drive(timer, 50.0, length, 25.0, length);
+		CHECK(timer.laps_completed() == 2);
+		CHECK(timer.last().reason == LapInvalidReason::Paused);
+	}
+	SUBCASE("the first reason wins, so going off then pausing reports the excursion") {
+		// A driver who put a wheel on the grass and then paused is told they went off,
+		// which is the thing they did and the thing they can fix.
+		drive(timer, 0.0, 300.0, 25.0, length, true);
+		timer.strike_paused();
+		CHECK(timer.progress().reason == LapInvalidReason::OffTrack);
+		drive(timer, 300.0, length, 25.0, length);
+		CHECK(timer.last().reason == LapInvalidReason::OffTrack);
+	}
+	SUBCASE("striking an already-struck lap twice changes nothing") {
+		drive(timer, 0.0, 300.0, 25.0, length);
+		timer.strike_paused();
+		timer.strike_paused();
+		timer.strike_paused();
+		drive(timer, 300.0, length, 25.0, length);
+		CHECK(timer.laps_completed() == 2);
+		CHECK(timer.last().reason == LapInvalidReason::Paused);
+	}
+	SUBCASE("a struck lap sets no best and no best sector") {
+		// The point of striking it. A paused lap that seeded a sector best would feed
+		// `optimal_lap_s` a split nobody drove.
+		drive(timer, 0.0, 400.0, 25.0, length);
+		timer.strike_paused();
+		drive(timer, 400.0, length, 25.0, length);
+		CHECK_FALSE(timer.best().is_valid());
+		CHECK_FALSE(lap_time_exists(timer.best_sector_s(0)));
+		CHECK(timer.optimal_lap_s() == LAP_TIME_NONE);
+	}
+}
+
 TEST_CASE("a respawn kills the lap and re-arms the marks from where the kart landed") {
 	const double length = 1200.0;
 	LapTimer timer;

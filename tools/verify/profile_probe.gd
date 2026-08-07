@@ -356,15 +356,27 @@ func _check_corpus_loads_through_godot() -> void:
 		if profile.best_ghost_path("brackwater", KartProfile.LAYOUT_FORWARD,
 				KartProfile.CLASS_OK) != SCRATCH + "/ghosts/bw_fwd_ok_0002.ghost":
 			faults.append("brackwater ghost path wrong")
-	# And the round trip is byte-identical to the captured file, which is the
-	# assertion `tests/data/saves/README.md` calls the mechanical form of "bump the
-	# version on every format change".
-	if profile.to_text().to_utf8_buffer() != corpus:
-		faults.append("re-serializing v1.save is not byte-identical")
+	# And the round trip differs from the captured file in the **version line and
+	# nowhere else**, which is what a migrated older capture can assert.
+	#
+	# It used to be plain byte identity, and that was correct while v1 was current.
+	# `PROFILE_FORMAT_VERSION` is 2 now — the `best` record grew a `-` no-ghost
+	# sentinel and an optional `pause_forgiven` token — so no v1 file can ever again
+	# equal the writer's output. `tests/data/saves/README.md` carries the reasoning;
+	# the mechanical form of "bump on every format change" moved to the newest
+	# capture, `v2.save`, which `test_profile.cpp` holds to full byte identity.
+	#
+	# This is still a real assertion about the 1 -> 2 step: it is the identity
+	# function, so a migration that re-rounded a lap time or dropped a standings row
+	# fails here on the byte where it did it.
+	var migrated := corpus.get_string_from_utf8().replace("version 1\n", "version 2\n")
+	if profile.to_text() != migrated:
+		faults.append("re-serializing v1.save differs by more than its version line")
 
 	_ok("the v1 corpus loads through user://", faults.is_empty(),
 		", ".join(faults) if not faults.is_empty() else
-			"%d bytes, 8 standings, 4 bests, re-serializes identical" % corpus.size())
+			"%d bytes, 8 standings, 4 bests, re-serializes as v2 with only the version moved"
+				% corpus.size())
 
 
 # --- 7 -------------------------------------------------------------------------
@@ -680,11 +692,14 @@ func _check_settings_load_when_the_profile_does_not() -> void:
 		and fresh_settings.get_camera() == KartSettings.CAMERA_COCKPIT \
 		and absf(fresh_settings.get_master_volume_db() + 7.5) <= HALF_QUANTUM \
 		and absf(fresh_settings.get_steer_deadzone() - 0.08) <= HALF_QUANTUM
+	# Eleven, and it is the whole schema rather than the five keys this check moved:
+	# a save writes every key, so a load applies every key. `settings_version` is not
+	# counted — the version branch returns before `applied` is touched.
 	_ok("settings load when the career does not",
 		bool(stored["ok"]) and bool(settings_loaded["ok"]) and non_default
-			and int(settings_loaded["applied"]) == 5
+			and int(settings_loaded["applied"]) == 11
 			and int(profile_loaded["status"]) == KartProfile.LOAD_CORRUPT,
-		"career %s (%s), settings applied %d/5: camera %s, master %.6f dB, deadzone %.6f" % [
+		"career %s (%s), settings applied %d/11: camera %s, master %.6f dB, deadzone %.6f" % [
 			profile_loaded["status_name"], profile_loaded["problem_name"],
 			int(settings_loaded["applied"]), fresh_settings.get_camera_name(),
 			fresh_settings.get_master_volume_db(), fresh_settings.get_steer_deadzone(),
@@ -754,9 +769,17 @@ func _check_settings_tolerate_an_unknown_key() -> void:
 	_clean_scratch()
 	var settings := KartSettings.new()
 	settings.set_base_dir(SCRATCH)
+	# **The stand-in for "a newer build's key" has to be a key that is still not
+	# built**, and this check's used to be `horizon_lock` — which M5f then built, so
+	# the probe quietly stopped testing tolerance and started testing that a real
+	# key applies. Picked a fresh one from the same list for the same reason: it is
+	# ARCHITECTURE §18's colorblind palette, which is designed, unbuilt, and has no
+	# reader anywhere in the project.
+	#
+	# The next person to build it will land here. That is the intended cost.
 	var text := "settings_version 1\n" \
 		+ "assist_auto_clutch false\n" \
-		+ "horizon_lock true\n" \
+		+ "colorblind_palette deuteranopia\n" \
 		+ "camera cockpit\n" \
 		+ "steer_deadzone not-a-number\n" \
 		+ "master_volume_db -2.500000\n"

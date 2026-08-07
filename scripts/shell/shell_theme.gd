@@ -172,13 +172,25 @@ static func face(weight: int = Weight.REGULAR, tracking_px: int = 0) -> Font:
 		variation.variation_embolden = EMBOLDEN_SEMIBOLD
 	if tracking_px != 0:
 		variation.spacing_glyph = tracking_px
-	# Belt and braces. Liberation Sans is Arial-metric and Arial's lining digits
-	# are already fixed-advance, so this should be moot -- but FRONTEND §3 calls
-	# tabular figures non-negotiable on anything that reports a time, and an
-	# assertion costs nothing next to a column of lap times that wobbles.
-	# If one ever does wobble anyway, the proven fallback is `timing_hud.gd:361`'s
-	# hand-pitched `_digits()`.
-	variation.opentype_features = {_tag("tnum"): 1}
+	# **`kern: 0` is the line that actually delivers tabular figures. `tnum` is a
+	# no-op here and shipping it alone was wrong.**
+	#
+	# Measured on Liberation Sans Bold at 30 px: every digit already has a 17.000
+	# px advance with or without `tnum` — the face carries no `tnum` table, so the
+	# feature does nothing — and yet `1:11.111` renders 141.00 px against
+	# `0:00.000`'s 146.00. Five pixels, 3.4% of the column, on a screen whose whole
+	# job is a column of lap times that line up.
+	#
+	# The cause is **kerning between digit pairs**, which `tnum` does not touch and
+	# which the Arial-metric argument does not predict. Disabling it flattens all
+	# four samples to exactly 118.00 px. The engine's own fallback face measures a
+	# uniform 147.00, so the shipped font was worse than the fallback at the one
+	# thing FRONTEND §3 calls non-negotiable.
+	#
+	# `tnum` stays because it is free and correct for any face that does carry the
+	# table. If a column ever wobbles anyway, the proven fallback is
+	# `timing_hud.gd:361`'s hand-pitched `_digits()`.
+	variation.opentype_features = {_tag("tnum"): 1, _tag("kern"): 0}
 	_faces[key] = variation
 	return variation
 

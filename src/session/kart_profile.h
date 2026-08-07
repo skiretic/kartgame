@@ -314,8 +314,19 @@ public:
 	// failed, and a best that got worse is not a best. `has_best` before and after
 	// is how a caller learns whether it improved.
 
+	// `p_ghost_id` may be the empty String, which means the lap was set with ghost
+	// recording turned off. **That is a menu row and not an edge case** — the setup
+	// screen offers "Ghost: off / personal best" — and it was refused outright until
+	// version 2 of the format: `profile_is_slug("")` is false, so `set_best` said no
+	// and the lap time silently did not save. `profile.h`'s header has the sentinel
+	// the record now uses.
+	//
+	// `p_pause_forgiven` is issue #186 and defaults false, so every existing caller
+	// keeps its meaning and only a caller that knows about ADR-0052 §4's setting has
+	// to say anything.
 	bool set_best(const godot::String &p_track_id, int p_layout, int p_kart_class,
-			double p_lap_time_s, const godot::String &p_ghost_id);
+			double p_lap_time_s, const godot::String &p_ghost_id,
+			bool p_pause_forgiven = false);
 	bool has_best(const godot::String &p_track_id, int p_layout, int p_kart_class) const;
 
 	// Seconds, or a negative number when there is no best. Negative rather than
@@ -324,14 +335,22 @@ public:
 	double best_time(const godot::String &p_track_id, int p_layout, int p_kart_class) const;
 	godot::String best_ghost_id(const godot::String &p_track_id, int p_layout,
 			int p_kart_class) const;
-	// The ghost id resolved through `ghost_path`, or empty when there is no best.
+	// The ghost id resolved through `ghost_path`, or empty when there is no best —
+	// and also empty when there is a best that has no ghost, which is why a caller
+	// deciding whether to offer a ghost checks this and not `has_best`.
 	godot::String best_ghost_path(const godot::String &p_track_id, int p_layout,
+			int p_kart_class) const;
+
+	// Whether the stored best was set with ADR-0052 §4's pause forgiveness on.
+	// False for a best that does not exist, which is the same answer a records
+	// screen wants for a blank row.
+	bool best_pause_forgiven(const godot::String &p_track_id, int p_layout,
 			int p_kart_class) const;
 
 	int best_count() const;
 	// One row, by array index, for a records screen that lists every best without
 	// knowing which tracks exist. Keys: `track`, `layout`, `kart_class`,
-	// `lap_time_s`, `ghost_id`, `ghost_path`.
+	// `lap_time_s`, `ghost_id`, `ghost_path`, `pause_forgiven`.
 	godot::Dictionary best_at(int p_index) const;
 	godot::Array bests_table() const;
 
@@ -423,23 +442,29 @@ private:
 //
 // ## What is in here is what exists
 //
-// `ARCHITECTURE.md` §18 lists nine things and most of them are not built: there is
-// no FOV slider, no shake intensity, no horizon lock, no remapping screen, no
-// colorblind palette. Putting keys in this file for settings nothing reads would
-// be a save format advertising features the game does not have, which is the exact
-// failure mode this project keeps having — an advertised control with no reader.
+// Every key in this file has a reader. Putting keys here for settings nothing
+// applies would be a save format advertising features the game does not have,
+// which is the exact failure mode this project keeps having — an advertised
+// control with no reader — and `GAMEDESIGN.md` §13 forbids a claim the code does
+// not honor.
 //
-// So the schema is five values, and every one of them can be applied today from
-// GDScript with no new engine code:
+// The schema is eleven values and each one names what applies it:
 //
-//     assist_auto_clutch    KartBody.set_auto_clutch()      #40, defaults on
-//     assist_auto_shift     KartBody.set_auto_shift()       #40, defaults on
-//     camera                which rig starts current        chase / cockpit / free
-//     master_volume_db      AudioServer.set_bus_volume_db() ADR-0039 trims Master
-//     steer_deadzone        InputMap.action_set_deadzone()  §18's deadzone slider
+//     assist_auto_clutch     KartBody.set_auto_clutch()      #40, defaults on
+//     assist_auto_shift      KartBody.set_auto_shift()       #40, defaults on
+//     camera                 which rig starts current        chase/cockpit/free
+//     master_volume_db       AudioServer.set_bus_volume_db() ADR-0039 trims Master
+//     steer_deadzone         InputMap.action_set_deadzone()  §18's deadzone slider
+//     field_of_view_deg      chase_camera.gd, cockpit_camera.gd -- a trim, not an
+//                            absolute; `settings.h` says why
+//     head_motion            cockpit_camera.gd's aim lag
+//     shake                  chase_camera.gd's lateral-G roll
+//     horizon_lock           cockpit_camera.gd
+//     motion_blur            motion_blur.gd's shutter angle
+//     pause_invalidates_lap  KartLapTimer.strike_paused(), ADR-0052 sec 4
 //
-// The file grows a key when something grows a reader. That is the whole rule, and
-// the version bump per ADR-0042 is what makes it cheap.
+// The file grows a key when something grows a reader. That is still the whole
+// rule; the M5f comfort block grew six readers first.
 //
 // ## The failure policy is the opposite of the career's, deliberately
 //
@@ -518,6 +543,42 @@ public:
 	// inside the deadzone.
 	void set_steer_deadzone(double p_deadzone);
 	double get_steer_deadzone() const;
+
+	// --- ARCHITECTURE.md §18's comfort block --------------------------------------
+	//
+	// All five clamp rather than refuse, for the reason the volume trim does: a
+	// slider cannot produce an out-of-range value and a hand-edited file must not
+	// lose the rest of its keys over one that did.
+	//
+	// **Every default is what the consumer already shipped**, so a player who never
+	// opens the settings screen sees exactly the picture they saw before it existed.
+	// `src/core/settings.h` carries the ranges and the reasoning for each.
+
+	// A trim in degrees added to both camera rigs' static and at-speed field of
+	// view. Not an absolute: the two rigs run 62-78 and 74-92 and that difference is
+	// tuned, so one number cannot be both. +-20 degrees, 0.0 by default.
+	void set_field_of_view_deg(double p_degrees);
+	double get_field_of_view_deg() const;
+
+	// Multipliers on the shipped intensity, 0.0 to 2.0, 1.0 by default. Zero is
+	// fully off, which §18 asks for in as many words.
+	void set_head_motion(double p_scale);
+	double get_head_motion() const;
+	void set_shake(double p_scale);
+	double get_shake() const;
+	// Scales `motion_blur.gd`'s 180-degree shutter, so 2.0 is the 360-degree
+	// shutter that file names as the maximum and 0.0 is §18's toggle turned off.
+	void set_motion_blur(double p_scale);
+	double get_motion_blur() const;
+
+	void set_horizon_lock(bool p_locked);
+	bool is_horizon_lock() const;
+
+	// ADR-0052 sec 4: pausing strikes the lap in flight. Defaults **on**, and a best
+	// set with it off is marked on the saved record — issue #186, and
+	// `KartProfile::set_best`'s sixth argument.
+	void set_pause_invalidates_lap(bool p_enabled);
+	bool is_pause_invalidates_lap() const;
 
 	void reset_to_defaults();
 

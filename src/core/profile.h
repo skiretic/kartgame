@@ -56,6 +56,7 @@
 //
 //     best autumn_ridge forward ok 48.123456 ar_fwd_ok_0001
 //     best autumn_ridge reverse ok 49.874000 ar_rev_ok_0001
+//     best brackwater forward ok 62.330500 - pause_forgiven
 //
 // Line oriented, one record per line, `key` then the rest of the line — which is
 // exactly `ParsedLine::Header`'s shape in `tuning.h`, and deliberately so. Numbers
@@ -102,6 +103,35 @@
 // `profile_is_slug` rejects `.` and `/`: a save file is user-writable and a ghost
 // id is pasted into a path, so the character set is a boundary and not a style
 // rule.
+//
+// ## A best lap may have no ghost at all, and `-` is how it says so
+//
+// The setup screen offers "Ghost: off / personal best", so a lap set with ghost
+// recording turned off is reachable from a menu on the first session anybody
+// drives. Version 1 had no spelling for it: the record was five whitespace-
+// separated tokens, an empty trailing token is not a token, and `profile_is_slug`
+// is false on `len <= 0` — so `set_best`, `is_valid` and the binder all three
+// refused an empty ghost id and the lap time silently did not save.
+//
+// The sentinel is **`-`**, and it is the one character that cannot collide with a
+// real id: `profile_is_slug_within` already refuses a slug that *begins* with `-`,
+// so no id a caller can construct is ever spelled that way. In memory "no ghost"
+// is an empty `ghost_id`; on disk it is `-`. The two are converted at exactly two
+// places, `format_profile` and the binder, so nothing else in the project has to
+// know the token exists.
+//
+// ## The pause flag is an optional sixth token, and its absence is the default
+//
+// ADR-0052 §4 makes pausing strike the lap in flight, with `pause_invalidates_lap`
+// a setting a player may turn off. #186: a best set with that forgiveness enabled
+// is not the same achievement as one set without it, so the record carries which
+// it was.
+//
+// It is written **only when true**, as the literal `pause_forgiven`. A best set
+// the strict way is therefore still exactly five tokens and byte-identical to what
+// version 1 wrote, so bumping the version did not rewrite a single existing line —
+// which is what let the v1 corpus file keep earning its keep instead of being
+// replaced.
 //
 // ## Settings are NOT in this struct
 //
@@ -164,7 +194,22 @@ namespace kart::core {
 // profile it parses to. Change anything the writer emits, including the comment
 // preamble, and that assertion fails until the version is bumped and a new corpus
 // file is captured. Which is the rule, made mechanical.
-inline constexpr int PROFILE_FORMAT_VERSION = 1;
+//
+// **Version 2 is the `best` record's two additions**: the `-` no-ghost sentinel
+// and the optional `pause_forgiven` sixth token, both argued for in the header
+// above. The step from 1 to 2 is `profile_migrate_identity` and that is not a
+// shortcut — a v1 `best` is five tokens with a real ghost id and no flag, which is
+// exactly one of the shapes the v2 binder accepts, so there is nothing to rewrite.
+//
+// **The bump is required even though the writer's bytes did not move.** A v2 file
+// containing a no-ghost best is `WrongTokenCount` or `BadIdentifier` to a v1
+// reader, and a v1 reader treats that as `Corrupt` — which files an intact career
+// under `profile.save.corrupt.1`. `FutureVersion` is the status that exists to
+// stop exactly that, and the only thing that produces it is a version number the
+// old build has never heard of. So the classification here is not "did the writer
+// change", it is "can an older build destroy a save it cannot read", and this
+// change could.
+inline constexpr int PROFILE_FORMAT_VERSION = 2;
 
 // Names, not paths. `user://` resolution is Godot's job.
 inline constexpr const char *PROFILE_FILE_NAME = "profile.save";
@@ -262,16 +307,44 @@ struct ProfileBest {
 	KartClass kart_class = KartClass::KZ2;
 	double lap_time_s = 0.0;
 	// Resolves to `user://ghosts/<id>.ghost`. A stream is never inlined here.
+	//
+	// **Empty means there is no ghost**, which is a lap set with ghost recording
+	// turned off and not an error. It is written as `-` and read back from `-`; see
+	// the header's section on the sentinel for why that token cannot collide with a
+	// real id.
 	char ghost_id[PROFILE_SLUG_CHARS] = {};
+	// Whether the lap was set with `pause_invalidates_lap` turned off. Issue #186,
+	// ADR-0052 §4: a best that a pause could not strike is not the same achievement
+	// as one that could, and a records screen that showed them identically would be
+	// making a claim about the lap that the lap does not support.
+	//
+	// **False is the default and false writes nothing**, which is what keeps every
+	// record a version 1 profile could hold byte-identical across the bump.
+	bool pause_forgiven = false;
 };
+
+// How a `best` record spells "no ghost".
+//
+// One character, and the only one that is safe: `profile_is_slug_within` refuses a
+// slug beginning with `-`, so this can never be a real id however a caller builds
+// one. An empty trailing token was the alternative and it is not a token at all —
+// the record would lex as four fields where the schema wants five.
+inline constexpr const char *PROFILE_NO_GHOST = "-";
+
+// The optional sixth token of a `best`. Written only when the flag is set.
+inline constexpr const char *PROFILE_PAUSE_FORGIVEN = "pause_forgiven";
 
 // --- text primitives -----------------------------------------------------------
 
 inline constexpr int PROFILE_KEY_CHARS = 32;
-// The longest record is a `best`: a 47-character track id, `reverse`, `kz2`, a
-// lap time and a 31-character ghost id, with four separators. 106 characters.
+// The longest record is a `best`: a 47-character track id, `reverse`, `kz2`, a lap
+// time and a 31-character ghost id, with four separators — 106 characters — plus
+// version 2's optional ` pause_forgiven`, which is 15 more. 121, and this is the
+// *value* buffer so the `best ` key is not in it.
 inline constexpr int PROFILE_TEXT_CHARS = 128;
-inline constexpr int PROFILE_MAX_TOKENS = 5;
+// Six, for the widest `best`. The tokenizer refuses a record with more, so a stray
+// seventh field is an error rather than a silently ignored tail.
+inline constexpr int PROFILE_MAX_TOKENS = 6;
 inline constexpr int PROFILE_DETAIL_CHARS = 64;
 
 inline bool profile_is_space(char c) {
@@ -332,6 +405,31 @@ inline bool profile_is_slug_within(const char *text, int len, int cap) {
 
 inline bool profile_is_slug(const char *text, int len) {
 	return profile_is_slug_within(text, len, PROFILE_SLUG_CHARS);
+}
+
+// Whether a counted slice is the no-ghost sentinel: exactly `-`, nothing else.
+inline bool profile_is_no_ghost(const char *text, int len) {
+	return profile_text_equals(text, len, PROFILE_NO_GHOST);
+}
+
+// What a `best` record's ghost field may hold, in either direction.
+//
+// Three spellings and they all mean one of two things. A slug is a ghost. The
+// sentinel `-` and the empty string are both "no ghost" — the sentinel because
+// that is what the file says and the empty string because that is what a caller
+// with no ghost to name passes, and refusing the caller's spelling is the bug this
+// exists to close.
+inline bool profile_is_ghost_id(const char *text, int len) {
+	if (len <= 0) {
+		return true;
+	}
+	return profile_is_no_ghost(text, len) || profile_is_slug(text, len);
+}
+
+// Whether a stored `ghost_id` names a ghost. The in-memory spelling of "no ghost"
+// is an empty buffer; `-` never reaches memory.
+inline bool profile_has_ghost(const char *ghost_id) {
+	return ghost_id != nullptr && ghost_id[0] != '\0';
 }
 
 // A track id is a slug too, but with `session.h`'s wider buffer: `SESSION_ID_CHARS`
@@ -600,13 +698,22 @@ struct Profile {
 	//
 	// A slower lap on an existing key is ignored and reported as `true`: the caller
 	// finished a lap, nothing failed, and a best that got worse is not a best.
+	//
+	// `ghost_id` may be empty or `-`, both meaning the lap was set with ghost
+	// recording off. That is not a degenerate case to be tolerated: "Ghost: off" is
+	// a row on the setup screen, so it is the *first* thing a lot of laps will be.
+	//
+	// `pause_forgiven` defaults false so every existing caller keeps its meaning,
+	// and it is a parameter of this call rather than a separate setter because a
+	// lap and the conditions it was set under are one fact. A best replaced by a
+	// faster lap takes the new lap's flag, not the old one's.
 	bool set_best(const char *track_id, TrackLayout layout, KartClass kart_class,
-			double lap_time_s, const char *ghost_id) {
+			double lap_time_s, const char *ghost_id, bool pause_forgiven = false) {
 		const int track_len = profile_length(track_id);
 		if (!profile_is_track_slug(track_id, track_len)) {
 			return false;
 		}
-		if (!profile_is_slug(ghost_id, profile_length(ghost_id))) {
+		if (!profile_is_ghost_id(ghost_id, profile_length(ghost_id))) {
 			return false;
 		}
 		if (!(lap_time_s > 0.0) || !std::isfinite(lap_time_s)) {
@@ -628,7 +735,8 @@ struct Profile {
 					return true; // Not an improvement. Nothing failed.
 				}
 				bests[slot].lap_time_s = lap_time_s;
-				return copy_slug(ghost_id, bests[slot].ghost_id, PROFILE_SLUG_CHARS);
+				bests[slot].pause_forgiven = pause_forgiven;
+				return copy_ghost_id(ghost_id, bests[slot].ghost_id, PROFILE_SLUG_CHARS);
 			}
 			if (order > 0) {
 				break;
@@ -649,8 +757,9 @@ struct Profile {
 		best.layout = layout;
 		best.kart_class = kart_class;
 		best.lap_time_s = lap_time_s;
+		best.pause_forgiven = pause_forgiven;
 		++best_count;
-		return copy_slug(ghost_id, best.ghost_id, PROFILE_SLUG_CHARS);
+		return copy_ghost_id(ghost_id, best.ghost_id, PROFILE_SLUG_CHARS);
 	}
 
 	const ProfileBest *find_best(const char *track_id, TrackLayout layout,
@@ -726,7 +835,11 @@ struct Profile {
 			if (!profile_is_track_slug(best.track_id, profile_length(best.track_id))) {
 				return false;
 			}
-			if (!profile_is_slug(best.ghost_id, profile_length(best.ghost_id))) {
+			// Empty is legal and means no ghost. `-` is not: it is the *file's*
+			// spelling and the binder converts it, so a `-` sitting in memory would
+			// be a ghost id that resolves to `user://ghosts/-.ghost`.
+			if (profile_has_ghost(best.ghost_id) &&
+					!profile_is_slug(best.ghost_id, profile_length(best.ghost_id))) {
 				return false;
 			}
 			if (!std::isfinite(best.lap_time_s) || !(best.lap_time_s > 0.0)) {
@@ -791,6 +904,21 @@ private:
 			out[i] = text[i];
 		}
 		return true;
+	}
+
+	// A ghost id, where absent is a legal answer. Both spellings of "no ghost" —
+	// the caller's empty string and the file's `-` — land as an empty buffer, so
+	// there is exactly one in-memory representation and `profile_has_ghost` is the
+	// only test anything downstream needs.
+	static bool copy_ghost_id(const char *text, char *out, int cap) {
+		const int len = profile_length(text);
+		if (len <= 0 || profile_is_no_ghost(text, len)) {
+			for (int i = 0; i < cap; ++i) {
+				out[i] = '\0';
+			}
+			return true;
+		}
+		return copy_slug(text, out, cap);
 	}
 };
 
@@ -960,7 +1088,15 @@ inline int format_profile(const Profile &profile, char *out, int cap) {
 		}
 		append(number);
 		append(" ");
-		append(best.ghost_id);
+		// The sentinel, not an empty token: five tokens is the schema's floor and a
+		// trailing space would lex as four fields.
+		append(profile_has_ghost(best.ghost_id) ? best.ghost_id : PROFILE_NO_GHOST);
+		// Written only when set, which is what keeps a strict best byte-identical to
+		// what version 1 wrote for the same lap.
+		if (best.pause_forgiven) {
+			append(" ");
+			append(PROFILE_PAUSE_FORGIVEN);
+		}
 		append("\n");
 	}
 
@@ -1250,24 +1386,25 @@ struct ProfileLoadResult {
 // A step from one version to the next, operating on the lexed document. Rewrite
 // records; the strict binder afterwards decides whether it was enough.
 //
-// **There are no migrations today, and inventing one would be a lie in a test
-// fixture.** `PROFILE_FORMAT_VERSION` is 1, so the chain from any loadable file
-// to the current version is empty: there is no v0 and there is no v2. That is the
-// honest state and it is stated rather than papered over with an identity entry
-// from 1 to 1, which is not a step and would make `migration_chain_is_complete`
-// assert something false.
+// **There is one migration, 1 -> 2, and it is the identity function.** That is not
+// a placeholder: version 2 only *widened* what a `best` record may say — the `-`
+// no-ghost sentinel and the optional `pause_forgiven` token — so every record a
+// version 1 file can hold is already a record the version 2 binder accepts. The
+// step exists so the chain is complete and so a v1 file announces its version
+// honestly on the way through, not because anything has to be rewritten.
 //
-// What *is* built and tested is the machinery, and it is parameterized on the
-// table precisely so that it can be: `run_migrations` and `load_profile_with`
-// take the table as an argument, so `test_profile.cpp` drives a synthetic
-// 1 -> 2 -> 3 chain through the real code and proves the ordering, the gap
-// detection and the failure path today. The fictional versions live in a test of
-// the mechanism; they never enter `tests/data/saves/`, which holds only real
-// captured files.
+// The prediction this file used to carry turned out to be exactly right, so it is
+// worth keeping as a record: *"when v2 actually arrives it is one entry in
+// `PROFILE_MIGRATIONS`, one bump to `PROFILE_FORMAT_VERSION`, and
+// `tests/data/saves/v1.save` stays exactly where it is and starts earning its
+// keep. No new mechanism."* It was, it did, and there was none.
 //
-// When v2 actually arrives it is: one entry in `PROFILE_MIGRATIONS`, one bump to
-// `PROFILE_FORMAT_VERSION`, and `tests/data/saves/v1.save` stays exactly where it
-// is and starts earning its keep. No new mechanism.
+// The machinery is parameterized on the table so it can be tested past what the
+// production chain exercises: `run_migrations` and `load_profile_with` take the
+// table as an argument, so `test_profile.cpp` drives a synthetic chain through the
+// real code and proves the ordering, the gap detection and the failure path. The
+// fictional versions live in a test of the mechanism; they never enter
+// `tests/data/saves/`, which holds only real captured files.
 
 using ProfileMigrationFn = bool (*)(ProfileDocument &document);
 
@@ -1280,18 +1417,23 @@ struct ProfileMigration {
 	const char *summary = "";
 };
 
-// Null with a count of zero rather than a one-element array with a dead entry: a
-// zero-length array is not legal C++ and a placeholder entry is a migration that
-// does not exist sitting in a table of migrations that do.
-inline const ProfileMigration *const PROFILE_MIGRATIONS = nullptr;
-inline constexpr int PROFILE_MIGRATION_COUNT = 0;
-
 // An identity migration, provided because ADR-0042 says a bump may need one and a
-// caller should not have to write `return true;` in a lambda to get it. Unused
-// today; the first format change that moves nothing structural uses it.
+// caller should not have to write `return true;` in a lambda to get it.
 inline bool profile_migrate_identity(ProfileDocument &) {
 	return true;
 }
+
+// The chain. One step, and it does nothing to the document — see above for why
+// that is the correct implementation of this particular bump rather than a gap in
+// it.
+inline constexpr ProfileMigration PROFILE_MIGRATION_TABLE[] = {
+	{ 1, 2, profile_migrate_identity,
+			"best records may carry a - no-ghost sentinel and a pause_forgiven flag" },
+};
+
+inline const ProfileMigration *const PROFILE_MIGRATIONS = PROFILE_MIGRATION_TABLE;
+inline constexpr int PROFILE_MIGRATION_COUNT =
+		static_cast<int>(sizeof(PROFILE_MIGRATION_TABLE) / sizeof(PROFILE_MIGRATION_TABLE[0]));
 
 // Whether a table can carry a file from version 1 to `current`: exactly one step
 // out of every intermediate version, each advancing by exactly one, and none
@@ -1383,9 +1525,18 @@ inline bool profile_run_migrations(ProfileDocument &document, int to_version,
 
 // --- the current schema -------------------------------------------------------
 
+// A key's shape. `token_min` is -1 for a key whose value is the whole rest of the
+// line, and `token_max` is then ignored.
+//
+// **The width is a range and not a count**, which it became when version 2 gave
+// `best` an optional sixth token. A single count could only have been satisfied by
+// writing the flag on every record, which would have rewritten every existing
+// `best` line for a field almost all of them do not carry. The range is one int
+// and it keeps the strict spelling byte-identical.
 struct ProfileKeySpec {
 	const char *key;
-	int token_count; // -1 for a key whose value is the whole rest of the line
+	int token_min;
+	int token_max;
 	bool repeated;
 	bool required;
 };
@@ -1395,22 +1546,23 @@ struct ProfileKeySpec {
 // far enough, and saying so is the difference between ADR-0042's format and the
 // best-effort loader it rejected.
 inline constexpr ProfileKeySpec PROFILE_KEYS[] = {
-	{ "version", 1, false, true },
+	{ "version", 1, 1, false, true },
 	// The one free-text field: "Surname, Forename" contains a space, so its value
 	// is the rest of the line rather than a token.
-	{ "driver_name", -1, false, true },
-	{ "driver_number", 1, false, true },
-	{ "driver_nationality", 1, false, true },
-	{ "driver_livery", 1, false, true },
-	{ "career_class", 1, false, true },
-	{ "career_season", 1, false, true },
-	{ "career_round", 1, false, true },
+	{ "driver_name", -1, -1, false, true },
+	{ "driver_number", 1, 1, false, true },
+	{ "driver_nationality", 1, 1, false, true },
+	{ "driver_livery", 1, 1, false, true },
+	{ "career_class", 1, 1, false, true },
+	{ "career_season", 1, 1, false, true },
+	{ "career_round", 1, 1, false, true },
 	// Both repeated blocks are optional and empty is meaningful: a career that has
 	// run no rounds has no standings, and a profile that has set no lap has no
 	// bests. Absent is not the same as missing here, which is why neither is
 	// `required`.
-	{ "standing", 2, true, false },
-	{ "best", 5, true, false },
+	{ "standing", 2, 2, true, false },
+	// Five or six: the sixth is version 2's `pause_forgiven`, written only when set.
+	{ "best", 5, 6, true, false },
 };
 
 inline constexpr int PROFILE_KEY_COUNT =
@@ -1598,7 +1750,7 @@ inline bool profile_bind(const ProfileDocument &document, Profile &out,
 
 		const int text_len = profile_length(record.text);
 		ProfileTokens tokens;
-		if (spec->token_count < 0) {
+		if (spec->token_min < 0) {
 			// A free-text value is never tokenized. Doing it anyway would make a
 			// six-word driver name a `WrongTokenCount` failure, which is a save
 			// refused for having a long name in it.
@@ -1611,7 +1763,7 @@ inline bool profile_bind(const ProfileDocument &document, Profile &out,
 				result.fail(ProfileProblem::WrongTokenCount, record.line, record.key, key_len);
 				return false;
 			}
-			if (tokens.count != spec->token_count) {
+			if (tokens.count < spec->token_min || tokens.count > spec->token_max) {
 				result.fail(ProfileProblem::WrongTokenCount, record.line, record.key, key_len);
 				return false;
 			}
@@ -1739,14 +1891,33 @@ inline bool profile_bind(const ProfileDocument &document, Profile &out,
 						tokens.length[3]);
 				return false;
 			}
+			// The ghost, or the `-` that says there is not one. The sentinel is
+			// converted here rather than stored, so `-` never reaches memory and
+			// nothing downstream can paste it into `user://ghosts/<id>.ghost`.
 			char ghost_id[PROFILE_SLUG_CHARS] = {};
-			if (!profile_is_slug(tokens.begin[4], tokens.length[4])) {
+			if (!profile_is_ghost_id(tokens.begin[4], tokens.length[4])) {
 				result.fail(ProfileProblem::BadIdentifier, record.line, tokens.begin[4],
 						tokens.length[4]);
 				return false;
 			}
-			for (int c = 0; c < tokens.length[4]; ++c) {
-				ghost_id[c] = tokens.begin[4][c];
+			if (!profile_is_no_ghost(tokens.begin[4], tokens.length[4])) {
+				for (int c = 0; c < tokens.length[4]; ++c) {
+					ghost_id[c] = tokens.begin[4][c];
+				}
+			}
+			// Version 2's optional sixth token, and it has exactly one legal
+			// spelling. Anything else is a `BadEnum` naming the token rather than a
+			// field quietly ignored — the same argument the unknown-key branch makes
+			// one level up.
+			bool pause_forgiven = false;
+			if (tokens.count == 6) {
+				if (!profile_text_equals(tokens.begin[5], tokens.length[5],
+							PROFILE_PAUSE_FORGIVEN)) {
+					result.fail(ProfileProblem::BadEnum, record.line, tokens.begin[5],
+							tokens.length[5]);
+					return false;
+				}
+				pause_forgiven = true;
 			}
 			// A duplicate key would be silently absorbed as "not an improvement", so
 			// it is caught here rather than by `set_best`.
@@ -1754,7 +1925,8 @@ inline bool profile_bind(const ProfileDocument &document, Profile &out,
 				result.fail(ProfileProblem::DuplicateField, record.line, track_id, -1);
 				return false;
 			}
-			if (!out.set_best(track_id, layout, kart_class, lap_time_s, ghost_id)) {
+			if (!out.set_best(track_id, layout, kart_class, lap_time_s, ghost_id,
+						pause_forgiven)) {
 				result.fail(ProfileProblem::BadValue, record.line, track_id, -1);
 				return false;
 			}

@@ -77,6 +77,38 @@ const KEY_LINE := (
 )
 const DEBUG_LINE := "F3 telemetry  F4 freeze frustum  F5 physics draw"
 
+## The menu context. ADR-0053 §2, and the reason it is a separate list rather
+## than more entries in the two above: menus and driving are **disjoint input
+## contexts**, and printing them as one list would suggest Cross does both things
+## at once. It does not — over a live session the pause menu suspends the driver
+## through `SessionRunner.set_input_suspended()`, and in the shell there is no
+## `PlayerDriver` in the tree at all.
+##
+## **Every one of these collides with a driving control**, which is not an
+## oversight: a DualSense has no spare buttons, and the driving map above already
+## spends both triggers, both sticks, all four face buttons, R1, Create, Options
+## and the d-pad. `tools/verify/shell_probe.gd` check 8 asserts the overlap
+## against a written-down list, so a new collision fails a gate rather than
+## surprising a driver.
+const MENU_PAD_LINE := (
+	"Cross confirm  Circle back  D-pad or left stick to move"
+)
+const MENU_KEY_LINE := (
+	"Enter confirm  Esc back  Arrow keys to move"
+)
+
+
+## The menu bindings, for the pause screen's Controls row and the settings
+## screen's binding list. Device-aware for the same reason `lines()` is.
+static func menu_lines() -> Array[String]:
+	var out: Array[String] = []
+	if Input.get_connected_joypads().is_empty():
+		out.append(MENU_KEY_LINE)
+	else:
+		out.append(MENU_PAD_LINE)
+		out.append(MENU_KEY_LINE)
+	return out
+
 
 ## The lines to print, given what is plugged in.
 ##

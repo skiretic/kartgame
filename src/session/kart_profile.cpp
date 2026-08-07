@@ -251,15 +251,21 @@ void KartProfile::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("points_for", "driver_id"), &KartProfile::points_for);
 	ClassDB::bind_method(D_METHOD("standings_table"), &KartProfile::standings_table);
 
+	// `pause_forgiven` is defaulted so every existing five-argument caller keeps
+	// working: `best_lap_store.gd` and `shell_probe.gd` both call it that way and
+	// neither knows about ADR-0052's setting.
 	ClassDB::bind_method(
-			D_METHOD("set_best", "track_id", "layout", "kart_class", "lap_time_s", "ghost_id"),
-			&KartProfile::set_best);
+			D_METHOD("set_best", "track_id", "layout", "kart_class", "lap_time_s", "ghost_id",
+					"pause_forgiven"),
+			&KartProfile::set_best, DEFVAL(false));
 	ClassDB::bind_method(D_METHOD("has_best", "track_id", "layout", "kart_class"),
 			&KartProfile::has_best);
 	ClassDB::bind_method(D_METHOD("best_time", "track_id", "layout", "kart_class"),
 			&KartProfile::best_time);
 	ClassDB::bind_method(D_METHOD("best_ghost_id", "track_id", "layout", "kart_class"),
 			&KartProfile::best_ghost_id);
+	ClassDB::bind_method(D_METHOD("best_pause_forgiven", "track_id", "layout", "kart_class"),
+			&KartProfile::best_pause_forgiven);
 	ClassDB::bind_method(D_METHOD("best_ghost_path", "track_id", "layout", "kart_class"),
 			&KartProfile::best_ghost_path);
 	ClassDB::bind_method(D_METHOD("best_count"), &KartProfile::best_count);
@@ -562,7 +568,7 @@ Array KartProfile::standings_table() const {
 }
 
 bool KartProfile::set_best(const String &p_track_id, int p_layout, int p_kart_class,
-		double p_lap_time_s, const String &p_ghost_id) {
+		double p_lap_time_s, const String &p_ghost_id, bool p_pause_forgiven) {
 	TrackLayout layout = TrackLayout::Forward;
 	KartClass kart_class = KartClass::KZ2;
 	if (!to_layout(p_layout, layout) || !to_kart_class(p_kart_class, kart_class)) {
@@ -570,7 +576,8 @@ bool KartProfile::set_best(const String &p_track_id, int p_layout, int p_kart_cl
 	}
 	const CharString track = p_track_id.utf8();
 	const CharString ghost = p_ghost_id.utf8();
-	return profile_.set_best(bytes_of(track), layout, kart_class, p_lap_time_s, bytes_of(ghost));
+	return profile_.set_best(bytes_of(track), layout, kart_class, p_lap_time_s, bytes_of(ghost),
+			p_pause_forgiven);
 }
 
 const ProfileBest *KartProfile::lookup_best(const String &p_track_id, int p_layout,
@@ -605,6 +612,12 @@ String KartProfile::best_ghost_path(const String &p_track_id, int p_layout,
 	return id.is_empty() ? String() : ghost_path(id);
 }
 
+bool KartProfile::best_pause_forgiven(const String &p_track_id, int p_layout,
+		int p_kart_class) const {
+	const ProfileBest *best = lookup_best(p_track_id, p_layout, p_kart_class);
+	return best != nullptr && best->pause_forgiven;
+}
+
 int KartProfile::best_count() const {
 	return profile_.best_count;
 }
@@ -620,8 +633,11 @@ Dictionary KartProfile::best_at(int p_index) const {
 	row["layout"] = static_cast<int>(best.layout);
 	row["kart_class"] = static_cast<int>(best.kart_class);
 	row["lap_time_s"] = best.lap_time_s;
+	// Empty when the lap was set with ghost recording off, and so is the path. A
+	// records screen tests the id rather than `has_best`.
 	row["ghost_id"] = ghost_id;
-	row["ghost_path"] = ghost_path(ghost_id);
+	row["ghost_path"] = ghost_id.is_empty() ? String() : ghost_path(ghost_id);
+	row["pause_forgiven"] = best.pause_forgiven;
 	return row;
 }
 
@@ -870,6 +886,25 @@ void KartSettings::_bind_methods() {
 			&KartSettings::set_steer_deadzone);
 	ClassDB::bind_method(D_METHOD("get_steer_deadzone"), &KartSettings::get_steer_deadzone);
 
+	// ARCHITECTURE.md sec 18's comfort block. `shell_probe.gd`'s settings
+	// round-trip check discovers these **by name** rather than by a list it keeps
+	// in step, so the spellings here are a contract with that gate.
+	ClassDB::bind_method(D_METHOD("set_field_of_view_deg", "degrees"),
+			&KartSettings::set_field_of_view_deg);
+	ClassDB::bind_method(D_METHOD("get_field_of_view_deg"), &KartSettings::get_field_of_view_deg);
+	ClassDB::bind_method(D_METHOD("set_head_motion", "scale"), &KartSettings::set_head_motion);
+	ClassDB::bind_method(D_METHOD("get_head_motion"), &KartSettings::get_head_motion);
+	ClassDB::bind_method(D_METHOD("set_shake", "scale"), &KartSettings::set_shake);
+	ClassDB::bind_method(D_METHOD("get_shake"), &KartSettings::get_shake);
+	ClassDB::bind_method(D_METHOD("set_motion_blur", "scale"), &KartSettings::set_motion_blur);
+	ClassDB::bind_method(D_METHOD("get_motion_blur"), &KartSettings::get_motion_blur);
+	ClassDB::bind_method(D_METHOD("set_horizon_lock", "locked"), &KartSettings::set_horizon_lock);
+	ClassDB::bind_method(D_METHOD("is_horizon_lock"), &KartSettings::is_horizon_lock);
+	ClassDB::bind_method(D_METHOD("set_pause_invalidates_lap", "enabled"),
+			&KartSettings::set_pause_invalidates_lap);
+	ClassDB::bind_method(D_METHOD("is_pause_invalidates_lap"),
+			&KartSettings::is_pause_invalidates_lap);
+
 	ClassDB::bind_method(D_METHOD("reset_to_defaults"), &KartSettings::reset_to_defaults);
 	ClassDB::bind_method(D_METHOD("to_text"), &KartSettings::to_text);
 	ClassDB::bind_method(D_METHOD("save"), &KartSettings::save);
@@ -962,6 +997,54 @@ double KartSettings::get_steer_deadzone() const {
 	return settings_.steer_deadzone;
 }
 
+void KartSettings::set_field_of_view_deg(double p_degrees) {
+	settings_.set_field_of_view_deg(p_degrees);
+}
+
+double KartSettings::get_field_of_view_deg() const {
+	return settings_.field_of_view_deg;
+}
+
+void KartSettings::set_head_motion(double p_scale) {
+	settings_.set_head_motion(p_scale);
+}
+
+double KartSettings::get_head_motion() const {
+	return settings_.head_motion;
+}
+
+void KartSettings::set_shake(double p_scale) {
+	settings_.set_shake(p_scale);
+}
+
+double KartSettings::get_shake() const {
+	return settings_.shake;
+}
+
+void KartSettings::set_motion_blur(double p_scale) {
+	settings_.set_motion_blur(p_scale);
+}
+
+double KartSettings::get_motion_blur() const {
+	return settings_.motion_blur;
+}
+
+void KartSettings::set_horizon_lock(bool p_locked) {
+	settings_.horizon_lock = p_locked;
+}
+
+bool KartSettings::is_horizon_lock() const {
+	return settings_.horizon_lock;
+}
+
+void KartSettings::set_pause_invalidates_lap(bool p_enabled) {
+	settings_.pause_invalidates_lap = p_enabled;
+}
+
+bool KartSettings::is_pause_invalidates_lap() const {
+	return settings_.pause_invalidates_lap;
+}
+
 void KartSettings::reset_to_defaults() {
 	settings_ = Settings{};
 }
@@ -1001,7 +1084,7 @@ Dictionary KartSettings::save() {
 		warnings.push_back(from_utf8("the settings could not be serialized"));
 		return finish(false, ERR_INVALID_DATA);
 	}
-	// The whole document is ASCII by construction -- five keys, two words and three
+	// The whole document is ASCII by construction -- twelve keys, five words and six
 	// numbers -- so `to_utf8_buffer` is exact here and the byte count is the
 	// character count. Through the same temporary-then-rename path as the career,
 	// because a settings file truncated by a crash is a menu that will not draw.

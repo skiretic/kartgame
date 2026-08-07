@@ -542,6 +542,7 @@ void KartLapTimer::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("reset"), &KartLapTimer::reset);
 	ClassDB::bind_method(D_METHOD("advance", "distance_m", "off_track"), &KartLapTimer::advance);
 	ClassDB::bind_method(D_METHOD("respawn", "distance_m"), &KartLapTimer::respawn);
+	ClassDB::bind_method(D_METHOD("strike_paused"), &KartLapTimer::strike_paused);
 	ClassDB::bind_method(D_METHOD("invalidate_fastest"), &KartLapTimer::invalidate_fastest);
 
 	ClassDB::bind_method(D_METHOD("lap_time"), &KartLapTimer::lap_time);
@@ -668,6 +669,10 @@ bool KartLapTimer::advance(double p_distance_m, bool p_off_track) {
 
 void KartLapTimer::respawn(double p_distance_m) {
 	timer_.respawn(p_distance_m);
+}
+
+void KartLapTimer::strike_paused() {
+	timer_.strike_paused();
 }
 
 double KartLapTimer::invalidate_fastest() {

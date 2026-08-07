@@ -118,6 +118,12 @@ const TRACK_MESH_PATH := "res://assets/generated/valdirone_nuova.glb"
 ## being lit.
 const LIGHTMAP_PATH := "res://scenes/game/valdirone.lmbake"
 
+## The pause menu, loaded by path rather than `preload`ed. A `--script` gate
+## populates no class cache, and a hard reference to a screen that has not been
+## imported yet is a parse error that takes the whole scene down rather than a
+## session that runs without a pause menu.
+const PAUSE_SCREEN := "res://scripts/shell/screens/pause_screen.gd"
+
 ## `kart::core::SurfaceType` from `src/core/surface.h`. **These integers are a wire
 ## format** — that header says so — so they are written out rather than derived.
 const SURFACE_NAMES: PackedStringArray = ["asphalt", "curb", "grass", "dirt"]
@@ -172,6 +178,25 @@ var _scatter: TrackScatter
 var _build_ms := {}
 var _lightmap_users := 0
 
+## The ghost, recording and playing back. ADR-0041, ROADMAP M3c.
+##
+## `KartGhost`, `ghost_kart.gd` and `ghost_probe.gd` were all built and complete
+## and **no scene instantiated any of them** — the same shape as the profile hole
+## this milestone exists to close. This is the join, and it is a join rather than
+## a build: every method used below already existed and is already gated by
+## `ghost_probe.gd`'s 23 checks.
+var _ghost_recorder: KartGhost
+var _ghost_kart: GhostKart
+var _ghost_saved_id := ""
+var _ghost_saved_s := -1.0
+## The time to beat before a recording is worth keeping. Seeded from the profile
+## so a slow session cannot overwrite a faster stored ghost with its own best —
+## `save_as_id()` derives one filename per track+layout+class, so an unguarded
+## save would leave the profile's record pointing at a ghost slower than the time
+## written beside it.
+var _ghost_target_s := -1.0
+var _pause_stack: ScreenStack
+
 
 ## What `_ready()` builds, in order, so a loading screen can name the step it is
 ## on instead of animating a bar that means nothing.
@@ -206,6 +231,7 @@ func _ready() -> void:
 	# is destructive on purpose, so a stale configuration cannot survive into the
 	# next session.
 	_args = SessionRequest.take(Cmdline.parse())
+	_step_started = Time.get_ticks_usec()
 
 	_track = KartTrack.new()
 	var path := Cmdline.as_string(_args, "track", DEFAULT_TRACK)
@@ -260,8 +286,75 @@ func _ready() -> void:
 	add_child(preload("res://scenes/ui/telemetry.tscn").instantiate())
 	_step("hud")
 
+	_build_pause_host()
+
 	_set_camera_mode(Cmdline.as_string(_args, "camera", "chase"))
 	_report()
+
+
+## Somewhere for the pause menu to be pushed. ADR-0052, mockup plate 8.
+##
+## **Without this the pause screen is unreachable and Practice has no exit.**
+## `pause` has been in `project.godot` since M0 and `grep` found it read by
+## nothing but `input_probe.gd`'s list — the fourth member of the family
+## `control_hints.gd` heads: a control that is bound, advertised and unread.
+## Practice is `LIMIT_OPEN` and `SessionRunner.end_session()` is its only ending,
+## so a session with no pause menu is a session you can only leave by closing the
+## window, and the results sheet is unreachable by construction.
+##
+## A `ScreenStack` here rather than in the shell, because the shell is not in the
+## tree during a session — `start_session()` swapped the whole scene. The stack's
+## `shell_root` is deliberately **null**: there is no `ShellRoot` to hand out, and
+## `pause_screen.gd` already reads its own `KartSettings` off disk for exactly
+## that case.
+##
+## `get_tree().paused` is not used and the layer is not `PROCESS_MODE_ALWAYS`.
+## The world keeps running behind the veil on purpose — the kart is not frozen,
+## the session clock keeps ticking, and the pause screen's consequence line says
+## so in as many words.
+func _build_pause_host() -> void:
+	if not ResourceLoader.exists(PAUSE_SCREEN):
+		return
+	var layer := CanvasLayer.new()
+	layer.name = "PauseUI"
+	# Above the driving HUD and the timing screen, which build their own layers.
+	layer.layer = 10
+	add_child(layer)
+	_pause_stack = ScreenStack.new()
+	# This stack starts empty and its depth 1 is the pause menu itself, so the
+	# shell's "the bottom screen never pops" rule would make Resume impossible.
+	_pause_stack.keeps_bottom = false
+	layer.add_child(_pause_stack)
+
+
+## The arguments this session was built from, so "Restart session" can re-post
+## them. `SessionRequest.take()` was destructive, so nothing else still holds
+## them — which is why the pause screen takes them by hand rather than reading
+## them back out of somewhere.
+func session_config() -> Dictionary:
+	return _args.duplicate()
+
+
+## Open the pause menu, or close it. One key does both: `menu_back` and `pause`
+## are both Escape, and `ScreenStack._input()` returns without consuming when its
+## stack is empty — so a closed menu lets the key through to here and an open one
+## eats it and pops itself.
+func _toggle_pause() -> void:
+	if _pause_stack == null:
+		return
+	if _pause_stack.depth() > 0:
+		_pause_stack.back()
+		return
+	var script := load(PAUSE_SCREEN) as GDScript
+	if script == null:
+		return
+	var screen := script.new() as ShellScreen
+	_pause_stack.push(screen)
+	# After the push, because `bind_session` rebuilds the rows and `build()` has
+	# to have run first. `on_enter` is what gates the input, a frame later, so the
+	# driver is not suspended before the screen exists.
+	if screen.has_method("bind_session"):
+		screen.call("bind_session", self, session_config())
 
 
 # --- construction ----------------------------------------------------------
@@ -273,13 +366,18 @@ func _ready() -> void:
 ## why `_build_ms` keeps its own three finer-grained entries — `corridor`,
 ## `terrain` and `scatter` are measured inside the functions that own them and
 ## reported in `_report()`. These are the coarse steps a loading screen names.
+## Seeded in `_ready()` before the first `_step()`, **not** lazily inside it.
+##
+## Seeding it on first call makes the first step measure the interval from itself
+## to itself, so `track` reported 0.00 ms forever while `KartTrack.load()` plus
+## `select_layout()` actually costs about 3.2 ms. A stage that always reports zero
+## reads as a stage that costs nothing, which is the wrong thing to learn from a
+## table whose whole purpose is deciding what to make asynchronous.
 var _step_started := 0
 
 
 func _step(step_name: String) -> void:
 	var now := Time.get_ticks_usec()
-	if _step_started == 0:
-		_step_started = now
 	var elapsed := (now - _step_started) / 1000.0
 	_step_started = now
 	_build_ms["step_" + step_name] = elapsed
@@ -740,7 +838,95 @@ func _build_session() -> void:
 		_runner = null
 		return
 	_runner.session_finished.connect(_on_session_finished)
+	_runner.lap_completed.connect(_on_lap_completed)
+	_build_ghost()
 	_runner.begin()
+
+
+## Record this session's laps, and play back the stored best if one was asked for.
+##
+## `--ghost=off` is the default for a scripted run and `--ghost=best` turns
+## playback on, because a `shoot.sh` still or a `drive.sh` scenario must not gain
+## a second kart in frame from a file sitting in `user://`. Recording is always
+## on: it costs one `record_tick` a physics tick, it is what makes a first lap
+## worth setting, and nothing that reads a gate can see it.
+func _build_ghost() -> void:
+	_ghost_recorder = KartGhost.new()
+	if not _ghost_recorder.adopt_session(_session):
+		push_warning("ghost: adopt_session refused; not recording")
+		_ghost_recorder = null
+		return
+	_ghost_recorder.begin_record()
+
+	var profile := KartProfile.new()
+	profile.load()
+	var track_id := _session.get_track()
+	var layout := _session.get_layout()
+	var kart_class := _session.get_kart_class()
+	if profile.has_best(track_id, layout, kart_class):
+		_ghost_target_s = profile.best_time(track_id, layout, kart_class)
+
+	if Cmdline.as_string(_args, "ghost", "off") != "best":
+		return
+	var id := profile.best_ghost_id(track_id, layout, kart_class)
+	if id.is_empty():
+		# Said rather than silently skipped: "ghost: best" with no ghost on file is
+		# a reasonable thing to ask for on a first visit, and a driver who asked
+		# and got nothing should be told which of the two happened.
+		print("ghost: none on file for %s %s" % [track_id, _track.layout()])
+		return
+	var stored := KartGhost.new()
+	var loaded: Dictionary = stored.load_id(id)
+	if not bool(loaded.get("ok", false)):
+		print("ghost: %s did not load (%s)" % [id, loaded.get("reason", "no reason")])
+		return
+	_ghost_kart = GhostKart.new()
+	_ghost_kart.name = "GhostKart"
+	add_child(_ghost_kart)
+	_ghost_kart.set_ghost(stored)
+	print("ghost: %s, %s over %d samples" % [
+		id, SessionRunner.format_time(stored.lap_time()), stored.sample_count(),
+	])
+
+
+## One lap closed. Keep the recording if it is worth keeping, then start again.
+##
+## `adopt_lap()` does the work and it does the refusing: it reads the timer's last
+## lap, **discards the recording outright when that lap was invalid** — a ghost of
+## a lap that cut a corner is a ghost driving through the scenery — and otherwise
+## closes it with the lap's real sector durations. So validity is not re-decided
+## here; it is asked for once, in the place that owns it.
+func _on_lap_completed(number: int, time_s: float, valid: bool, _reason: String) -> void:
+	if _ghost_recorder == null:
+		return
+	var adopted: Dictionary = _ghost_recorder.adopt_lap(_runner.timer())
+	if bool(adopted.get("ok", false)) and _beats_target(time_s):
+		if _ghost_recorder.save_as_id() == OK:
+			_ghost_saved_id = _ghost_recorder.id()
+			_ghost_saved_s = time_s
+			_ghost_target_s = time_s
+			print("ghost: lap %d saved as %s (%s)" % [
+				number, _ghost_saved_id, SessionRunner.format_time(time_s),
+			])
+		else:
+			push_warning("ghost: lap %d closed but save_as_id refused" % number)
+	# Whether it was kept, refused as invalid or simply slower, the next lap gets
+	# a clean recorder. `discard()` is a no-op on an already-discarded one.
+	_ghost_recorder.discard()
+	_ghost_recorder.begin_record()
+	if not valid:
+		return
+
+
+## Strictly faster, and quantized the way the profile quantizes, so a lap that is
+## a nanosecond quicker does not rewrite a 45 KB file and claim an improvement
+## nobody could drive.
+func _beats_target(time_s: float) -> bool:
+	if not (time_s > 0.0):
+		return false
+	if _ghost_target_s <= 0.0:
+		return true
+	return int(round(time_s * 1e6)) < int(round(_ghost_target_s * 1e6))
 
 
 ## The result, printed **and** handed to the shell.
@@ -761,6 +947,24 @@ func _on_session_finished(result: Dictionary) -> void:
 	carried["layout_name"] = _track.layout()
 	carried["result_line"] = _runner.result_line()
 	carried["laps"] = _ledger_rows()
+	# The ghost this session actually wrote, so the profile write can point the
+	# `best` record at it. Empty when no lap beat what was already on file, which
+	# is also the honest answer: the stored ghost is still the right one.
+	carried["ghost_id"] = _ghost_saved_id
+	carried["ghost_lap_s"] = _ghost_saved_s
+	# **The identity, without which no lap can ever be filed.**
+	# `SessionRunner.result()` publishes the type, the config hash and
+	# `DriverResult`'s three measurements, and nothing that says which circuit
+	# they were set on. `track_name` and `layout_name` above are display strings
+	# for a masthead — "Valdirone Nuova" is not a slug and `best_lap_store` refuses
+	# an empty one rather than filing under it.
+	#
+	# `track` and not `track_id`, because that is the key
+	# `best_lap_store.record()` reads and the key `shell_probe.gd` passes it. One
+	# spelling, and it is this one.
+	carried["track"] = _session.get_track()
+	carried["layout"] = _session.get_layout()
+	carried["kart_class"] = _session.get_kart_class()
 	SessionRequest.deliver(carried)
 	session_over.emit(carried)
 
@@ -789,6 +993,42 @@ func _ledger_rows() -> Array:
 ## consumed event does not reach that at all.
 func set_paused(paused: bool) -> void:
 	_suspend_input(paused)
+	# The free camera polls the drive actions out of the `Input` singleton in its
+	# own `_process`, so suspending the driver does not touch it. Its arrow-key
+	# bindings are the menu's arrow keys, and one press of Down would otherwise
+	# both walk the selection and fly the camera backwards.
+	if _free != null:
+		_free.enabled = not paused
+	if paused:
+		_strike_paused_lap()
+
+
+## Strike the lap in flight, if the driver asked for that.
+##
+## **The host strikes it, not the pause screen.** The screen reads the same
+## setting to say which of its two authored sentences to show, but a screen is a
+## display and must not be the thing that decides a lap time. If the two ever
+## disagree the screen is wrong and the record is right, which is the correct way
+## round.
+##
+## Read from `KartSettings` here rather than taken from the screen for the same
+## reason. Both read one source, so they agree by construction.
+##
+## `strike_paused()` drives `LapTimer::taint()` — the invalidation path that
+## already existed — and touches no mark state and no travel counter, so it
+## cannot produce the shape `lap_timing.h` argues against: a lap struck before its
+## first mark that then never closes at all, leaving no lap on the screen and no
+## reason.
+func _strike_paused_lap() -> void:
+	if _runner == null or not _runner.is_running():
+		return
+	if not ClassDB.class_exists("KartSettings"):
+		return
+	var settings := KartSettings.new()
+	settings.load()
+	if not settings.is_pause_invalidates_lap():
+		return
+	_runner.timer().strike_paused()
 
 
 ## Leave now. The pause menu's "Quit to paddock", and the only way out of a
@@ -989,8 +1229,33 @@ func _physics_process(_delta: float) -> void:
 		pieces.append("%d %s" % [surfaces[type], SURFACE_NAMES[clampi(type, 0, 3)]])
 	_surface_text = ", ".join(pieces)
 
+	# One sample a physics tick, from the physics loop, because that is the clock
+	# the pose is true on. `record_tick` decimates to the header's `sample_hz`
+	# itself — feeding it at the sample rate instead makes the ghost store every
+	# fourth pose while labelling them consecutive, and it plays back at four
+	# times the speed it was recorded at.
+	if _ghost_recorder != null and _ghost_recorder.is_recording():
+		_ghost_recorder.record_tick(_kart.global_transform)
+
+	# The ghost and the driver run on one clock — the lap clock — so the gap a
+	# driver sees beside them is the gap the timing screen reports. Driven from
+	# here rather than from `_process` so it cannot drift from the lap it belongs
+	# to; `GhostKart` interpolates to frame rate on its own side.
+	if _ghost_kart != null and _runner != null:
+		_ghost_kart.playback_time = _runner.timer().lap_time()
+
 
 func _unhandled_input(event: InputEvent) -> void:
+	if event.is_action_pressed("pause"):
+		get_viewport().set_input_as_handled()
+		_toggle_pause()
+		return
+	# Not while the menu is up. `respawn` is Circle, which is also `menu_back`, so
+	# the stack has already consumed it — but `camera_cycle` is Create and reaches
+	# here, and cycling to the free camera from behind a pause menu would hand the
+	# throttle to a flight control the menu cannot see.
+	if _pause_stack != null and _pause_stack.depth() > 0:
+		return
 	if event.is_action_pressed("respawn"):
 		_respawn()
 	elif event.is_action_pressed("camera_cycle"):

@@ -58,6 +58,27 @@ const FOV_REFERENCE_SPEED := 38.9  # 140 km/h, the §6.4 top-speed figure
 ## through them.
 const NEAR_PLANE := 0.05
 
+## Three of ARCHITECTURE §18's comfort settings land on this rig, and it is the
+## rig §18 names them for: "cockpit view makes several of these load-bearing rather
+## than optional".
+##
+##   * `fov_trim_deg` moves both FOV endpoints. A trim rather than an absolute
+##     because this rig and the chase rig are tuned 12 degrees apart on purpose and
+##     one number cannot be both; `src/core/settings.h` has the argument.
+##   * `head_motion` scales how far the view lags the chassis. At 0.0 the eye is
+##     rigid — the camera bolted to a frame rail this file's header describes —
+##     and at 2.0 the neck is twice as slack. §18 asks for "including full off".
+##   * `horizon_lock` drops the chassis roll out of the aim entirely, which is the
+##     option §18 names for this rig specifically.
+##
+## The constants above are unchanged and are what a trim of 0.0, a motion scale of
+## 1.0 and horizon lock off produce. `chase_camera.gd`'s header has the rule about
+## when the stored file is read at all, and `comfort_settings()` below is the same
+## function for the same reason.
+var fov_trim_deg := 0.0
+var head_motion := 1.0
+var horizon_lock := false
+
 var camera: Camera3D
 
 var _target: KartBody
@@ -66,10 +87,38 @@ var _aim := Quaternion.IDENTITY
 var _looking_back := false
 
 
+## Take the comfort settings off a loaded `KartSettings`.
+func apply_comfort(settings: Object) -> void:
+	if settings == null:
+		return
+	fov_trim_deg = float(settings.get_field_of_view_deg())
+	head_motion = float(settings.get_head_motion())
+	horizon_lock = bool(settings.is_horizon_lock())
+	if camera != null:
+		camera.fov = FOV_STATIC + fov_trim_deg
+
+
+## See `chase_camera.gd`'s copy for why this guard lives in each consumer and why
+## the argument list it tests is `assist_settings.gd`'s constant rather than a
+## second one.
+static func comfort_settings() -> Object:
+	if not ClassDB.class_exists("KartSettings"):
+		return null
+	var args := Cmdline.parse()
+	for key in AssistSettings.SCRIPTED_INPUT_ARGS:
+		if args.has(key):
+			return null
+	var settings := KartSettings.new()
+	settings.load()
+	return settings
+
+
 func _ready() -> void:
+	apply_comfort(comfort_settings())
+
 	camera = Camera3D.new()
 	camera.name = "CockpitCamera3D"
-	camera.fov = FOV_STATIC
+	camera.fov = FOV_STATIC + fov_trim_deg
 	camera.near = NEAR_PLANE
 	add_child(camera)
 
@@ -103,6 +152,15 @@ func _process(delta: float) -> void:
 	camera.global_position = _target.to_global(_eye)
 
 	var basis := _target.global_transform.basis
+	if horizon_lock:
+		# §18's horizon lock: keep the kart's heading, throw away its roll and pitch.
+		# Rebuilt from the flattened forward rather than by zeroing an Euler angle,
+		# because an Euler decomposition of a rolled-and-pitched basis puts some of
+		# the roll into the yaw term and the view drifts sideways over a lap.
+		var forward := -basis.z
+		var flat := Vector3(forward.x, 0.0, forward.z)
+		if flat.length_squared() > 0.0001:
+			basis = Basis.looking_at(flat.normalized(), Vector3.UP)
 	if _looking_back:
 		basis = basis.rotated(basis.y.normalized(), PI)
 	var target_aim := basis.get_rotation_quaternion()
@@ -111,7 +169,14 @@ func _process(delta: float) -> void:
 	# same at 60 and at 240 Hz. `chase_camera.gd` uses the same form and the same
 	# argument; a frame-rate-dependent camera is a tuning judgement that changes
 	# with the machine it was judged on.
-	var alpha := 1.0 - pow(0.5, delta / AIM_HALF_LIFE)
+	#
+	# **§18's head-motion slider scales the half-life, which is the lag itself.**
+	# The lag *is* the head motion here: the eye is rigid and only the direction is
+	# damped, so a longer half-life is a slacker neck and a shorter one is a head
+	# bolted to the frame. At 0.0 the half-life is zero and the slerp snaps, which
+	# is "full off" done exactly rather than approached.
+	var half_life := AIM_HALF_LIFE * head_motion
+	var alpha := 1.0 if half_life <= 0.0 else 1.0 - pow(0.5, delta / half_life)
 	_aim = _aim.slerp(target_aim, clampf(alpha, 0.0, 1.0))
 	camera.global_transform = Transform3D(Basis(_aim), camera.global_position)
 
@@ -120,7 +185,9 @@ func _process(delta: float) -> void:
 	# kinetic energy: what is being conveyed is how fast the road is arriving.
 	var speed := _target.linear_velocity.length()
 	var kick := clampf(speed / FOV_REFERENCE_SPEED, 0.0, 1.0)
-	camera.fov = lerpf(FOV_STATIC, FOV_AT_SPEED, kick)
+	# The trim moves both endpoints so the 18-degree kick survives wherever the
+	# player put the base. Same arithmetic as the chase rig, deliberately.
+	camera.fov = lerpf(FOV_STATIC, FOV_AT_SPEED, kick) + fov_trim_deg
 
 
 ## Take over from whichever camera is current.

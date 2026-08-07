@@ -319,6 +319,16 @@ public:
 	// is a real disqualification and not a courtesy.
 	void respawn(double p_distance_m);
 
+	// The driver paused during the lap in flight, and `pause_invalidates_lap` is
+	// on. ADR-0052 §4 and mockup plate 8.
+	//
+	// **The pause screen calls this and does nothing else to the timer.** The world
+	// keeps running under an ADR-0052 pause — `get_tree().paused` is not used and
+	// the kart is not frozen — so the lap keeps timing and simply stops counting.
+	// `lap_timing.h`'s `strike_paused` explains why that is the same taint path a
+	// wheel on the grass uses rather than a second mechanism.
+	void strike_paused();
+
 	// A qualifying penalty deletes the driver's *fastest* lap, not the current one.
 	// Returns the deleted time, or a negative number if there was nothing to delete.
 	double invalidate_fastest();

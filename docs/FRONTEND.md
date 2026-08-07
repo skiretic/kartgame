@@ -7,7 +7,10 @@ end and the paddock* (F1–F6) or to a regulation. Where a choice is ours it is
 labeled ours. ADR-0052 is the decision record; issue #171 is the ticket this
 file exists to close; #187 is the asset bill.
 
-Status: design phase. Nothing in this file is built.
+Status: **built at M5f** (2026-08-06). Nine of the ten screens exist and are
+gated by `tools/verify/shell.sh`; standings is deferred with the championship.
+The language here is the source the build was made from -- where a screen and
+this file disagree, this file is right and the screen is a bug.
 
 ---
 

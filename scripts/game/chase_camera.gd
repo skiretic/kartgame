@@ -14,6 +14,20 @@ extends SpringArm3D
 ## **Cameras read sim state and never write it** — ARCHITECTURE.md §7's rule. A
 ## camera that pushes the body it is watching breaks replays, so this only ever
 ## reads `linear_velocity` and a transform.
+##
+## ## Two of ARCHITECTURE §18's comfort settings land here
+##
+## `field_of_view_deg` is a trim added to both FOV endpoints and `shake` scales the
+## lateral-G roll, both from `user://settings.cfg` via `KartSettings`. The
+## constants below stay exactly what they were and are what a trim of 0.0 and a
+## scale of 1.0 produce, so a player who never opens the settings screen sees the
+## rig unchanged.
+##
+## **The stored file is skipped whenever the run is scripted**, per the rule
+## `assist_settings.gd`'s header sets out at length: `shoot.sh` drives a scene from
+## `--throttle`/`--steer`/`--brake` and every still in this project has to be
+## reproducible from the command that made it, so a `settings.cfg` nobody mentioned
+## must never move a published frame. A FOV trim would move every pixel of one.
 
 ## Arm length and height, meters. A kart is 1.83 m long, so 3.4 m back puts the
 ## whole kart plus a little road in frame at a 70 degree FOV.
@@ -47,10 +61,31 @@ const AIM_HALF_LIFE := 0.16
 
 var camera: Camera3D
 
+## ARCHITECTURE §18. Degrees added to both FOV endpoints, and a multiplier on the
+## roll. These are the defaults `Settings` ships, restated here rather than read at
+## construction so a rig built in a test or a still is at the shipped values with
+## no file on disk.
+var fov_trim_deg := 0.0
+var shake := 1.0
+
 var _target: KartBody
 var _aim := Vector3.ZERO
 var _previous_velocity := Vector3.ZERO
 var _roll := 0.0
+
+
+## Take the comfort settings off a loaded `KartSettings`.
+##
+## Separate from `_ready` so a caller that already has the settings open — a
+## settings screen previewing a change, a scene that loads the file once for the
+## kart and the camera together — applies them without a second read of the disk.
+func apply_comfort(settings: Object) -> void:
+	if settings == null:
+		return
+	fov_trim_deg = float(settings.get_field_of_view_deg())
+	shake = float(settings.get_shake())
+	if camera != null:
+		camera.fov = FOV_STATIC + fov_trim_deg
 
 
 func _ready() -> void:
@@ -60,9 +95,11 @@ func _ready() -> void:
 	margin = 0.15
 	position = Vector3(0.0, ARM_HEIGHT, 0.0)
 
+	apply_comfort(comfort_settings())
+
 	camera = Camera3D.new()
 	camera.name = "ChaseCamera3D"
-	camera.fov = FOV_STATIC
+	camera.fov = FOV_STATIC + fov_trim_deg
 	camera.near = 0.05
 	camera.far = 800.0
 	add_child(camera)
@@ -121,14 +158,43 @@ func _process(delta: float) -> void:
 	_previous_velocity = velocity
 	var right := _target.global_transform.basis.x
 	var lateral_g := acceleration.dot(right) / 9.81
-	var target_roll := -clampf(lateral_g / 2.5, -1.0, 1.0) * ROLL_AT_PEAK_G
+	# §18's shake slider scales the amplitude and nothing else: at 0.0 the rig is
+	# level and at 2.0 it rolls twice as far, but the response is the same shape and
+	# the same time constant, so turning it down is not a different camera.
+	var target_roll := -clampf(lateral_g / 2.5, -1.0, 1.0) * ROLL_AT_PEAK_G * shake
 	_roll = lerpf(_roll, target_roll, _decay(0.25, delta))
 
 	camera.look_at_from_position(camera.global_position, _aim, Vector3.UP)
 	camera.rotate_object_local(Vector3.FORWARD, _roll)
+	# The trim moves both endpoints, so the kick keeps its full 16 degrees of travel
+	# wherever the player put the base. Scaling the endpoints instead would make a
+	# narrow FOV a flat one.
 	camera.fov = lerpf(
 		FOV_STATIC, FOV_AT_SPEED, clampf(speed / FOV_REFERENCE_SPEED, 0.0, 1.0)
-	)
+	) + fov_trim_deg
+
+
+## A loaded `KartSettings`, or null when this run must not read one.
+##
+## **The skip rule is `assist_settings.gd`'s and the list of arguments is its
+## constant**, so there is one owner of what "this run is scripted" means even
+## though the four-line guard appears in each comfort consumer. `cockpit_camera.gd`
+## and `motion_blur.gd` carry the same function for the same reason: they are
+## constructed by three different scenes, none of which this file owns, and a
+## capability wired at one end only is the failure `assist_settings.gd` exists
+## because of.
+##
+## Static so a caller with several rigs to configure reads the file once.
+static func comfort_settings() -> Object:
+	if not ClassDB.class_exists("KartSettings"):
+		return null
+	var args := Cmdline.parse()
+	for key in AssistSettings.SCRIPTED_INPUT_ARGS:
+		if args.has(key):
+			return null
+	var settings := KartSettings.new()
+	settings.load()
+	return settings
 
 
 ## Frame-rate independent smoothing.

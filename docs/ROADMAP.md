@@ -490,21 +490,28 @@ finished shell, not retrofit one. The visual design is done and approved —
 screens, [ADR-0052](DECISIONS.md#adr-0052--the-paddock-is-a-place-and-the-eight-decisions-that-shape-the-shell)
 holds the shell's behavioral decisions and
 [ADR-0053](DECISIONS.md#adr-0053--the-shell-is-one-scene-and-the-six-decisions-that-make-the-front-end-buildable)
-the structural ones. This milestone is the build. **Blocked until Anthony ends
-the design phase.**
+the structural ones. This milestone is the build.
 
-- [ ] **The shell scene** — one root scene owning the 3D paddock and the UI
+**Partly built, 2026-08-06.** The shell, the theme, menu input, the pause-flag
+field and the gate are done and green; the calendar, the flag generator and the
+generated paddock are untouched and keep their boxes. ADR-0070 records the five
+decisions the build had to make that the mockups could not.
+
+- [x] **The shell scene** — one root scene owning the 3D paddock and the UI
   layer; screens are `Control` panels on a push/pop stack (ADR-0053 §1).
   `project.godot` sets it as the main scene: the demo definition's "the game
   boots into itself" line closes here
-- [ ] **Theme** — palette tokens from FRONTEND.md as a Godot Theme resource,
+- [x] **Theme** — palette tokens from FRONTEND.md as a Godot Theme resource,
   Liberation Sans imported (`tools/assets/fetch_liberation_sans.sh` already
   fetches it), tabular figures wherever digits align
 - [ ] **The ten screens** rebuilt from the approved mockups: boot, paddock
   overlay, session setup, loading, pause, results, standings, settings,
   profile, driving HUD refinements. Screen family dark, paper family light,
-  per FRONTEND.md
-- [ ] **Menu input context** — Cross confirm / Circle back, its own `[input]`
+  per FRONTEND.md. **Nine of ten built** — standings is deferred with the
+  championship it serves (Phase C), and plate 1's eight-row live timing grid
+  waits for the field M7 brings, since `SessionRunner` refuses `entry_count > 1`
+  by name and a one-row grid is the stubbed mode §13 forbids
+- [x] **Menu input context** — Cross confirm / Circle back, its own `[input]`
   actions, `control_hints.gd` grows the menu context (ADR-0053 §2)
 - [ ] **Season calendar schema + data** — rounds 1–2 Valdirone forward/reverse,
   rounds 3–4 honestly unbuilt (ADR-0053 §4); schema doc + executable copy,
@@ -513,8 +520,8 @@ the design phase.**
   for the roster's nationalities (#187, ADR-0053 §5)
 - [ ] **Paddock stage 1** — the vignette module set per #188: kart on stand,
   awning, `look_env.gd` lighting; later stages grow outward
-- [ ] **Pause-flag field on saved bests** (#186) — the ADR-0052 §4 consequence
-- [ ] **`tools/verify/shell_probe.gd`** — the gate: every screen reachable,
+- [x] **Pause-flag field on saved bests** (#186) — the ADR-0052 §4 consequence
+- [x] **`tools/verify/shell_probe.gd`** — the gate: every screen reachable,
   back always returns, focus lands on entry, pad-only coverage (ADR-0053 §3)
 
 **Accept:** launching the game with no arguments boots into the paddock. Every

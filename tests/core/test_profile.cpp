@@ -3,6 +3,7 @@
 #include "core/profile.h"
 
 #include <cstdio>
+#include <cmath>
 #include <cstring>
 #include <string>
 
@@ -73,6 +74,12 @@ std::string read_file(const std::string &path) {
 std::string corpus_v1() {
 	const std::string text = read_file(corpus_path("v1.save"));
 	REQUIRE_MESSAGE(!text.empty(), "tests/data/saves/v1.save is missing or unreadable");
+	return text;
+}
+
+std::string corpus_v2() {
+	const std::string text = read_file(corpus_path("v2.save"));
+	REQUIRE_MESSAGE(!text.empty(), "tests/data/saves/v2.save is missing or unreadable");
 	return text;
 }
 
@@ -177,8 +184,10 @@ TEST_CASE("the captured v1 file loads and yields exactly the values written in i
 	CAPTURE(result.detail);
 	REQUIRE(result.ok());
 	CHECK(result.declared_version == 1);
-	// One version exists, so the chain from it to the current version is empty.
-	CHECK(result.migrations_applied == 0);
+	// One step, 1 -> 2, and it is the identity function. The point of asserting the
+	// count is that the file went *through* the chain rather than being read as if
+	// it were current.
+	CHECK(result.migrations_applied == 1);
 
 	CHECK(std::strcmp(profile.driver.name, "Skirving, Anthony") == 0);
 	CHECK(profile.driver.number == 101);
@@ -243,31 +252,104 @@ TEST_CASE("the captured v1 file loads and yields exactly the values written in i
 	CHECK(profile.find_best("brackwater", TrackLayout::Reverse, KartClass::KZ2) == nullptr);
 }
 
-TEST_CASE("the captured v1 file is byte-identical to what the v1 writer produces") {
-	// The strictest statement available: the checked-in capture is exactly what
-	// `format_profile` emits at this version, comment preamble included. Change
-	// anything the writer writes and this fails until the version is bumped and a
-	// new file is captured, which is ADR-0042's "bump on every format change" made
-	// mechanical instead of remembered.
-	const std::string text = corpus_v1();
+// Print the first divergence between two documents, because a 1,000-character
+// mismatch reported as "not equal" is a diagnostic nobody can act on.
+static void report_first_difference(const std::string &expected, const std::string &written) {
+	size_t at = 0;
+	while (at < written.size() && at < expected.size() && written[at] == expected[at]) {
+		++at;
+	}
+	MESSAGE("first difference at byte " << at);
+	MESSAGE("expected: " << expected.substr(at, 60));
+	MESSAGE("writer:   " << written.substr(at, 60));
+}
+
+TEST_CASE("the captured v2 file is byte-identical to what the v2 writer produces") {
+	// The strictest statement available, applied to the **newest** capture: the
+	// checked-in file is exactly what `format_profile` emits at this version,
+	// comment preamble included. Change anything the writer writes and this fails
+	// until the version is bumped and a new file is captured, which is ADR-0042's
+	// "bump on every format change" made mechanical instead of remembered.
+	//
+	// It is the v2 file and not the v1 file that can carry this now, and the reason
+	// is arithmetic rather than a weakening: v1.save says `version 1` and the writer
+	// says `version 2`, so no v1 file can ever again equal the writer's output. What
+	// v1.save proves instead is the test below it.
+	const std::string text = corpus_v2();
 	Profile profile;
-	REQUIRE(load(text, profile).ok());
+	const ProfileLoadResult result = load(text, profile);
+	CAPTURE(profile_problem_name(result.problem));
+	CAPTURE(result.line);
+	CAPTURE(result.detail);
+	REQUIRE(result.ok());
 	const std::string written = write_profile(profile);
 	REQUIRE(!written.empty());
 
 	if (written != text) {
-		// Print the first divergence, because a 1,000-character mismatch reported as
-		// "not equal" is a diagnostic nobody can act on.
-		size_t at = 0;
-		while (at < written.size() && at < text.size() && written[at] == text[at]) {
-			++at;
-		}
-		MESSAGE("first difference at byte " << at);
-		MESSAGE("corpus: " << text.substr(at, 60));
-		MESSAGE("writer: " << written.substr(at, 60));
+		report_first_difference(text, written);
 	}
 	CHECK(written == text);
 	CHECK(written.size() == text.size());
+}
+
+TEST_CASE("v2's best records mean what the file says") {
+	// Field by field, and specifically the four corners of the two booleans the
+	// bump added. Asserting only "it loaded" would pass on a binder that defaulted
+	// both of them.
+	Profile profile;
+	REQUIRE(load(corpus_v2(), profile).ok());
+	REQUIRE(profile.best_count == 4);
+
+	const ProfileBest *ghost_strict =
+			profile.find_best("autumn_ridge", TrackLayout::Forward, KartClass::OK);
+	REQUIRE(ghost_strict != nullptr);
+	CHECK(std::strcmp(ghost_strict->ghost_id, "ar_fwd_ok_0001") == 0);
+	CHECK(ghost_strict->pause_forgiven == false);
+
+	// No ghost and forgiven: `-` becomes an empty buffer, never the literal.
+	const ProfileBest *bare_forgiven =
+			profile.find_best("autumn_ridge", TrackLayout::Forward, KartClass::KZ2);
+	REQUIRE(bare_forgiven != nullptr);
+	CHECK(bare_forgiven->ghost_id[0] == '\0');
+	CHECK_FALSE(profile_has_ghost(bare_forgiven->ghost_id));
+	CHECK(bare_forgiven->pause_forgiven == true);
+
+	const ProfileBest *bare_strict =
+			profile.find_best("autumn_ridge", TrackLayout::Reverse, KartClass::OK);
+	REQUIRE(bare_strict != nullptr);
+	CHECK(bare_strict->ghost_id[0] == '\0');
+	CHECK(bare_strict->pause_forgiven == false);
+
+	const ProfileBest *ghost_forgiven =
+			profile.find_best("brackwater", TrackLayout::Forward, KartClass::OK);
+	REQUIRE(ghost_forgiven != nullptr);
+	CHECK(std::strcmp(ghost_forgiven->ghost_id, "bw_fwd_ok_0002") == 0);
+	CHECK(ghost_forgiven->pause_forgiven == true);
+}
+
+TEST_CASE("the captured v1 file migrates to v2 and nothing but its version moves") {
+	// What a v1 capture can still prove, and it is nearly as strong as byte
+	// identity: the 1 -> 2 step is the identity function, so the writer's output
+	// must differ from the capture in the `version` line and **nowhere else**. A
+	// migration that re-rounded a lap time, reordered the bests or dropped a
+	// standings row fails on the byte where it did it.
+	const std::string text = corpus_v1();
+	Profile profile;
+	const ProfileLoadResult result = load(text, profile);
+	CAPTURE(profile_problem_name(result.problem));
+	REQUIRE(result.ok());
+	CHECK(result.declared_version == 1);
+	CHECK(result.migrations_applied == 1);
+
+	const std::string expected = replace_first(text, "version 1\n", "version 2\n");
+	const std::string written = write_profile(profile);
+	REQUIRE(!written.empty());
+
+	if (written != expected) {
+		report_first_difference(expected, written);
+	}
+	CHECK(written == expected);
+	CHECK(written.size() == expected.size());
 }
 
 TEST_CASE("write, read, write is byte-identical") {
@@ -310,8 +392,9 @@ TEST_CASE("a hand-edited file is canonicalized rather than refused") {
 	REQUIRE(result.ok());
 	CHECK(profile.driver.number == 101);
 	CHECK(profile.career.round == 2);
-	// Back to the canonical file, which is the corpus file.
-	CHECK(write_profile(profile) == corpus_v1());
+	// Back to the canonical file — which is the corpus file at the current version,
+	// because canonicalizing a v1 save also migrates it.
+	CHECK(write_profile(profile) == replace_first(corpus_v1(), "version 1\n", "version 2\n"));
 }
 
 // --- rejection rather than half-loading ---------------------------------------
@@ -540,10 +623,22 @@ TEST_CASE("a malformed record is refused with the field named") {
 		CHECK(result.problem == ProfileProblem::WrongTokenCount);
 		CHECK(std::strcmp(result.detail, "best") == 0);
 	}
-	SUBCASE("a best with six fields") {
+	SUBCASE("a best whose sixth field is not the flag") {
+		// Six fields is legal at version 2 and the sixth has exactly one spelling, so
+		// this is a `BadEnum` naming the token rather than a width error — and it is
+		// named rather than ignored, which is the whole of ADR-0042's argument about
+		// a field that silently does nothing.
 		const std::string text = replace_first(corpus_v1(),
 				"best brackwater forward ok 62.330500 bw_fwd_ok_0002",
 				"best brackwater forward ok 62.330500 bw_fwd_ok_0002 extra");
+		const ProfileLoadResult result = load(text, profile);
+		CHECK(result.problem == ProfileProblem::BadEnum);
+		CHECK(std::strcmp(result.detail, "extra") == 0);
+	}
+	SUBCASE("a best with seven fields") {
+		const std::string text = replace_first(corpus_v1(),
+				"best brackwater forward ok 62.330500 bw_fwd_ok_0002",
+				"best brackwater forward ok 62.330500 bw_fwd_ok_0002 pause_forgiven extra");
 		CHECK(load(text, profile).problem == ProfileProblem::WrongTokenCount);
 	}
 	SUBCASE("a class that names nothing") {
@@ -634,18 +729,208 @@ TEST_CASE("a ghost id cannot escape the ghosts directory") {
 	CHECK(profile_is_slug("0", 1));
 }
 
+// --- version 2: a best lap with no ghost, and the pause flag --------------------
+
+TEST_CASE("the no-ghost sentinel cannot be mistaken for a ghost id") {
+	// The whole safety argument for `-` in one place: `profile_is_slug_within`
+	// refuses a slug that begins with `-`, so no id a caller can construct is ever
+	// spelled that way and the sentinel cannot collide with real data.
+	CHECK_FALSE(profile_is_slug(PROFILE_NO_GHOST, 1));
+	CHECK_FALSE(profile_is_slug("-", 1));
+	CHECK_FALSE(profile_is_slug("-a", 2));
+	CHECK_FALSE(profile_is_slug("-fwd_ok_0001", 12));
+	// A `-` anywhere but the front is still a perfectly good id, so the exclusion is
+	// exactly one character wide and costs the namespace nothing.
+	CHECK(profile_is_slug("a-b", 3));
+	CHECK(profile_is_slug("ar-fwd-ok-0001", 14));
+
+	// And the sentinel is only itself. `--`, `- `, `-x` are not "no ghost".
+	CHECK(profile_is_no_ghost("-", 1));
+	CHECK_FALSE(profile_is_no_ghost("--", 2));
+	CHECK_FALSE(profile_is_no_ghost("", 0));
+	CHECK_FALSE(profile_is_no_ghost("-x", 2));
+
+	// The field validator takes three spellings and no others.
+	CHECK(profile_is_ghost_id("", 0));
+	CHECK(profile_is_ghost_id("-", 1));
+	CHECK(profile_is_ghost_id("ar_fwd_ok_0001", 14));
+	CHECK_FALSE(profile_is_ghost_id("--", 2));
+	CHECK_FALSE(profile_is_ghost_id("-a", 2));
+	CHECK_FALSE(profile_is_ghost_id("../escape", 9));
+}
+
+TEST_CASE("a best lap set with the ghost turned off round-trips") {
+	// The bug this closes, stated as its symptom: the setup screen offers
+	// "Ghost: off / personal best", and with it off `set_best` returned false and the
+	// lap time silently did not save. Nothing reported anything.
+	Profile profile = fresh_profile();
+	REQUIRE(profile.best_count == 0);
+
+	SUBCASE("an empty ghost id is accepted, which is what the caller passes") {
+		REQUIRE(profile.set_best("valdirone_nuova", TrackLayout::Forward, KartClass::KZ2,
+				46.611, ""));
+		REQUIRE(profile.best_count == 1);
+		CHECK_FALSE(profile_has_ghost(profile.bests[0].ghost_id));
+		CHECK(tuning_micro(profile.bests[0].lap_time_s) == tuning_micro(46.611));
+		CHECK(profile.is_valid());
+
+		// Through the file and back, to the microsecond.
+		const std::string text = write_profile(profile);
+		REQUIRE(!text.empty());
+		CHECK(text.find("best valdirone_nuova forward kz2 46.611000 -\n") != std::string::npos);
+
+		Profile reloaded;
+		const ProfileLoadResult result = load(text, reloaded);
+		CAPTURE(profile_problem_name(result.problem));
+		CAPTURE(result.detail);
+		REQUIRE(result.ok());
+		REQUIRE(reloaded.best_count == 1);
+		CHECK_FALSE(profile_has_ghost(reloaded.bests[0].ghost_id));
+		// An explicit absolute comparison and not `Approx(x).epsilon(0)`, which is
+		// `0 < 0` and fails even when the two numbers are bit-identical. 1e-9 is the
+		// tolerance `shell_probe.gd` measures this same value to.
+		CHECK(std::fabs(reloaded.bests[0].lap_time_s - 46.611) < 1e-9);
+		CHECK(tuning_micro(reloaded.bests[0].lap_time_s) == tuning_micro(46.611));
+		CHECK(write_profile(reloaded) == text);
+	}
+	SUBCASE("the file's own spelling is accepted too, and lands as empty") {
+		// So a caller that read a `-` out of a record and handed it back does not
+		// create a ghost called `-` pointing at `user://ghosts/-.ghost`.
+		REQUIRE(profile.set_best("valdirone_nuova", TrackLayout::Forward, KartClass::KZ2,
+				46.611, PROFILE_NO_GHOST));
+		CHECK_FALSE(profile_has_ghost(profile.bests[0].ghost_id));
+		CHECK(profile.bests[0].ghost_id[0] == '\0');
+	}
+	SUBCASE("a real ghost still round-trips, unchanged") {
+		REQUIRE(profile.set_best("valdirone_nuova", TrackLayout::Forward, KartClass::KZ2,
+				46.611, "vn_fwd_kz2_0001"));
+		const std::string text = write_profile(profile);
+		CHECK(text.find("best valdirone_nuova forward kz2 46.611000 vn_fwd_kz2_0001\n") !=
+				std::string::npos);
+		Profile reloaded;
+		REQUIRE(load(text, reloaded).ok());
+		CHECK(std::strcmp(reloaded.bests[0].ghost_id, "vn_fwd_kz2_0001") == 0);
+		CHECK(write_profile(reloaded) == text);
+	}
+	SUBCASE("a faster lap can drop the ghost, and a slower one changes nothing") {
+		REQUIRE(profile.set_best("valdirone_nuova", TrackLayout::Forward, KartClass::KZ2,
+				47.0, "vn_fwd_kz2_0001"));
+		REQUIRE(profile.set_best("valdirone_nuova", TrackLayout::Forward, KartClass::KZ2,
+				46.611, ""));
+		CHECK(profile.best_count == 1);
+		CHECK_FALSE(profile_has_ghost(profile.bests[0].ghost_id));
+		// Not an improvement: reported as success and nothing moves, including the
+		// ghost. A best that got worse is not a best.
+		REQUIRE(profile.set_best("valdirone_nuova", TrackLayout::Forward, KartClass::KZ2,
+				48.0, "vn_fwd_kz2_0002"));
+		CHECK_FALSE(profile_has_ghost(profile.bests[0].ghost_id));
+		CHECK(tuning_micro(profile.bests[0].lap_time_s) == tuning_micro(46.611));
+	}
+}
+
+TEST_CASE("a ghost-bearing best is written exactly as version 1 wrote it") {
+	// The compatibility claim, measured rather than asserted in a comment: the two
+	// additions cost the common record nothing, so a save full of ordinary bests
+	// differs from what version 1 produced in the `version` line and nowhere else.
+	//
+	// `corpus_v1()` is the evidence — a file written before either addition existed —
+	// and the migrated round trip above already proves the whole document. This
+	// narrows it to the `best` block so a failure says which thing broke.
+	const std::string v1 = corpus_v1();
+	Profile profile;
+	REQUIRE(load(v1, profile).ok());
+	const std::string written = write_profile(profile);
+	REQUIRE(!written.empty());
+
+	const char *records[] = {
+		"best autumn_ridge forward ok 48.412355 ar_fwd_ok_0001\n",
+		"best autumn_ridge forward kz2 44.108900 ar_fwd_kz2_0003\n",
+		"best autumn_ridge reverse ok 49.877010 ar_rev_ok_0001\n",
+		"best brackwater forward ok 62.330500 bw_fwd_ok_0002\n",
+	};
+	for (const char *record : records) {
+		CAPTURE(record);
+		CHECK(v1.find(record) != std::string::npos);
+		CHECK(written.find(record) != std::string::npos);
+	}
+	// And no record grew a token: four bests, four `best ` lines, no `-` and no flag
+	// anywhere in the document.
+	CHECK(written.find(" -\n") == std::string::npos);
+	CHECK(written.find("pause_forgiven") == std::string::npos);
+}
+
+TEST_CASE("the pause-forgiveness flag survives the file and defaults off") {
+	// Issue #186. A best set with ADR-0052 §4's forgiveness on is not the same
+	// achievement as one set without it, so the record says which.
+	Profile profile = fresh_profile();
+	REQUIRE(profile.set_best("valdirone_nuova", TrackLayout::Forward, KartClass::KZ2,
+			46.611, "vn_fwd_kz2_0001", true));
+	REQUIRE(profile.set_best("valdirone_nuova", TrackLayout::Reverse, KartClass::KZ2,
+			48.200, "vn_rev_kz2_0001"));
+	CHECK(profile.bests[0].pause_forgiven);
+	CHECK_FALSE(profile.bests[1].pause_forgiven);
+
+	const std::string text = write_profile(profile);
+	REQUIRE(!text.empty());
+	CHECK(text.find(
+				  "best valdirone_nuova forward kz2 46.611000 vn_fwd_kz2_0001 pause_forgiven\n") !=
+			std::string::npos);
+	// Absent, not `pause_forgiven false`. A flag that is written either way is a
+	// flag that rewrites every record it was added to.
+	CHECK(text.find("best valdirone_nuova reverse kz2 48.200000 vn_rev_kz2_0001\n") !=
+			std::string::npos);
+
+	Profile reloaded;
+	const ProfileLoadResult result = load(text, reloaded);
+	CAPTURE(profile_problem_name(result.problem));
+	CAPTURE(result.detail);
+	REQUIRE(result.ok());
+	REQUIRE(reloaded.best_count == 2);
+	CHECK(reloaded.bests[0].pause_forgiven);
+	CHECK_FALSE(reloaded.bests[1].pause_forgiven);
+	CHECK(write_profile(reloaded) == text);
+
+	SUBCASE("a faster lap set the strict way clears the flag") {
+		// The flag belongs to the lap, not to the key. A record that kept a stale
+		// `pause_forgiven` after being beaten by a clean lap would be marking the
+		// wrong lap.
+		REQUIRE(reloaded.set_best("valdirone_nuova", TrackLayout::Forward, KartClass::KZ2,
+				46.000, "vn_fwd_kz2_0002"));
+		CHECK_FALSE(reloaded.bests[0].pause_forgiven);
+	}
+	SUBCASE("and the flag and the missing ghost are independent") {
+		Profile both = fresh_profile();
+		REQUIRE(both.set_best("valdirone_nuova", TrackLayout::Forward, KartClass::KZ2,
+				46.611, "", true));
+		const std::string line = write_profile(both);
+		CHECK(line.find("best valdirone_nuova forward kz2 46.611000 - pause_forgiven\n") !=
+				std::string::npos);
+		Profile back;
+		REQUIRE(load(line, back).ok());
+		CHECK_FALSE(profile_has_ghost(back.bests[0].ghost_id));
+		CHECK(back.bests[0].pause_forgiven);
+	}
+}
+
 // --- the migration machinery ---------------------------------------------------
 
-TEST_CASE("there are no migrations at version 1, and the chain says so honestly") {
-	CHECK(PROFILE_FORMAT_VERSION == 1);
-	CHECK(PROFILE_MIGRATION_COUNT == 0);
-	CHECK(PROFILE_MIGRATIONS == nullptr);
-	// An empty table is a complete chain from 1 to 1: there is no intermediate
-	// version to step out of. This is the assertion that would start failing the
-	// moment `PROFILE_FORMAT_VERSION` is bumped without an entry being added, which
-	// is exactly the mistake worth catching.
+TEST_CASE("the production chain reaches the current version with no gaps") {
+	// Not a restatement of the table. This is the assertion that fails the moment
+	// `PROFILE_FORMAT_VERSION` is bumped without an entry being added, which is
+	// exactly the mistake worth catching — and it caught nothing for as long as the
+	// table was empty and the version was 1, because an empty table is trivially a
+	// complete chain from 1 to 1.
+	CHECK(PROFILE_FORMAT_VERSION == 2);
+	CHECK(PROFILE_MIGRATION_COUNT == PROFILE_FORMAT_VERSION - 1);
+	REQUIRE(PROFILE_MIGRATIONS != nullptr);
 	CHECK(profile_migration_chain_is_complete(PROFILE_MIGRATIONS, PROFILE_MIGRATION_COUNT,
 			PROFILE_FORMAT_VERSION));
+	// The 1 -> 2 step is the identity function on purpose: version 2 only widened
+	// what a `best` may say, so every v1 record is already a legal v2 record. See
+	// `profile.h`'s section above the table.
+	CHECK(PROFILE_MIGRATIONS[0].from_version == 1);
+	CHECK(PROFILE_MIGRATIONS[0].to_version == 2);
+	CHECK(PROFILE_MIGRATIONS[0].apply == profile_migrate_identity);
 }
 
 TEST_CASE("the chain completeness check catches every way a table can be wrong") {
@@ -1037,8 +1322,14 @@ TEST_CASE("bests are kept sorted, deduplicated, and only improve") {
 		CHECK_FALSE(profile.set_best("Autumn Ridge", TrackLayout::Forward, KartClass::OK, 48.0, "g"));
 		CHECK_FALSE(profile.set_best("autumn_ridge", TrackLayout::Forward, KartClass::OK, 0.0, "g"));
 		CHECK_FALSE(profile.set_best("autumn_ridge", TrackLayout::Forward, KartClass::OK, -1.0, "g"));
-		CHECK_FALSE(profile.set_best("autumn_ridge", TrackLayout::Forward, KartClass::OK, 48.0, ""));
 		CHECK_FALSE(profile.set_best("", TrackLayout::Forward, KartClass::OK, 48.0, "g"));
+		// An empty ghost id is **not** in this list any more and that is the whole of
+		// issue #186's sibling bug: it used to be refused here, so a lap set with
+		// ghost recording off could not be saved at all. See the no-ghost cases below.
+		CHECK_FALSE(profile.set_best("autumn_ridge", TrackLayout::Forward, KartClass::OK, 48.0,
+				"Bad Ghost"));
+		CHECK_FALSE(profile.set_best("autumn_ridge", TrackLayout::Forward, KartClass::OK, 48.0,
+				"../escape"));
 		CHECK(profile.best_count == 4);
 	}
 	SUBCASE("the array fills up and refuses rather than overflowing") {
@@ -1110,9 +1401,17 @@ TEST_CASE("the schema table is internally consistent") {
 		CHECK(spec.key != nullptr);
 		CHECK(std::strlen(spec.key) > 0);
 		CHECK(std::strlen(spec.key) < static_cast<size_t>(PROFILE_KEY_CHARS));
-		CHECK(spec.token_count >= -1);
-		CHECK(spec.token_count <= PROFILE_MAX_TOKENS);
-		CHECK(spec.token_count != 0);
+		CHECK(spec.token_min >= -1);
+		CHECK(spec.token_min <= PROFILE_MAX_TOKENS);
+		CHECK(spec.token_min != 0);
+		// A range, and it has to be one: `token_max` below `token_min` is a key no
+		// record can satisfy, and a free-text key (-1) must say -1 at both ends
+		// rather than carrying a width the binder will never read.
+		CHECK(spec.token_max >= spec.token_min);
+		CHECK(spec.token_max <= PROFILE_MAX_TOKENS);
+		if (spec.token_min < 0) {
+			CHECK(spec.token_max == spec.token_min);
+		}
 		// A repeated key that is also required would mean "at least one", which no
 		// block in this format wants: an empty career has no standings.
 		const bool repeated_and_required = spec.repeated && spec.required;
@@ -1239,10 +1538,12 @@ TEST_CASE("profile_tokenize splits on runs of whitespace and caps the count") {
 	CHECK(profile_tokenize("   ", -1, tokens));
 	CHECK(tokens.count == 0);
 
-	CHECK(profile_tokenize("a b c d e", -1, tokens));
-	CHECK(tokens.count == 5);
-	// A sixth field is an error rather than a silently ignored tail.
-	CHECK_FALSE(profile_tokenize("a b c d e f", -1, tokens));
+	// Six is the widest record the format has — a version 2 `best` carrying the
+	// `pause_forgiven` flag.
+	CHECK(profile_tokenize("a b c d e f", -1, tokens));
+	CHECK(tokens.count == 6);
+	// A seventh field is an error rather than a silently ignored tail.
+	CHECK_FALSE(profile_tokenize("a b c d e f g", -1, tokens));
 }
 
 TEST_CASE("profile_text_equals does not call a prefix a match") {
@@ -1260,7 +1561,7 @@ TEST_CASE("a carriage return does not become part of a value") {
 	// A save copied out of a bug report through a Windows machine. Every line ends
 	// `\r\n`, and a parser that fed that to the number reader would refuse the whole
 	// career.
-	std::string text = corpus_v1();
+	std::string text = corpus_v2();
 	std::string crlf;
 	for (char c : text) {
 		if (c == '\n') {

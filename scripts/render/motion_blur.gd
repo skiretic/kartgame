@@ -62,7 +62,16 @@ enum DebugMode {
 ## Degrees of shutter opening per frame. 180 is the film convention — the shutter
 ## is open for half of each frame, so half a frame of motion is smeared. Higher
 ## values blur more; 360 is a shutter that never closes.
+##
+## **This is what ARCHITECTURE §18's motion-blur setting drives.** `Settings`
+## stores a multiplier where 1.0 is the 180 below and 0.0 is §18's toggle turned
+## off; `SHUTTER_AT_UNIT_SCALE` and `apply_comfort` are the join, and the 2.0
+## ceiling on the setting is exactly the 360 in the sentence above.
 @export_range(0.0, 360.0, 1.0) var shutter_angle_degrees := 180.0
+
+## The shutter a comfort setting of 1.0 means. The film convention, and the value
+## this effect has always constructed at, so `apply_comfort(1.0)` is a no-op.
+const SHUTTER_AT_UNIT_SCALE := 180.0
 
 ## Upper bound on taps along the blur vector. The shader takes roughly one tap
 ## per two pixels of blur and stops here, so this caps the worst case rather than
@@ -91,6 +100,50 @@ func _init() -> void:
 	# Hands the pass an MSAA-resolved color buffer rather than the raw samples.
 	access_resolved_color = true
 	RenderingServer.call_on_render_thread(_initialize_resources)
+
+
+## ARCHITECTURE §18's motion-blur setting, as the shutter angle it means.
+##
+## A multiplier and not an angle in the file, because 180 degrees is a property of
+## this effect and not of the player's preference: change the convention here and
+## every stored setting still means "the shipped amount". `enabled` goes false at
+## zero rather than the shader running with a zero-length blur, so §18's toggle
+## costs nothing when it is off.
+func apply_comfort(scale: float) -> void:
+	shutter_angle_degrees = clampf(scale, 0.0, 2.0) * SHUTTER_AT_UNIT_SCALE
+	enabled = shutter_angle_degrees > 0.0
+
+
+## Build the effect a driveable scene should use, or null when the player has
+## turned it off.
+##
+## **This is the join, and it is a static factory rather than a self-load inside
+## `_init` for a specific reason.** `lookdev.gd` builds this effect from
+## `--shutter` and `--blur`, and every still in this project has to be reproducible
+## from the command that made it — so the one existing construction site must not
+## acquire a dependency on `user://settings.cfg`. A scene that wants the player's
+## preference asks for it by calling this; `lookdev.gd` keeps calling `new()` and
+## is untouched.
+##
+## The scripted-input guard is `chase_camera.gd`'s, for the reason its copy states.
+static func for_settings() -> MotionBlurEffect:
+	var scale := 1.0
+	if ClassDB.class_exists("KartSettings"):
+		var args := Cmdline.parse()
+		var scripted := false
+		for key in AssistSettings.SCRIPTED_INPUT_ARGS:
+			if args.has(key):
+				scripted = true
+				break
+		if not scripted:
+			var settings := KartSettings.new()
+			settings.load()
+			scale = float(settings.get_motion_blur())
+	if scale <= 0.0:
+		return null
+	var effect := MotionBlurEffect.new()
+	effect.apply_comfort(scale)
+	return effect
 
 
 func _notification(what: int) -> void:

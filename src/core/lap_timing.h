@@ -117,9 +117,15 @@ enum class LapInvalidReason : int {
 	Respawned, // restarted with outside help, which is a real disqualification
 	Deleted, // taken away afterwards: a qualifying penalty deletes the fastest lap
 	OutLap, // the first lap of a session, which starts from a standing kart
+	// The driver paused during it. Ours, ADR-0052 §4, and off by preference —
+	// `Settings::pause_invalidates_lap`. Appended rather than inserted: nothing
+	// serializes the integer (`kart_session.cpp` and `kart_ghost.cpp` both publish
+	// `lap_invalid_reason_name`), but a reason code that shifts under a saved file
+	// is a bug waiting for the first thing that does.
+	Paused,
 };
 
-inline constexpr int LAP_INVALID_REASON_COUNT = 6;
+inline constexpr int LAP_INVALID_REASON_COUNT = 7;
 
 inline const char *lap_invalid_reason_name(LapInvalidReason reason) {
 	switch (reason) {
@@ -129,6 +135,7 @@ inline const char *lap_invalid_reason_name(LapInvalidReason reason) {
 		case LapInvalidReason::Respawned: return "respawned";
 		case LapInvalidReason::Deleted: return "deleted";
 		case LapInvalidReason::OutLap: return "out_lap";
+		case LapInvalidReason::Paused: return "paused";
 	}
 	return "invalid";
 }
@@ -513,6 +520,28 @@ public:
 		// rather than a free lap.
 		arm_marks_from(distance_m);
 	}
+
+	// The driver paused during this lap. ADR-0052 §4 and mockup plate 8.
+	//
+	// **The kart is not frozen and this must not pretend otherwise.** ADR-0052's
+	// pause keeps the world running and gates input at the driver, so the timer
+	// keeps ticking and the lap keeps going; what changes is that the lap no longer
+	// counts. That is precisely `taint`, which is the mechanism `advance` already
+	// uses for a wheel on the grass, and this is a two-line function on purpose —
+	// a second invalidation path would be a second set of rules about when a lap
+	// closes.
+	//
+	// **What it deliberately does not touch is `next_mark_`.** The bug this class
+	// has already had once was a lap that could never close: a cut over the first
+	// mark left `next_mark_` at 1, the arming condition only accepted a consumed
+	// mark, and the driver got no lap and no reason. Both witnesses are an `||`
+	// now, and this function stays clear of both of them — it changes one enum and
+	// nothing else, so a struck lap runs to the line, closes, reports `paused`, and
+	// the next lap starts clean like any other invalid one.
+	//
+	// First reason wins, per `taint`: a driver who went off and *then* paused is
+	// told they went off, which is the thing they did.
+	void strike_paused() { taint(LapInvalidReason::Paused); }
 
 	// Take away the fastest valid lap of the session.
 	//

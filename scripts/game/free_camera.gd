@@ -75,8 +75,25 @@ func _unhandled_input(event: InputEvent) -> void:
 		_pitch = clampf(_pitch - motion.relative.y * MOUSE_SENSITIVITY, -1.5, 1.5)
 
 
+## Cleared while a menu is over the session.
+##
+## **`set_process_input(false)` was not enough and that is measured.** The flight
+## controls are `Input.get_action_strength` **polls in `_process`**, not events,
+## so gating `_input` leaves every one of them live — and the poll reads
+## `throttle`, `brake`, `steer_left` and `steer_right`, whose second bindings are
+## the arrow keys, which are also `menu_up/down/left/right`. So with the pause
+## menu open in free-camera mode, one press of Down both walked the selection and
+## flew the camera backwards.
+##
+## `set_input_as_handled()` cannot fix it either: consuming an event does not
+## touch the `Input` singleton. That is the same fact CLAUDE.md records for
+## `KartBody`, and the reason `PlayerDriver.enabled` exists rather than an
+## event-consuming overlay. This flag is the camera's equivalent of that lever.
+var enabled := true
+
+
 func _process(delta: float) -> void:
-	if not current:
+	if not current or not enabled:
 		return
 
 	if Input.is_action_just_pressed(&"debug_camera"):

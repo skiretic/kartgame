@@ -140,6 +140,23 @@ func reload_settings() -> void:
 		_settings.load()
 
 
+## Redirect every save this shell makes. `--profile-dir=user://somewhere/`.
+##
+## **This exists because a gate that opens the results screen can write a lap
+## time into the runner's real career.** The results sheet files a best through
+## `best_lap_store` as part of showing it, which is correct in the game and
+## catastrophic in a probe: `shell_probe.gd` hands the screen twelve synthetic
+## Valdirone laps, and against the default `user://` that is a fabricated
+## 0:46.740 seated at the top of Anthony's own sheet, saved through the fsync'd
+## atomic write, indistinguishable from a lap he drove.
+##
+## `profile_probe.gd` established the rule — all probe I/O under its own base dir
+## — and it only reached as far as probes that construct their own `KartProfile`.
+## A probe that instantiates the whole shell needs the shell to honor it too.
+func _profile_dir() -> String:
+	return Cmdline.as_string(_args, "profile-dir", "")
+
+
 func _load_persistence() -> void:
 	if not ClassDB.class_exists("KartProfile"):
 		# A stale or missing extension build, and it reads exactly like a
@@ -149,7 +166,12 @@ func _load_persistence() -> void:
 				+ "with `scons target=editor arch=arm64`")
 		return
 
+	var base := _profile_dir()
+
 	_profile = KartProfile.new()
+	if not base.is_empty():
+		_profile.set_base_dir(base)
+		_boot_notes.append("saves    redirected to %s" % base)
 	var loaded: Dictionary = _profile.load()
 	if bool(loaded.get("existed", false)):
 		_boot_notes.append("profile   %s, %d best%s" % [
@@ -162,6 +184,8 @@ func _load_persistence() -> void:
 		_boot_notes.append("          %s" % warning)
 
 	_settings = KartSettings.new()
+	if not base.is_empty():
+		_settings.set_base_dir(base)
 	var read: Dictionary = _settings.load()
 	_boot_notes.append("settings  %s" % (
 		_settings.settings_path() if bool(read.get("existed", false))
@@ -234,6 +258,31 @@ func start_session(config: Dictionary) -> void:
 	SessionRequest.post(config)
 	if has_screen("loading"):
 		open("loading")
+		var loading := _stack.top()
+		if loading != null and loading.has_method("set_request"):
+			loading.call("set_request", config)
+
+		# **The awaits are the whole reason the loading screen exists.** Measured:
+		# without them the shell is freed in the same frame the screen is pushed,
+		# `is_instance_valid()` on it is already false by the next `_process`, and
+		# the entire ~1.2 s build runs inside that frame's deferred flush. The
+		# screen was built and destroyed without ever being drawn — a loading
+		# screen nobody has ever seen, which is indistinguishable from not having
+		# one.
+		#
+		# Two frames, not one: `ScreenStack` lands focus a frame after the push
+		# (containers have to sort first), so one frame renders a screen with no
+		# focus on it and the wrong layout. `frame_post_draw` is the honest signal
+		# that pixels actually reached the swapchain.
+		await get_tree().process_frame
+		await get_tree().process_frame
+		# **Guarded on the display server, not on the editor.** `--headless` has no
+		# rendering device, so `frame_post_draw` never fires and awaiting it there
+		# is a hang rather than a wait — and headless is exactly where every gate
+		# and every probe runs.
+		if DisplayServer.get_name() != "headless":
+			await RenderingServer.frame_post_draw
+
 	var error := get_tree().change_scene_to_file(TRACK_SCENE)
 	if error != OK:
 		push_error("could not open %s (%d)" % [TRACK_SCENE, error])

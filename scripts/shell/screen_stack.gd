@@ -60,6 +60,20 @@ signal screen_popped(screen: ShellScreen)
 ## by hand is how a scene reorganization becomes a null nobody expected.
 var shell_root: Node
 
+## Whether the bottom screen is allowed to pop.
+##
+## **True in the shell and false in an overlay host, and getting it wrong makes
+## the pause menu impossible to close.** In the shell the bottom of the stack is
+## the paddock and popping it would leave nothing on screen and no way back. The
+## stack `circuit.gd` builds during a session starts *empty* — its depth 1 is the
+## pause menu itself, and refusing to pop that is refusing to resume.
+##
+## Measured: with this hardcoded true, `_toggle_pause()` opened the menu and then
+## could not close it. `can_pop()` already carries the per-screen half of the same
+## rule — boot and the paddock both return false — so this is the per-*stack* half
+## and not a second copy of it.
+var keeps_bottom := true
+
 var _stack: Array[ShellScreen] = []
 var _pending_focus: ShellScreen = null
 var _held := StringName()
@@ -100,16 +114,19 @@ func push(screen: ShellScreen) -> void:
 ## the stack never pops**, or the shell is left with nothing on screen and no way
 ## back.
 func pop() -> ShellScreen:
-	if _stack.size() <= 1:
+	if _stack.is_empty():
+		return null
+	if keeps_bottom and _stack.size() <= 1:
 		return null
 	var leaving: ShellScreen = _stack.pop_back()
 	leaving.on_exit()
 	remove_child(leaving)
 	leaving.queue_free()
 
-	var revealed: ShellScreen = _stack[-1]
-	revealed.visible = true
-	_pending_focus = revealed
+	if not _stack.is_empty():
+		var revealed: ShellScreen = _stack[-1]
+		revealed.visible = true
+		_pending_focus = revealed
 	screen_popped.emit(leaving)
 	return leaving
 
