@@ -4,7 +4,9 @@
 #include "audio/engine_voice.h"
 #include "audio/noise_voice.h"
 #include "kart_core.h"
+#include "kart_racing_line.h"
 #include "kart_random.h"
+#include "kart_replay.h"
 #include "kart_state_hash.h"
 #include "session/kart_ghost.h"
 #include "session/kart_profile.h"
@@ -133,6 +135,22 @@ void initialize_kartgame_module(ModuleInitializationLevel p_level) {
 	// there, which is how `settings.cfg` ended up saveable, loadable and never once
 	// loaded.
 	GDREGISTER_CLASS(kartgame::KartTrack);
+
+	// The replay. ROADMAP M6, ADR-0041.
+	//
+	// RefCounted like the rest: a replay is a document, one per recording, held by
+	// whatever is recording or playing it. There is deliberately no `ReplayDriver`
+	// node beside it -- ADR-0040 says input reaches `KartBody` two ways and a third
+	// producer would be a third way. A player-back feeds the decoded stream through
+	// the same `input_driver` Callable every scripted run already uses.
+	GDREGISTER_CLASS(kartgame::KartReplay);
+
+	// The racing line and its speed profile. ROADMAP M7.
+	//
+	// RefCounted for the same reason `KartTrack` is: a line is a *definition* that
+	// the AI driver, the telemetry overlay and the verification probe all read, and
+	// putting it in the tree would invite each of them to go looking for it there.
+	GDREGISTER_CLASS(kartgame::KartRacingLine);
 }
 
 void uninitialize_kartgame_module(ModuleInitializationLevel p_level) {
