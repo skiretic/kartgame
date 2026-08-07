@@ -2744,3 +2744,101 @@ Both are worth keeping because both were argued confidently from evidence.
 2. **The slot count.** Six in the docstring, eight in the ticket, nine on the only
    orthographic drawing of the five. A count off an oblique exploded view is not a
    measurement.
+
+## Engine audio — how fast the note brightens with rpm
+
+Everything the audio sections above record describes the spectrum at *an* operating
+point. None of it says how the spectrum moves as the engine revs, and that motion
+turns out to separate a racing two-stroke from every other small engine — including
+from a two-stroke with an ordinary muffler. It is also what was wrong with the
+shipped synth, which measured **duller with revs than a chainsaw**.
+
+Method: decode to mono 48 kHz, 8,192-point Hann frames at a 2,048 hop, track f0 with
+the harmonic-sum estimator, and per frame take the power-weighted mean frequency
+from 50 Hz to the file's own measured codec ceiling. Bin frames by f0, take the
+median of each bin. Recordings are fetched and hash-checked by
+`tools/assets/fetch_kz_audio.sh`.
+
+The quantity is the exponent **k in `centroid ~ f0^k`**, not a ratio: each recording
+spans a different rev range, so a raw top-over-bottom figure would compare a
+threefold sweep against a twofold one.
+
+| Recording | Exhaust | rpm span | centroid span | >4 kHz span | **k** |
+| --- | --- | --- | --- | --- | --- |
+| Colibri D-3 (accelerating frames) | racing pipe | 4,207-8,767 | 1409-3591 Hz | 5.3-42.0% | **1.27** |
+| Eindhoven kartbaan | racing pipe | 6,202-13,537 | 862-1482 Hz | 3.6-6.6% | **0.69** |
+| Tomos D-7 (accelerating frames) | racing pipe | 3,885-13,284 | 1556-2814 Hz | 8.5-23.0% | **0.49** |
+| Stihl MS 150 C | **muffler** | 6,660-11,347 | 1256-1319 Hz | 7.6-8.1% | **0.09** |
+| Rental kart | **four-stroke, muffler** | 1,275-1,687 | 590-615 Hz | 2.0-2.1% | **0.15** |
+
+**The two groups do not overlap and there is a factor of three between them.** A
+tuned expansion chamber boosts a band of harmonic *indices* — `ONPIPE_LADDER_DB`
+peaks at h6 — so as the engine revs, that band is dragged up in absolute frequency
+with f0 and the note brightens. A muffler's transfer function is fixed in Hz and its
+centroid sits still. The two muffled engines are carried here as **negative
+controls** and are the reason this is a measurement rather than a preference.
+
+The Tomos D-9 is excluded: its k measures 0.13, but a k is a fit *against* rpm and
+the D-9's f0 track is the one this document already refuses to take an rpm figure
+from. Its ladder is unaffected and is still used.
+
+**Absolute centroid does not transfer** — Eindhoven's is 862-1482 Hz and the
+Colibri's is 1409-3591 for the same class of engine, because one is trackside
+through an unknown amount of air absorption. The exponent survives it: a fixed
+transfer function multiplies every frame of one recording alike, so a ratio between
+two rpm bands of the same file divides it back out. Same argument the throttle split
+rests on.
+
+Level, on the two recordings where a level means anything — stationary, fixed short
+microphone distance, revving under load:
+
+| Recording | rpm span | band level | dB per doubling of rpm |
+| --- | --- | --- | --- |
+| Colibri D-3 (accel.) | 4,207-8,767 | 47.2 -> 57.8 dB | **+10.4** |
+| Tomos D-7 (accel.) | 3,885-13,284 | 43.0 -> 61.4 dB | **+10.4** |
+| Stihl MS 150 C | 6,660-11,347 | 54.9 -> 57.2 dB | +3.0 |
+| Rental kart | 1,275-1,687 | 49.5 -> 50.0 dB | +1.0 |
+
+The two usable rows agree to a tenth of a dB, which is the most consistent pair in
+this document. The figure includes coming on the pipe and cannot be separated from
+it, so a consumer applying it alongside an on-pipe level bonus is double-counting.
+
+**The on-pipe transition, in rpm.** Colibri accelerating frames, 10% to 90% of the
+total centroid rise: **4,700 to 7,470 rpm — 2,770 rpm wide centered on 6,085**, or
+46% of its own center speed. Whether an expansion chamber's transition scales with
+its tuned speed or is roughly constant in absolute rpm is something this corpus
+cannot answer, so this is **not** a KZ figure and `engine_synth.h` carries it with
+`ONPIPE_TRANSITION_MEASURED_ON_KART = false` rather than acting on it.
+
+**Codec ceilings**, measured per file: 19.0 to 20.8 kHz. High enough that the
+centroid figures are unaffected; the harmonic ladder tops remain lower bounds.
+
+**One correction to the ladder tables above.** The published decay slopes are
+whole-range least-squares fits, and for a ladder that rises to a hump and then
+falls, such a fit has the wrong sign for extrapolating past h24. The D-9 peaks at h6
+and falls monotonically to h24; its whole-range fit is **+1.04** dB per doubling and
+its **upper-six-indices (h8-h24) fit is -3.08**. The corresponding figures are PIPE
+-5.79, D-7 -4.69, Colibri -6.90, Chainsaw -5.22. **This resolves the sign conflict
+this document previously filed as unresolvable** — and it was not academic: every
+partial above h24 was being extrapolated *louder* than the one below it.
+
+**A correction to `ATTRIBUTION.md`.** The Patras recording's recorded SHA-256 prefix
+`80122451865e74c8` does not match the bytes at its own URL, which hash
+`4dbfd7700419a59a...`. Commons reports a single revision from 2011 whose size
+matches byte for byte, so this is **not** an upstream re-encode — the recorded hash
+is of a transcode or an extracted audio track, not of the original `.ogv`.
+
+### The recordings
+
+| file | what | license |
+| --- | --- | --- |
+| `WWS_MotorcycleTOMOSD-9.ogg` | Tomos D-9, racing pipe | CC BY 4.0 |
+| `WWS_MotorcycleTOMOSD7.ogg` | Tomos D-7, racing pipe | CC BY 4.0 |
+| `WWS_MotorcycleTOMOSColibrispecialD-3.ogg` | Colibri D-3, racing pipe | CC BY 4.0 |
+| `WWS_Chainsaw.ogg` | Stihl MS 150 C, **muffler — negative control** | CC BY 4.0 |
+| `529071_109901-hq.mp3` | Eindhoven kartbaan, real two-stroke karts | **CC0** |
+| `317470_4709749-hq.mp3` | four-stroke rental kart, **negative control** | **CC0** |
+
+No engine-audio fetch script existed for a milestone while the scrub band had one
+from day one, so these constants were unreproducible in principle. Closed by
+`tools/assets/fetch_kz_audio.sh`, which pins every file by full SHA-256.

@@ -4629,3 +4629,146 @@ could drive.
   not fail; a gate without inverted-exit sabotage modes is not trusted here.
 - Ten screens are built to plate fidelity and **unjudged**. ADR-0053 §3 stands:
   numbers gate structure, Anthony's eye gates looks.
+
+## ADR-0071
+
+**Issue #137 is a spin, not a scrub — and the obvious fix is falsified. The tire
+law stays as it is until the launch is fixed.**
+
+2026-08-07. Supersedes the framing in ADR-0034 and in #137's own title.
+
+### What was measured
+
+Issue #137 has been recorded since M3b as a *scrub*: the kart "grinding to a halt in
+a corner" at 5.6 km/h on a 2.70 m circle, with `drive.sh` publishing 0.04-0.09 g of
+sustained lateral against a 1.5-2.0 g band.
+
+It is not a scrub. **Max body slip on that run is 174.2 degrees** — the kart is
+travelling backwards — and the end state is a sustained power-on donut at 9.97 m/s,
+yaw 3.91 rad/s, with rear slip ratios of 3.14 and 1.29. The published 0.04 g was a
+spin being averaged and reported as cornering.
+
+The mechanism is `src/core/tire.h:272`. The friction ellipse computes
+
+    demand = sqrt(lateral_fraction^2 + longitudinal_fraction^2)
+
+and both fractions reduce to `normalized(slip)`, **which falls past its own peak**.
+So a wheel sliding harder *lowers* the demand, the ellipse stops clipping, and force
+grows back. Three measurements of the consequence:
+
+- lateral force at the peak slip angle dips to 968 N and then **rises to 1143 N at
+  three times the peak slip** — recovering 26.9%. A wheel spinning at 3x road speed
+  grips harder laterally than one at optimum slip.
+- the applied force sits **61.1 degrees off the rolling axis while the slip vector
+  is at 3.0 degrees.** Coulomb friction opposes the slip vector; this is nearly
+  perpendicular to it.
+- in the donut the model **under-brakes the spinning wheel by 33%** and over-holds
+  it laterally by 107%, so the axle never re-hooks.
+
+`tire.h`'s own comment on `TireForce::utilization` documents this exact
+non-monotonicity as a trap for telemetry consumers, and does not notice that the
+ellipse divides by the same quantity.
+
+Four other candidates were ruled out by measurement, not argument: the tire curve
+(0.915 of peak at twice the peak slip angle — it does not collapse), load transfer
+(sweeping `FRAME_TORSION_NM_PER_DEG` across the whole published span makes it
+*worse*), steering geometry (driven/geometric radius 0.98-1.08 across all locks),
+and solver integration (a driven transient of 1.976 g against a quasi-static ceiling
+of 1.9986 g — 1.2% apart).
+
+### Why the fix is not in this change
+
+The obvious correction is normalized-slip (similarity) combined slip. It was
+implemented, measured, and **reverted**.
+
+First, the naive form does not reduce to the pure-slip curves — `lateral.force(s *
+peak_slip)` is off by **0.80% at 0.5 degrees**, which is cornering stiffness, because
+`ap/tan(ap) = 0.9919`. Re-entering through the tangent,
+`lateral.force(atan(s * tan(peak_slip)))`, reduces exactly (0.000000000% over 17
+angles and 10 slip ratios). That version was the one tested.
+
+It makes the kart worse:
+
+| entry | law | end km/h | lat g | radius | max body slip |
+| --- | --- | --- | --- | --- | --- |
+| 13.5 m/s | current ellipse | 21.8 | 1.073 | 3.49 m | 174.2 deg |
+| 25.0 m/s | current ellipse | 100.2 | 1.736 | 45.50 m | 20.5 deg |
+| 13.5 m/s | similarity | 8.7 | 0.169 | 3.50 m | 179.5 deg |
+| 25.0 m/s | similarity | 8.7 | 0.169 | 3.49 m | **180.0 deg** |
+
+It does not stop the donut; it makes the *good* branch donut too. Top speed falls
+139.8 -> 32.6 km/h and **the kart spins out in a straight line with zero steering
+input.**
+
+The reason is not that the law is wrong. Slip ratios are identical between the two
+laws, so the longitudinal reduction is exact; what differs is the rear axle's slip
+*angle*, which goes from 0.03-0.15 degrees for a whole run under the ellipse to 22
+degrees by tick 220 under similarity. **Rear cornering stiffness correctly falls
+about 60x wherever slip ratio is large** — at k = 2.0 the slip vector is 99.5%
+longitudinal, so genuine Coulomb friction puts only 0.6% of the force sideways — and
+a rear-weight-biased kart with no rear lateral stiffness is violently unstable.
+
+**The kart spends 1.49 s above slip ratio 0.5 and 1.18 s above 1.0 on a launch.**
+That is a burnout, and the broken ellipse was making it free.
+
+### The decision
+
+1. `Tire::evaluate` is **unchanged** for now. The ellipse is wrong and is documented
+   as wrong; replacing it in isolation makes the simulation worse, and shipping a
+   change that fails its own acceptance test to satisfy a ticket title would be the
+   opposite of what this log is for.
+2. **The real defect is upstream: drivetrain and clutch torque at launch and corner
+   exit.** A tire that spends over a second above unity slip ratio is being asked
+   for torque no tire can transmit.
+3. `src/core/vehicle.h` clamps `force.lateral` and `force.longitudinal`
+   **independently** after `evaluate`. Any combined-slip law that guarantees force
+   *direction* has that guarantee broken by those two clamps at low speed. This must
+   be fixed in the same change as the tire, not before or after.
+4. A Pacejka cosine G-factor weighting is the likely route — less aggressive than
+   similarity by design, reduces exactly to pure slip, stays monotone — but its
+   coefficients would be **unsourced invented numbers** under §5 item 10, so it is
+   not adopted here.
+
+### What ships instead
+
+`drive_probe.gd` now tracks max body slip and **refuses to publish a lateral figure
+from a departed run**, printing `DEPARTED` and the angle. `drive.sh` exits 1 until
+this is closed; the four figures that must not move are still measured and still
+unmoved (139.8 km/h, 4.51 s, 1.35 g mean / 1.98 peak). Read the table, not the exit
+code.
+
+`tools/verify/tire_probe.gd` is the standing instrument: eleven named checks against
+a real `KartBody` held at its settled attitude, four of them red, reproducing #137's
+recorded row to a rounding error.
+
+### The band, corrected in kind rather than in number
+
+**Sustained 1.5-2.0 g is right and the kart is already in it** — 1.881 g, measured
+three independent ways. **The transient 2.0-2.5 g band's floor sits above the
+model's own quasi-static ceiling of 1.9986 g**, so no input can enter it: ADR-0034's
+failure mode reproduced inside the split ADR-0034 created.
+
+The band's provenance is datalogger peaks, and a MyChron sits roughly 0.6 m ahead of
+the CoM reading `a_y + yaw_accel * x`. That channel measures **2.404 g** where the
+chassis channel reads 1.976 g. So the chassis peak now carries **no band**, and a
+**derived** `lateral station` row publishes the kinematic transform with its lever
+arm marked **estimated**, because ADR-0034 says "roughly 0.6 m" and sources it
+nowhere. **Do not raise `peak_friction`** — 2.10 -> 2.70 buys 0.265 g, because
+capacity falls 3646 -> 3430 N as transfer eats the increment.
+
+### Two things this turned up that are not #137
+
+- **`docs/REFERENCES.md`'s "what could not be sourced" item 1 and
+  `scripts/game/track_layout.gd`'s docstring** both state that the tightest circle
+  the kart can hold is 2.70 m at 5.6 km/h, and that a corner under about 11 m is one
+  it crawls through. Both were read off the spun run. Measured speed-held: **2.76 m
+  at 21.2 km/h and 1.279 g**, holding 1.881 g down to a 6.97 m radius. Wrong by 4x
+  on speed and 14x on lateral g — **and it has been guiding circuit design.**
+- **`src/core/chassis_flex.h:228-231`** claims the rear tire's 2.6x rate makes roll
+  stiffness rear-biased. `FRAME_TORSION_NM_PER_DEG` twenty lines below nullifies it:
+  the series pair is **47/53**, within 2% of the free-warp limit, because the couple
+  splits by track width rather than by tire rate. The kart lifts the inside
+  **front**, where ARCHITECTURE §6 says the inside rear leaving *is* the
+  differential. Two independent gates now show it. **A ticket, not a constant bump**
+  — stiffening costs 0.44 g of sustained lateral and makes every open-loop case
+  depart.
