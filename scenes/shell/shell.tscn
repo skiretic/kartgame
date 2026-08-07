@@ -1,0 +1,26 @@
+[gd_scene load_steps=2 format=3]
+
+; project.godot's run/main_scene. Double-clicking the game lands here.
+;
+; Almost empty, like every other buildable scene in this repo: scripts/shell/
+; shell_root.gd builds the backdrop, the UI layer and the screen stack, and each
+; screen builds its own controls. The reason is the usual one -- a scene
+; described by the command that opened it rather than by editor state -- plus one
+; that is specific to the shell: assets/fonts/ is gitignored, so a Theme.tres
+; holding an ext_resource to Liberation Sans would fail to load the whole
+; resource on a fresh clone. scripts/shell/shell_theme.gd loads the face behind
+; ResourceLoader.exists() and reports which one it got.
+;
+; The 3D backdrop loads assets/generated/valdirone_nuova.glb and kart.glb at run
+; time for the same gitignore reason valdirone.tscn gives, and --backdrop=flat
+; needs neither -- which is what lets tools/verify/shell_probe.gd run in a fresh
+; worktree.
+;
+;     godot --path .                            the paddock
+;     godot --path . -- --backdrop=flat         no generated asset touched
+;     godot --path . -- --screen=settings       one screen, for a still
+
+[ext_resource type="Script" path="res://scripts/shell/shell_root.gd" id="1_shell"]
+
+[node name="ShellRoot" type="Node3D"]
+script = ExtResource("1_shell")

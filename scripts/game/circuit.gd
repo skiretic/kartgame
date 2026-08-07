@@ -173,8 +173,39 @@ var _build_ms := {}
 var _lightmap_users := 0
 
 
+## What `_ready()` builds, in order, so a loading screen can name the step it is
+## on instead of animating a bar that means nothing.
+##
+## **The steps are real and the timings are already collected.** `_build_ms`
+## has always held the per-stage cost; nothing published it. Do not invent the
+## mockup's six pretty names on top of this list -- `circuit.gd` builds
+## synchronously in `_ready()`, so the loading screen renders one frame and then
+## the process sits here for the whole build, and a bar that claimed smooth
+## progress through named stages would be the one lie on the screen.
+const BUILD_STEPS: PackedStringArray = [
+	"track", "environment", "ground", "collision", "scatter", "lightmap",
+	"kart", "tuning", "session", "cameras", "hud",
+]
+
+## Emitted as each stage finishes, with the stage's own measured cost.
+signal step_done(name: String, index: int, total: int, elapsed_ms: float)
+
+## Emitted when whoever is driving asks to leave -- the pause menu's "Quit to
+## paddock", or the flag falling. The shell listens; a headless run does not, and
+## `_on_session_finished` still prints its sentence either way.
+signal session_over(result: Dictionary)
+
+
 func _ready() -> void:
-	_args = Cmdline.parse()
+	# `SessionRequest.take()` and not `Cmdline.parse()` alone. The merge puts the
+	# shell's posted keys in first and the command line's in second, so **the
+	# command line wins every key it carries** -- which is why drive.sh,
+	# circuit.sh, bake.sh, session_probe.gd and every recorded shoot.sh
+	# invocation are byte-identical after this line changed. With nothing posted
+	# it is exactly `Cmdline.parse()`. See session_request.gd's header: the read
+	# is destructive on purpose, so a stale configuration cannot survive into the
+	# next session.
+	_args = SessionRequest.take(Cmdline.parse())
 
 	_track = KartTrack.new()
 	var path := Cmdline.as_string(_args, "track", DEFAULT_TRACK)
@@ -194,34 +225,66 @@ func _ready() -> void:
 		push_error("no layout %s in %s; have %s" % [wanted, path, _track.layout_names()])
 		_track.select_layout(_track.layout_names()[0])
 
+	_step("track")
+
 	_build_environment()
+	_step("environment")
 	_build_ground()
+	_step("ground")
 	_build_track()
+	_step("collision")
 	# After the ground, because every prop stands on the terrain's height field and
 	# before the kart, so a still taken with `--eye` frames a dressed circuit rather
 	# than one that gains its trees a frame later.
 	_build_scatter()
+	_step("scatter")
 	# After every mesh it lights exists. `LightmapGI` binds its data on entering the
 	# tree, so one added before the geometry finds nothing, warns that it needs a
 	# rebake, and leaves the scene unlit — `bake_test.gd` documented this ordering
 	# and it applies to every procedurally built scene in the project.
 	_build_lightmap()
+	_step("lightmap")
 	_build_kart()
+	_step("kart")
 	_build_tuning()
+	_step("tuning")
 	# After the tuning, because `adopt_tuning` records what the session was driven
 	# under and the `--tune`/`--preset` arguments have been applied by then; before
 	# the HUD, because the timing screen binds to the runner and a HUD built first
 	# would bind to null and draw nothing all session.
 	_build_session()
+	_step("session")
 	_build_cameras()
+	_step("cameras")
 	_build_hud()
 	add_child(preload("res://scenes/ui/telemetry.tscn").instantiate())
+	_step("hud")
 
 	_set_camera_mode(Cmdline.as_string(_args, "camera", "chase"))
 	_report()
 
 
 # --- construction ----------------------------------------------------------
+
+
+## Close out a build stage: record what it cost and tell whoever is listening.
+##
+## The clock is wall time between calls rather than a timer per builder, which is
+## why `_build_ms` keeps its own three finer-grained entries — `corridor`,
+## `terrain` and `scatter` are measured inside the functions that own them and
+## reported in `_report()`. These are the coarse steps a loading screen names.
+var _step_started := 0
+
+
+func _step(step_name: String) -> void:
+	var now := Time.get_ticks_usec()
+	if _step_started == 0:
+		_step_started = now
+	var elapsed := (now - _step_started) / 1000.0
+	_step_started = now
+	_build_ms["step_" + step_name] = elapsed
+	var index := BUILD_STEPS.find(step_name)
+	step_done.emit(step_name, index, BUILD_STEPS.size(), elapsed)
 
 
 func _bounds() -> AABB:
@@ -680,10 +743,63 @@ func _build_session() -> void:
 	_runner.begin()
 
 
-## The result, printed. There is no results screen — `GAMEDESIGN.md` §9 puts that
-## behind #171 — so the terminal is where a session's result goes, as one sentence.
-func _on_session_finished(_result: Dictionary) -> void:
+## The result, printed **and** handed to the shell.
+##
+## The `print` stays, and it is not redundant. Every headless run in this project
+## reports its session this way — `session_probe.gd`, `drive.sh`, a bare
+## `godot --path . scenes/game/valdirone.tscn` — and a results screen appearing
+## does not make a terminal stop being where a scripted run says what happened.
+##
+## `SessionRequest.deliver()` carries what the sheet needs and the runner does
+## not have: the per-lap ledger, because `KartLapTimer` publishes only `last_*`
+## and `best_*` and never a history, and the circuit's display name, because the
+## runner deals in a slug and a classification has a masthead.
+func _on_session_finished(result: Dictionary) -> void:
 	print(_runner.result_line())
+	var carried := result.duplicate(true)
+	carried["track_name"] = _track.track_name()
+	carried["layout_name"] = _track.layout()
+	carried["result_line"] = _runner.result_line()
+	carried["laps"] = _ledger_rows()
+	SessionRequest.deliver(carried)
+	session_over.emit(carried)
+
+
+## The per-lap rows for the results sheet. Empty until `scripts/game/lap_ledger.gd`
+## is attached — it subscribes to `SessionRunner.lap_completed` and reads
+## `timer().last_sectors()` **inside the handler**, which is the only place it is
+## still this lap's and not the next one's.
+func _ledger_rows() -> Array:
+	var ledger := get_node_or_null("LapLedger")
+	return ledger.rows() if ledger != null else []
+
+
+## Pause: gate the input, leave the world running.
+##
+## ADR-0052 and mockup plate 8, and both are emphatic that **the kart is not
+## frozen**. `get_tree().paused` is deliberately not used — the session clock
+## keeps running because `_tick_running()` keeps ticking, which is the whole
+## reason the pause screen has a consequence line to write.
+##
+## The lever is `PlayerDriver.enabled`, and it keeps its single writer:
+## `SessionRunner._apply_input_gate()`, reached through `set_input_suspended()`,
+## whose docstring in `session_runner.gd:458` names this caller in advance. Pause
+## does not become a second writer, and `set_input_as_handled()` is not the lever
+## because `KartBody` polls the `Input` singleton in `_physics_process` and a
+## consumed event does not reach that at all.
+func set_paused(paused: bool) -> void:
+	_suspend_input(paused)
+
+
+## Leave now. The pause menu's "Quit to paddock", and the only way out of a
+## Practice session — `GAMEDESIGN.md` §4 gives Practice no limit, so nothing
+## inside the simulation can end one and the decision belongs to whoever opened
+## it. `end_session()` emits `session_finished`, so the result reaches the shell
+## through `_on_session_finished` like any other ending.
+func leave_session(outcome := "left for the paddock") -> void:
+	if _runner != null and not _runner.is_over():
+		_runner.end_session(outcome)
+	ShellRoot.return_to_shell(get_tree())
 
 
 func _build_cameras() -> void:

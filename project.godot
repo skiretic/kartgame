@@ -12,7 +12,13 @@ config_version=5
 
 config/name="kartgame"
 config/description="A physically-grounded KZ shifter kart racing sim."
-run/main_scene="res://scenes/debug/input_probe.tscn"
+
+; The demo definition's first line -- "the game boots into itself" -- and until
+; M5f this was res://scenes/debug/input_probe.tscn, a gamepad axis readout. A
+; kart was reachable only by typing a scene path. ADR-0053 §1: one shell scene
+; owns the paddock and a screen stack, and starting a session swaps to
+; scenes/game/circuit.tscn.
+run/main_scene="res://scenes/shell/shell.tscn"
 config/features=PackedStringArray("4.7", "Forward Plus")
 
 [display]

@@ -1,0 +1,29 @@
+[gd_scene load_steps=2 format=3]
+
+; The scene the shell starts a session into. Same script as
+; scenes/game/valdirone.tscn and deliberately not the same scene.
+;
+; The difference is only which circuit is the default. This one has none: it is
+; opened by ShellRoot.start_session(), which has already posted a track, a layout
+; and a session type through scripts/game/session_request.gd, so baking a default
+; in here would be a second place that decides what you are driving.
+;
+; valdirone.tscn stays exactly as it is, and that is not tidiness deferred:
+;
+;   * tools/bake/bake.sh's lightmap contract is by node path. circuit.gd:110
+;     spells it out -- LightmapGIData stores its users as paths relative to the
+;     LightmapGI's parent, so renaming a node silently unlights the ground. The
+;     baked scenes are a matched pair and this is not one of them.
+;   * every recorded shoot.sh still and every drive.sh scenario names
+;     valdirone.tscn by path. CLAUDE.md makes reproducibility from the recorded
+;     command a rule rather than a convenience.
+;
+; The two collapse into one once a second circuit exists and the default stops
+; meaning anything. There is a ticket; do not do it here.
+;
+;     godot --path . scenes/game/circuit.tscn -- --track=data/tracks/x.track.json
+
+[ext_resource type="Script" uid="uid://dvqri44o7gaqo" path="res://scripts/game/circuit.gd" id="1_circuit"]
+
+[node name="Circuit" type="Node3D"]
+script = ExtResource("1_circuit")
