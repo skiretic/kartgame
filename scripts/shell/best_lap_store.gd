@@ -145,7 +145,13 @@ static func record(profile: KartProfile, result: Dictionary) -> Dictionary:
 	var previous := profile.best_time(track, layout, kart_class) if had else -1.0
 	out["previous_s"] = previous
 
-	var accepted := profile.set_best(track, layout, kart_class, lap_s, ghost_id)
+	# The sixth argument, #186's. It defaults false, `profile.h` has carried the
+	# token since that ticket, and this call passed five for a milestone -- so a lap
+	# set with pause forgiveness on was filed as though it had been set without it,
+	# and two laps run under different rules sat on one board. `circuit.gd` now puts
+	# the key in the result; found by `tools/verify/walk_probe.gd`.
+	var pause_forgiven := bool(result.get("pause_forgiven", false))
+	var accepted := profile.set_best(track, layout, kart_class, lap_s, ghost_id, pause_forgiven)
 	if not accepted:
 		if ghost_id.is_empty():
 			# The one refusal that is expected, structural, and somebody else's to fix.

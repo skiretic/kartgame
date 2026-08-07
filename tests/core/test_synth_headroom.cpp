@@ -202,8 +202,14 @@ std::vector<float> render_run(EngineSynth &synth) {
 double steady_level(const Cell &c, double gain) {
 	const double off = c.trailing ? 1.0 : 0.0;
 	const double onpipe = EngineSynth::powerband_weight(c.rpm) * clamp01(c.load) * (1.0 - off);
+	// `rpm_level_db` is the measured +10.4 dB per doubling of rpm, referenced to
+	// peak power and applied downward only. It is a term of the level chain like
+	// any other and it is reconstructed here rather than measured, so a term added
+	// to the synth and forgotten here fails the level identity below instead of
+	// quietly moving every figure in this file.
 	const double level_db = -kz_audio::THROTTLE_LEVEL_DELTA_DB * off +
-			synth_tuning::ONPIPE_LEVEL_DB * onpipe;
+			synth_tuning::ONPIPE_LEVEL_DB * onpipe +
+			EngineSynth::rpm_level_db(c.rpm);
 	const double rpm_fade = clamp01(c.rpm / synth_tuning::IDLE_FADE_RPM);
 	return std::pow(10.0, level_db * 0.05) * gain * rpm_fade;
 }
@@ -543,8 +549,13 @@ TEST_CASE("the gain chain, stage by stage") {
 
 		// (b) The noise layer, recovered exactly by subtraction and compared
 		//     against its own analytic level.
+		// The corner tracks the **effective** ceiling, which is a function of rpm
+		// now rather than the configured constant. Reading `STACK_CEILING_HZ` here
+		// was correct while the two were the same number and became an 8.8 dB error
+		// the moment they stopped being.
 		const double clutch = 0.0;
-		const double corner = kz_audio::STACK_CEILING_HZ * synth_tuning::NOISE_HIGHPASS_FRACTION *
+		const double corner = a.stack_ceiling_hz(kz_audio::rpm_to_f0_hz(c.rpm)) *
+				synth_tuning::NOISE_HIGHPASS_FRACTION *
 				(1.0 - synth_tuning::CLUTCH_NOISE_CORNER_DROP * clutch);
 		const double alpha = 1.0 - std::exp(-2.0 * PI * corner / SAMPLE_RATE);
 		const double noise_level = level * defaults.noise_gain *

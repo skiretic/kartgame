@@ -435,13 +435,34 @@ struct Track {
 		std::size_t first = 0;
 		std::size_t span = points.size();
 		if (hint >= 0.0) {
+			// The window is `hint +/- window` **in arc length**, and it has to be
+			// accumulated toward `hint + window` rather than for a fixed `2 * window`.
+			// `first` is the span *containing* `hint - window`, so it generally begins
+			// behind the window's own start; counting `2 * window` from there stops
+			// short of `hint + window` by however far back the span boundary sits.
+			//
+			// That is not a rounding error. Valdirone's control point 10 starts at
+			// 222.431 m and its span runs 38.861 m, so a hint of 290 m produced the
+			// window [222.431, 283.222] -- **the hint was not inside its own window.**
+			// Every candidate past the end then clamps to the span end, reports the
+			// overshoot as its gap, and wins, because it is the only thing on offer.
+			// A carried-hint walk of the lap ended 687.5 m wrong while the unhinted
+			// walk was exact to 0.0000 m, and since `SessionRunner` hints every tick,
+			// **every lap of the shipped circuit was struck out `off_track` and no lap
+			// could ever be filed.** Found by `tools/verify/walk_probe.gd`, which is
+			// the first thing that ever drove a lap end to end.
+			//
+			// `wrap` on the difference is what makes this correct across the
+			// start/finish line, where `hint + window` is numerically less than the
+			// span start it is measured from.
 			first = span_at(wrap(hint - window));
+			const double reach = wrap(hint + window - points[first].distance_m);
 			span = 0;
 			double covered = 0.0;
 			for (std::size_t step = 0; step < points.size(); ++step) {
 				covered += span_length((first + step) % points.size());
 				++span;
-				if (covered >= window * 2.0) {
+				if (covered >= reach) {
 					break;
 				}
 			}

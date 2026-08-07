@@ -150,6 +150,43 @@ const SKIDPAD_LOCK := 1.0
 ## command instead of from this comment.
 const SKIDPAD_THROTTLE := 0.30
 
+## Body slip past which a run is a spin rather than a corner, radians.
+##
+## **This probe had no departure detector for two milestones, and that is the
+## whole reason its lateral figure was wrong.** The default skidpad run spins:
+## measured max body slip is 174.2 degrees, which is a kart travelling
+## essentially backwards. The last quarter of that run was then averaged and
+## published as "lateral sust 0.09 g" against §6.4's 1.5-2.0 g sustained band,
+## and `docs/REFERENCES.md` turned the same run into circuit-design guidance —
+## "the tightest circle the kart can physically hold is 2.70 m at 5.6 km/h".
+## Neither is a cornering measurement. Both describe a kart that has spun and
+## come nearly to a stop, and nothing on the page said so.
+##
+## 30 degrees, and it is **not chosen here**: it is `steady_corner`'s cutoff in
+## `tests/core/test_vehicle.cpp` (0.52 rad) and `tire_probe.gd`'s
+## `DEPARTURE_RAD`, reused unchanged so that all three mean the same thing by
+## "no longer following the circle". A kart 30 degrees off its own velocity
+## vector has its front tires at 3.4x their peak slip angle.
+##
+## **This guard tunes nothing.** It does not touch an input, a constant or the
+## simulation; it refuses to *publish* a figure the run cannot support. Raising
+## `--corner-throttle` until the run stops departing would move the number, which
+## is exactly why that lever is left where it is.
+const DEPARTURE_RAD := deg_to_rad(30.0)
+
+## Where a steering-wheel-mounted datalogger's accelerometer sits, meters ahead
+## of the center of mass. **estimated** — ADR-0034 says "roughly 0.6 m" and
+## sources it nowhere; this repo classifies every externally-derived number as
+## sourced / derived / estimated and this one is the third. It is consistent
+## with `src/core/chassis.h`'s wheelbase of 1.050 m and a wheel mounted just
+## behind the front axle line, which puts the rim face somewhere between 0.5 and
+## 0.7 m ahead of a center of mass sitting 0.22 m up and roughly amidships.
+##
+## It exists because §6.4's transient band has a provenance problem the
+## measurement has to match, not because anything here wants a bigger number —
+## see `_report`.
+const LOGGER_LEVER_M := 0.60
+
 ## Speed below which a longitudinal or lateral spike is not reported as a peak.
 ## At walking pace one tick of full brake is a legitimate 12 g — the clamp in the
 ## drive model stops exactly one tick of momentum, by design — and reporting that
@@ -179,6 +216,12 @@ var _brake_start_tick := 0
 var _brake_mean_g := 0.0
 var _max_roll_deg := 0.0
 var _distance := 0.0
+
+## The departure detector, and the station channel. See `DEPARTURE_RAD` and
+## `LOGGER_LEVER_M`.
+var _max_body_slip := 0.0
+var _peak_lateral_station_g := 0.0
+var _previous_yaw_rate := 0.0
 
 ## Peak wheel lift per corner, meters, FL FR RL RR. Issue #32's acceptance and
 ## `ARCHITECTURE.md` §6's defining kart behavior: with no differential, the inside
@@ -426,8 +469,35 @@ func _sample(delta: float) -> void:
 		var acceleration := (velocity - _previous_velocity) / delta
 		var basis := _kart.global_transform.basis
 		var lateral_g := absf(acceleration.dot(basis.x)) / 9.80665
+
+		# **The departure detector.** Body slip is the angle between where the kart
+		# is pointing and where it is going, and it is the one number that tells a
+		# skidpad from a spin. Measured above a walking pace only, because the
+		# direction of a 0.2 m/s velocity is noise and a kart that has stopped has
+		# no meaningful heading error.
+		if speed > 1.0:
+			var body_slip := absf(atan2(velocity.dot(basis.x), -velocity.dot(basis.z)))
+			_max_body_slip = maxf(_max_body_slip, body_slip)
+
+		# The station channel: what a steering-wheel-mounted logger reads, which is
+		# the lateral acceleration of a point `LOGGER_LEVER_M` ahead of the center
+		# of mass rather than of the center of mass itself.
+		#
+		# For a point at `r = x * forward`, `a_P = a_com + alpha x r`, and with
+		# `alpha = alpha_up * up` and `up x forward = -right`, the lateral component
+		# is `a_com . right - alpha_up * x`. The centripetal term `omega x (omega x r)`
+		# points along `-forward` and contributes nothing lateral, so it is dropped
+		# rather than ignored. Yaw rate is taken about the body's own up axis, which
+		# stays meaningful when the kart is rolled and an Euler angle does not.
+		var yaw_rate := _kart.angular_velocity.dot(basis.y)
+		var yaw_acceleration := (yaw_rate - _previous_yaw_rate) / delta
+		_previous_yaw_rate = yaw_rate
+		var station_g := absf(
+			acceleration.dot(basis.x) - yaw_acceleration * LOGGER_LEVER_M) / 9.80665
+
 		if speed > PEAK_SPEED_GATE:
 			_peak_lateral_g = maxf(_peak_lateral_g, lateral_g)
+			_peak_lateral_station_g = maxf(_peak_lateral_station_g, station_g)
 		if _tick >= int(float(_ticks) * (1.0 - STEADY_FRACTION)):
 			_steady_lateral_sum += lateral_g
 			_steady_speed_sum += speed
@@ -491,12 +561,47 @@ func _report() -> void:
 	# restated here, and the ambiguous `lateral_g_*` keys they replaced were
 	# removed rather than aliased so that a caller which had not been updated would
 	# fail loudly instead of quietly reading the wrong band.
-	lines.append("    lateral sust    %8.2f g            (KZ %.1f-%.1f sustained)" % [
-		steady, kz["lateral_sustained_g_min"], kz["lateral_sustained_g_max"],
+	# **A departed run publishes no lateral figure.** See `DEPARTURE_RAD`. The
+	# average is still computed above and is deliberately not printed: a number on
+	# the page is a number somebody quotes, and this one has been quoted twice.
+	var departed := _max_body_slip >= DEPARTURE_RAD
+	if departed:
+		lines.append("    lateral sust      DEPARTED - no measurement   (max body slip %.1f deg)" %
+			rad_to_deg(_max_body_slip))
+		lines.append("                      the kart spun; the mean of a spin is not a corner")
+	else:
+		lines.append("    lateral sust    %8.2f g            (KZ %.1f-%.1f sustained, %.1f deg slip)" % [
+			steady, kz["lateral_sustained_g_min"], kz["lateral_sustained_g_max"],
+			rad_to_deg(_max_body_slip),
+		])
+	# **Two peak rows, because the band describes one of them and the probe was
+	# reporting the other.** ADR-0034 sourced §6.4's 2.0-2.5 g transient band to
+	# datalogger peaks, and a MyChron's accelerometer sits on the steering wheel
+	# rather than at the center of mass — so the channel the band was read off is
+	# `a_y + yaw_accel * x`, not `a_y`. The chassis channel below therefore has no
+	# band beside it at all: comparing it to those numbers is comparing two
+	# different quantities, which is the exact mistake ADR-0034 was written to
+	# correct and which it then reproduced inside its own split.
+	#
+	# It matters arithmetically and not just pedantically. The band's floor of
+	# 2.0 g sits **above** this model's own quasi-static ceiling of 1.9986 g, so
+	# no input can put the chassis channel inside it — a gate that cannot be
+	# passed is not a gate. The station channel can be, and is measured at 2.404 g
+	# where the chassis reads 1.976 g.
+	#
+	# The lever arm is `estimated` and says so at its constant. That is the honest
+	# label: it makes the derived row an estimate too, which is a normal outcome
+	# and better than a chassis figure judged against a logger's band.
+	lines.append("    lateral peak    %8.2f g            (chassis frame, at the CoM - no band:" % [
+		_peak_lateral_g,
 	])
-	lines.append("    lateral peak    %8.2f g            (KZ %.1f-%.1f transient)" % [
-		_peak_lateral_g, kz["lateral_peak_g_min"], kz["lateral_peak_g_max"],
+	lines.append("                                                  the KZ band is a logger channel)")
+	lines.append("    lateral station %8.2f g            (KZ %.1f-%.1f transient; derived," % [
+		_peak_lateral_station_g, kz["lateral_peak_g_min"], kz["lateral_peak_g_max"],
 	])
+	lines.append("                                                  a_y - yaw_accel * %.2f m," %
+		LOGGER_LEVER_M)
+	lines.append("                                                  lever ESTIMATED)")
 	if _brake_mean_g > 0.0:
 		# Issue #131 is the same peak-versus-mean confusion in the braking row and
 		# it is **not resolved here**: §6.4's 1.5-2.0 g has never been labeled
@@ -567,4 +672,8 @@ func _report() -> void:
 	# `state-hash`; ADR-0037 has why.
 	lines.append("tuning-hash default")
 	print("\n".join(lines))
-	quit(0)
+	# Non-zero on a departure, **after** the state hash has been printed, so
+	# `drive.sh` still gets to compare the two runs. A scenario that spins is
+	# perfectly reproducible and the determinism half of the gate is still a real
+	# question about it; what it is not is a measurement.
+	quit(1 if departed else 0)

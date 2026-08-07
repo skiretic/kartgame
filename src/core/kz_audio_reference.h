@@ -205,6 +205,54 @@ inline constexpr double DECAY_DB_PER_DOUBLING_PIPE = -1.92; // fit of PIPE_LADDE
 inline constexpr double DECAY_DB_PER_DOUBLING_ONPIPE = 1.04; // fit of ONPIPE_LADDER_DB
 inline constexpr double DECAY_DB_PER_DOUBLING_MUFFLER = -6.20; // fit of CHAINSAW_LADDER_DB
 
+// The slope to **extrapolate above h24 with**, which is not the slope above.
+//
+// The whole-range fits are fits through a **hump**, and using one past the end of
+// the table gets the sign wrong. The D-9 ladder rises to +10.3 dB at h6 and then
+// falls monotonically to +4.9 at h24 — it has been descending for two octaves by
+// the time the table ends. A least-squares line through all twelve points is
+// dominated by the rise and comes out at **+1.04 dB per doubling**, so a caller
+// extrapolating with it makes h48 *louder* than h24 when the last four measured
+// points say the opposite. That is worse than the h24 kink the whole-range fits
+// were chosen to avoid, because a kink is a wrong derivative and this is a wrong
+// direction.
+//
+// The slice fitted is the **upper six tabulated indices, h8 to h24**, and the
+// rule is `LADDER_INDEX`'s own: that comment says the table "thins to six points
+// below h6 and six above", so the upper six is a split the data already had rather
+// than one invented to get an answer. It is also the half that is past every
+// ladder's pipe boost and is falling monotonically, which is the property an
+// extrapolation needs.
+//
+//     table       whole-range fit   upper-six fit (h8..h24)
+//     PIPE             -1.92                 -5.79
+//     D-7              -1.95                 -4.69
+//     Colibri          -1.89                 -6.90
+//     D-9              +1.04                 -3.08
+//     Chainsaw         -6.20                 -5.22
+//
+// A first cut of this used "from each table's own maximum to h24" and the test
+// below caught it: the PIPE ladder's argmax is h1, because it is flat to within
+// 0.5 dB out to h8 and only then falls, so that rule quietly returned the
+// whole-range fit for the one ladder it mattered most for. A rule that lands on a
+// different slice depending on where a table's noise put its maximum is not a
+// rule.
+//
+// **Derived**, not measured: arithmetic over the sourced tables above, and the
+// arithmetic is a least-squares fit of dB against log2(h).
+// `tests/core/test_engine_synth.cpp` recomputes both fits from the tables, so
+// these two constants cannot drift from the ladders they came out of without a
+// test going red.
+//
+// Nothing below h24 changes: the synth interpolates inside the table and only
+// reaches for a decay past its end.
+inline constexpr double DECAY_DB_PER_DOUBLING_PIPE_TAIL = -5.79;
+inline constexpr double DECAY_DB_PER_DOUBLING_ONPIPE_TAIL = -3.08;
+
+// The index the tail fit starts at. Named so the constant, the comment and the
+// test cannot disagree about which slice was fitted.
+inline constexpr int LADDER_TAIL_FROM = 8;
+
 // What `REFERENCES.md` publishes. Not used by the synth; here so the two numbers
 // sit side by side and a reader cannot find one without the other.
 inline constexpr double DECAY_PUBLISHED_PIPE = -2.95;
@@ -223,31 +271,192 @@ inline constexpr double DECAY_DB_PER_DOUBLING_ONE_OVER_N = -6.02;
 // inter-harmonic floor out to h24 on every usable recording, which is where the
 // analysis stopped rather than where the engine did.
 //
-// A synth that truncates at a fixed harmonic *index* has a brick wall that slides
-// with rpm: at a 2,000 rpm idle f0 is 33 Hz and h24 is 800 Hz, so the note has
-// nothing above 800 Hz at all, while at 14,000 rpm the same index reaches 5.6 kHz.
-// With a ladder this flat the wall is audible as the note changing character
-// across the range — which is precisely #82's "no audible stepping anywhere in the
-// range", failed for a reason that has nothing to do with stepping the frequency.
-//
-// So the partial count is chosen from a **frequency ceiling** and this index is the
-// floor under it: synthesize at least this many partials, more if they fit below
-// the ceiling, and never any above Nyquist.
+// This comment used to carry an argument against truncating at a fixed harmonic
+// index, on the grounds that doing so makes "the note change character across the
+// range". **The argument was wrong and the measurement below overturns it: a
+// two-stroke's note changing character across the range is the entire effect, and
+// a note whose character does not change is the chainsaw.** See
+// `CENTROID_EXPONENT_*`. The index is still a floor — synthesize at least this
+// many partials — but the ceiling above it is now a harmonic count and not a fixed
+// frequency, which is what makes the brightness track rpm at all.
 inline constexpr int LADDER_MEASURED_TO = 24;
 
-// The frequency ceiling the stack fills to, Hz.
+// The absolute cap on the stack, Hz — a backstop, not the thing that shapes the
+// note. `synth_tuning::STACK_CEILING_HARMONICS` is what sets where the stack ends
+// at a given rpm; this clamps it so a runaway rpm cannot walk the stack into the
+// top octave.
 //
 // **A tunable, and unmeasured.** Nothing in the corpus establishes where a KZ's
 // spectrum ends, because every recording is lossy — Ogg Vorbis for the Commons
 // files, mp3 previews for the Freesound ones — so the top of every measured ladder
-// is codec-limited and is a lower bound (`REFERENCES.md` item 4 and item 10).
+// is codec-limited and is a lower bound (`REFERENCES.md` item 4 and item 10). The
+// codec ceilings of the six files re-measured for `CENTROID_EXPONENT_*` are 19.0
+// to 20.8 kHz, so that particular objection does not bite the centroid figures,
+// only the ladder tops.
 //
-// 8 kHz is chosen for a reason that is not about the engine: at 14,000 rpm it is
-// h34, comfortably past the h24 that was measured, and it leaves the top octave of
-// the audible band to §12's noise layer, which is where broadband two-stroke
-// content belongs anyway. It is stated here so it can be turned rather than
-// discovered.
-inline constexpr double STACK_CEILING_HZ = 8000.0;
+// 9 kHz rather than the 8 it was: the cap is meant to be a backstop and at 8 kHz
+// it was the binding constraint over the top 800 rpm of the range, clipping the
+// harmonic ceiling exactly where the note is supposed to be brightest. The
+// harmonic ceiling reaches 8,880 Hz at `Engine::hard_cut_rpm` of 14,800, so 9 kHz
+// puts the cap just clear of anywhere the engine can legally run and leaves it
+// catching only a runaway. The top octave of the audible band still belongs to
+// §12's noise layer, which is where broadband two-stroke content belongs anyway.
+inline constexpr double STACK_CEILING_HZ = 9000.0;
+
+// --- How fast the note brightens with rpm -----------------------------------
+//
+// **The measurement this whole file was missing, and the one that says what
+// "scream" is.** Everything above describes the spectrum at *an* operating point.
+// None of it says how the spectrum moves as the engine revs, and that motion turns
+// out to be the thing that separates a racing two-stroke from every other small
+// engine — including from a two-stroke with an ordinary muffler.
+//
+// Measured here, on the same hash-pinned corpus, by `tools/assets/fetch_kz_audio.sh`
+// and the method in `REFERENCES.md` §"Engine audio": decode to mono 48 kHz, 8,192
+// point Hann frames at a 2,048 hop, track f0 with the harmonic-sum estimator, and
+// per frame take the power-weighted mean frequency over `CENTROID_BAND_LOW_HZ` to
+// the file's own measured codec ceiling. Frames are then binned by f0 and the
+// median centroid of each bin is taken, because one DFT frame of a field recording
+// is one realization and a statistic off one of them is noise.
+//
+// The quantity carried is the **exponent k in centroid proportional to f0^k**,
+// fitted between the lowest and highest f0 bin of each recording. An exponent
+// rather than a ratio because every recording spans a different rev range, and a
+// raw "top over bottom" figure would compare a threefold sweep against a
+// twofold one. k = 1 is a spectrum whose shape is fixed in *harmonic* space and
+// therefore slides bodily up with the fundamental; k = 0 is a spectrum pinned to
+// absolute frequency, which is what a resonance-free muffler gives.
+//
+//     recording                exhaust            rpm span        centroid span    k
+//     Colibri D-3 (accel.)     racing pipe        4,207-8,767     1409-3591 Hz    1.27
+//     Eindhoven karts          racing pipe        6,202-13,537     862-1482 Hz    0.69
+//     Tomos D-7 (accel.)       racing pipe        3,885-13,284    1556-2814 Hz    0.49
+//     ---
+//     Stihl MS 150 C           muffler            6,660-11,347    1256-1319 Hz    0.09
+//     rental kart (4-stroke)   muffler            1,275-1,687      590-615 Hz     0.15
+//
+// **The two groups do not overlap and there is a factor of three between them.**
+// That is the finding. A tuned expansion chamber boosts a band of *harmonic
+// indices* — `ONPIPE_LADDER_DB` peaks at h6 — so as the engine revs, the boosted
+// band is dragged up in absolute frequency with f0 and the note brightens. A
+// muffler has no such band, its transfer function is fixed in Hz, and its centroid
+// sits still.
+//
+// The Tomos D-9 is excluded and not for convenience: its k measures 0.13, but its
+// f0 track is the one this file already refuses to take an rpm figure from — 1.6%
+// of its frame transitions are tracker jumps at rational ratios, and a k is a fit
+// *against* rpm. Its ladder is unaffected and is still used, exactly as before.
+//
+// **What does not transfer is the absolute centroid.** Eindhoven's is 862-1482 Hz
+// and the Colibri's is 1409-3591 for the same class of engine, because one is
+// trackside at an unknown distance through an unknown amount of air absorption and
+// the other is a close museum capture. `REFERENCES.md` item 3's objection applies
+// in full. The exponent survives it, because a fixed transfer function multiplies
+// every frame of one recording alike and a *ratio between two rpm bands of the
+// same file* divides it back out. That is the same argument the throttle split is
+// carried on and it is the reason these are exponents and not spectra.
+inline constexpr double CENTROID_EXPONENT_COLIBRI = 1.27;
+inline constexpr double CENTROID_EXPONENT_EINDHOVEN = 0.69;
+inline constexpr double CENTROID_EXPONENT_D7 = 0.49;
+inline constexpr double CENTROID_EXPONENT_CHAINSAW = 0.09;
+inline constexpr double CENTROID_EXPONENT_FOUR_STROKE = 0.15;
+
+// The band a synthesized note has to land in to be a tuned-pipe two-stroke rather
+// than a muffled one. The min and max of the three racing pipes above.
+//
+// It is a **band and not a target** for the same reason `PIPE_LADDER_DB` is: no
+// recording in the corpus is a KZ, the three that set it are a 1959 50 cc racer, a
+// 1962 50 cc racer and a trackside capture of somebody else's karts, and they
+// disagree by a factor of 2.6. A synth inside the band is consistent with every
+// tuned-pipe engine anyone here measured. A synth below
+// `CENTROID_EXPONENT_MUFFLED_MAX` is measurably a chainsaw.
+inline constexpr double CENTROID_EXPONENT_MIN = 0.49;
+inline constexpr double CENTROID_EXPONENT_MAX = 1.27;
+inline constexpr double CENTROID_EXPONENT_MUFFLED_MAX = 0.15;
+
+// The measurement band for a centroid, Hz, and the split for the high-frequency
+// fraction. Carried so that a figure quoted as "the centroid" is reproducible —
+// a centroid is meaningless without the band it was taken over, and two sessions
+// picking different bands would report two different numbers for one signal.
+//
+// The low edge is 50 Hz because below it every outdoor recording is wind and
+// handling rumble rather than engine. The high edge is 16 kHz or the file's own
+// codec ceiling, whichever is lower.
+inline constexpr double CENTROID_BAND_LOW_HZ = 50.0;
+inline constexpr double CENTROID_BAND_HIGH_HZ = 16000.0;
+inline constexpr double HF_SPLIT_HZ = 4000.0;
+
+// What fraction of total band energy sits above `HF_SPLIT_HZ` at the top of the
+// rev range. Median of the highest f0 bin of each racing-pipe recording.
+//
+//     Eindhoven karts   6.6 %      (trackside, distant — the low end of the band)
+//     Tomos D-7        23.0 %
+//     Colibri D-3      42.0 %      (close museum capture, accelerating)
+//
+// **A wide band, and it is distance that makes it wide, not the engines.** Air
+// absorption at 8 kHz is roughly 0.1 dB/m at 20 C and 50% humidity, so forty
+// meters of trackside is 4 dB off the top octave before anything else happens.
+// This is carried as a sanity bound — a synth outside 5-45% is wrong somewhere —
+// and explicitly **not** as a target, because picking a point inside it would be
+// picking a microphone distance and calling it an engine.
+inline constexpr double HF_FRACTION_ONPIPE_MIN = 0.05;
+inline constexpr double HF_FRACTION_ONPIPE_MAX = 0.45;
+
+// How much louder the engine gets per doubling of rpm, dB, at a fixed microphone
+// distance.
+//
+// **Measured, on the two recordings where a level means anything**, and the two
+// agree to a tenth of a dB, which is the most consistent pair of numbers anywhere
+// in this file:
+//
+//     recording               rpm span         band level        dB per doubling
+//     Colibri D-3 (accel.)    4,207-8,767      47.2 -> 57.8 dB        +10.4
+//     Tomos D-7 (accel.)      3,885-13,284     43.0 -> 61.4 dB        +10.4
+//     ---
+//     Stihl MS 150 C          6,660-11,347     54.9 -> 57.2 dB         +3.0
+//     rental kart (4-stroke)  1,275-1,687      49.5 -> 50.0 dB         +1.0
+//
+// Both usable rows are stationary engines at a fixed short distance being revved
+// under load, which is the only geometry in the corpus where a level change is the
+// engine's. Eindhoven and Patras are trackside and their levels are dominated by
+// how far away the kart was; the D-9's rpm axis is the untrustworthy one. Those
+// three are excluded for reasons already stated elsewhere in this file, not for
+// disagreeing.
+//
+// **This figure includes coming on the pipe and cannot be separated from it.** The
+// Colibri's span runs straight through its own transition, so some unknown part of
+// the 10.4 is `synth_tuning::ONPIPE_LEVEL_DB`'s effect measured a second time. A
+// consumer applying both in full is double-counting; a consumer applying this over
+// a full 3,000-14,000 rpm range would ask for 23 dB, which is more range than a
+// game mix has. It is carried as the slope it is, and the clamp belongs to the
+// caller.
+inline constexpr double LEVEL_RISE_DB_PER_RPM_DOUBLING = 10.4;
+inline constexpr double LEVEL_RISE_DB_PER_RPM_DOUBLING_MUFFLER = 3.0;
+
+// How wide the on-pipe transition is, in rpm, and where it sits.
+//
+// Measured on the **Colibri D-3 accelerating frames only** — the one recording in
+// the corpus that is a stationary engine at a fixed microphone distance sweeping
+// under load, which is the only geometry where a spectral change over a rev sweep
+// is the engine's and not the vehicle's. 10% to 90% of the total centroid rise:
+//
+//     rpm      1409  1879  2643  3034  3431  3557  3591      (centroid, Hz)
+//     bin mid  4207  5212  6075  6900  7466  8036  8767
+//
+// 10% of the 1409->3674 rise is 1636 Hz and 90% is 3436 Hz, which interpolate to
+// **4,700 and 7,470 rpm** — a transition **2,770 rpm wide centered on 6,085**, or
+// 46% of its own center speed.
+//
+// **Transferring that to a KZ is not established and these two constants must not
+// be read as KZ figures.** A 3.7 kW 1959 50 cc racer makes peak power somewhere
+// around 7,000 rpm and a KZ makes it at 13,000; whether an expansion chamber's
+// transition scales with its own tuned speed (46% of center, so ~5,300 rpm on a
+// KZ) or is roughly constant in absolute rpm is exactly the kind of thing this
+// corpus cannot answer. `synth_tuning::ONPIPE_EDGE_RPM` is the synth's own figure,
+// it is narrower than this, and it stays a tunable.
+inline constexpr double ONPIPE_TRANSITION_WIDTH_RPM = 2770.0;
+inline constexpr double ONPIPE_TRANSITION_CENTER_RPM = 6085.0;
+inline constexpr bool ONPIPE_TRANSITION_MEASURED_ON_KART = false;
 
 // On-throttle minus off-throttle broadband level, dB.
 //

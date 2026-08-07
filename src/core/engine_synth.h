@@ -132,6 +132,52 @@ namespace synth_tuning {
 // stack gains and loses partials continuously as rpm moves.
 inline constexpr double CEILING_FADE_FRACTION = 0.15;
 
+// Where the stack ends, as a **harmonic count** rather than a frequency.
+//
+// **This is the fix for "not enough two-stroke scream", and it is the one change
+// in this file that a measurement forced rather than suggested.** The synth used
+// to fill up to a fixed 8 kHz at every rpm. A ladder indexed by harmonic number
+// under a ceiling fixed in Hz produces a spectrum whose center of gravity barely
+// moves: measured on the shipped build, the spectral centroid went 3443 Hz at
+// 6,000 rpm to 4046 at 13,000, an exponent of k = 0.21 in centroid ~ f0^k, and
+// **inside the powerband it went backwards** — 4418 Hz at 9,000 down to 3770 at
+// 14,500, k = -0.33. `kz_audio::CENTROID_EXPONENT_*` puts three racing two-strokes
+// at k = 0.49 to 1.27 and the two muffled negative controls at 0.09 and 0.15. The
+// shipped note was therefore measurably closer to a chainsaw than to a two-stroke,
+// and over the range a driver actually uses it was on the wrong side of the
+// chainsaw.
+//
+// A ceiling that is a harmonic count makes the stack's shape identical in harmonic
+// space at every rpm, so the whole spectrum slides up bodily with f0 and k = 1.0
+// by construction — inside the measured band, and near the middle of it in log
+// terms. It is **derived** and not a free knob: k = 1 is what an index-indexed
+// ladder gives, and the corpus brackets k = 1.
+//
+// 36 rather than 24 because 36 * f0 at 13,000 rpm is 7.8 kHz, which is where the
+// old fixed ceiling put the top of the stack — so the change moves the note's
+// brightness *at peak revs* by almost nothing and takes everything below peak
+// revs down with rpm, which is the direction the measurement asked for. It also
+// costs less: the stack was 160 partials at 3,000 rpm and is now 40.
+inline constexpr double STACK_CEILING_HARMONICS = 36.0;
+
+// The floor under `STACK_CEILING_HARMONICS * f0`, Hz.
+//
+// **A tunable.** At 2,000 rpm the harmonic ceiling alone is 1.2 kHz, and while the
+// corpus's trackside kart recording really is that dark at low revs (centroid
+// 530 Hz), it is dark partly because it is forty meters away. This keeps a
+// stationary idling engine from losing its top two octaves to a microphone
+// distance nobody measured. 2 kHz is one octave above where the harmonic ceiling
+// crosses it, at 3,333 rpm.
+inline constexpr double STACK_CEILING_MIN_HZ = 2000.0;
+
+// `ceiling_gate` lets every harmonic at or below `LADDER_MEASURED_TO` past the
+// ceiling, because the measured range is a floor the ceiling may not cut into. If
+// the harmonic ceiling were ever set below that index the two rules would
+// contradict each other and the ceiling would silently do nothing.
+static_assert(STACK_CEILING_HARMONICS >= static_cast<double>(kz_audio::LADDER_MEASURED_TO),
+		"the harmonic ceiling sits inside the measured ladder, so `ceiling_gate`'s "
+		"floor would override it and the stack would not track rpm at all");
+
 // The highest partial frequency allowed, as a fraction of Nyquist.
 //
 // A partial above Nyquist does not vanish, it folds back into the audible band at
@@ -186,6 +232,37 @@ inline constexpr double ONPIPE_EDGE_RPM = 1500.0;
 // actually sounds like.
 inline constexpr double ONPIPE_LEVEL_DB = 3.0;
 
+// How far below peak-revs level the note is allowed to fall, dB, and the rpm the
+// rise is referenced to.
+//
+// **The synth had no rpm-to-level term at all**, which nobody noticed because the
+// amplitude-sum normalization was quietly supplying one: the stack's RMS falls as
+// 1/sqrt(N) and N fell from 160 partials at 3,000 rpm to 36 at 13,000, so the note
+// got 5.5 dB louder across the range as a side effect of a normalization whose own
+// comment describes it as a pure change of shape. Making the ceiling track rpm
+// holds N nearly constant and took that accident away, which is how it was found.
+// An effect worth having should not arrive from a divisor.
+//
+// So it is modelled, and `kz_audio::LEVEL_RISE_DB_PER_RPM_DOUBLING` is the
+// measurement: +10.4 dB per doubling of rpm on the two stationary museum captures,
+// agreeing to 0.1 dB, against +3.0 for the muffled chainsaw.
+//
+// **Referenced to peak power and applied downward only.** Anchoring at
+// `kz::PEAK_POWER_RPM` and subtracting below it means the loudest thing the synth
+// can produce is exactly what it produced before this term existed, so no amount
+// of it can cost headroom — `tests/core/test_synth_headroom.cpp` would have to see
+// the peak move, and it cannot. Anchoring at idle and adding upward would have
+// been the same curve and would have blown the mix.
+//
+// 12 dB of range rather than the full slope, which over 3,000-13,000 rpm would ask
+// for 22.6. The measured span it has to cover is 10.4 dB per doubling over a
+// corpus whose own recordings span 1.06 and 1.77 doublings — 11.0 and 18.4 dB —
+// and 12 sits at the low end of that on purpose: this stacks on top of the 3 dB of
+// `ONPIPE_LEVEL_DB` and the constant's own comment says the two measurements
+// overlap and cannot be separated. The floor bites below 5,780 rpm, which is under
+// `kz::POWERBAND_MIN_RPM` and therefore below anywhere a driver spends time.
+inline constexpr double RPM_LEVEL_RANGE_DB = 12.0;
+
 // How far the note drops during a shift's torque cut, dB. **A tunable** —
 // `kz_audio::SHIFT_TRANSIENT_MEASURED` is false. 9 dB is about a third of the
 // perceived loudness, which is what an unloaded two-stroke does for the 50-80 ms
@@ -231,13 +308,23 @@ inline constexpr double CLUTCH_NOISE_CORNER_DROP = 0.75; // of the corner, at fu
 // ceiling.
 //
 // **A tunable, but a derived one, and the derivation is short:**
-// `kz_audio::STACK_CEILING_HZ`'s comment says 8 kHz "leaves the top octave of the
-// audible band to §12's noise layer, which is where broadband two-stroke content
-// belongs anyway". So the two layers are placed not to fight: the stack fills up
+// `kz_audio::STACK_CEILING_HZ`'s comment says the cap "leaves the top octave of
+// the audible band to §12's noise layer, which is where broadband two-stroke
+// content belongs anyway". So the two layers are placed not to fight: the stack fills up
 // to the ceiling and the noise is high-passed at half of it, a gentle 6 dB/octave
 // corner that leaves the noise present but subordinate below the ceiling and
 // dominant above it. Nothing measured constrains the shape — no recording in the
 // corpus separates the broadband layer from the engine over the top of it.
+//
+// **It is a fraction of the *effective* ceiling and not of the configured one**,
+// which used to be the same thing and stopped being it when the ceiling started
+// tracking rpm. Leaving the corner at a fixed 4 kHz while the stack moved would
+// have kept a fixed-frequency layer sitting on top of an rpm-tracking one, and
+// that layer is exactly what flattened the centroid before: measured on the
+// shipped build, the stack alone rose at k = 0.71 and the mix rose at k = 0.21,
+// so a fixed-corner noise bed was throwing away two thirds of a brightness
+// sweep the stack was already producing correctly. Half of the effective ceiling
+// keeps the two layers in the relationship this comment describes at every rpm.
 inline constexpr double NOISE_HIGHPASS_FRACTION = 0.5;
 
 // Where the output soft-clips. Linear below this and asymptotic to 1.0 above, so
@@ -298,13 +385,21 @@ class EngineSynth {
 public:
 	// The hard cap on the stack size.
 	//
-	// It is a cost bound, not an acoustic one, and it binds only at the bottom of
-	// the range: with the default 8 kHz ceiling it starts to matter below
-	// f0 = 8000/192 = 41.7 Hz, which is 2,500 rpm — just above `Engine::idle_rpm`.
-	// Below that the effective ceiling falls to 192 * f0 and the note darkens, and
-	// because the cap enters the same fade as every other ceiling that is a
-	// darkening rather than a step. Above 2,500 rpm the cap never binds at all: at
-	// 12,000 rpm the stack is 40 partials.
+	// It is a cost bound, not an acoustic one, and since the ceiling became a
+	// harmonic count it is **very nearly dead code**: the stack is 36 partials
+	// wherever `STACK_CEILING_HARMONICS * f0` is the binding constraint, and only
+	// the `STACK_CEILING_MIN_HZ` floor can grow it — 60 partials at 2,000 rpm, 192
+	// at 625. It is kept because the floor is a tunable somebody may raise and
+	// because a cap that has never fired is cheaper than the crash if it were
+	// needed and absent.
+	//
+	// **It used to bind hard and often**, which is what it was sized for: with the
+	// old fixed 8 kHz ceiling the stack was 160 partials at 3,000 rpm and 191 at
+	// 2,500, and `tools/verify/synth_cost_probe.gd` measured the worst operating
+	// point at 6.11% of real time for one kart and **73.3% for M7's twelve-kart
+	// field**, which is an underrun. The same probe on the harmonic ceiling reports
+	// 1.7-2.5% and 20-30%. That was not the reason for the change and it is the
+	// largest single number that came out of it.
 	static constexpr int MAX_PARTIALS = 192;
 
 	// Sine table size. 4,096 points with linear interpolation puts the
@@ -422,10 +517,17 @@ public:
 			const double harmonic = static_cast<double>(index + 1);
 			harmonic_[index] = harmonic;
 			log2_harmonic_[index] = std::log2(harmonic);
+			// The **tail** fits, not the whole-range ones. See
+			// `kz_audio::DECAY_DB_PER_DOUBLING_ONPIPE_TAIL`: the on-pipe ladder
+			// peaks at h6 and falls for two octaves after it, so extrapolating past
+			// h24 with the whole-range fit made every partial above h24 louder than
+			// the one below it, which is the wrong direction and not merely a kink.
+			// This only affects harmonics past the end of the table; everything
+			// inside it still interpolates through the measured points.
 			pipe_db_[index] = ladder_db(kz_audio::PIPE_LADDER_DB, harmonic,
-					kz_audio::DECAY_DB_PER_DOUBLING_PIPE);
+					kz_audio::DECAY_DB_PER_DOUBLING_PIPE_TAIL);
 			onpipe_db_[index] = ladder_db(kz_audio::ONPIPE_LADDER_DB, harmonic,
-					kz_audio::DECAY_DB_PER_DOUBLING_ONPIPE);
+					kz_audio::DECAY_DB_PER_DOUBLING_ONPIPE_TAIL);
 		}
 
 		reset();
@@ -558,7 +660,8 @@ public:
 		// measured columns each half fits.
 		const double level_db = -kz_audio::THROTTLE_LEVEL_DELTA_DB * off_ +
 				synth_tuning::ONPIPE_LEVEL_DB * onpipe_ -
-				synth_tuning::SHIFT_CUT_DB * shift_;
+				synth_tuning::SHIFT_CUT_DB * shift_ +
+				rpm_level_db(rpm_end);
 		const double rpm_fade = clamp01(rpm_end / synth_tuning::IDLE_FADE_RPM);
 		const double level = db_to_linear(level_db) * gain_ * rpm_fade;
 
@@ -566,15 +669,9 @@ public:
 		const double f0_high = kz_audio::rpm_to_f0_hz(rpm_high);
 		const int active = active_partials(f0_high);
 
-		// The ceiling that the fade runs down to. Three things can be the binding
-		// one and whichever is lowest wins: the configured ceiling, Nyquist, and
-		// `MAX_PARTIALS` worth of harmonics. Folding the cap in here is what stops
-		// it being a brick wall of its own.
-		double ceiling = ceiling_hz_;
-		const double cap_ceiling = static_cast<double>(MAX_PARTIALS) * f0_high;
-		if (cap_ceiling < ceiling) {
-			ceiling = cap_ceiling;
-		}
+		// The ceiling that the fade runs down to, and the same one `active_partials`
+		// counted against a moment ago.
+		const double ceiling = effective_ceiling(f0_high);
 
 		// Off-throttle tilt, dB per doubling of harmonic number. Positive, and it
 		// adds to the ladder: the fundamental takes the whole broadband drop while
@@ -624,7 +721,7 @@ public:
 		// The noise layer's corner drops as the clutch slips, which broadens it down
 		// out of the top octave and into the range where a slipping clutch is
 		// actually heard.
-		const double corner = ceiling_hz_ * synth_tuning::NOISE_HIGHPASS_FRACTION *
+		const double corner = ceiling * synth_tuning::NOISE_HIGHPASS_FRACTION *
 				(1.0 - synth_tuning::CLUTCH_NOISE_CORNER_DROP * clutch_);
 		const double noise_alpha = one_pole_alpha(corner);
 		const double noise_level = level * noise_gain_ *
@@ -740,6 +837,11 @@ public:
 	double current_f0_hz() const { return kz_audio::rpm_to_f0_hz(rpm_); }
 	double nyquist_hz() const { return nyquist_; }
 
+	// Where the stack ends at a given fundamental. Exposed so a test can assert the
+	// ceiling tracks rpm directly, rather than inferring it from a spectrum and
+	// leaving open whether a flat centroid came from the ceiling or the ladder.
+	double stack_ceiling_hz(double f0) const { return effective_ceiling(f0); }
+
 	// The dB the ladder machinery says harmonic `harmonic` should sit at, relative
 	// to h1, before the tilt and the crossfade. Exposed so a test can compare the
 	// realized spectrum against the model as well as against the table.
@@ -771,6 +873,26 @@ public:
 			}
 		}
 		return ladder[last];
+	}
+
+	// How much quieter than peak revs the note is at this rpm, dB. Never positive:
+	// `kz::PEAK_POWER_RPM` is the anchor and everything below it is attenuated, so
+	// this term cannot raise the peak output and cannot cost headroom. Public
+	// because `tests/core/test_synth_headroom.cpp` reconstructs the level chain
+	// term by term and a term it could not see would be a term it silently skipped.
+	static double rpm_level_db(double rpm) {
+		if (!(rpm > 0.0)) {
+			return -synth_tuning::RPM_LEVEL_RANGE_DB;
+		}
+		const double db = kz_audio::LEVEL_RISE_DB_PER_RPM_DOUBLING *
+				std::log2(rpm / kz::PEAK_POWER_RPM);
+		if (db > 0.0) {
+			return 0.0;
+		}
+		if (db < -synth_tuning::RPM_LEVEL_RANGE_DB) {
+			return -synth_tuning::RPM_LEVEL_RANGE_DB;
+		}
+		return db;
 	}
 
 	// How far into the powerband the engine is, 0 to 1. Public because it is half
@@ -858,15 +980,40 @@ private:
 	// ceiling, and **never any above Nyquist**. Where the h24 floor and Nyquist
 	// disagree, Nyquist wins — the floor is an analysis limit and folding a partial
 	// back into the audible band is a defect.
+	// Where the stack ends at this fundamental, Hz. A harmonic count first, so the
+	// spectrum's shape is fixed in harmonic space and slides up with f0; then the
+	// floor, the configured absolute cap, `MAX_PARTIALS` worth of harmonics and
+	// Nyquist, whichever binds.
+	//
+	// **One function, called by all three consumers** — the partial count, the fade
+	// gate and the noise layer's corner. They were three copies of the same clamp
+	// chain when the ceiling was a constant, which cost nothing because a constant
+	// cannot disagree with itself. An rpm-dependent ceiling can, and a noise corner
+	// that had drifted a clamp away from the stack it is supposed to sit above
+	// would be inaudible as a bug and visible only as the mix being wrong.
+	double effective_ceiling(double f0) const {
+		double ceiling = synth_tuning::STACK_CEILING_HARMONICS * f0;
+		if (ceiling < synth_tuning::STACK_CEILING_MIN_HZ) {
+			ceiling = synth_tuning::STACK_CEILING_MIN_HZ;
+		}
+		if (ceiling > ceiling_hz_) {
+			ceiling = ceiling_hz_;
+		}
+		const double cap_ceiling = static_cast<double>(MAX_PARTIALS) * f0;
+		if (ceiling > cap_ceiling) {
+			ceiling = cap_ceiling;
+		}
+		if (ceiling > nyquist_ceiling_) {
+			ceiling = nyquist_ceiling_;
+		}
+		return ceiling;
+	}
+
 	int active_partials(double f0) const {
 		if (!(f0 > 0.0)) {
 			return 0;
 		}
-		double ceiling = ceiling_hz_;
-		const double cap_ceiling = static_cast<double>(MAX_PARTIALS) * f0;
-		if (cap_ceiling < ceiling) {
-			ceiling = cap_ceiling;
-		}
+		const double ceiling = effective_ceiling(f0);
 		int count = 0;
 		for (int harmonic = 1; harmonic <= MAX_PARTIALS; ++harmonic) {
 			const double frequency = static_cast<double>(harmonic) * f0;

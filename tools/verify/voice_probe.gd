@@ -30,28 +30,48 @@ extends SceneTree
 ## be confused.
 const TICKS := 240
 
-## Throttle held for the whole run, so the engine revs and the partial count moves.
+## Throttle held for the whole run, so the engine revs and the rpm the audio thread
+## renders at moves.
 ##
 ## **The rpm is the solver's and is not injected**, which is the point. Publishing a
 ## synthetic rpm into the stream would test the seqlock while skipping
 ## `KartBody::publish_engine_audio` — the mapping from `VehicleTelemetry` to
 ## `EngineAudioInput`, which is the join with no other coverage. Holding the
-## throttle exercises the whole chain and a moving partial count is the evidence it
-## moved: `active_partials` falls as f0 rises, from 191 at idle toward 33 at the
-## soft cut, so a count that changes is an rpm that crossed the thread boundary.
+## throttle exercises the whole chain and the rpm read back off the audio thread is
+## the evidence it arrived.
+##
+## **This used to key off the partial count and that witness has expired.** The
+## stack used to end at a fixed frequency, so its size fell as f0 rose — 191
+## partials at idle down to 33 at the soft cut — and a changing count was a fair
+## proxy for a changing rpm. The stack now ends at a fixed harmonic *count*, which
+## is what makes the note brighten with revs, and its size is near constant across
+## the whole range. The proxy would have gone on passing on the single 35-to-0 step
+## at the end of the run while measuring nothing about the transport. `voice_stats`
+## publishes `render_rpm` now and this asserts on that directly.
 ##
 ## A first version of this file computed an rpm ramp and never published it. The
 ## probe passed, on `KartBody`'s own idle rpm, and the ramp was dead code that made
 ## the report claim a transport test it had not run.
 const PROBE_THROTTLE := 1.0
 
+## How much the rendered rpm has to move over the run before the transport counts
+## as demonstrated. Full throttle from `engage(1, 5.0)` climbs several thousand rpm
+## in two seconds; 500 is far enough above the idle jitter that nothing but a real
+## ramp clears it, and far enough below the real span that a slow machine does not
+## fail for being slow.
+const MIN_RPM_TRAVEL := 500.0
+
 var _kart: KartBody
 var _stream: Object
 var _tick := 0
 
-## Distinct partial counts seen across the run. More than one means the rpm reached
-## the audio thread and changed there.
+## Distinct partial counts seen across the run. Reported, not asserted on — see
+## `PROBE_THROTTLE` for why this stopped being evidence of anything.
 var _partials_seen: Dictionary = {}
+
+## Lowest and highest rpm the audio thread was seen rendering at.
+var _rpm_low := INF
+var _rpm_high := -INF
 
 
 func _initialize() -> void:
@@ -96,6 +116,15 @@ func _physics_process(_delta: float) -> bool:
 	var stats: Dictionary = _stream.call("voice_stats")
 	_partials_seen[int(stats["partials"])] = true
 
+	# Indexed with `[]` and not `get(key, 0.0)`. A renamed key must fail loudly here;
+	# with a default it would read zero on every tick, the travel would come out as
+	# whatever the idle value was, and the probe would report a confident number for
+	# a field that no longer exists.
+	var rpm: float = stats["render_rpm"]
+	if rpm > 0.0:
+		_rpm_low = minf(_rpm_low, rpm)
+		_rpm_high = maxf(_rpm_high, rpm)
+
 	_tick += 1
 	if _tick < TICKS:
 		return false
@@ -125,6 +154,8 @@ func _report() -> void:
 	print("    physics ticks                %d" % _tick)
 	print("    _mix calls                   %d" % calls)
 	print("    partials, last block         %d" % partials)
+	print("    rendered rpm, last block     %.0f" % float(stats["render_rpm"]))
+	print("    rendered f0, last block      %.1f Hz" % float(stats["render_f0_hz"]))
 	print("")
 	print("    seqlock retries              %d" % retries)
 	print("    seqlock gave up              %d" % gave_up)
@@ -156,22 +187,34 @@ func _report() -> void:
 	else:
 		print("    ok    the stack was %d partials on the last block" % partials)
 
-	# The transport test proper. One distinct count over 240 ticks of full throttle
-	# means the audio thread saw one rpm for two seconds — the seqlock published once
-	# and stopped, or `publish_engine_audio` is never reached, or the payload is not
-	# arriving. Silence is not the symptom; a note stuck at idle is.
-	var distinct: int = _partials_seen.size()
-	if distinct <= 1:
-		print("    FAIL  the partial count never changed across %d ticks at full" % _tick)
-		print("          throttle. The rpm is not crossing the thread boundary: the")
-		print("          note would be stuck at one pitch, which is not silence and is")
-		print("          why this is checked separately from _mix being called.")
+	# The transport test proper, asserted on the rendered rpm itself. One rpm across
+	# 240 ticks of full throttle means the audio thread saw one state for two seconds
+	# — the seqlock published once and stopped, or `publish_engine_audio` is never
+	# reached, or the payload is not arriving. Silence is not the symptom; a note
+	# stuck at idle is.
+	#
+	# The partial count is printed beside it and is no longer the witness. See
+	# `PROBE_THROTTLE`: the stack ends at a fixed harmonic count now, so its size is
+	# nearly rpm-independent by design, and a check that keyed off it would be
+	# passing on the one step to zero at the end of the run.
+	var travel: float = _rpm_high - _rpm_low if is_finite(_rpm_low) else 0.0
+	if travel < MIN_RPM_TRAVEL:
+		print("    FAIL  the rendered rpm moved %.0f across %d ticks at full throttle,"
+			% [travel, _tick])
+		print("          under the %.0f this needs. The rpm is not crossing the thread"
+			% MIN_RPM_TRAVEL)
+		print("          boundary: the note would be stuck at one pitch, which is not")
+		print("          silence and is why this is checked separately from _mix.")
 		failed = true
 	else:
-		var counts: Array = _partials_seen.keys()
-		counts.sort()
-		print("    ok    the stack moved across %d distinct counts, %d down to %d"
-			% [distinct, counts[counts.size() - 1], counts[0]])
+		print("    ok    the rendered rpm travelled %.0f, %.0f to %.0f"
+			% [travel, _rpm_low, _rpm_high])
+
+	var counts: Array = _partials_seen.keys()
+	counts.sort()
+	print("    --    stack size spanned %d..%d partials (reported, not asserted:"
+		% [counts[0], counts[counts.size() - 1]])
+	print("          a harmonic-count ceiling makes this nearly flat with rpm)")
 
 	# Bounded retry means giving up is *possible*, and at one publish per tick
 	# against one read per block ADR-0035 predicts it never happens. A nonzero count

@@ -1,5 +1,6 @@
 #include "vehicle/player_driver.h"
 
+#include "core/replay.h"
 #include "tuning/tuning_registry.h"
 #include "vehicle/kart_body.h"
 
@@ -121,6 +122,26 @@ void PlayerDriver::_physics_process(double p_delta) {
 	// Disabled falls through with every axis at zero, and still pushes. See the
 	// header: going silent would make the body's freshness check fail every tick
 	// and log a warning about a situation nobody has a problem with.
+
+	// Quantize to the replay storage grid **here**, upstream of the solver, and not
+	// when a recording is written. `replay.h` argues this at length and then names
+	// this exact call site: if input were quantized on write, the live run would
+	// consume full-precision values and the replay would consume rounded ones, the
+	// two would diverge at the rate any chaotic system does, and it would look
+	// exactly like a solver bug.
+	//
+	// The call was missing for a milestone, and because `replay_encode_input`
+	// **refuses** off-grid input rather than rounding it -- deliberately, so the
+	// defect cannot be introduced silently -- the consequence was not a subtle
+	// divergence but a flat refusal: **a human-driven lap could not be recorded at
+	// all.** A stick axis is never on the grid. Found when `KartReplay` gave
+	// `replay.h` its first consumer; the header had described this call in the
+	// present tense since it was written.
+	//
+	// Free for a scripted run, which reaches `KartBody::input_driver` directly and
+	// does its own snapping, and free here too: it is four multiplies on a struct
+	// that is about to cross a frame boundary anyway.
+	input = kart::core::replay_snap(input);
 
 	last_input_ = input;
 	kart_->set_input(input, godot::Engine::get_singleton()->get_physics_frames());

@@ -187,6 +187,9 @@ var _lightmap_users := 0
 ## `ghost_probe.gd`'s 23 checks.
 var _ghost_recorder: KartGhost
 var _ghost_kart: GhostKart
+## True when the driver paused during a lap and `pause_invalidates_lap` is off,
+## so the lap survived. The record has to carry it -- see `_strike_paused_lap`.
+var _pause_forgiven := false
 var _ghost_saved_id := ""
 var _ghost_saved_s := -1.0
 ## The time to beat before a recording is worth keeping. Seeded from the profile
@@ -839,6 +842,25 @@ func _build_session() -> void:
 		return
 	_runner.session_finished.connect(_on_session_finished)
 	_runner.lap_completed.connect(_on_lap_completed)
+
+	# The per-lap rows the results sheet reads. **Nothing created this for a
+	# milestone** — `_ledger_rows()` read `get_node_or_null("LapLedger")`, a grep for
+	# the class returned that read and its own file and nothing else, so
+	# `carried["laps"]` was `[]` on every session and `results_screen.gd`'s
+	# "no ledger" branch was the only one that had ever run. Found by
+	# `tools/verify/walk_probe.gd`, which is the first thing that ever drove a lap
+	# end to end. Same family as `pause` being bound and read by nobody.
+	#
+	# Parented before `begin()`, because `configure()` subscribes to
+	# `lap_completed` and a ledger attached after the first crossing misses it.
+	var ledger := LapLedger.new()
+	ledger.name = "LapLedger"
+	add_child(ledger)
+	# The course and the kart are what the speed trap needs and are independently
+	# optional; the ledger still files every lap without them.
+	if not ledger.configure(_runner, _track, _kart):
+		push_error("lap ledger refused; the results sheet will have no rows")
+
 	_build_ghost()
 	_runner.begin()
 
@@ -950,6 +972,7 @@ func _on_session_finished(result: Dictionary) -> void:
 	# The ghost this session actually wrote, so the profile write can point the
 	# `best` record at it. Empty when no lap beat what was already on file, which
 	# is also the honest answer: the stored ghost is still the right one.
+	carried["pause_forgiven"] = _pause_forgiven
 	carried["ghost_id"] = _ghost_saved_id
 	carried["ghost_lap_s"] = _ghost_saved_s
 	# **The identity, without which no lap can ever be filed.**
@@ -1025,8 +1048,22 @@ func _strike_paused_lap() -> void:
 	if not ClassDB.class_exists("KartSettings"):
 		return
 	var settings := KartSettings.new()
+	# `--profile-dir=` has to reach this too. Every worktree shares one `user://`,
+	# and a probe that pauses was otherwise reading Anthony's real settings file to
+	# decide whether to strike its own synthetic lap.
+	var base := Cmdline.as_string(_args, "profile-dir", "")
+	if not base.is_empty():
+		settings.set_base_dir(base)
 	settings.load()
 	if not settings.is_pause_invalidates_lap():
+		# Paused, and the driver has said that does not cost the lap. Remember it:
+		# the lap is still valid, but the record has to say it was set with the
+		# forgiveness on or the board compares two laps run under different rules.
+		# `profile.h` has carried the token since #186 and **nothing ever set it** —
+		# `set_best`'s sixth argument defaulted false, `best_lap_store` called it
+		# with five, and no result dictionary held the key. Found by
+		# `tools/verify/walk_probe.gd`.
+		_pause_forgiven = true
 		return
 	_runner.timer().strike_paused()
 

@@ -84,6 +84,13 @@ Dictionary EngineVoiceStream::voice_stats() const {
 	d["mix_calls"] = calls;
 	d["partials"] = _partials.load(std::memory_order_relaxed);
 	d["mix_rate"] = rate;
+	// The rpm and the fundamental the audio thread last rendered. `voice_probe.gd`
+	// reads these with `[]` and not `get(key, default)` — a renamed key has to fail
+	// loudly rather than draw a zero forever, which is the trap `kart_body.cpp`
+	// warns about over its own telemetry Dictionary.
+	d["render_rpm"] = _render_rpm.load(std::memory_order_relaxed);
+	d["render_f0_hz"] = kart::core::kz_audio::rpm_to_f0_hz(
+			_render_rpm.load(std::memory_order_relaxed));
 	d["seq_gave_up"] = _state.gave_up();
 	d["seq_retries"] = _state.retries();
 
@@ -251,6 +258,7 @@ int32_t EngineVoicePlayback::_mix(AudioFrame *p_buffer, float p_rate_scale, int3
 	stream->_render_ns_total.fetch_add(render_ns, std::memory_order_relaxed);
 	stream->_render_frames_total.fetch_add(p_frames, std::memory_order_relaxed);
 	stream->_partials.store(static_cast<int32_t>(_synth.partial_count()), std::memory_order_relaxed);
+	stream->_render_rpm.store(_synth.current_rpm(), std::memory_order_relaxed);
 
 	// The worst block, kept with a compare-exchange so that two playbacks reporting
 	// into one stream cannot lose the larger of them. The block size is stored with

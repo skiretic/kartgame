@@ -66,7 +66,21 @@ run_scenario() {
 FAILED=0
 for scenario in "${SCENARIOS[@]}"; do
 	FIRST="$(run_scenario "$scenario")"
+	STATUS=$?
 	echo "$FIRST" | grep -E '^(---|    |state-hash|tuning-hash)'
+
+	# The probe exits non-zero when a run departed — body slip past 30 degrees,
+	# which is a spin and not a corner. It prints its state hash first, so the
+	# determinism half below still runs and still means something; what it refuses
+	# to do is publish a lateral figure off a kart that has spun.
+	#
+	# This gate had no such check, and for two milestones `--scenario=skidpad`
+	# reported "lateral sust 0.09 g" in green off a run whose max body slip was
+	# 174.2 degrees.
+	if [ "$STATUS" != "0" ]; then
+		echo "    scenario        FAILED: see the run's own report above" >&2
+		FAILED=1
+	fi
 
 	if [ "$ONCE" = "1" ]; then
 		continue
@@ -87,7 +101,10 @@ for scenario in "${SCENARIOS[@]}"; do
 done
 
 if [ "$FAILED" = "1" ]; then
-	echo "error: a scenario did not reproduce. Look for wall-clock reads in the" >&2
-	echo "       drive model, an unseeded generator, or iteration over a Dictionary." >&2
+	echo "error: a scenario either departed or did not reproduce." >&2
+	echo "       DEPARTED means the kart spun and the run measures nothing; the fix" >&2
+	echo "       is to the vehicle, not to the scenario's throttle." >&2
+	echo "       DIVERGED means look for wall-clock reads in the drive model, an" >&2
+	echo "       unseeded generator, or iteration over a Dictionary." >&2
 	exit 1
 fi

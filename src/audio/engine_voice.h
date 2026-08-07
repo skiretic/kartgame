@@ -178,6 +178,20 @@ private:
 	mutable std::atomic<int32_t> _worst_block_frames{ 0 };
 	mutable std::atomic<int32_t> _partials{ 0 };
 	mutable std::atomic<double> _mix_rate{ 0.0 };
+
+	// The rpm the synth was actually rendering at the end of the last block.
+	//
+	// **Not the same fact as `_partials`, and that used to be missable.** The stack
+	// size was the only rpm-dependent number a probe could see, so
+	// `tools/verify/voice_probe.gd` used a *changing partial count* as its evidence
+	// that rpm had crossed the thread boundary at all. That inference held only
+	// because the stack ended at a fixed frequency and so shrank as f0 rose — 191
+	// partials at idle down to 33 at the cut. The stack now ends at a fixed
+	// harmonic count and its size barely moves, which does not break the audio and
+	// does break the probe's only witness. Publishing the rpm makes the check
+	// direct instead of circumstantial, and a direct check is what should have been
+	// there when the indirect one still worked.
+	mutable std::atomic<double> _render_rpm{ 0.0 };
 };
 
 // The playback half. Owns one `EngineSynth` and does nothing else.

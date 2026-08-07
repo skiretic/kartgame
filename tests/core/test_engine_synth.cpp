@@ -84,6 +84,132 @@ double fit_decay(const std::vector<double> &log2_harmonic, const std::vector<dou
 	return covariance / variance;
 }
 
+// --- Brightness, which needs every bin rather than three of them ---------------
+//
+// `bin_magnitude` above answers "how much is at this exact frequency", which is
+// the right question for the ladder and the alias test and the wrong one for a
+// spectral centroid. A centroid is a statistic over the whole spectrum including
+// the broadband noise layer, so it needs a transform rather than a probe, and it
+// has to be taken **on the shipped configuration** — noise on, comb on, jitter on
+// — because the thing being asserted is what a driver hears and the noise layer
+// is half of what went wrong.
+
+constexpr int SPECTRUM_N = 32768; // 1.46 Hz bins at 48 kHz, 0.68 s of audio
+
+// Iterative radix-2 Cooley-Tukey, in place. Small enough to read, and the
+// alternative is pulling a dependency into a suite whose selling point is that it
+// builds with one include path and no engine.
+void fft_in_place(std::vector<double> &real, std::vector<double> &imaginary) {
+	const int count = static_cast<int>(real.size());
+	for (int i = 1, j = 0; i < count; ++i) {
+		int bit = count >> 1;
+		for (; (j & bit) != 0; bit >>= 1) {
+			j ^= bit;
+		}
+		j ^= bit;
+		if (i < j) {
+			std::swap(real[i], real[j]);
+			std::swap(imaginary[i], imaginary[j]);
+		}
+	}
+	for (int length = 2; length <= count; length <<= 1) {
+		const double angle = -2.0 * 3.14159265358979323846 / static_cast<double>(length);
+		const double wr = std::cos(angle);
+		const double wi = std::sin(angle);
+		for (int start = 0; start < count; start += length) {
+			double cr = 1.0;
+			double ci = 0.0;
+			for (int k = 0; k < length / 2; ++k) {
+				const int a = start + k;
+				const int b = a + length / 2;
+				const double xr = real[b] * cr - imaginary[b] * ci;
+				const double xi = real[b] * ci + imaginary[b] * cr;
+				real[b] = real[a] - xr;
+				imaginary[b] = imaginary[a] - xi;
+				real[a] += xr;
+				imaginary[a] += xi;
+				const double nr = cr * wr - ci * wi;
+				ci = cr * wi + ci * wr;
+				cr = nr;
+			}
+		}
+	}
+}
+
+struct Brightness {
+	double centroid_hz = 0.0;
+	double hf_fraction = 0.0;
+	int partials = 0;
+	double rms_dbfs = 0.0;
+};
+
+// Power-weighted mean frequency and the fraction of band power above
+// `kz_audio::HF_SPLIT_HZ`, measured over `kz_audio::CENTROID_BAND_*`.
+//
+// **The band is not a detail.** A centroid without the band it was taken over is
+// not a number anybody can reproduce, which is why those two edges are constants
+// in `kz_audio_reference.h` rather than literals here — the same band was used on
+// the recordings the comparison figures came from, and a gate that measured the
+// synth over a different band would be comparing two different statistics and
+// would pass or fail for arithmetic reasons.
+Brightness brightness(const EngineAudioConfig &config, const EngineAudioInput &input,
+		double sample_rate) {
+	EngineSynth synth;
+	synth.configure(config, sample_rate);
+	std::vector<float> samples;
+	render_steady(synth, input, samples, SPECTRUM_N, sample_rate);
+
+	std::vector<double> real(SPECTRUM_N);
+	std::vector<double> imaginary(SPECTRUM_N, 0.0);
+	double sum_square = 0.0;
+	for (int index = 0; index < SPECTRUM_N; ++index) {
+		const double value = samples[index];
+		sum_square += value * value;
+		// Hann, matching the analysis the reference figures were taken with.
+		const double window = 0.5 - 0.5 * std::cos(2.0 * 3.14159265358979323846 *
+										  static_cast<double>(index) / static_cast<double>(SPECTRUM_N));
+		real[index] = value * window;
+	}
+	fft_in_place(real, imaginary);
+
+	const double bin_hz = sample_rate / static_cast<double>(SPECTRUM_N);
+	const int low = static_cast<int>(kz_audio::CENTROID_BAND_LOW_HZ / bin_hz);
+	int high = static_cast<int>(kz_audio::CENTROID_BAND_HIGH_HZ / bin_hz);
+	if (high > SPECTRUM_N / 2) {
+		high = SPECTRUM_N / 2;
+	}
+	const int split = static_cast<int>(kz_audio::HF_SPLIT_HZ / bin_hz);
+
+	double total = 0.0;
+	double weighted = 0.0;
+	double above = 0.0;
+	for (int index = low; index < high; ++index) {
+		const double power = real[index] * real[index] + imaginary[index] * imaginary[index];
+		total += power;
+		weighted += power * static_cast<double>(index) * bin_hz;
+		if (index >= split) {
+			above += power;
+		}
+	}
+
+	Brightness out;
+	out.centroid_hz = total > 0.0 ? weighted / total : 0.0;
+	out.hf_fraction = total > 0.0 ? above / total : 0.0;
+	out.partials = synth.partial_count();
+	const double rms = std::sqrt(sum_square / static_cast<double>(SPECTRUM_N));
+	out.rms_dbfs = rms > 0.0 ? 20.0 * std::log10(rms) : -200.0;
+	return out;
+}
+
+// The exponent k in `centroid ~ f0^k`, between two rpm. This is the quantity
+// `kz_audio::CENTROID_EXPONENT_*` carries and the reason it is an exponent rather
+// than a ratio is in that constant's comment: every recording spans a different
+// rev range, so a raw top-over-bottom figure is not comparable between two of
+// them, and would not be comparable to the synth either.
+double centroid_exponent(double centroid_low, double rpm_low, double centroid_high, double rpm_high) {
+	return std::log2(centroid_high / centroid_low) / std::log2(rpm_high / rpm_low);
+}
+
 // A state with the engine pulling hard and nothing exceptional happening.
 EngineAudioInput driving(double rpm, double load) {
 	EngineAudioInput input;
@@ -176,6 +302,260 @@ TEST_CASE("the realized ladder is the ladder that was measured") {
 	// Within 10 dB of the fundamental at h24 is the headline claim of the whole
 	// measurement. The realized spectrum has to keep it.
 	CHECK(measured_db.back() > -10.5);
+}
+
+TEST_CASE("the note brightens with rpm the way a tuned pipe does, not the way a muffler does") {
+	// **The gate for "not enough two-stroke scream", and the one that would have
+	// caught it.** Every other spectral test in this file measures the synth at an
+	// operating point. None of them said anything about how the spectrum *moves*
+	// with rpm, and that motion is what separates a racing two-stroke from a
+	// chainsaw — `kz_audio::CENTROID_EXPONENT_*` measures three tuned-pipe engines
+	// at k = 0.49 to 1.27 and two muffled ones at 0.09 and 0.15, with no overlap.
+	//
+	// What the shipped build measured before this gate existed: k = 0.21 across the
+	// driving range and **k = -0.33 inside the powerband**, where the note got
+	// duller the harder it was revved. That is on the wrong side of both negative
+	// controls, and every one of the eleven test cases around this one passed.
+	//
+	// Measured on the **shipped configuration** — noise, comb and combustion jitter
+	// all on — because the noise layer was two thirds of the defect and a bare
+	// stack would have hidden it. The stack alone rose at k = 0.71 while the mix
+	// rose at 0.21.
+	const EngineAudioConfig config; // shipped defaults, deliberately not bare_stack()
+	const double RATE = 48000.0;
+
+	const double RPMS[] = { 3000.0, 4500.0, 6000.0, 7500.0, 9000.0, 10500.0, 12000.0, 13000.0, 14000.0 };
+	const int COUNT = static_cast<int>(sizeof(RPMS) / sizeof(RPMS[0]));
+
+	MESSAGE("");
+	MESSAGE("Spectral centroid and high-frequency share against rpm, shipped config.");
+	char line[220];
+	std::snprintf(line, sizeof(line), "%8s %7s %8s %10s %10s %10s",
+			"rpm", "f0 Hz", "partials", "centroid", ">4 kHz %", "rms dBFS");
+	MESSAGE(line);
+
+	std::vector<Brightness> measured;
+	for (int index = 0; index < COUNT; ++index) {
+		const Brightness b = brightness(config, driving(RPMS[index], 1.0), RATE);
+		measured.push_back(b);
+		std::snprintf(line, sizeof(line), "%8.0f %7.1f %8d %10.0f %10.2f %10.2f",
+				RPMS[index], kz_audio::rpm_to_f0_hz(RPMS[index]), b.partials,
+				b.centroid_hz, 100.0 * b.hf_fraction, b.rms_dbfs);
+		MESSAGE(line);
+	}
+
+	// Index 2 is 6,000 rpm — below the powerband, off the pipe — and index 7 is
+	// 13,000, which is `kz::PEAK_POWER_RPM`. That span is the closest thing the
+	// synth has to the rev sweeps the corpus recordings were measured over.
+	const double k_range = centroid_exponent(measured[2].centroid_hz, RPMS[2],
+			measured[7].centroid_hz, RPMS[7]);
+	// And the same question asked only inside the powerband, which is the range a
+	// driver actually spends time in and the range the old build failed hardest.
+	const double k_band = centroid_exponent(measured[4].centroid_hz, RPMS[4],
+			measured[7].centroid_hz, RPMS[7]);
+
+	MESSAGE("");
+	MESSAGE("centroid exponent k, 6,000 to 13,000 rpm: " << k_range);
+	MESSAGE("centroid exponent k, 9,000 to 13,000 rpm (powerband only): " << k_band);
+	MESSAGE("measured corpus: racing pipes " << kz_audio::CENTROID_EXPONENT_D7 << " to "
+			<< kz_audio::CENTROID_EXPONENT_COLIBRI << ", mufflers "
+			<< kz_audio::CENTROID_EXPONENT_CHAINSAW << " and "
+			<< kz_audio::CENTROID_EXPONENT_FOUR_STROKE);
+
+	// The band, from both sides. Below it the synth is a muffler; above it the
+	// brightness sweep is steeper than anything anybody measured, which would be
+	// inventing an engine rather than reproducing one.
+	CHECK(k_range >= kz_audio::CENTROID_EXPONENT_MIN);
+	CHECK(k_range <= kz_audio::CENTROID_EXPONENT_MAX);
+	CHECK(k_band >= kz_audio::CENTROID_EXPONENT_MIN);
+	CHECK(k_band <= kz_audio::CENTROID_EXPONENT_MAX);
+
+	// The negative control, stated separately from the band even though it is
+	// implied by it. The two muffled recordings are the failure this gate exists
+	// for and a reader should be able to see them asserted against by name.
+	CHECK(k_range > kz_audio::CENTROID_EXPONENT_MUFFLED_MAX);
+	CHECK(k_band > kz_audio::CENTROID_EXPONENT_MUFFLED_MAX);
+
+	// Monotone: the note must brighten at every step through the powerband, not
+	// merely end up brighter. A synth that dipped in the middle and recovered would
+	// satisfy the exponents above and would sound like it was changing its mind.
+	for (int index = 4; index < 7; ++index) {
+		CHECK(measured[index + 1].centroid_hz > measured[index].centroid_hz);
+	}
+
+	// The high-frequency share at peak power, against the sanity bound rather than
+	// against a target. `kz_audio::HF_FRACTION_ONPIPE_*`'s comment says why there
+	// is no target: the corpus spans 6.6% to 42% and the spread is microphone
+	// distance, so picking a point inside it would be picking a distance.
+	MESSAGE("high-frequency share at 13,000 rpm: " << 100.0 * measured[7].hf_fraction
+			<< " %, corpus band " << 100.0 * kz_audio::HF_FRACTION_ONPIPE_MIN << " to "
+			<< 100.0 * kz_audio::HF_FRACTION_ONPIPE_MAX << " %");
+	CHECK(measured[7].hf_fraction >= kz_audio::HF_FRACTION_ONPIPE_MIN);
+	CHECK(measured[7].hf_fraction <= kz_audio::HF_FRACTION_ONPIPE_MAX);
+}
+
+TEST_CASE("the stack ends at a harmonic count, which is what makes the spectrum slide with rpm") {
+	// The mechanism under the gate above, asserted directly. A centroid that failed
+	// to rise could be the ladder or could be the ceiling, and a test that only
+	// measured the spectrum would not say which.
+	EngineSynth synth;
+	synth.configure(EngineAudioConfig(), 48000.0);
+
+	MESSAGE("");
+	MESSAGE("Stack ceiling against rpm.");
+	char line[200];
+	std::snprintf(line, sizeof(line), "%8s %8s %11s %10s", "rpm", "f0 Hz", "ceiling Hz", "harmonics");
+	MESSAGE(line);
+
+	// Between the floor and the absolute cap the ceiling is exactly a harmonic
+	// count, which is the whole claim: the spectrum's shape is fixed in harmonic
+	// space, so it moves bodily up with the fundamental.
+	const double UNCLAMPED[] = { 4000.0, 6000.0, 9000.0, 12000.0, 14000.0, 14800.0 };
+	for (double rpm : UNCLAMPED) {
+		const double f0 = kz_audio::rpm_to_f0_hz(rpm);
+		const double ceiling = synth.stack_ceiling_hz(f0);
+		std::snprintf(line, sizeof(line), "%8.0f %8.1f %11.0f %10.1f", rpm, f0, ceiling, ceiling / f0);
+		MESSAGE(line);
+		CHECK(ceiling / f0 == doctest::Approx(kart::core::synth_tuning::STACK_CEILING_HARMONICS).epsilon(1e-9));
+	}
+
+	// `Engine::hard_cut_rpm` is 14,800 and the absolute cap must sit clear of it,
+	// or the cap is shaping the note over the top of the range instead of catching
+	// a runaway. This is the assertion that would fire if somebody lowered
+	// `kz_audio::STACK_CEILING_HZ` back to the 8 kHz that was clipping the top
+	// 800 rpm of the powerband.
+	const Engine engine;
+	const double f0_cut = kz_audio::rpm_to_f0_hz(engine.hard_cut_rpm);
+	MESSAGE("at hard_cut_rpm " << engine.hard_cut_rpm << " the harmonic ceiling wants "
+			<< kart::core::synth_tuning::STACK_CEILING_HARMONICS * f0_cut
+			<< " Hz and the absolute cap is " << kz_audio::STACK_CEILING_HZ);
+	CHECK(kart::core::synth_tuning::STACK_CEILING_HARMONICS * f0_cut < kz_audio::STACK_CEILING_HZ);
+
+	// The floor, below the powerband, and the cap, past any rpm the engine reaches.
+	CHECK(synth.stack_ceiling_hz(kz_audio::rpm_to_f0_hz(2000.0)) ==
+			doctest::Approx(kart::core::synth_tuning::STACK_CEILING_MIN_HZ).epsilon(1e-9));
+	CHECK(synth.stack_ceiling_hz(kz_audio::rpm_to_f0_hz(30000.0)) ==
+			doctest::Approx(kz_audio::STACK_CEILING_HZ).epsilon(1e-9));
+
+	// And the consequence that pays for it twice: a stack whose size barely moves
+	// costs a predictable amount and stops the amplitude-sum normalization from
+	// swinging the stack against the noise layer across the rev range. It was 160
+	// partials at 3,000 rpm and 36 at 13,000, a 6.5 dB swing in the balance between
+	// two layers for no reason anybody modelled.
+	EngineSynth low;
+	EngineSynth high;
+	low.configure(EngineAudioConfig(), 48000.0);
+	high.configure(EngineAudioConfig(), 48000.0);
+	std::vector<float> scratch;
+	render_steady(low, driving(6000.0, 1.0), scratch, 512, 48000.0);
+	render_steady(high, driving(13000.0, 1.0), scratch, 512, 48000.0);
+	MESSAGE("partials: " << low.partial_count() << " at 6,000 rpm, "
+			<< high.partial_count() << " at 13,000");
+	CHECK(low.partial_count() - high.partial_count() <= 2);
+}
+
+TEST_CASE("past the measured ladder the extrapolation follows the tail, not the hump") {
+	// `kz_audio::DECAY_DB_PER_DOUBLING_*_TAIL` claims to be a least-squares fit of
+	// a specific slice of a specific table. This recomputes both from the tables
+	// themselves, so the constants cannot drift away from the ladders they came out
+	// of — the failure mode being that somebody edits a ladder and the decay beside
+	// it silently keeps describing the old one.
+	std::vector<double> log2_harmonic;
+	std::vector<double> db;
+
+	// The slice is `kz_audio::LADDER_TAIL_FROM` to h24 — the upper six tabulated
+	// indices, which is the split `LADDER_INDEX`'s comment says the table was
+	// thinned on. An earlier version of this fitted "from each table's own
+	// maximum", which sounds equivalent and is not: the pipe ladder is flat to
+	// within 0.5 dB out to h8 so its argmax is h1, and that rule handed back the
+	// whole-range fit for the one ladder the change was about. This test failed on
+	// it, which is the only reason it is not still in the tree.
+	auto tail_fit = [&](const double *ladder) {
+		log2_harmonic.clear();
+		db.clear();
+		for (std::size_t index = 0; index < kz_audio::LADDER_POINTS; ++index) {
+			if (kz_audio::LADDER_INDEX[index] < kz_audio::LADDER_TAIL_FROM) {
+				continue;
+			}
+			log2_harmonic.push_back(std::log2(static_cast<double>(kz_audio::LADDER_INDEX[index])));
+			db.push_back(ladder[index]);
+		}
+		return fit_decay(log2_harmonic, db);
+	};
+
+	const double pipe_tail = tail_fit(kz_audio::PIPE_LADDER_DB);
+	const double onpipe_tail = tail_fit(kz_audio::ONPIPE_LADDER_DB);
+
+	MESSAGE("");
+	MESSAGE("pipe ladder tail fit " << pipe_tail << " against the constant "
+			<< kz_audio::DECAY_DB_PER_DOUBLING_PIPE_TAIL);
+	MESSAGE("on-pipe ladder tail fit " << onpipe_tail << " against the constant "
+			<< kz_audio::DECAY_DB_PER_DOUBLING_ONPIPE_TAIL);
+
+	CHECK(pipe_tail == doctest::Approx(kz_audio::DECAY_DB_PER_DOUBLING_PIPE_TAIL).epsilon(0.005));
+	CHECK(onpipe_tail == doctest::Approx(kz_audio::DECAY_DB_PER_DOUBLING_ONPIPE_TAIL).epsilon(0.005));
+
+	// The point of the whole change: the on-pipe ladder has been falling for two
+	// octaves by the time the table runs out, so an extrapolation past it must
+	// fall too. The whole-range fit does not — it is +1.04, because it is a line
+	// through a hump — and using it made every partial above h24 louder than the
+	// one below it.
+	MESSAGE("on-pipe whole-range fit is " << kz_audio::DECAY_DB_PER_DOUBLING_ONPIPE
+			<< " dB per doubling, which extrapolates in the wrong direction");
+	CHECK(onpipe_tail < 0.0);
+	CHECK(kz_audio::DECAY_DB_PER_DOUBLING_ONPIPE > 0.0); // the trap, kept visible
+
+	// And the realized stack agrees: h48 must sit below h24 on both ladders.
+	const double pipe_h24 = EngineSynth::ladder_db(kz_audio::PIPE_LADDER_DB, 24.0,
+			kz_audio::DECAY_DB_PER_DOUBLING_PIPE_TAIL);
+	const double pipe_h48 = EngineSynth::ladder_db(kz_audio::PIPE_LADDER_DB, 48.0,
+			kz_audio::DECAY_DB_PER_DOUBLING_PIPE_TAIL);
+	const double on_h24 = EngineSynth::ladder_db(kz_audio::ONPIPE_LADDER_DB, 24.0,
+			kz_audio::DECAY_DB_PER_DOUBLING_ONPIPE_TAIL);
+	const double on_h48 = EngineSynth::ladder_db(kz_audio::ONPIPE_LADDER_DB, 48.0,
+			kz_audio::DECAY_DB_PER_DOUBLING_ONPIPE_TAIL);
+	MESSAGE("pipe h24 " << pipe_h24 << " -> h48 " << pipe_h48
+			<< " dB;  on-pipe h24 " << on_h24 << " -> h48 " << on_h48);
+	CHECK(pipe_h48 < pipe_h24);
+	CHECK(on_h48 < on_h24);
+}
+
+TEST_CASE("the rpm level term is an attenuation and can never cost headroom") {
+	// `synth_tuning::RPM_LEVEL_RANGE_DB`'s comment makes a safety claim — that
+	// anchoring the level rise at peak power and applying it downward means the
+	// loudest output the synth can produce is exactly what it produced before the
+	// term existed. That claim is the reason this term did not need a new headroom
+	// budget, so it is asserted rather than trusted.
+	MESSAGE("");
+	MESSAGE("rpm level term, dB relative to peak power.");
+	char line[160];
+	const double RPMS[] = { 0.0, 500.0, 2000.0, 4000.0, 6000.0, 9000.0, 11000.0,
+		13000.0, 14000.0, 14800.0, 20000.0 };
+	const int COUNT = static_cast<int>(sizeof(RPMS) / sizeof(RPMS[0]));
+	double previous = -1e9;
+	for (int index = 0; index < COUNT; ++index) {
+		const double db = EngineSynth::rpm_level_db(RPMS[index]);
+		std::snprintf(line, sizeof(line), "  %8.0f rpm  %7.2f dB", RPMS[index], db);
+		MESSAGE(line);
+
+		// Never positive: the peak cannot move.
+		CHECK(db <= 0.0);
+		// Never past the declared range.
+		CHECK(db >= -kart::core::synth_tuning::RPM_LEVEL_RANGE_DB);
+		// Monotone non-decreasing, including through the clamp and through zero rpm,
+		// which is the argument that a rev sweep never gets quieter as it rises.
+		CHECK(db >= previous - 1e-12);
+		previous = db;
+	}
+
+	// Exactly zero at the anchor. `Approx(0).epsilon(0)` compares 0 < 0 and fails,
+	// so this is written as an absolute bound.
+	CHECK(std::fabs(EngineSynth::rpm_level_db(kart::core::kz::PEAK_POWER_RPM)) < 1e-12);
+
+	// The floor bites below the powerband and not inside it, which is what makes
+	// the clamp invisible to a driver.
+	CHECK(EngineSynth::rpm_level_db(kart::core::kz::POWERBAND_MIN_RPM) >
+			-kart::core::synth_tuning::RPM_LEVEL_RANGE_DB);
 }
 
 TEST_CASE("coming on the pipe changes the ladder and is not a volume knob") {

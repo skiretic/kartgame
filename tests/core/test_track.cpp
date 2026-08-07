@@ -802,3 +802,143 @@ TEST_CASE("pit stations with no side are rejected rather than silently ignored")
 	track.layouts[0].pit_side = SIDE_FULL;
 	CHECK(mentions(track.validate(1), "declares pit stations and no pit side"));
 }
+
+// A ring of short spans. `make_oval`'s spans are 100 m and 377 m, which is why
+// every hinted test above passes on it whatever `project` does with its window:
+// one span already overruns any window worth asking for. A real circuit is not
+// like that -- Valdirone's control points average 17 m -- and the defect below
+// only appears when a span is shorter than the window it is being accumulated
+// into. The fixture exists to make that case reachable in five seconds.
+namespace {
+
+constexpr double RING_RADIUS = 60.0;
+
+// The station spacing is deliberately uneven, and the first two spans are the
+// whole point. A uniform ring does **not** reproduce the defect: with 18.9 m
+// spans the old window accumulated 75.4 m and always reached past the hint, so a
+// carried walk kept up and a test built on it would have been green forever.
+//
+// The lock needs `covered < first_span + window`, where `covered` is the sum of
+// spans taken until it first reaches `2 * window`. A 40 m span followed by a 20 m
+// span reaches exactly 60 and stops -- so the window ends at `first + 60` while
+// `hint - window` is still inside that 40 m first span, and the window can
+// therefore never advance no matter how far the kart drives. Valdirone's control
+// points 10 and 11 are 38.861 m and 21.930 m and do exactly this, which is where
+// the measured 283.222 m sticking point comes from.
+//
+// Any station spacing closes this ring exactly: curvature is 1/R everywhere, so
+// the total turn is (1/R) * 2*pi*R = 2*pi whatever the spans are.
+std::vector<double> ring_spans(double length) {
+	std::vector<double> spans;
+	spans.push_back(40.0);
+	spans.push_back(20.0);
+	const int rest = 16;
+	for (int index = 0; index < rest; ++index) {
+		spans.push_back((length - 60.0) / rest);
+	}
+	return spans;
+}
+
+Track make_short_span_ring() {
+	Track track;
+	track.schema_version = 1;
+	track.name = "Short span ring";
+	track.grade = 1;
+	track.length_m = 2.0 * kart::core::PI * RING_RADIUS;
+
+	const std::vector<double> spans = ring_spans(track.length_m);
+	double station = 0.0;
+	for (std::size_t index = 0; index < spans.size(); ++index) {
+		ControlPoint point;
+		point.distance_m = station;
+		station += spans[index];
+		point.curvature = 1.0 / RING_RADIUS;
+		point.width_m = OVAL_WIDTH;
+		point.crown_pct = 0.0;
+		point.bank_pct = 5.0;
+		point.elevation_m = 0.0;
+		point.grade = 0.0;
+		point.segment = index;
+		track.points.push_back(point);
+	}
+	seat_positions(track);
+	return track;
+}
+
+// Signed separation between two stations the short way around the lap.
+double station_gap(const Track &track, double a, double b) {
+	double gap = std::fabs(track.wrap(a) - track.wrap(b));
+	if (gap > track.length_m * 0.5) {
+		gap = track.length_m - gap;
+	}
+	return gap;
+}
+
+} // namespace
+
+TEST_CASE("a carried hint keeps up with the kart") {
+	// The hint the solver actually passes is the *previous call's answer*, not the
+	// true station -- `SessionRunner` has no other source for it. Every hinted test
+	// above hands `project` the exact station instead, so none of them could see
+	// this: the window was accumulated for a fixed `2 * window` from the start of
+	// the span containing `hint - window`, which is generally behind the window's
+	// own start, and the window therefore ended before `hint + window`.
+	//
+	// Past the window's end every candidate clamps to a span end and reports the
+	// overshoot as its gap, so one of them always wins and the answer looks like a
+	// projection. The hint then stops advancing, and the error compounds.
+	//
+	// Found by `tools/verify/walk_probe.gd` on Valdirone, where a carried-hint walk
+	// of the lap ended 687.5 m wrong while the unhinted walk was exact. Because
+	// `SessionRunner` hints every tick, every lap of the shipped circuit was struck
+	// out `off_track` and no lap could ever be filed.
+	const Track track = make_short_span_ring();
+	// The fixture only reaches the defect if the window can lock. Assert the
+	// condition rather than trusting the span table above, because a change to it
+	// would otherwise quietly turn this into a test that cannot fail -- which is
+	// exactly what the uniform-span version of this fixture was.
+	const std::vector<double> spans = ring_spans(track.length_m);
+	double covered = 0.0;
+	for (std::size_t index = 0; covered < 60.0 && index < spans.size(); ++index) {
+		covered += spans[index];
+	}
+	REQUIRE(covered < spans[0] + 30.0);
+
+	double hint = -1.0;
+	double worst_station = 0.0;
+	double worst_lateral = 0.0;
+	const double offset = 2.0;
+	for (int step = 0; step <= 2000; ++step) {
+		const double station = track.length_m * step / 2000.0;
+		const Frame frame = track.sample(station);
+		double rx = 0.0;
+		double rz = 0.0;
+		Track::right_of(frame.heading_rad, rx, rz);
+		const Projection carried =
+				track.project(frame.x + rx * offset, frame.z + rz * offset, hint);
+		worst_station = std::fmax(worst_station, station_gap(track, carried.distance_m, station));
+		worst_lateral = std::fmax(worst_lateral, std::fabs(carried.lateral_m - offset));
+		hint = carried.distance_m;
+	}
+	// A millimeter, not a tolerance for a wrong window: the unhinted walk is exact
+	// and a correct window has to agree with it.
+	CHECK(worst_station < 1e-3);
+	CHECK(worst_lateral < 1e-3);
+}
+
+TEST_CASE("the hint's own window reaches a full window ahead of the hint") {
+	// The invariant behind the walk above, asserted directly so a future change to
+	// the accumulation is caught at its cause rather than 2000 steps downstream.
+	// A kart 30 m past its last projection must still be found, and it is found only
+	// if the window extends `window` beyond the hint.
+	const Track track = make_short_span_ring();
+	const double window = 30.0;
+	for (int step = 0; step < 200; ++step) {
+		const double hint = track.length_m * step / 200.0;
+		// Sit exactly at the far edge of what the window promises.
+		const double station = track.wrap(hint + window);
+		const Frame frame = track.sample(station);
+		const Projection found = track.project(frame.x, frame.z, hint, window);
+		CHECK(station_gap(track, found.distance_m, station) < 1e-6);
+	}
+}
