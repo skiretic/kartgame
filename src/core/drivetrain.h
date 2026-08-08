@@ -231,7 +231,32 @@ public:
 		bool request_up = input.shift_up;
 		bool request_down = input.shift_down;
 		if (assists.auto_shift) {
-			apply_auto_shift(input, request_up, request_down);
+			// **A manual request wins, and auto-shift stays on.** This used to pass
+			// `request_up`/`request_down` straight into `apply_auto_shift`, which
+			// writes both flags on every one of its paths -- so with `auto_shift`
+			// defaulting to **true**, a driver's shift was read off the pad, latched
+			// by `KartBody::request_shift_up`, and then overwritten and thrown away
+			// before the gearbox ever saw it. E/Q and Square/Cross did nothing at
+			// all on a fresh launch, on a shifter kart, with `control_hints.gd`
+			// printing both bindings on screen. That is the "advertised controls
+			// drift from the real ones" family, one level worse because the key is
+			// on the screen -- and it was found sideways, by an audio probe
+			// reporting zero gearshift strikes at seven speeds with the shift layer
+			// working perfectly.
+			//
+			// Anthony chose this policy over "a manual shift switches auto off":
+			// the buttons always do what the hints say, and G still turns the assist
+			// off outright.
+			//
+			// Safe to OR rather than to branch. `gearbox.step` refuses both flags
+			// while a shift is in flight and resolves up-and-down-together as "up
+			// wins", so a manual request surviving `apply_auto_shift`'s own shifting
+			// guard changes nothing -- it meets the same refusal one call later.
+			bool auto_up = false;
+			bool auto_down = false;
+			apply_auto_shift(input, auto_up, auto_down);
+			request_up = request_up || auto_up;
+			request_down = request_down || auto_down;
 		}
 
 		gearbox.step(dt, request_up, request_down);
