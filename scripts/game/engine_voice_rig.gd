@@ -262,7 +262,13 @@ static func attach_listener(kart: KartBody) -> AudioListener3D:
 		return null
 	var listener := AudioListener3D.new()
 	listener.name = "DriverEars"
-	listener.position = kart.driver_head_position()
+	# The cockpit camera's eye, not `driver_head_position()`. That method returns
+	# `chassis.h`'s head **mass lump**, which is where the driver's mass is carried
+	# for the yaw inertia and is not where he looks or hears from. Once #195 moved
+	# the cockpit eye onto KART_SPEC 60.1.4's sourced hard point, the two were
+	# **371 mm apart** -- and ADR-0039 measured 20.7 dB of level swing over listener
+	# range, so a third of a meter is not free. The ears go where the eyes are.
+	listener.position = CockpitCamera.EYE
 	kart.add_child(listener)
 	# Both, and this is the same class of trap as `autoplay` below. `make_current`
 	# on a node that is not yet in the tree does nothing, and a node parented during

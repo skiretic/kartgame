@@ -56,7 +56,21 @@ const ROLL_AT_PEAK_G := deg_to_rad(3.5)
 ## Smoothing half-lives, seconds. Position is followed harder than aim, because a
 ## camera that lags in position feels attached by elastic while one that lags in
 ## aim feels like a head turning.
-const POSITION_HALF_LIFE := 0.09
+##
+## **Position smoothing is off — zero means snap, and that is Anthony's call.**
+## It used to be 0.09 s, and a first-order smoother chasing `p(t)` settles at
+## `p - tau*v`, so the lag was a *function of speed*: tau = 0.1298 s put the camera
+## 3.40 m behind at rest and **8.45 m behind at 140 km/h**, measured, predicted to
+## 4.6%. The kart shrank **3.06x** across that range and ended up a sliver sitting
+## on the horizon line. That was the reason 140 km/h did not read as fast, and it
+## was not the fov response, which measures exact (#237 heals within a frame here
+## because this rig rewrites `fov` every `_process`).
+##
+## It is not a tuned-down lag. He asked for none: *"i'd rather not have camera lag
+## at all. it's very distracting and most games DO NOT use it."* Aim smoothing is
+## untouched — a rig that lags in aim reads as a head turning, which is the half
+## that was never the problem.
+const POSITION_HALF_LIFE := 0.0
 const AIM_HALF_LIFE := 0.16
 
 ## How close the aim point may come to the camera before `Vector3.UP` stops being
@@ -84,6 +98,29 @@ var camera: Camera3D
 var fov_trim_deg := 0.0
 var shake := 1.0
 
+## The six numbers that decide what this rig feels like, as fields rather than as
+## constants read straight out of `_process`.
+##
+## **Every one of them defaults to the constant directly above it and nothing about
+## the shipped rig moves.** They exist because #242's whole question — chase
+## distance, FOV response, the roll term, whether 140 km/h reads as fast — is a set
+## of judgements Anthony makes by looking, and until this there was no way to *show*
+## him an alternative: the still tools all park a fourth camera with `--eye/--look`
+## and never touch this rig at all, which is how it shipped for a milestone aimed
+## the wrong way round.
+##
+## `--chase-arm=5.0` and friends therefore put a proposal in the command line, which
+## is the rule every still in this project is held to — an image is described by the
+## command that made it. Read once in `_ready`, so a run that names none of them is
+## byte-identical to the run before this block existed, and
+## `tools/verify/camera_probe.gd` measures that rather than asserting it.
+var arm_length := ARM_LENGTH
+var arm_height := ARM_HEIGHT
+var position_half_life := POSITION_HALF_LIFE
+var look_ahead_seconds := LOOK_AHEAD_SECONDS
+var fov_static := FOV_STATIC
+var fov_at_speed := FOV_AT_SPEED
+
 var _target: KartBody
 var _aim := Vector3.ZERO
 var _previous_velocity := Vector3.ZERO
@@ -101,21 +138,40 @@ func apply_comfort(settings: Object) -> void:
 	fov_trim_deg = float(settings.get_field_of_view_deg())
 	shake = float(settings.get_shake())
 	if camera != null:
-		camera.fov = FOV_STATIC + fov_trim_deg
+		camera.fov = fov_static + fov_trim_deg
+
+
+## The command-line overrides. See the field block for why they exist and why the
+## shipped rig cannot move because of them.
+func apply_arguments(args: Dictionary) -> void:
+	arm_length = Cmdline.as_float(args, "chase-arm", ARM_LENGTH)
+	arm_height = Cmdline.as_float(args, "chase-height", ARM_HEIGHT)
+	# Clamped at zero, not at 0.0001. Zero is a real setting here and it means
+	# snap; `_decay` special-cases it rather than relying on `0.5 ** (dt/1e-4)`
+	# underflowing to zero, which is what a tiny floor would have been doing --
+	# true at 120 Hz and an accident, not a design.
+	position_half_life = maxf(
+		Cmdline.as_float(args, "chase-lag", POSITION_HALF_LIFE), 0.0)
+	look_ahead_seconds = Cmdline.as_float(
+		args, "chase-look-ahead", LOOK_AHEAD_SECONDS)
+	fov_static = Cmdline.as_float(args, "chase-fov-static", FOV_STATIC)
+	fov_at_speed = Cmdline.as_float(args, "chase-fov-speed", FOV_AT_SPEED)
 
 
 func _ready() -> void:
-	spring_length = ARM_LENGTH
+	apply_arguments(Cmdline.parse())
+
+	spring_length = arm_length
 	# The arm collides with the world so the camera never ends up inside a wall.
 	# Margin keeps the near plane out of the surface it stops against.
 	margin = 0.15
-	position = Vector3(0.0, ARM_HEIGHT, 0.0)
+	position = Vector3(0.0, arm_height, 0.0)
 
 	apply_comfort(comfort_settings())
 
 	camera = Camera3D.new()
 	camera.name = "ChaseCamera3D"
-	camera.fov = FOV_STATIC + fov_trim_deg
+	camera.fov = fov_static + fov_trim_deg
 	camera.near = 0.05
 	camera.far = 800.0
 	add_child(camera)
@@ -149,10 +205,10 @@ func _process(delta: float) -> void:
 		flat_forward = Vector3.FORWARD
 	flat_forward = flat_forward.normalized()
 
-	var anchor := _target.global_position + Vector3.UP * ARM_HEIGHT
-	global_position = global_position.lerp(anchor, _decay(POSITION_HALF_LIFE, delta))
+	var anchor := _target.global_position + Vector3.UP * arm_height
+	global_position = global_position.lerp(anchor, _decay(position_half_life, delta))
 
-	var look_at_point := _target.global_position + velocity * LOOK_AHEAD_SECONDS
+	var look_at_point := _target.global_position + velocity * look_ahead_seconds
 	_aim = _aim.lerp(look_at_point, _decay(AIM_HALF_LIFE, delta))
 
 	# The camera sits behind the kart's *heading*, not behind its velocity —
@@ -186,7 +242,7 @@ func _process(delta: float) -> void:
 	# wherever the player put the base. Scaling the endpoints instead would make a
 	# narrow FOV a flat one.
 	camera.fov = lerpf(
-		FOV_STATIC, FOV_AT_SPEED, clampf(speed / FOV_REFERENCE_SPEED, 0.0, 1.0)
+		fov_static, fov_at_speed, clampf(speed / FOV_REFERENCE_SPEED, 0.0, 1.0)
 	) + fov_trim_deg
 
 
@@ -269,4 +325,10 @@ static func comfort_settings() -> Object:
 ## the difference shows up as a camera that feels heavier on a slower machine.
 ## Expressed as a half-life instead, the result is identical at any frame rate.
 func _decay(half_life: float, delta: float) -> float:
+	# Zero half-life is "no smoothing", and it has to be answered here rather than
+	# by division: `delta / 0.0` is `inf` in GDScript, `pow(0.5, inf)` is 0.0 and
+	# the result would be right by luck. It is also a division by zero sitting in
+	# the per-frame path of every driving scene.
+	if half_life <= 0.0:
+		return 1.0
 	return 1.0 - pow(0.5, delta / half_life)
