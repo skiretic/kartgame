@@ -762,12 +762,25 @@ TypedArray<Dictionary> KartTrack::surface_meshes(double p_sagitta, double p_max_
 	}
 
 	// Kerbs and any other declared surface span, outboard of the road edge.
+	//
+	// **Every `SurfaceType` gets its own bucket, including grass.** The fall-through
+	// used to be asphalt for everything that was not a kerb or dirt, so a span
+	// authored as `"type": "grass"` - which `surface_from` accepts and the schema
+	// permits - was published under `SURFACE_ASPHALT` and became a strip of grip
+	// 1.00 with a grass name. Nothing on Valdirone reaches it: all eleven of its
+	// spans are kerbs, so this changes no triangle on any circuit that exists
+	// today. It is written out because the failure is silent - the band is built,
+	// the collider carries a `surface_type`, the raycast finds it, and the only
+	// wrong thing is the integer, which is the exact shape of every defect issue
+	// #241 went looking for.
 	for (const ct::SurfaceSpan &span : _track.surfaces) {
 		PackedVector3Array *target = &asphalt;
 		if (span.surface_type == kart::core::SURFACE_CURB) {
 			target = &kerb;
 		} else if (span.surface_type == kart::core::SURFACE_DIRT) {
 			target = &gravel;
+		} else if (span.surface_type == kart::core::SURFACE_GRASS) {
+			target = &grass;
 		}
 		const int hands[2] = { -1, 1 };
 		for (int which = 0; which < 2; ++which) {

@@ -65,35 +65,69 @@ public:
 	// tree order, so a scene is free to put this node wherever it reads best.
 	static constexpr int PHYSICS_PRIORITY = -1;
 
-	// The steering curve's exponent, and every one of the four numbers below is
-	// why it is 3.0. With `x^3`, against the measured 0.065-of-lock limit at
-	// 100 km/h and `project.godot`'s 0.15 deadzone:
+	// The steering curve's exponent, and every one of the numbers below is why it
+	// is 3.0. With `x^3`, against the measured 0.065-of-lock limit at 100 km/h.
 	//
-	//     stick   lock    inner deg  radius m  asked g   what it is
-	//      0.15   0.0034      0.08    713.57     0.11    the deadzone edge
-	//      0.40   0.0640      1.60     38.14     2.06    the 100 km/h limit
-	//      0.62   0.2383      5.96     10.61     7.41    Turn 2's 11 m hairpin
-	//      1.00   1.0000     25.00      2.80    28.06    full lock, still there
+	// **The curve's input is not the stick position.** It is what
+	// `Input::get_action_strength` returns, which for a joypad axis is the
+	// deadzone-rescaled value, and the two columns differ by 0.15 of travel at
+	// every row. Both are given here because writing one and meaning the other is
+	// the mistake this table used to make:
 	//
-	// The exponent is chosen from the second row: it puts the fastest corner on the
-	// track at 40% of stick travel, which is where a thumb has resolution, instead
-	// of at 6.5% where it has none. The first row is the fix — the deadzone edge
-	// asked 4.8 g before the curve and asks 0.11 g after it, so the smallest input
-	// a stick can make is now a corner instead of a slide. The third row is the
-	// check that it did not overshoot: a curve that made fast corners comfortable
-	// by pushing the hairpin past the end of the stick would have traded one
-	// unreachable corner for another.
+	//   raw stick  strength    lock    inner deg  radius m  asked g   what it is
+	//      0.1500   0.00000  0.00000     0.0000       inf     0.00   the deadzone edge
+	//      0.1569   0.00807  0.00000     0.0000       inf     0.00   one 8-bit code past it
+	//      0.1700   0.02353  0.00000     0.0000       inf     0.00   the last dead position
+	//      0.1711   0.02482  0.00003     0.0008         -        -   the first live one
+	//      0.2775   0.15000  0.00339     0.0847    713.57     0.11   strength 0.15
+	//      0.4220   0.32003  0.03278     0.8194         -     2.10   asks the 140 km/h limit
+	//      0.4900   0.40000  0.06400     1.5999     38.14     2.06   the 100 km/h limit
+	//      0.6770   0.62000  0.23832     5.9580     10.61     7.41   Turn 2's 11 m hairpin
+	//      1.0000   1.00000  1.00000    25.0000      2.80    28.06   full lock, still there
 	//
-	// Those five columns are printed by `tests/core/test_vehicle.cpp`'s
-	// steering-step case, which is where they were measured rather than computed in
-	// this comment.
+	// The exponent is chosen from the 100 km/h row: it puts the fastest corner on
+	// the track at 49% of stick travel, which is where a thumb has resolution,
+	// instead of at 17.7% where it has none. The hairpin row is the check that it
+	// did not overshoot — a curve that made fast corners comfortable by pushing the
+	// hairpin past the end of the stick would have traded one unreachable corner
+	// for another.
 	//
-	// `project.godot` sets the steer actions' deadzone to 0.15 and Godot's
-	// `get_action_strength` returns the raw value above the deadzone with no
-	// rescaling, so the smallest input a stick can produce is 0.15 of lock. Without
-	// the curve the entire followable range at 100 km/h is *inside the deadzone* —
-	// there is no stick position that produces a corner the kart can hold. That is
-	// not a difficult car, it is an unreachable one.
+	// The raw-stick, strength, lock and inner-degree columns are **measured** by
+	// `tools/verify/stick_probe.gd --case=lock`, which walks a synthesized joypad
+	// axis through the real InputMap and reads the angle back off `wheel_report()`
+	// in `valdirone.tscn`. The radius and asked-g columns come from
+	// `tests/core/test_vehicle.cpp`'s steering-step case and are left blank on the
+	// two rows that case does not print — the radius column is the Ackermann
+	// solve's answer and is **not** `wheelbase / tan(inner)`, so a value invented
+	// for a new row by that arithmetic would be wrong and would look right. The
+	// 0.4220 row's 2.10 g is ADR-0072's measured lateral ceiling by construction:
+	// that is the row's definition, `atan(1.050 / 73.411)`, on `steering.h`'s
+	// sourced 1.050 m wheelbase.
+	//
+	// ## What this comment said before, and why it mattered
+	//
+	// It said Godot's `get_action_strength` *"returns the raw value above the
+	// deadzone with no rescaling, so the smallest input a stick can produce is 0.15
+	// of lock"*. **Measured on 4.7.1, that is false.** A joypad axis is rescaled:
+	//
+	//     strength = clamp((|raw| - deadzone) / (1 - deadzone), 0, 1)
+	//
+	// fitted to a worst residual of 9.6e-8 across sixteen positions, while the
+	// pass-through model it claimed misses by 0.1488. So the deadzone edge does not
+	// deliver 0.15 of anything — it delivers **exactly zero**, and leaves zero as
+	// `(raw - 0.15)^3`. The first three rows above are all zero for a second reason
+	// on top of that: `replay_snap` quantizes steer to 32,767 codes, so any lock
+	// below half a code is rounded to nothing, and **no raw stick below 0.1711
+	// produces a single count of steering.** Measured: 0.1700 delivers 0.000000 deg
+	// and 0.1711 delivers 0.000763 deg, which is one code.
+	//
+	// The conclusion survives — 3.0 is still the right order of exponent and the
+	// constant does not move — but the argument it rested on was the wrong way
+	// round. Without the curve the smallest producible stick would ask 0.0081 of
+	// lock and 0.005 g, not 4.8 g; what the curve buys is resolution in the middle
+	// of the travel, not protection at the bottom of it. Issue #239, which was
+	// filed on the belief that the bottom of the travel was dangerous, and closed
+	// by measuring that it delivers nothing at all.
 	//
 	// Tunable because it is judged by feel and this is a first estimate from
 	// arithmetic. 1.0 restores the linear mapping exactly, which is what issue #40's
