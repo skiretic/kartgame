@@ -314,6 +314,57 @@ public:
 	// two runs is the jacking and nothing else.
 	bool jacking_enabled = true;
 
+	// **The split-grip negative control. Off, and not physical.**
+	//
+	// The two rear tires share one shaft, so they share one slip ratio — but they
+	// carry two different normal loads and stand on two different surfaces, so
+	// `tire.h` gives them two different longitudinal forces at that one slip. The
+	// difference acts at `REAR_HALF_TRACK` from the centerline and is therefore a
+	// yaw moment nobody asked for: on a plane it is small and symmetric, and with
+	// one rear wheel on grass at 0.18 and the other on asphalt at 1.00 it is the
+	// largest yaw input on the kart.
+	//
+	// Setting this true replaces each rear tire's longitudinal force with the
+	// pair's mean before it is applied. The total drive force and the axle's
+	// reaction torque are unchanged to the last bit — a mean of two numbers sums to
+	// the same total — so the *only* thing that changes is that yaw moment. A
+	// departure that survives it is not a split-longitudinal departure, and that is
+	// the whole claim it exists to let a probe make.
+	//
+	// ADR-0072 used exactly this control on the steering-response question. Issue
+	// #243 asks whether the two are one defect; a control that lives in one place
+	// is how that stays answerable.
+	bool rear_longitudinal_mean = false;
+
+	// **#243's mechanism control. 1.0 is today's behavior, bit for bit.**
+	//
+	// `rear_traction_torque` converges the rear axle onto `longitudinal_peak_slip`
+	// — see the long note at its definition, which argues correctly that merely
+	// *permitting* the peak leaves the axle at a marginal equilibrium and that the
+	// convergence term is what regulates. What it does not say is what holding the
+	// axle at that slip ratio costs the other axis.
+	//
+	// It costs everything. `tire.h`'s `normalized(peak_slip)` is **1.0 by
+	// definition**, so at the peak the longitudinal fraction of the friction
+	// ellipse is exactly 1, `demand` is `sqrt(1 + lateral^2) >= 1` whatever the
+	// slip angle is, and `evaluate` divides the lateral force by it. A rear axle
+	// sitting on its longitudinal peak has spent its whole circle on drive and has
+	// no lateral reserve at all — measured on a plane at 130 km/h: asphalt at 0.6
+	// throttle sits at slip ratio 0.010, grass at 0.4 throttle at 0.029, and grass
+	// at 0.6 throttle at 0.078 climbing past 0.139. The first two hold 0.1-0.6
+	// degrees of body slip and the third departs at 144.5.
+	//
+	// This scales the *target*, not the ceiling. The ceiling is untouched on
+	// purpose: `rear_traction_torque`'s own note records that turning the ceiling
+	// into a friction circle was tried, measured, and falsified — it moved a
+	// settled corner from 100.2 km/h on 45.5 m to 76.6 on 26.0 while changing the
+	// launch by nothing. That measurement is about the ceiling and says nothing
+	// about the target, and the two are separate terms.
+	//
+	// At 1.0 the arithmetic is `outer + 1.0 * peak * reference`, which is the same
+	// expression it always was, so the default cannot move a published figure.
+	double traction_slip_target_fraction = 1.0;
+
 	// World gravity, used **only** to predict the body forward between substeps.
 	// The solver never applies it; Godot does. It is here because a prediction
 	// that ignores gravity is wrong by 9.81 m/s^2 in the one direction the
@@ -753,6 +804,15 @@ private:
 		double tire_reaction_rear = 0.0;
 		double rear_rolling_torque = 0.0;
 
+		// Kept only for `rear_longitudinal_mean`. Two doubles and two vectors, so
+		// that the control is a fix-up after the loop rather than a branch inside
+		// it — the loop is the same arithmetic in the same order either way, which
+		// is what keeps the control's own run comparable to the run it is a control
+		// for. Indexed [0] = RL, [1] = RR.
+		double rear_longitudinal[2] = { 0.0, 0.0 };
+		Vec3 rear_roll_dir[2];
+		bool rear_applied[2] = { false, false };
+
 		for (int corner = 0; corner < CORNER_COUNT; ++corner) {
 			WheelTelemetry &wheel = telemetry_.wheel[corner];
 			wheel.normal_load = normal_load[corner];
@@ -890,6 +950,10 @@ private:
 					taper * (spin >= 0.0 ? 1.0 : -1.0);
 
 			if (rear) {
+				const int index = corner == CORNER_RL ? 0 : 1;
+				rear_longitudinal[index] = force.longitudinal;
+				rear_roll_dir[index] = roll_dir;
+				rear_applied[index] = true;
 				tire_reaction_rear += force.longitudinal * radius;
 				rear_rolling_torque += rolling_torque;
 				// Kept for the next substep's traction limit. See section 5.
@@ -898,6 +962,24 @@ private:
 				integrate_front_wheel(corner, force.longitudinal * radius, rolling_torque,
 						brake, h);
 			}
+		}
+
+		// 6b. The split-grip negative control. See `rear_longitudinal_mean`. It runs
+		//     only when both rear corners actually made a force this substep, because
+		//     the mean of a pair where one member does not exist is not a mean — a
+		//     kart with one rear wheel in the air would otherwise have half its drive
+		//     force teleported onto the airborne corner.
+		if (rear_longitudinal_mean && rear_applied[0] && rear_applied[1]) {
+			const double mean = 0.5 * (rear_longitudinal[0] + rear_longitudinal[1]);
+			for (int index = 0; index < 2; ++index) {
+				const int corner = index == 0 ? CORNER_RL : CORNER_RR;
+				const Vec3 correction = rear_roll_dir[index] * (mean - rear_longitudinal[index]);
+				out.force[corner] += correction;
+				telemetry_.wheel[corner].force += correction;
+			}
+			// `tire_reaction_rear` is deliberately not touched: the two corrections
+			// are equal and opposite by construction, so the sum the axle integrates
+			// is bit-identical and the drivetrain cannot tell the control is on.
 		}
 
 		// 7. **The solid rear axle.** One rotational degree of freedom, integrated
@@ -1104,8 +1186,12 @@ private:
 				: rear_forward_speed_[1];
 		const double reference =
 				std::fabs(outer) > SLIP_REFERENCE_SPEED ? std::fabs(outer) : SLIP_REFERENCE_SPEED;
+		// `traction_slip_target_fraction` is 1.0 by default, so this is the
+		// expression it has always been. See the field for why it exists.
 		const double target_speed =
-				(outer + tire_[CORNER_RL].longitudinal_peak_slip * reference) / radius;
+				(outer + traction_slip_target_fraction *
+								tire_[CORNER_RL].longitudinal_peak_slip * reference) /
+				radius;
 		(void)forward_speed;
 
 		const double inertia = axle_inertia_ + rear_reflected_;

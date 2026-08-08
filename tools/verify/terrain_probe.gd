@@ -263,6 +263,17 @@ const SWEEP_KMH := 130.0
 ## process of about a minute.
 const ZERO_SPACING := 25.0
 
+## The grip values `--case=gripsweep` walks.
+##
+## 0.05 to 1.00 in twentieths, which brackets every row in `src/core/surface.h` —
+## dirt 0.17, grass 0.18, curb 0.72, asphalt 1.00 — and puts at least three samples
+## between any two of them, so a boundary can be located rather than bracketed by
+## the table's own accidental spacing.
+const GRIP_SWEEP: PackedFloat32Array = [
+	0.05, 0.10, 0.15, 0.17, 0.18, 0.20, 0.25, 0.30, 0.35, 0.40, 0.45, 0.50,
+	0.55, 0.60, 0.65, 0.70, 0.72, 0.75, 0.80, 0.85, 0.90, 0.95, 1.00,
+]
+
 ## Where `--case=departure` traces by default.
 ##
 ## **Set from `--case=zero`'s own output**, not chosen. 300 m is on the -4.60%
@@ -427,7 +438,10 @@ const BREAK_CALIB_GRADE := 0.01
 
 
 func _build_flat() -> void:
-	var body := _slab("Ground", 0,
+	# `--surface=N` writes a different `surface_type` onto the plane and changes
+	# nothing else, which is #243's one-variable experiment: the same plane, the same
+	# spawn, the same input, and only the grip the table hands back is different.
+	var body := _slab("Ground", Cmdline.as_int(_args, "surface", 0),
 		Vector3(FLAT_SIZE, FLAT_THICKNESS, FLAT_SIZE),
 		Vector3(0.0, -FLAT_THICKNESS * 0.5, 0.0))
 	if _break == "calib":
@@ -793,8 +807,15 @@ func _plan() -> Array[Dictionary]:
 			# verge, and the whole case is void. It is deliberately the first row.
 			out.append(_paired("inside the line (control)", CASE_STATIONS["verge"], 130.0, 6, 360,
 				_input_hold(0.6, 0.0, 0.0), {"lateral": edge - 1.6, "no_zero_to_100": true}))
+			# **`--break=onroad` keeps the name and moves the placement inside the
+			# line.** #243's departure check would then pass having driven a lap of
+			# clean asphalt, and that is precisely the way a departure gate rots: the
+			# scenario stops reaching the thing it is named for and the number goes
+			# quiet. The straddle check beside it is what has to catch this.
 			out.append(_paired("right wheels on verge", CASE_STATIONS["verge"], 130.0, 6, 360,
-				_input_hold(0.6, 0.0, 0.0), {"lateral": edge - 0.30, "no_zero_to_100": true}))
+				_input_hold(0.6, 0.0, 0.0),
+				{"lateral": edge - (1.6 if _break == "onroad" else 0.30),
+					"no_zero_to_100": true}))
 			out.append(_paired("all four on verge", CASE_STATIONS["verge"], 130.0, 6, 360,
 				_input_hold(0.6, 0.0, 0.0), {"lateral": edge + 1.2, "no_zero_to_100": true}))
 			out.append(_paired("verge, then steer 0.05", CASE_STATIONS["verge"], 130.0, 6, 360,
@@ -863,6 +884,27 @@ func _plan() -> Array[Dictionary]:
 					Cmdline.as_float(_args, "throttle", 1.0), 0.0,
 					Cmdline.as_float(_args, "steer", 0.0)),
 				{"no_zero_to_100": true, "trace": true}))
+		"gripsweep":
+			# **#243's bisection.** A plane, zero steering, full throttle, and the
+			# only variable in the whole run is `surface_grip`. Agent C reported this
+			# from the four tabulated values and found it non-monotonic — asphalt 1.00
+			# fine, curb 0.72 departed, grass 0.18 fine — which no split-grip story
+			# predicts, and four points cannot say where the boundary is or how many
+			# there are. `grip_override` makes it continuous.
+			#
+			# Flat only. On the circuit the ground is a second variable and the whole
+			# point is that there is one.
+			if _ground != "flat":
+				return out
+			# 1.00 first, and it is not decoration: with the override at 1.00 the run
+			# must be bit-identical to the same run with the override off, or the
+			# lever is doing something besides handing back a number. `_verdict`
+			# checks the two hashes.
+			out.append(_spec("override off (asphalt)", FLAT_SPAWN, 130.0, 6, 360,
+				_input_hold(1.0, 0.0, 0.0), {"grip": -1.0, "no_zero_to_100": true}))
+			for step in GRIP_SWEEP:
+				out.append(_spec("grip %.3f" % step, FLAT_SPAWN, 130.0, 6, 360,
+					_input_hold(1.0, 0.0, 0.0), {"grip": step, "no_zero_to_100": true}))
 		"sweep":
 			# The #239 question. On flat ground the station is irrelevant — the input is
 			# a pure function of time and the plane is the same everywhere — so the flat
@@ -956,6 +998,26 @@ func _begin_run(spec: Dictionary) -> bool:
 	if _kart == null:
 		printerr("KartRig built no kart — is assets/generated/kart.glb present?")
 		return false
+
+	# #243's two levers, both debug instruments on `KartBody` and both off unless a
+	# run or the command line asks for them. `grip_override` replaces the surface
+	# table's four tabulated values with one continuous number so a sweep is
+	# possible at all; `rear_longitudinal_mean` is ADR-0072's split-grip control.
+	# Per-run first, command line second, so a case can build its own sweep.
+	var grip := float(spec.get("grip", Cmdline.as_float(_args, "grip", -1.0)))
+	_kart.grip_override = grip
+	_kart.rear_longitudinal_mean = bool(
+		spec.get("rear_mean", Cmdline.as_bool(_args, "rear-mean", false)))
+	_kart.traction_slip_target_fraction = float(
+		spec.get("slip_target", Cmdline.as_float(_args, "slip-target", 1.0)))
+	_measure["grip_override"] = grip
+	# Only for `--moments`' closure check. The four tire forces are supposed to be
+	# the whole of what acts on this body; if the chassis collider is also resting
+	# on the ground then Godot's own solver is a second, unaccounted actor and the
+	# closure arithmetic is measuring the wrong system.
+	if Cmdline.as_bool(_args, "moments", false):
+		_kart.contact_monitor = true
+		_kart.max_contacts_reported = 8
 
 	# **`input_driver` is what makes the scripted input reach the solver**, and
 	# `--break=input` is the control that proves it: with the Callable unset the body
@@ -1255,6 +1317,106 @@ func _trace(velocity: Vector3, basis: Basis) -> void:
 		min_load if min_load < 1e29 else -1.0, tilt,
 		"".join(surfaces), _kart.global_position.y,
 	])
+	if Cmdline.as_bool(_args, "moments", false):
+		_trace_moments(report, basis)
+
+
+## **#243's mechanism column.** The yaw moment each pair of tires is applying,
+## about the center of mass, in N m — and the rear pair's split into the part that
+## comes from the two longitudinal forces disagreeing and the part that comes from
+## the two lateral forces.
+##
+## A yaw rate is not a mechanism. A departure trace shows the kart rotating and
+## says nothing about which tire is rotating it, and the two candidate stories for
+## #243 — the split-grip longitudinal moment across the solid axle, and a rear
+## lateral force that has stopped restoring — make *opposite* predictions about
+## which of these columns carries the divergence. Reading them is the difference
+## between naming the mechanism and guessing it.
+##
+## `force` from `wheel_report()` is the tire force in **world** coordinates and
+## excludes the normal load, which is what makes this arithmetic honest: the yaw
+## moment of a vertical force about a vertical axis is zero anyway, so nothing has
+## to be subtracted out.
+func _trace_moments(report: Array, basis: Basis) -> void:
+	var com := _kart.to_global(_kart.center_of_mass)
+	var pair := [0.0, 0.0]
+	# The rear split, in the chassis frame: `long` is the moment from the two rear
+	# longitudinal forces differing, `lat` the moment from the two lateral forces.
+	var rear_long := [0.0, 0.0]
+	var rear_lat := [0.0, 0.0]
+	for corner in range(report.size()):
+		var wheel: Dictionary = report[corner]
+		var force: Vector3 = wheel["force"]
+		var arm: Vector3 = (wheel["point"] as Vector3) - com
+		var moment := arm.cross(force).dot(basis.y)
+		var rear := corner >= 2
+		pair[1 if rear else 0] += moment
+		if rear:
+			# Split the force onto the chassis axes first, then take each part's
+			# own moment. `-basis.z` is forward and `basis.x` is right (vec3.h).
+			var forward := -basis.z
+			var side := basis.x
+			var index := corner - 2
+			rear_long[index] = arm.cross(forward * force.dot(forward)).dot(basis.y)
+			rear_lat[index] = arm.cross(side * force.dot(side)).dot(basis.y)
+	# **The last two columns do not close, and that is unresolved.** Read them as an
+	# open question, not as a measurement: on a plane at grip 1.00 with the kart
+	# straight and its yaw rate dead constant at -0.2 deg/s, `net` sits at a steady
+	# +8.3 N m where `Izz*acc` is 0.0, and during a grass departure `net` reads +113
+	# against an `Izz*acc` of -47.5. Something is either missing from the sum or
+	# wrong in the arithmetic, and the obvious suspects are eliminated: the four
+	# normal loads sum to 1715.0 N against a 1716.2 N weight so the tires carry the
+	# whole kart, `get_colliding_bodies()` is empty so Godot's own contact solver is
+	# not a second actor, nothing writes `central_torque`, drag acts at the CoM, and
+	# a vertical force has no moment about a vertical axis. It is worth its own
+	# ticket; #243's conclusions rest on the `rear k` and `rear lat` columns below
+	# and on the sweeps, none of which need this arithmetic to be right.
+	#
+	# The closure check, and it is the reason this is worth printing at all: the
+	# four tire forces are the *only* yaw torque on this kart — the normal load is
+	# vertical and its moment about a vertical axis is zero, drag acts at the CoM,
+	# and nothing writes `central_torque`. So `net` must equal `Izz * yaw_accel`. If
+	# it does not, there is a yaw torque nobody has accounted for and every
+	# conclusion drawn off the columns to its left is worthless.
+	var net: float = pair[0] + pair[1]
+	var yaw: float = _kart.angular_velocity.dot(basis.y)
+	var previous_yaw := float(_measure.get("trace_yaw", yaw))
+	var elapsed := float(TRACE_INTERVAL) / float(Engine.physics_ticks_per_second)
+	var yaw_accel := (yaw - previous_yaw) / elapsed
+	_measure["trace_yaw"] = yaw
+	# Yaw inertia about the CoM, from the chassis lump table by way of the body the
+	# engine is actually integrating — `inertia` is what Godot will divide by.
+	var izz: float = _kart.inertia.y
+	var load_sum := 0.0
+	for wheel in report:
+		load_sum += float(wheel["load"])
+	if _tick <= TRACE_INTERVAL:
+		print("        com %s  inertia %s  mass %.2f  weight %.1f N" % [
+			_kart.center_of_mass, _kart.inertia, _kart.mass, _kart.mass * 9.80665])
+		print("        moments N m:  front    rear   rearL-long  rearR-long"
+			+ "  long split  rearL-lat  rearR-lat   lat sum      net   Izz*acc")
+	# **The mechanism columns.** The rear axle is one shaft and one slip ratio (#33),
+	# so `rear k` is the whole rear axle's state in one number, and `rear |lat|` is
+	# the lateral force the two rear tires are still making. #243's question is
+	# whether the rear tires stop resisting yaw, and those two columns answer it
+	# directly: a slip ratio past `tire.h`'s longitudinal peak of 0.108 with the
+	# lateral force collapsing is rear saturation, and nothing else looks like it.
+	var rear_k := 0.5 * (float(report[2]["slip_ratio"]) + float(report[3]["slip_ratio"]))
+	var rear_lateral := 0.0
+	var front_lateral := 0.0
+	for corner in range(report.size()):
+		var side := (report[corner]["force"] as Vector3).dot(basis.x)
+		if corner >= 2:
+			rear_lateral += side
+		else:
+			front_lateral += side
+	print("        sum load %.0f N  contacts %d   rear k %7.3f   rear lat %7.1f N"
+		% [load_sum, _kart.get_colliding_bodies().size(), rear_k, rear_lateral]
+		+ "   front lat %7.1f N" % front_lateral)
+	print("                     %8.1f %7.1f %11.1f %11.1f %11.1f %10.1f %10.1f %9.1f %8.1f %9.1f" % [
+		pair[0], pair[1], rear_long[0], rear_long[1], rear_long[0] + rear_long[1],
+		rear_lat[0], rear_lat[1], rear_lat[0] + rear_lat[1], net, izz * yaw_accel,
+	])
 
 
 ## `src/core/surface.h`'s `grip_for`, restated.
@@ -1499,6 +1661,7 @@ func _verdict() -> void:
 					grass_ticks += int((row["surface_ticks"] as Array)[2])
 				_check("a wheel was on the verge", grass_ticks > 0,
 					"%d wheel-ticks on surface_type 2" % grass_ticks)
+				_check_verge_departure()
 		"zero":
 			# **The #239 question, and the answer is a number rather than an opinion.**
 			# Agent B measured the kart spinning to 178.778 deg on Valdirone with
@@ -1540,6 +1703,8 @@ func _verdict() -> void:
 				% [zero_load_ticks, rad_to_deg(worst_on_road)])
 			print("    of body slip. So the state is reachable without a departure: it is a")
 			print("    symptom of the road's own relief, not a cause of anything.")
+		"gripsweep":
+			_check_gripsweep()
 		"step":
 			var vertical := 0.0
 			for row in _results:
@@ -1587,6 +1752,14 @@ func _break_fingerprint() -> bool:
 			_fingerprint = "the step was actually driven into"
 		"calib":
 			_fingerprint = "calibration reproduces drive.sh"
+		"onroad":
+			# #243. The sabotage puts the two-wheel row back inside the white line, so
+			# its departure check goes green having driven nothing but asphalt. The
+			# fingerprint is deliberately **not** the departure check — a control whose
+			# fingerprint is a check going *green* proves nothing, because green is
+			# also what a fixed kart looks like. It is the straddle check, which can
+			# only go red when the row stopped reaching the verge.
+			_fingerprint = "the two-wheel row reached the verge"
 		_:
 			_fingerprint = "(unknown mode)"
 			return false
@@ -1603,6 +1776,115 @@ func _break_fingerprint() -> bool:
 ## this file cannot hold a stale copy of a figure that moved — which is how
 ## `CLAUDE.md`'s own table came to say 139.8 km/h and 4.51 s when the build measures
 ## 140.1 and 4.38.
+## **#243's bisection, and the check that makes the lever trustworthy.**
+##
+## Two assertions, and the first one is the important one. `grip_override = 1.00`
+## has to produce a run **bit-identical** to the same run with the override off,
+## because `SURFACES[SURFACE_ASPHALT].grip` is 1.00 and the override is supposed to
+## replace a table lookup with a number and do nothing else. If those two state
+## hashes ever differ, the lever has a side effect and every row under it is
+## measuring the instrument. A tolerance would be the wrong shape here: the two
+## runs execute the same arithmetic on the same inputs, so the honest bar is
+## equality.
+##
+## The second is the finding. Departure against grip is a **hump**, not a step:
+## nothing above 0.35, worst at 0.17-0.20, and smaller again at 0.05 where the
+## forces themselves are too small to rotate the kart in the time available. That
+## shape is why four samples off `surface.h`'s own table looked like noise. The
+## check asserts the two ends — that high grip is quiet and that the middle is not
+## — so a future change that flattens the hump moves this line rather than passing
+## silently.
+func _check_gripsweep() -> void:
+	var baseline := ""
+	var unity := ""
+	var worst := 0.0
+	var worst_at := 0.0
+	var high_grip_worst := 0.0
+	for row in _results:
+		var name := String(row["name"])
+		var slip := float(row["max_body_slip"])
+		if name.begins_with("override off"):
+			baseline = String(row["hash_hex"])
+			continue
+		if name.begins_with("grip 1.000"):
+			unity = String(row["hash_hex"])
+		var grip := float(name.get_slice(" ", 1))
+		if slip > worst:
+			worst = slip
+			worst_at = grip
+		if grip >= 0.50:
+			high_grip_worst = maxf(high_grip_worst, slip)
+
+	_check("the grip lever at 1.00 is the asphalt run",
+		baseline != "" and baseline == unity,
+		"override off %s vs grip 1.000 %s" % [baseline, unity])
+	_check("high grip does not depart", high_grip_worst < DEPARTURE_RAD,
+		"worst body slip %.2f deg over grip >= 0.50 (departure is %.0f)" % [
+			rad_to_deg(high_grip_worst), rad_to_deg(DEPARTURE_RAD)])
+	# Not pass/fail: it is the row the ticket turns on, and it is red on the gate
+	# above rather than here.
+	print("    worst departure in the sweep: %.1f deg at grip %.3f -- the hump #243 is"
+		% [rad_to_deg(worst), worst_at])
+	print("    about. `--slip-target=0.5` is the control that removes it.")
+
+
+## **#243's gate.** Two wheels over the white line at 129 km/h must not spin the
+## kart, and until it stops doing so this check is RED on purpose.
+##
+## It is red the way `drive.sh` exits 1 on purpose for #137: the measurement is the
+## ticket's subject and hiding it behind a threshold nobody can fail would make the
+## whole case decorative. The number to watch is the body slip on the two-wheel row
+## — 179.5 deg with 11 airborne ticks when #243 was filed.
+##
+## The threshold is `DEPARTURE_RAD`, the same 30 degrees `--case=zero`,
+## `test_vehicle.cpp`, `tire_probe.gd` and `drive_probe.gd` all mean by "no longer
+## following the road". A kart that drops two wheels onto grass is *expected* to go
+## loose and lose a great deal of time; 30 degrees leaves it room to be loose and
+## still catches an end-for-end spin.
+##
+## The straddle check beside it is what stops this from being satisfiable by
+## accident. A run that quietly stayed on asphalt would pass the departure check
+## having tested nothing, which is exactly what `--break=onroad` does on purpose.
+func _check_verge_departure() -> void:
+	var straddle: Dictionary = {}
+	for row in _results:
+		if String(row["name"]).begins_with("right wheels on verge"):
+			straddle = row
+			break
+	if straddle.is_empty():
+		# `--case=verge` was run with a subset that does not contain the row, so
+		# there is nothing to assert. Recorded rather than silently skipped: a check
+		# that quietly does not run is the shape CLAUDE.md's `ClassDB.class_exists`
+		# trap has already cost this repo once.
+		_check("the two-wheel row was driven", false,
+			"no run named 'right wheels on verge' in this plan")
+		return
+
+	var census: Array = straddle["surface_ticks"]
+	var total := 0
+	for entry in census:
+		total += int(entry)
+	var grass := int(census[2])
+	var share := float(grass) / float(maxi(1, total))
+	# **"Both non-zero" was the first cut and `--break=onroad` walked straight
+	# through it.** Placed 1.6 m inside the line the kart still drifts far enough to
+	# collect 25 grass wheel-ticks against 1295 on asphalt — 1.9% — and a check
+	# spelled `grass > 0` called that a straddle and reported the sabotage as caught
+	# by nothing. A quarter is the bar because a kart genuinely holding two wheels
+	# over the edge is at 50% by construction and one that has left the road
+	# entirely is above that; the two-wheel row measures 93% today.
+	_check("the two-wheel row reached the verge", share >= 0.25,
+		"%d of %d wheel-ticks on the verge (%.1f%%, and under 25%% means the row never"
+			% [grass, total, share * 100.0] + " got there)")
+
+	var slip := float(straddle["max_body_slip"])
+	_check("two wheels on the verge did not spin the kart", slip < DEPARTURE_RAD,
+		"peak body slip %.1f deg, %d airborne tick(s), %.2f g vertical (departure is %.0f"
+			% [rad_to_deg(slip), int(straddle["max_air_ticks"]),
+				float(straddle["peak_vertical_g"]), rad_to_deg(DEPARTURE_RAD)]
+			+ " deg) -- issue #243, RED until it closes")
+
+
 func _check_calibrate() -> void:
 	var reference := Cmdline.as_string(_args, "reference", "")
 	if reference == "":

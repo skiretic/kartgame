@@ -268,6 +268,44 @@ public:
 	void set_peak_friction(double p_value);
 	double get_peak_friction() const;
 
+	// **Debug instrument, not a tunable.** Overrides the surface grip every wheel
+	// reports, whatever collider it hit, with one continuous number.
+	//
+	// Issue #243 needs a grip *sweep* and `surface_grip` is derived from
+	// `surface_type` through `src/core/surface.h`'s table, so GDScript can reach
+	// exactly four values — 1.00, 0.72, 0.18, 0.17 — and the one measurement the
+	// ticket turns on is whether departure is monotonic in grip *between* them. A
+	// probe cannot answer that from the four tabulated rows however it builds its
+	// colliders.
+	//
+	// Negative is off, which is the default and the only state anything but a probe
+	// should ever see. It multiplies nothing and models nothing: it replaces the
+	// table lookup after the raycast, so a run with it set to 1.00 is bit-identical
+	// to a run on asphalt. `terrain_probe.gd`'s sweep asserts exactly that.
+	void set_grip_override(double p_value);
+	double get_grip_override() const;
+
+	// **Debug instrument, not a tunable.** Replaces each rear tire's longitudinal
+	// force with the pair's mean before it is applied.
+	//
+	// ADR-0072's negative control, forwarded. The two rear tires are one shaft and
+	// one slip ratio (#33) but two normal loads and two surface grips, so they make
+	// two different longitudinal forces at the same slip — and the difference is a
+	// yaw moment about the CoM with a `REAR_HALF_TRACK` lever that nothing asked
+	// for. Averaging them removes exactly that moment and leaves the total drive
+	// force, so a departure that survives it is not a split-grip departure.
+	//
+	// Off by default. It is not physical: a real solid axle *does* make that
+	// moment. It exists so a measurement can subtract it.
+	void set_rear_longitudinal_mean(bool p_enabled);
+	bool is_rear_longitudinal_mean() const;
+
+	// #243's mechanism control, forwarded. 1.0 is today's behavior bit for bit;
+	// see `KartVehicle::traction_slip_target_fraction` for what it means and why
+	// the target rather than the ceiling is the term it scales.
+	void set_traction_slip_target_fraction(double p_value);
+	double get_traction_slip_target_fraction() const;
+
 	// Maximum steer angle at the inner front wheel, radians. `get_steer_lock()`
 	// below reads the same number and is the read-out the HUD uses; this is the
 	// writable half, added for the tuning registry.
@@ -520,6 +558,9 @@ private:
 	static constexpr double SCRUB_REFERENCE_SLIP_RAD = 0.20;
 
 	kart::core::KartVehicle vehicle_;
+
+	// See `set_grip_override`. Negative is off.
+	double grip_override_ = -1.0;
 
 	godot::NodePath engine_voice_path_;
 	godot::Ref<EngineVoiceStream> engine_voice_;

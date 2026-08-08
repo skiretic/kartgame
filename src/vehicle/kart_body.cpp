@@ -192,6 +192,25 @@ void KartBody::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "peak_friction"), "set_peak_friction",
 			"get_peak_friction");
 
+	ClassDB::bind_method(D_METHOD("set_grip_override", "value"), &KartBody::set_grip_override);
+	ClassDB::bind_method(D_METHOD("get_grip_override"), &KartBody::get_grip_override);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "grip_override"), "set_grip_override",
+			"get_grip_override");
+
+	ClassDB::bind_method(D_METHOD("set_rear_longitudinal_mean", "enabled"),
+			&KartBody::set_rear_longitudinal_mean);
+	ClassDB::bind_method(D_METHOD("is_rear_longitudinal_mean"),
+			&KartBody::is_rear_longitudinal_mean);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "rear_longitudinal_mean"),
+			"set_rear_longitudinal_mean", "is_rear_longitudinal_mean");
+
+	ClassDB::bind_method(D_METHOD("set_traction_slip_target_fraction", "value"),
+			&KartBody::set_traction_slip_target_fraction);
+	ClassDB::bind_method(D_METHOD("get_traction_slip_target_fraction"),
+			&KartBody::get_traction_slip_target_fraction);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "traction_slip_target_fraction"),
+			"set_traction_slip_target_fraction", "get_traction_slip_target_fraction");
+
 	ClassDB::bind_method(D_METHOD("set_max_lock", "radians"), &KartBody::set_max_lock);
 	ClassDB::bind_method(D_METHOD("get_max_lock"), &KartBody::get_max_lock);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "max_lock"), "set_max_lock", "get_max_lock");
@@ -520,7 +539,12 @@ void KartBody::query_ground(GroundQuery r_contacts[CORNER_COUNT]) {
 			stored.point = point;
 			stored.normal = normal;
 			stored.surface = surface;
-			stored.surface_grip = grip_for(surface);
+			// `grip_override_` is #243's sweep lever and is negative — off — in
+			// every build but a probe's. `stored.surface` is deliberately left
+			// honest: the override answers "what does grip 0.55 do", not "pretend
+			// this collider is something else", and a census that lied about which
+			// collider was under the wheel would make the sweep unreadable.
+			stored.surface_grip = grip_override_ >= 0.0 ? grip_override_ : grip_for(surface);
 			stored.valid = true;
 		} else {
 			// Convention 4, second half. A miss is two different things and they
@@ -912,6 +936,30 @@ void KartBody::set_peak_friction(double p_value) {
 
 double KartBody::get_peak_friction() const {
 	return vehicle_.tire(CORNER_FL).lateral.peak_friction;
+}
+
+void KartBody::set_grip_override(double p_value) {
+	grip_override_ = p_value;
+}
+
+double KartBody::get_grip_override() const {
+	return grip_override_;
+}
+
+void KartBody::set_rear_longitudinal_mean(bool p_enabled) {
+	vehicle_.rear_longitudinal_mean = p_enabled;
+}
+
+bool KartBody::is_rear_longitudinal_mean() const {
+	return vehicle_.rear_longitudinal_mean;
+}
+
+void KartBody::set_traction_slip_target_fraction(double p_value) {
+	vehicle_.traction_slip_target_fraction = p_value;
+}
+
+double KartBody::get_traction_slip_target_fraction() const {
+	return vehicle_.traction_slip_target_fraction;
 }
 
 void KartBody::set_max_lock(double p_radians) {

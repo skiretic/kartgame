@@ -55,7 +55,7 @@ FORWARDED=()
 # Every case, in the order they are meant to be read. `survey` and `place` first
 # because they are what the driving cases' station choices and placement rest on;
 # `calibrate` before anything that publishes a number.
-ALL_CASES=(survey place calibrate sixfour slope crossfall curb verge step zero sweep)
+ALL_CASES=(survey place calibrate sixfour slope crossfall curb verge step zero sweep gripsweep)
 
 # Which cases have a flat-ground pair. `survey` and `place` have no ground at all,
 # `calibrate` is flat by definition, and `step` is a property of the height field.
@@ -64,7 +64,7 @@ PAIRED_CASES=" sixfour slope crossfall curb verge zero sweep "
 # The five negative controls, and what each one sabotages. Each is run against the
 # case it can actually reach — a control run against a case that cannot see it is
 # not a control, it is a coincidence waiting to be reported as a catch.
-BREAK_MODES=(input flatground nocurb noterrain calib)
+BREAK_MODES=(input flatground nocurb noterrain calib onroad)
 break_case() {
 	case "$1" in
 		input)      echo "sixfour" ;;
@@ -72,6 +72,10 @@ break_case() {
 		nocurb)     echo "curb" ;;
 		noterrain)  echo "step" ;;
 		calib)      echo "calibrate" ;;
+		# #243. Moves the two-wheel verge row back inside the white line, so its
+		# departure check passes having driven asphalt. The straddle check is what
+		# has to catch it.
+		onroad)     echo "verge" ;;
 	esac
 }
 
@@ -193,6 +197,10 @@ for case_name in "${CASES[@]}"; do
 	case " $case_name " in
 		" survey "|" place ") GROUNDS=("circuit") ;;
 		" calibrate ")        GROUNDS=("flat") ;;
+		# #243's bisection is a plane by definition — its whole claim is that the
+		# only variable in the run is `surface_grip`, and the circuit is a second
+		# variable. Running it on the circuit would produce a table nobody could read.
+		" gripsweep ")        GROUNDS=("flat") ;;
 		*)
 			if [[ "$PAIRED_CASES" == *" $case_name "* ]]; then
 				# Flat first: it is the control, and reading the control before the

@@ -240,3 +240,68 @@ TEST_CASE("slide rises with slip where utilization falls") {
 	CHECK(sliding.utilization == doctest::Approx(0.612).epsilon(1e-2));
 	CHECK(utilization_when_locked < utilization_at_peak);
 }
+
+// **Issue #243.** A tire held at its longitudinal peak slip ratio has no lateral
+// reserve, and the arithmetic that makes that true is one line of `tire.h`.
+//
+// `normalized(peak_slip)` is 1.0 — that is the *definition* of the peak, found by
+// the bisection in `peak_slip()`. So `longitudinal_fraction` in `evaluate` is
+// exactly 1 there, `demand` is `sqrt(1 + lateral_fraction^2)`, and the lateral
+// force is divided by it for any slip angle at all. There is no slip angle small
+// enough to escape it.
+//
+// This is not a defect in `tire.h` — a tire really does have nothing left when it
+// is at its longitudinal limit, and the ellipse is doing its job. It is here
+// because `KartVehicle::rear_traction_torque` *converges the rear axle onto that
+// exact slip ratio* whenever the engine outruns the surface, and that is what
+// #243's departure is: the rear axle deliberately parked at zero lateral reserve
+// with the throttle open. Measured on a plane at 130 km/h, grip 0.18: throttle 0.4
+// holds slip ratio 0.029 and 0.6 degrees of body slip; throttle 0.6 reaches 0.078
+// climbing past 0.139 and spins to 144.5 degrees.
+//
+// The scaling is asserted rather than described so that a future change to the
+// combined-slip law has to move this test on its way past.
+TEST_CASE("a tire at its longitudinal peak keeps no lateral reserve") {
+	Tire tire;
+	const double load = 500.0;
+	const double peak = tire.longitudinal_peak_slip;
+	CHECK(peak > 0.0);
+
+	// The definition of the peak, restated as the thing `evaluate` relies on.
+	CHECK(tire.longitudinal.normalized(peak) == doctest::Approx(1.0).epsilon(1e-6));
+
+	// Pure lateral at a small slip angle: the ellipse does not bind, so the force
+	// is exactly what the lateral curve says.
+	const double angle = 0.02; // rad, well inside the linear range
+	TireSlip pure;
+	pure.normal_load = load;
+	pure.slip_angle = angle;
+	const TireForce alone = tire.evaluate(pure);
+	CHECK(alone.utilization < 1.0);
+
+	// The same slip angle with the wheel sitting on its longitudinal peak.
+	TireSlip combined = pure;
+	combined.slip_ratio = peak;
+	const TireForce at_peak = tire.evaluate(combined);
+
+	// `demand` is sqrt(1 + f^2) where f is the lateral fraction, so the lateral
+	// force comes back divided by that and by nothing else.
+	const double fraction = alone.lateral /
+			(tire.lateral.friction_at(load) * load);
+	const double expected = alone.lateral / std::sqrt(1.0 + fraction * fraction);
+	CHECK(at_peak.lateral == doctest::Approx(expected).epsilon(1e-9));
+	CHECK(at_peak.utilization >= 1.0);
+
+	// And the cost is not academic at large slip angles, which is where a kart
+	// that has started to rotate actually is. At 10 degrees the lateral force a
+	// tire on its longitudinal peak can still make is a fraction of what the same
+	// tire makes coasting, and that fraction is the yaw damping the kart has left.
+	TireSlip loose;
+	loose.normal_load = load;
+	loose.slip_angle = 10.0 * 3.14159265358979323846 / 180.0;
+	const double coasting = tire.evaluate(loose).lateral;
+	loose.slip_ratio = peak;
+	const double driven = tire.evaluate(loose).lateral;
+	CHECK(driven < coasting * 0.75);
+	CHECK(driven > 0.0);
+}
