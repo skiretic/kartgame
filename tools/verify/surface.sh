@@ -16,27 +16,34 @@
 #
 # ## THIS GATE EXITS 1 ON PURPOSE, and read the table rather than the exit code
 #
-# Exactly one check is red and it is a real defect this gate measured for the
-# first time, in the same shape as `drive.sh`'s standing failure:
+# Exactly one check is red, in the same shape as `drive.sh`'s standing failure:
 #
-#     every barrier stands on the ground it is built over
-#       282 of 681 barrier quads float more than 0.60 m above the ground beneath
-#       them, the worst by 3.184 m, and 76 are buried more than 1.00 m, the worst
-#       by 2.417 m.
+#     every barrier's head clears the ground around it
+#       103 quads have their head below the ground beside them.
 #
-# The cause is measured, not guessed. `KartTrack::surface_meshes` builds the
-# barrier on the road's **extrapolated cross-section** -- `_surface_point`
-# continues the crown and the bank outward from the centerline -- while the ground
-# out there is `TrackTerrain`'s height field, which is taken off the circuit but
-# not off that plane. Thirty meters out a 5% bank is 1.5 m of disagreement, and
-# T1's barrier stands 41.8 m from the centerline. So 41% of the barrier is a wall
-# a kart drives underneath, which is one of the two things issue #241 reports.
+# **This is a `TrackTerrain` defect, not a barrier defect.** The height field's
+# nearest-station flip builds a ridge through the barrier line where the lap
+# passes close to itself at two heights -- `track_terrain.gd` documents its own
+# 2.343 m irreducible pinned-to-pinned step -- and no closed-form wall height
+# reaches over it. 25 of the first 26 measured have the ground falling away again
+# outboard, so it is a ridge a kart can climb and drop off the far side of.
 #
-# It is NOT fixed here, on purpose. Seating the barrier on the terrain has to land
-# in `KartTrack` and in `tools/blender/tracklib/surfaces.py` in the same change or
-# the collider and the visible wall are in two different places -- ARCHITECTURE.md
-# §11's two consumers -- and the second of those is generated geometry whose gate
-# is a 28-minute `gentrack.sh --check`. Measured, reported, proposed.
+# ## The red this REPLACES, so a passing check is not read as a regression
+#
+# This gate used to report `every barrier stands on the ground it is built over`
+# as its standing failure -- 282 of 681 quads floating, worst 3.184 m. That was
+# issue #244 and it is **FIXED**: `KartTrack::surface_meshes` and
+# `tools/blender/tracklib/surfaces.py` now seat the barrier foot on
+# `elevation(station) - SHOULDER_DROP`, which is `TrackTerrain`'s own definition
+# of the ground inside the corridor and carries no crown or bank term, so the two
+# consumers agree by construction. 0 of 1,362 foot vertices stand proud; the worst
+# now sits 0.6045 m below the terrain. `circuit.sh --case=agree` measures both
+# halves and carries `--break=barrier-agree` and `--break=barrier-seat`.
+#
+# The head count moved 62 -> 103 when Valdirone's run-off was re-authored to mixed
+# gravel/grass (ADR-0073): T4's run-off was capped 26.0 -> 17.0 m, which moves that
+# barrier 9 m inboard into a slope, and the larger gravel beds repin the height
+# field. The re-author did not cause the defect; it exposed more of it.
 #
 # Everything else is green, and the headline is that the chain **works**: the grip
 # column reaches the tire and costs 70.3 m of stopping distance against asphalt's
@@ -161,8 +168,9 @@ echo
 if [ "$FAILED" -eq 0 ]; then
 	echo "surface: all cases green"
 else
-	echo "surface: at least one case is red. The KNOWN one is the barrier seating"
-	echo "defect described in this script's header -- 282 of 681 quads floating."
-	echo "Anything else is new."
+	echo "surface: at least one case is red. The KNOWN one is the terrain ridge"
+	echo "described in this script's header -- 103 barrier quads with their head"
+	echo "under a ridge the height field builds. The barrier SEATING defect this"
+	echo "line used to name is fixed (#244). Anything else is new."
 fi
 exit "$FAILED"

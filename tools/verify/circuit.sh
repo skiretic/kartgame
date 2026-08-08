@@ -21,7 +21,18 @@
 # must be refused for the thing they break. A validator with nothing proving it
 # can say no is a validator nobody has tested.
 #
+# --case=agree carries two more of its own, aimed at the barrier checks issue #244
+# added. They are run with --break=<mode> and the probe INVERTS its exit code under
+# it, so a break run that passes is the failure -- it means the check it targets
+# cannot fail. Catching it is not sufficient either: the verdict demands that the
+# measurement moved to the value that particular sabotage predicts, because a check
+# reporting "caught" off a pre-existing red it did not cause is not a check.
+#
 #     --case=schema|measure|agree|layouts|timing|pit|place|all
+#     --break=barrier-agree   moves the mesh's barrier rows 5 mm and leaves the
+#                             collider alone: a one-consumer regression
+#     --break=barrier-seat    lifts every barrier foot 1.5 m, which is through the
+#                             0.60 m of skirt margin Valdirone actually has
 
 set -uo pipefail
 

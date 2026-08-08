@@ -331,6 +331,13 @@ def write_manifest(track, strips, gltf_path: str, manifest_path: str) -> dict:
         # reproducible.
         "edges": edges,
         "pit_edges": pit_edges,
+        # The barrier's own rows, and they exist for the same reason the pit's do.
+        # `edges` samples the centerline's cross-section, which the barrier is not
+        # on - it stands at the outer edge of the run-off, up to 41.8 m out, where
+        # the road's extrapolated crown and bank had it floating 3.51 m over the
+        # ground with every one of `edges`' 55 stations still agreeing. Issue #244.
+        "barriers": surfaces.barrier_rows(
+            next((s for s in strips if s.name == "Barriers"), surfaces.Strip("", ""))),
     }
     os.makedirs(os.path.dirname(os.path.abspath(manifest_path)), exist_ok=True)
     with open(manifest_path, "w", encoding="utf-8") as handle:

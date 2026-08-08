@@ -28,6 +28,30 @@ namespace {
 // minimum is width spent on nothing.
 constexpr double VERGE_WIDTH_M = kart::core::circuit::VERGE_MIN_WIDTH_M;
 
+// --- the barrier's three numbers -------------------------------------------
+//
+// Issue #244. Duplicated in `tools/blender/tracklib/surfaces.py`, which builds the
+// same wall for the eye, and `BARRIER_SHOULDER_DROP` is duplicated a third time in
+// `scripts/track/track_terrain.gd` as `SHOULDER_DROP`, because that file is what
+// decides where the ground is. Three languages, one number, no way to share it;
+// `tools/verify/circuit.sh --case=agree` is what proves the three agree.
+
+// Meters above the seated base. **estimated** - Part I §8 grades barriers by type
+// and specifies their impact behaviour, not their height. Chosen to clear a kart's
+// centre of mass (0.23 m) by enough that a glancing hit is redirected.
+constexpr double BARRIER_HEIGHT_M = 1.0;
+
+// How far under the road's own elevation the barrier's base sits, meters.
+// `TrackTerrain::SHOULDER_DROP`, and it must stay the same number.
+constexpr double BARRIER_SHOULDER_DROP_M = 0.25;
+
+// How far the barrier reaches below its base, meters. The ground is a smoothed
+// height field with a documented 2.343 m irreducible step where the lap passes
+// close to itself at two heights, so the wall is driven into it rather than
+// balanced on it. Measured on Valdirone the worst foot still clears the terrain by
+// 0.60 m, and the gate fails when that margin reaches zero.
+constexpr double BARRIER_SKIRT_M = 3.0;
+
 // --- reading a Variant without trusting it ---------------------------------
 //
 // Godot's JSON parser hands back `Dictionary` and `Array` of `Variant`, and a
@@ -505,6 +529,24 @@ Vector3 KartTrack::_surface_point(const ct::Frame &p_frame, double p_lateral, do
 	return Vector3(p_frame.x + rx * p_lateral, y + p_lift, p_frame.z + rz * p_lateral);
 }
 
+Vector3 KartTrack::_barrier_base(const ct::Frame &p_frame, double p_lateral) const {
+	double rx = 0.0;
+	double rz = 0.0;
+	ct::Track::right_of(p_frame.heading_rad, rx, rz);
+	// The one line that is different from `_surface_point`, and it is the whole of
+	// issue #244: **no crown term and no bank term.** The cross-section formula is
+	// the road's, and the road ends; a barrier standing at the outer edge of a 42 m
+	// run-off is not on the road's plane, it is on `TrackTerrain`'s height field,
+	// which inside the circuit's corridor is `elevation(station) - SHOULDER_DROP`
+	// and has no lateral term at all. Extrapolating the bank out there put 344 of
+	// Valdirone's 681 barrier quads more than 0.60 m off the ground beneath them.
+	//
+	// x and z are unchanged: the cross-section never moved those.
+	return Vector3(p_frame.x + rx * p_lateral,
+			p_frame.elevation_m - BARRIER_SHOULDER_DROP_M,
+			p_frame.z + rz * p_lateral);
+}
+
 // --- furniture ---------------------------------------------------------------
 
 PackedFloat64Array KartTrack::checkpoints() const {
@@ -881,10 +923,27 @@ TypedArray<Dictionary> KartTrack::surface_meshes(double p_sagitta, double p_max_
 							Vector3(0.0, 1.0, 0.0));
 				}
 				const double limit = apron + corner.runoff.outfield_m;
-				const Vector3 foot_near = _surface_point(near, near_edge + hand * limit, 0.0);
-				const Vector3 foot_far = _surface_point(far, far_edge + hand * limit, 0.0);
-				const Vector3 head_near = foot_near + Vector3(0.0, 1.0, 0.0);
-				const Vector3 head_far = foot_far + Vector3(0.0, 1.0, 0.0);
+				// Seated on the terrain and not on the road's extrapolated
+				// cross-section. Issue #244: `_surface_point` continues the crown
+				// and the bank outward without limit, which is correct for the
+				// asphalt, the verge and the apron and wrong for anything standing
+				// 41.8 m out - at that distance a 5% bank is 2.09 m of extrapolation
+				// and the ground there is `TrackTerrain`'s height field, which
+				// inside the corridor is `elevation(station) - SHOULDER_DROP` with
+				// no lateral term at all. Measured before this changed: 344 of 681
+				// barrier quads had a gap of over 0.60 m under them, worst 3.51 m,
+				// and the kart drove under the wall.
+				//
+				// `_barrier_base` is that seated point. The foot is driven
+				// `BARRIER_SKIRT_M` into the ground so the height field's own
+				// residual cannot open a gap; the head is `BARRIER_HEIGHT_M` above
+				// the **base**, so the wall a driver meets is still 1.0 m tall.
+				const Vector3 base_near = _barrier_base(near, near_edge + hand * limit);
+				const Vector3 base_far = _barrier_base(far, far_edge + hand * limit);
+				const Vector3 foot_near = base_near - Vector3(0.0, BARRIER_SKIRT_M, 0.0);
+				const Vector3 foot_far = base_far - Vector3(0.0, BARRIER_SKIRT_M, 0.0);
+				const Vector3 head_near = base_near + Vector3(0.0, BARRIER_HEIGHT_M, 0.0);
+				const Vector3 head_far = base_far + Vector3(0.0, BARRIER_HEIGHT_M, 0.0);
 				double rx = 0.0;
 				double rz = 0.0;
 				ct::Track::right_of(near.heading_rad, rx, rz);

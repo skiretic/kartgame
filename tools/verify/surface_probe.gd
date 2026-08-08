@@ -167,6 +167,19 @@ const BARRIER_SPEED_MS := 25.0
 ## drives over rather than into.
 const BARRIER_MIN_HEIGHT_M := 0.5
 
+## The wall's height above its own seated base, meters — `BARRIER_HEIGHT_M` in
+## `src/track/kart_track.cpp` and `BARRIER_HEIGHT` in `tracklib/surfaces.py`, a
+## fourth copy of a number three languages already cannot share.
+##
+## It is needed here because issue #244 changed what the lowest vertex of a barrier
+## quad means. It used to be the base: the wall was 1.0 m tall and stood on the
+## road's extrapolated cross-section. It is now the bottom of a `BARRIER_SKIRT`
+## driven into the terrain, so `min(y)` is a point deliberately underground and
+## everything that read it as "where the wall meets the ground" reads 3 m low —
+## which spawned this probe's own strike kart under the terrain and sent it 87.74 m
+## through the wall. The base is `max(y) - BARRIER_HEIGHT_M`.
+const BARRIER_HEIGHT_M := 1.0
+
 ## How much the four surfaces have to differ before the grip column can be said to
 ## reach the tire at all. Grass is 0.18 of asphalt, so a working chain separates
 ## the stopping distances by more than a factor of two; a broken one separates
@@ -950,9 +963,12 @@ func _aim_at_barrier() -> bool:
 	var normal := (b - a).cross(c - a).normalized()
 	normal.y = 0.0
 	normal = normal.normalized()
-	var foot_y: float = minf(minf(a.y, b.y), c.y)
+	# The **base**, not the lowest vertex. Since issue #244 the lowest vertex is the
+	# bottom of a skirt driven into the terrain, so aiming the kart at it launched
+	# it from 3 m underground and it went 87.74 m through a wall that was working.
+	var base_y: float = maxf(maxf(a.y, b.y), c.y) - BARRIER_HEIGHT_M
 	var centre := (a + b + c) / 3.0
-	centre.y = foot_y
+	centre.y = base_y
 
 	# Which way is "into" the wall? The circuit's centerline at the nearest station
 	# is inboard by construction, so the wall's inward normal is the one that points
@@ -1019,8 +1035,8 @@ func _aim_at_barrier() -> bool:
 	_say("")
 	_say("  barrier chosen at %.1f, %.1f, %.1f, inward normal %.2f, %.2f, %.2f" % [
 		centre.x, centre.y, centre.z, normal.x, normal.y, normal.z])
-	_say("  barrier foot y %.3f, ground under it %s at y %.3f (gap %+.3f m)" % [
-		foot_y, ground_name, ground_y, foot_y - ground_y])
+	_say("  barrier base y %.3f, ground under it %s at y %.3f (gap %+.3f m)" % [
+		base_y, ground_name, ground_y, base_y - ground_y])
 	_say("  kart launched from %.1f m at %.1f m/s" % [BARRIER_STANDOFF_M, BARRIER_SPEED_MS])
 
 	_census_barrier_feet(faces, space)
@@ -1037,8 +1053,16 @@ func _aim_at_barrier() -> bool:
 ## bank is 1.5 m of disagreement, and the two are not obliged to meet.
 ##
 ## A wall whose foot floats above the ground is a wall the kart drives **under**
-## once the gap clears the chassis box, and a wall buried deeper than its own 1.0 m
-## height is not in the world at all. Both are "nothing happened".
+## once the gap clears the chassis box, and a wall whose *head* is under the ground
+## is not in the world at all. Both are "nothing happened".
+##
+## The two are measured off different vertices and that is the whole of #244's
+## effect on this census. The wall is no longer a 1.0 m quad standing on its own
+## base: the base is seated on the terrain and the geometry runs `BARRIER_SKIRT`
+## below it and `BARRIER_HEIGHT` above. So "is there a gap under the wall" is a
+## question about `min(y)` — which is now supposed to be underground, and the check
+## is that it *is* — and "is the wall reachable" is a question about `max(y)`. The
+## old census asked both of `min(y)` and would call the fixed wall 681 times buried.
 func _census_barrier_feet(faces: PackedVector3Array, space: PhysicsDirectSpaceState3D) -> void:
 	var floating := 0
 	var buried := 0
@@ -1054,9 +1078,10 @@ func _census_barrier_feet(faces: PackedVector3Array, space: PhysicsDirectSpaceSt
 		var b := faces[index + 1]
 		var c := faces[index + 2]
 		var foot_y: float = minf(minf(a.y, b.y), c.y)
+		var head_y: float = maxf(maxf(a.y, b.y), c.y)
 		var mid := (a + b + c) / 3.0
 		var query := PhysicsRayQueryParameters3D.create(
-			Vector3(mid.x, foot_y + 25.0, mid.z), Vector3(mid.x, foot_y - 25.0, mid.z))
+			Vector3(mid.x, head_y + 25.0, mid.z), Vector3(mid.x, foot_y - 25.0, mid.z))
 		# The wall itself is vertical, so a vertical ray at its own midpoint can
 		# still clip it. Excluded by asking for the ground bodies only would need a
 		# layer; instead the hit is taken and the barrier's own surface is skipped
@@ -1065,17 +1090,21 @@ func _census_barrier_feet(faces: PackedVector3Array, space: PhysicsDirectSpaceSt
 		if hit.is_empty() or String(hit["collider"].name) == "Barriers":
 			missing += 1
 		else:
-			var gap: float = foot_y - float(hit["position"].y)
+			var ground: float = float(hit["position"].y)
+			var gap: float = foot_y - ground
 			worst_high = maxf(worst_high, gap)
 			worst_low = minf(worst_low, gap)
 			sampled += 1
-			# The chassis box's underside sits at 0.035 m and its roof at about
-			# 0.6 m (`kart_rig.gd`), so a foot more than 0.60 m up is a wall the box
-			# passes beneath. A foot more than the wall's own 1.0 m height below
-			# ground is a wall entirely underground.
-			if gap > 0.60:
+			# Any part of the foot above the ground is a gap under the wall, and the
+			# skirt exists so there is never one — zero is the threshold, not 0.60,
+			# because the skirt makes it reachable. The chassis box's underside sits
+			# at 0.035 m, so 0.60 was the old figure for "the box passes beneath".
+			if gap > 0.0:
 				floating += 1
-			elif gap < -1.0:
+			# And the wall has to be *reachable*: the head under the ground is a
+			# barrier that is not in the world, which is the other half of the same
+			# sentence and was never measured because both halves read `min(y)`.
+			if head_y < ground:
 				buried += 1
 		index += 6
 
@@ -1083,16 +1112,31 @@ func _census_barrier_feet(faces: PackedVector3Array, space: PhysicsDirectSpaceSt
 	_say("  barrier foot against the ground beneath it, all %d quads" % (sampled + missing))
 	_say("  %-34s %10.3f m" % ["highest foot above ground", worst_high])
 	_say("  %-34s %10.3f m" % ["deepest foot below ground", worst_low])
-	_say("  %-34s %10d" % ["quads floating over 0.60 m", floating])
-	_say("  %-34s %10d" % ["quads buried over 1.00 m", buried])
+	_say("  %-34s %10d" % ["quads with a gap under them", floating])
+	_say("  %-34s %10d" % ["quads with their head buried", buried])
 	_say("  %-34s %10d" % ["quads with no ground found", missing])
-	_check("every barrier stands on the ground it is built over",
-			floating == 0 and buried == 0 and missing == 0,
-			"%d floating, %d buried, %d with no ground — a wall the kart passes under "
-					% [floating, buried, missing]
-					+ "or over is a barrier that is not there")
+	# Two checks and not one, because after issue #244 they have two different
+	# causes and merging them hides which is which. The gap is the barrier's own
+	# problem and is what #244 fixed. The buried head is the *terrain's*: where the
+	# lap passes close to itself the nearest-station answer flips and the height
+	# field pins a grid vertex to the neighbouring section's elevation, which
+	# `track_terrain.gd`'s own docstring records as an irreducible 2.343 m step. No
+	# closed-form wall height reaches over that, and 25 of the 26 have the ground
+	# falling away again outboard — a ridge a kart can climb and drop off the far
+	# side of. That is a terrain defect this measurement found and cannot fix.
+	_check("no barrier has a gap under it",
+			floating == 0 and missing == 0,
+			"%d with a gap under them, %d with no ground — a wall the kart passes "
+					% [floating, missing]
+					+ "under is a barrier that is not there")
+	_check("every barrier's head clears the ground around it",
+			buried == 0,
+			"%d quads have their head below the ground beside them; the height field "
+					% buried
+					+ "builds a ridge through the barrier line where the lap passes "
+					+ "close to itself, and the wall cannot be seen over it")
 	if floating > 0 or buried > 0 or missing > 0:
-		_fingerprints.append("feet: %d floating, %d buried, %d groundless" % [
+		_fingerprints.append("feet: %d gapped, %d head-buried, %d groundless" % [
 			floating, buried, missing])
 
 

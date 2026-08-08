@@ -150,6 +150,11 @@ private:
 	godot::Dictionary _frame_to_dictionary(const kart::core::track::Frame &p_frame) const;
 	godot::Vector3 _surface_point(const kart::core::track::Frame &p_frame, double p_lateral,
 			double p_lift) const;
+	// Where a barrier stands: the cross-section's x and z, but the road's own
+	// centerline elevation minus the terrain's shoulder drop for y. Issue #244 -
+	// see the definition for why this is not `_surface_point`.
+	godot::Vector3 _barrier_base(const kart::core::track::Frame &p_frame,
+			double p_lateral) const;
 	double _ramp(const kart::core::track::SurfaceSpan &p_span, double p_distance) const;
 };
 

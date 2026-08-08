@@ -53,12 +53,38 @@ VERGE_WIDTH = 1.80
 #: grass, it is the top of something buried.
 KERB_DEPTH = 0.15
 
-#: Barrier height, meters. Not sourced: Part I §8 grades barriers by *type* and
-#: specifies their impact behaviour, not their height. 1.0 m is chosen to be above
-#: a kart's centre of mass (0.23 m) by enough that a glancing hit is redirected
-#: rather than launched, and it is recorded here rather than in
-#: `circuit_reference.h` because nothing but this mesh reads it.
+#: Barrier height, meters, measured up from the barrier's seated base. **estimated**
+#: -- Part I §8 grades barriers by *type* and specifies their impact behaviour, not
+#: their height. 1.0 m is chosen to be above a kart's centre of mass (0.23 m) by
+#: enough that a glancing hit is redirected rather than launched.
 BARRIER_HEIGHT = 1.0
+
+#: How far under the road's own elevation the barrier's base sits, meters.
+#:
+#: This is `TrackTerrain.SHOULDER_DROP` and it has to be the same number, which is
+#: why it is named rather than folded into an offset. `src/track/kart_track.cpp`
+#: carries a third copy for the collider: three files, one constant, no way to
+#: share it across GDScript, C++ and Python. `circuit.sh --case=agree` is what
+#: proves the three agree.
+BARRIER_SHOULDER_DROP = 0.25
+
+#: How far the barrier reaches **below** its seated base, meters. Issue #244.
+#:
+#: A barrier whose foot is a curve and whose ground is a smoothed height field
+#: cannot be flush: `track_terrain.gd`'s own docstring records an irreducible
+#: **2.343 m** pinned-to-pinned step where the lap passes close to itself at two
+#: different heights, and nothing the barrier does changes that. So the wall is
+#: driven into the ground rather than balanced on it, far enough that the residual
+#: cannot open a gap under it. 3.0 m is that 2.343 plus `BARRIER_SHOULDER_DROP`
+#: plus margin; **measured** on Valdirone the worst foot still clears the terrain
+#: by 0.60 m, and `circuit.sh --case=agree` fails the moment that margin reaches
+#: zero rather than leaving the constant to be trusted.
+BARRIER_SKIRT = 3.0
+
+#: How often the manifest samples the barrier for `--case=agree`, in quads. The
+#: barrier is 681 quads on Valdirone and a committed sidecar wants tens of rows,
+#: not hundreds; every 7th quad is 98 rows and lands on all eight corners.
+BARRIER_MANIFEST_STRIDE = 7
 
 
 def to_blender(point: tuple[float, float, float]) -> tuple[float, float, float]:
@@ -350,6 +376,39 @@ def build_verge(track, line, rows: int) -> Strip:
     return strip
 
 
+def barrier_base(frame, lateral: float) -> tuple[float, float, float]:
+    """Where a barrier stands, in Godot's frame. Issue #244.
+
+    **Not** `frame.surface_point(lateral)`, and that difference is the whole bug.
+    `surface_point` continues the road's crown and bank outward without limit:
+
+        y(u) = elevation - (crown/100)|u| - (bank/100)u
+
+    which is right for the asphalt, right for the verge, right for the apron - and
+    wrong for anything standing at the outer edge of a 42 m run-off, because at
+    that distance a 5% bank is 2.09 m of extrapolation and the ground out there is
+    not the road's plane. It is `TrackTerrain`'s height field, which inside the
+    circuit's corridor is
+
+        h(station) = elevation(station) - SHOULDER_DROP
+
+    with no lateral term at all. Measured before this changed: 344 of Valdirone's
+    681 barrier quads had a gap of more than 0.60 m under them, worst 3.51 m, and
+    a kart drove under the wall. Seated this way the mean disagreement against the
+    terrain falls from 1.309 m to 0.096 m, and `BARRIER_SKIRT` covers what is
+    left - which is not a tolerance to be tightened but the height field's own
+    ambiguity where the lap passes over itself.
+
+    The x and z are unchanged: the cross-section never moved them, only y.
+    """
+    rx, rz = frame.right()
+    return (
+        frame.x + rx * lateral,
+        frame.elevation_m - BARRIER_SHOULDER_DROP,
+        frame.z + rz * lateral,
+    )
+
+
 def _runoff_window(corner) -> tuple[float, float]:
     # The run-off covers the corner plus a lead-in and a lead-out: a kart leaves
     # the road under braking, before the turn-in, more often than it leaves it at
@@ -432,10 +491,18 @@ def build_runoff(track, line, rows: int) -> tuple[Strip, Strip, Strip]:
                         ],
                     )
                 limit = apron_m + outfield_m
-                foot_near = near.surface_point(near_edge + hand * limit)
-                foot_far = far.surface_point(far_edge + hand * limit)
-                head_near = (foot_near[0], foot_near[1] + BARRIER_HEIGHT, foot_near[2])
-                head_far = (foot_far[0], foot_far[1] + BARRIER_HEIGHT, foot_far[2])
+                # Seated on the terrain rather than on the road's extrapolated
+                # cross-section - issue #244, and `barrier_base` carries the whole
+                # argument. The foot is driven `BARRIER_SKIRT` into the ground so
+                # the height field's own residual cannot open a gap under it, and
+                # the head is `BARRIER_HEIGHT` above the *base*, not above the
+                # foot, so the wall the driver sees is still 1.0 m tall.
+                base_near = barrier_base(near, near_edge + hand * limit)
+                base_far = barrier_base(far, far_edge + hand * limit)
+                foot_near = (base_near[0], base_near[1] - BARRIER_SKIRT, base_near[2])
+                foot_far = (base_far[0], base_far[1] - BARRIER_SKIRT, base_far[2])
+                head_near = (base_near[0], base_near[1] + BARRIER_HEIGHT, base_near[2])
+                head_far = (base_far[0], base_far[1] + BARRIER_HEIGHT, base_far[2])
                 barrier.quad(
                     (foot_near, head_near, head_far, foot_far),
                     [
@@ -452,6 +519,36 @@ def build_runoff(track, line, rows: int) -> tuple[Strip, Strip, Strip]:
                     ],
                 )
     return apron, gravel, barrier
+
+
+def barrier_rows(barrier: Strip, stride: int = BARRIER_MANIFEST_STRIDE) -> list[dict]:
+    """The manifest's barrier cross-check rows, read off the built strip.
+
+    Read off the strip and **not** rebuilt from the track, deliberately. A second
+    walk of the corner list would be a third implementation that could agree with
+    the schema while the mesh disagreed with both - which is precisely the failure
+    `--case=agree` exists to catch, reintroduced inside the check itself. Quad `i`
+    owns vertices `4i .. 4i+3` in the order `(foot_near, head_near, head_far,
+    foot_far)`, so the rows are the mesh, sampled.
+
+    Back in Godot's frame: `to_blender` is `(x, -z, y)`, so its inverse is
+    `(bx, bz, -by)`. The two conversions are inverse by construction and this is
+    the third place that matters - the module docstring's argument applies.
+    """
+    out = []
+    quads = len(barrier.vertices) // 4
+    for index in range(0, quads, max(1, stride)):
+        base = index * 4
+        foot = barrier.vertices[base]
+        head = barrier.vertices[base + 1]
+        out.append(
+            {
+                "distance_m": round(barrier.uvs[base][1], 6),
+                "foot": [round(v, 6) for v in (foot[0], foot[2], -foot[1])],
+                "head": [round(v, 6) for v in (head[0], head[2], -head[1])],
+            }
+        )
+    return out
 
 
 def build_pit(track, rows: int, max_spacing: float) -> Strip:

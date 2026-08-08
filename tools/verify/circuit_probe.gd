@@ -14,7 +14,9 @@ extends SceneTree
 ##                      published figures, recomputed rather than restated
 ##   --case=agree       the C++ collider against `gentrack.py`'s manifest — the
 ##                      "what you see and what you collide with cannot drift
-##                      apart" claim, as a number
+##                      apart" claim, as a number. Road edges **and barriers**;
+##                      it was road edges only, which is how issue #244's hole
+##                      under the wall lived through every run of this gate
 ##   --case=layouts     the reverse layout: stations, hands, grid, furniture
 ##   --case=timing      the authored sector marks and checkpoints, through the
 ##                      timer the session actually runs. Issue #180
@@ -24,6 +26,9 @@ extends SceneTree
 ##   --case=place       put the kart down at forty stations and read the surface
 ##                      under all four wheels. Needs the scene and the kart mesh
 ##   --track=res://...  which circuit
+##   --break=<mode>     sabotage one of `--case=agree`'s barrier checks. The exit
+##                      code is INVERTED: a break run that passes is the failure.
+##                      barrier-agree | barrier-seat
 ##
 ## ## Why the negative control is the first case and not the last
 ##
@@ -54,6 +59,10 @@ const SCENE_PATH := "res://scenes/game/valdirone.tscn"
 ## suspension to stop ringing and short enough that forty placements are quick.
 const PLACEMENT_COUNT := 40
 const SETTLE_TICKS := 120
+
+## The sabotages `--break` can perform. Both aim at `--case=agree`'s barrier half,
+## which is the half that did not exist when issue #244 shipped.
+const BREAK_MODES := ["barrier-agree", "barrier-seat"]
 
 ## The design's own published figures, from `docs/circuits/valdirone_nuova.json`'s
 ## `measured` block. Restated here **as the thing being checked**, not as the
@@ -102,6 +111,14 @@ var _track_path := DEFAULT_TRACK
 var _failures := 0
 var _track: KartTrack
 
+## `--break=<mode>`: a deliberate sabotage that the gate must catch. The exit code
+## is INVERTED under it — a break run that *passes* is the failure, because it
+## means the check it targets cannot fail. `_break_caught` is the second half:
+## catching it is not enough, the measurement has to carry the saboteur's own
+## fingerprint, which is what `_break_verdict` demands.
+var _break := ""
+var _break_caught := false
+
 var _root: Node3D
 var _kart: KartBody
 var _placements: Array[Dictionary] = []
@@ -115,6 +132,20 @@ func _initialize() -> void:
 	var args := Cmdline.parse()
 	_case = Cmdline.as_string(args, "case", "all")
 	_track_path = Cmdline.as_string(args, "track", DEFAULT_TRACK)
+	for name in _case.split(",", false):
+		if name != "all" and name not in CASES:
+			printerr("unknown --case=%s; the cases are %s" % [name, ", ".join(CASES)])
+			quit(1)
+			return
+	_break = Cmdline.as_string(args, "break", "")
+	if _break != "" and _break not in BREAK_MODES:
+		printerr("unknown --break=%s; the modes are %s" % [_break, ", ".join(BREAK_MODES)])
+		quit(1)
+		return
+	if _break != "":
+		# A sabotage aimed at the barrier checks proves nothing about the pit or the
+		# timer, and every unrelated red would be counted as "caught".
+		_case = "agree"
 
 	if not ClassDB.class_exists("KartTrack"):
 		printerr("KartTrack is not registered — build the extension:")
@@ -201,8 +232,18 @@ func _physics_process(_delta: float) -> bool:
 	return false
 
 
+## The known cases, in the order `_initialize` runs them. Named rather than
+## implied, because `--case=` used to accept anything: `--case=schema,agree` matched
+## nothing at all, ran nothing at all, and printed `circuit probe: pass`. A gate
+## that reports green having looked at zero cases is worse than one that fails, and
+## a typo in a case name is the same shape.
+const CASES := ["schema", "measure", "agree", "layouts", "timing", "pit", "place"]
+
+
 func _wants(name: String) -> bool:
-	return _case == "all" or _case == name
+	if _case == "all":
+		return true
+	return name in _case.split(",", false)
 
 
 func _fail(message: String) -> void:
@@ -212,6 +253,23 @@ func _fail(message: String) -> void:
 
 func _finish() -> void:
 	_done = true
+	if _break != "":
+		# INVERTED, and with a second condition. A break run has to go red *and* the
+		# red has to be the one this sabotage predicts — a check that reports
+		# "caught" off a pre-existing failure it did not cause is not a check.
+		if _failures > 0 and _break_caught:
+			print("== circuit probe: --break=%s was caught, with its own fingerprint =="
+					% _break)
+			quit(0)
+		elif _failures == 0:
+			printerr("== circuit probe: --break=%s was NOT caught. The check it "
+					% _break
+					+ "targets cannot fail, which means it has never measured anything. ==")
+			quit(1)
+		else:
+			printerr("== circuit probe: --break=%s went red for the wrong reason ==" % _break)
+			quit(1)
+		return
 	if _failures == 0:
 		print("== circuit probe: pass ==")
 		quit(0)
@@ -358,6 +416,228 @@ func _case_agree() -> void:
 		_fail("the mesh and the collider disagree by %.4f mm; §11's 'cannot drift "
 				% (worst * 1000.0)
 				+ "apart' is not true of this pipeline right now")
+
+	_agree_barriers(manifest)
+
+
+# --- barriers, issue #244 --------------------------------------------------
+#
+# `edges` samples the centerline's cross-section, and that is why this case did
+# not catch #244: the barrier stands at the outer edge of the run-off, up to
+# 41.8 m from the centerline, and every one of the road's 55 stations agreed
+# while 344 of 681 barrier quads sat more than 0.60 m off the ground beneath
+# them — worst 3.51 m, which is a hole a kart drives through at 120 km/h.
+#
+# Two claims are measured here and they are different claims.
+#
+#   1. **The two consumers are one wall.** `gentrack.py` writes every seventh
+#      barrier quad's foot and head into the manifest, read straight off the
+#      strip it just built; `KartTrack::surface_meshes` builds the same wall in
+#      C++ from the same file. Each manifest point must exist in the collider,
+#      so the number is the one-sided Hausdorff distance from the mesh's points
+#      to the collider's. Both walk the identical polyline, so the achievable
+#      figure is the manifest's own rounding — six decimals, a micron — and the
+#      threshold is the road edges' millimeter for the same reason.
+#
+#   2. **The wall is on the ground.** Measured against a real `TrackTerrain`,
+#      built here the way `circuit.gd` builds it. Not a tolerance: the claim is
+#      an inequality, that no barrier foot is *above* the terrain under it,
+#      because a foot above the terrain is a gap and a gap is the defect. What
+#      the number reports is the margin — how close the worst foot comes to the
+#      surface from below — and that margin is what sizes `BARRIER_SKIRT`.
+#
+# The seating check cannot be a millimeter and never could be. The terrain is a
+# smoothed height field on a 5 m grid whose own docstring records an irreducible
+# 2.343 m step where the lap passes close to itself at two different heights; a
+# closed-form barrier cannot be flush with that. The wall is driven into the
+# ground instead, and this is what proves it stays there.
+
+## How close a barrier foot may come to the terrain surface from below, meters.
+## Zero would be the letter of the claim; a hair of margin is demanded instead so
+## the gate goes red before a real gap opens rather than on the tick it does.
+const BARRIER_FOOT_MARGIN := 0.05
+
+## What `--break=barrier-seat` lifts every barrier foot by, meters. Verified at the
+## value the script actually passes: on Valdirone the worst foot clears the terrain
+## by 0.60 m, so 1.5 m is comfortably through the floor and the check must fire.
+## A control sized under that margin would be inert and the suite would still print
+## a confident number — `replay.sh`'s `BREAK_TICK` lesson, applied here.
+const BARRIER_BREAK_LIFT := 1.5
+
+## What `--break=barrier-agree` moves the manifest's barrier rows by, meters.
+## Five millimeters: five times the threshold, so the failure is unambiguous, and
+## small enough that the reported disagreement is the perturbation itself rather
+## than some other geometry error swamping it.
+const BARRIER_BREAK_SHIFT := 0.005
+
+
+func _agree_barriers(manifest: Dictionary) -> void:
+	print("-- barriers on the terrain (issue #244)")
+	var rows: Array = manifest.get("barriers", [])
+	if rows.is_empty():
+		_fail("the manifest carries no barrier rows, so this case is blind to "
+				+ "issue #244 — re-run gentrack.py's manifest stage")
+		return
+
+	var faces := PackedVector3Array()
+	for entry in _track.surface_meshes(0.02, 2.0):
+		if String(entry["name"]) == "Barriers":
+			faces = entry["faces"]
+	if faces.is_empty():
+		_fail("the collider built no barriers at all")
+		return
+
+	# 1. One wall, two consumers.
+	var worst := 0.0
+	var worst_where := 0.0
+	var worst_which := ""
+	for row in rows:
+		for which in ["foot", "head"]:
+			var theirs: Array = row[which]
+			var point := Vector3(theirs[0], theirs[1], theirs[2])
+			if _break == "barrier-agree":
+				# The saboteur moves the *mesh's* claim and leaves the collider alone,
+				# which is exactly the shape of a one-consumer regression.
+				point += Vector3(0.0, BARRIER_BREAK_SHIFT, 0.0)
+			var gap := sqrt(_nearest_squared(point, faces))
+			if gap > worst:
+				worst = gap
+				worst_where = float(row["distance_m"])
+				worst_which = which
+	print("  %d barrier rows, worst mesh-to-collider gap %.4f mm on a %s at %.1f m"
+			% [rows.size(), worst * 1000.0, worst_which, worst_where])
+	if worst > 0.001:
+		_fail("the barrier mesh and the barrier collider disagree by %.4f mm; the "
+				% (worst * 1000.0)
+				+ "wall you see and the wall you hit are in two places")
+	if _break == "barrier-agree":
+		_break_verdict("barrier-agree", worst, BARRIER_BREAK_SHIFT, 0.0005,
+				"worst mesh-to-collider gap")
+
+	# 2. On the ground.
+	var terrain := _build_terrain()
+	if terrain == null:
+		_fail("could not build a terrain to seat the barrier against")
+		return
+	var highest := -INF
+	var highest_at := Vector3.ZERO
+	var above := 0
+	var feet := 0
+	var clean_highest := -INF
+	for index in range(0, faces.size(), 6):
+		for vertex in _barrier_feet(faces, index):
+			feet += 1
+			var clean := vertex.y - terrain.height_at(vertex.x, vertex.z)
+			clean_highest = maxf(clean_highest, clean)
+			var delta := clean
+			if _break == "barrier-seat":
+				delta += BARRIER_BREAK_LIFT
+			if delta > highest:
+				highest = delta
+				highest_at = vertex
+			if delta > -BARRIER_FOOT_MARGIN:
+				above += 1
+	print("  %d foot vertices, %d not buried, worst stands %.4f m %s the terrain at (%.1f, %.1f)"
+			% [feet, above, absf(highest), "above" if highest > 0.0 else "below",
+			   highest_at.x, highest_at.z])
+	if above > 0:
+		_fail("%d barrier foot vertices are within %.2f m of the terrain surface or "
+				% [above, BARRIER_FOOT_MARGIN]
+				+ "above it (worst %.4f m); that is a gap under the wall" % highest)
+	if _break == "barrier-seat":
+		_break_verdict("barrier-seat", highest, clean_highest + BARRIER_BREAK_LIFT,
+				0.0001, "worst foot height over the terrain")
+
+
+## The one-sided nearest-neighbour distance, squared. Split out only so the
+## sabotage path and the clean path cannot diverge by accident.
+func _nearest_squared(point: Vector3, faces: PackedVector3Array) -> float:
+	var nearest := INF
+	for vertex in faces:
+		nearest = minf(nearest, point.distance_squared_to(vertex))
+	return nearest
+
+
+## The two foot vertices of the barrier quad starting at `index`.
+##
+## Per **quad** and not per triangle, because a barrier quad splits into
+## `(foot_near, head_near, head_far)` and `(foot_near, head_far, foot_far)` and the
+## first of those contains `head_far` with its own foot in the *other* triangle. A
+## per-triangle test therefore calls `head_far` a foot, which reported 2,724 feet
+## where there are 1,362 and put the wall's head into the seating measurement — the
+## check went red on the correct wall.
+##
+## A head sits directly over its own foot, so within the four distinct corners a
+## vertex is a head exactly when another corner shares its x and z and is below it.
+## Identifying feet as "the lower two" instead is wrong the moment the barrier runs
+## down a grade steeper than the wall is tall, and Valdirone reaches 8.95%.
+func _barrier_feet(faces: PackedVector3Array, index: int) -> Array[Vector3]:
+	var corners: Array[Vector3] = []
+	for offset in range(mini(6, faces.size() - index)):
+		var vertex: Vector3 = faces[index + offset]
+		var seen := false
+		for corner in corners:
+			if corner.is_equal_approx(vertex):
+				seen = true
+		if not seen:
+			corners.append(vertex)
+	var out: Array[Vector3] = []
+	for corner in corners:
+		var is_head := false
+		for other in corners:
+			if other.y < corner.y - 1e-6 and absf(other.x - corner.x) < 1e-6 \
+					and absf(other.z - corner.z) < 1e-6:
+				is_head = true
+		if not is_head:
+			out.append(corner)
+	return out
+
+
+## A `TrackTerrain` built the way `circuit.gd` builds one, because measuring the
+## barrier against anything else measures nothing. The three sizing numbers are
+## read off `circuit.gd`'s own script rather than copied, so a change there shows
+## up here as a moved measurement instead of as silent agreement with a world the
+## game does not build.
+func _build_terrain() -> TrackTerrain:
+	var circuit_script: GDScript = load("res://scripts/game/circuit.gd")
+	if circuit_script == null:
+		return null
+	var margin: float = circuit_script.get("RUNOFF_MARGIN")
+	var box := AABB()
+	var started := false
+	for point in _track.centerline(0.2, 8.0):
+		if not started:
+			box = AABB(point, Vector3.ZERO)
+			started = true
+		else:
+			box = box.expand(point)
+	var extent: float = maxf(box.size.x, box.size.z) + margin * 2.0
+	var corridor := TrackCorridor.new()
+	corridor.measure(_track)
+	var terrain := TrackTerrain.new()
+	terrain.build(_track, corridor, extent, box.get_center(), box.position.y - 0.5, 5.0)
+	return terrain
+
+
+## A negative control's verdict, and the reason it takes four arguments.
+##
+## "The gate went red" is not evidence the sabotage was caught: the gate may have
+## been red already, for a reason the saboteur had nothing to do with. So the
+## verdict demands the saboteur's own fingerprint — the measurement has to have
+## moved to the value this particular sabotage predicts, within `p_tolerance`.
+func _break_verdict(mode: String, measured: float, expected: float,
+		p_tolerance: float, what: String) -> void:
+	var off := absf(measured - expected)
+	print("  break=%s: %s is %.6f, predicted %.6f, off by %.6f"
+			% [mode, what, measured, expected, off])
+	if off > p_tolerance:
+		printerr("  BREAK MISS: --break=%s did not leave its own fingerprint; " % mode
+				+ "%s should have been %.6f and was %.6f. A control that reports "
+						% [what, expected, measured]
+				+ "'caught' off somebody else's red is not a control.")
+		_break_caught = false
+	else:
+		_break_caught = true
 
 
 # --- layouts ---------------------------------------------------------------
