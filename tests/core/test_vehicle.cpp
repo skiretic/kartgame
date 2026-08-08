@@ -1159,10 +1159,19 @@ TEST_CASE("how much steering it takes to lose it at speed, which is issue #137's
 	if (followable_input > 0.0) {
 		// The two numbers a driver's hands actually feel. `steer_rate` 3.4 reaches full
 		// lock in 1/3.4 s, so a digital input passes the followable limit after this
-		// long — and a stick has to be placed inside this fraction of its travel.
+		// long.
 		std::printf("\n      %-48s %6.0f ms of held key\n", "the followable range is reached in",
 				1000.0 * followable_input / 3.4);
-		std::printf("      %-48s %6.1f %% of stick travel\n", "and occupies", 100.0 * followable_input);
+		// **This said "% of stick travel" and it is a LOCK fraction**, which is the
+		// one confusion the next forty lines exist to prevent — they open by saying
+		// "the rows above are *lock* fractions, a driver does not have those". Read
+		// as stick travel it says the usable band is 6.5% of the thumb's range, which
+		// is alarming, wrong, and an invitation to go and tune `steer_gamma` for no
+		// reason: the x^3 curve is exactly what turns 0.065 of lock into 0.402 of
+		// stick, and `tuning.h`'s citation for `steer_gamma` says so in those words.
+		// Both are printed now so neither can be mistaken for the other.
+		std::printf("      %-48s %6.1f %% of lock, %.1f %% of stick\n", "and occupies",
+				100.0 * followable_input, 100.0 * std::pow(followable_input, 1.0 / 3.0));
 	}
 
 	// --- and what the driver's thumb actually reaches ------------------------

@@ -4772,3 +4772,179 @@ capacity falls 3646 -> 3430 N as transfer eats the increment.
   differential. Two independent gates now show it. **A ticket, not a constant bump**
   — stiffening costs 0.44 g of sustained lateral and makes every open-loop case
   depart.
+
+## ADR-0072
+
+**#137's remaining half is not saturation. The kart answers half the yaw rate its
+own front wheels are pointed at, at a tenth of a g, and the solid rear axle's
+scrub couple is what takes the other half.**
+
+2026-08-07. Extends ADR-0071, which located the spin and could not explain it.
+
+### What was measured
+
+ADR-0071 left the open half of #137 described as "near-pure lateral slip,
+drivetrain delivering zero torque, rear slip ratio 0.087 while rear slip angle
+runs -1.8 -> -84.1 deg", with the AI departing at a tenth of lock while using
+**0.5177 of the lateral ceiling**. That last figure is the one that did not fit:
+a controller cannot overshoot a limit it is at half of.
+
+It does not fit because there is no limit involved. Measured speed-held, which is
+the only protocol that can ask a steering question — the open-loop full-throttle
+protocol accelerates the kart to its lateral limit and then every lock returns
+the same saturated answer:
+
+| km/h | lock | steer | yaw got | yaw geometric | got/geo | lat g |
+| --- | --- | --- | --- | --- | --- | --- |
+| 18.0 | 0.05 | 1.24 deg | 0.083 | 0.092 | **0.901** | 0.038 |
+| 28.8 | 0.05 | 1.24 deg | 0.074 | 0.152 | **0.489** | 0.056 |
+| 43.2 | 0.05 | 1.24 deg | 0.116 | 0.238 | **0.489** | 0.137 |
+| 43.2 | 0.10 | 2.45 deg | 0.232 | 0.471 | 0.493 | 0.274 |
+| 72.0 | 0.05 | 1.24 deg | 0.195 | 0.399 | 0.488 | 0.386 |
+| 92.9 | 0.05 | 1.24 deg | 0.248 | 0.516 | 0.481 | 0.636 |
+
+**From 29 km/h upward the kart turns at 0.49 of the rate its front wheels ask
+for, and the ratio does not move with speed.** A real understeer gradient is
+`L / (L + K v^2)` and therefore falls with speed — matching 0.489 at 29 km/h
+would put it at 0.126 by 93 km/h. 0.489 against 0.481 across a 3.2x speed range
+and a 11x range in lateral acceleration is not a gradient. It is a factor.
+
+And it is not a limit: the 43.2 km/h row is asking for **0.137 g against 2.10
+capable**, which is 6.5% of capacity, with every tire deep in its linear range.
+
+### What takes it
+
+The applied yaw moment split four ways — front/rear crossed with
+lateral/longitudinal, resolved on the body's axes, closing on the applied moment
+to under 12 N m — at 43.2 km/h and 0.05 of lock:
+
+    Mz front lateral        +143.0 N m     the steering moment
+    Mz rear  lateral          -0.4 N m     the rear tires are doing NOTHING
+    Mz rear  longitudinal   -142.3 N m     the solid axle's scrub couple
+    Mz front longitudinal     -0.2 N m
+
+The front's steering moment is cancelled to within **0.3%** by the solid rear
+axle's longitudinal scrub couple — one rear tire dragged forward at +152.1 N
+while the other is dragged back at -83.3 N — and the rear tires' *lateral* force,
+which is what balances a steering input on any vehicle with a differential,
+carries **0.3%** of it.
+
+The kart is not cornering by developing a rear slip angle. It is cornering
+against its own rear axle.
+
+### The attribution is measured, not inferred
+
+Replacing each rear tire's longitudinal force with the pair's mean deletes the
+couple while leaving the net thrust, the axle's reaction torque and every lateral
+force exactly as they were. Under that control:
+
+| km/h | lock | got/geo with couple | got/geo without |
+| --- | --- | --- | --- |
+| 18.0 | 0.05 | 0.901 | **1.002** |
+| 28.8 | 0.05 | 0.489 | **0.996** |
+| 43.2 | 0.05 | 0.489 | **0.988** |
+| 72.0 | 0.05 | 0.488 | 0.894 |
+| 92.9 | 0.05 | 0.481 | 0.718 |
+
+Without the couple the kart tracks its own geometry at low speed and then washes
+out with speed — which is exactly the shape an understeer gradient has. With it,
+the response is halved everywhere and the shape is gone. The control was run
+against a snapshot of `src/core/vehicle.h` and the file was restored to the same
+SHA-256 afterwards; nothing under `src/` changed in this ADR.
+
+### The number was already on the screen under a wrong explanation
+
+`tests/core/test_vehicle.cpp`'s steering-step table has printed `yaw/Ack` of
+**0.483, 0.482, 0.478** for its three smallest inputs since it was written, and
+its own commentary explains the column away: *"the kart is not under-rotating, it
+is being asked for a radius no tire can hold"*. That is true of the bottom of
+that table — full lock at 100 km/h asks for 28 g — and it was written across the
+whole of it. Its top row asks for 1.62 g against 2.10 capable, and the
+measurement above asks for 0.137 g. **A demand-side explanation cannot survive a
+tenth of a g.** The row that motivates a caption is rarely the row that falsifies
+it.
+
+### The decision
+
+1. **Nothing under `src/` changes in this ADR.** The couple is real physics —
+   ARCHITECTURE.md §6 calls the inside rear leaving the ground the defining kart
+   dynamic *precisely because* that is how a real kart relieves this couple.
+   Deleting it is a diagnostic, not a fix, and shipping the diagnostic would give
+   the kart a rear axle it does not have.
+2. **#224 is not the cause, and this ADR proposed that it was before measuring
+   it.** The hypothesis was good — ARCHITECTURE §6 says the inside rear leaving
+   the ground *is* the differential, #224 measured twice that this kart lifts the
+   inside front instead, and an axle whose inside wheel never unloads is an axle
+   whose couple never relieves. It is wrong. Swept across the **whole** range
+   `chassis_flex.h` records as published — 193.62 (Fu and Wang 2007) to 3,464
+   (Sampayo et al. 2021), a factor of 18 — the steering response moves from
+   **0.489 to 0.505**:
+
+       N m/deg     got/geo    Mz F lat   Mz R lat   Mz R lon
+        193.62       0.489       143.0       -0.4     -142.3
+        400.00       0.492       142.9       -1.1     -141.8
+       1051.00       0.498       142.8       -2.4     -140.7
+       3464.00       0.505       142.7       -4.0     -139.3
+
+   The reason it cannot work is visible once stated: at 0.14 g there is almost no
+   lateral load to redistribute, so a frame that redistributes load harder has
+   nothing to redistribute. Wheel lift is a limit-handling mechanism and this
+   defect is not a limit-handling defect. #224 remains a real and separate
+   defect about what the kart does at the limit.
+3. **The couple's magnitude in the linear range is set by the tire's
+   longitudinal slip stiffness and the rear track, and by nothing else.** The
+   two rear tires run equal and opposite slip ratios of `half_track * yaw / v` —
+   ±0.0096 at 43.2 km/h and 0.05 of lock — and `longitudinal.stiffness = 12.0`
+   with `shape = 1.65` turns ±0.96% of slip ratio into ±19% of peak force. That
+   is where the 142.3 N m comes from.
+4. **The likely real answer is a missing degree of freedom, not a wrong
+   constant.** `vehicle.h` carries the rear axle as one rigid `axle_speed_`. A
+   real KZ rear axle is a steel tube roughly 1.4 m long and 40-50 mm across, and
+   its torsional compliance is not a detail — soft, medium and hard axles are
+   sold as *the* primary kart setup variable, which is a strong statement that
+   the real thing twists enough to matter. `GJ/L` for a tube is computable from
+   dimensions `params.py` already carries, so this is sourceable rather than
+   invented, and it is exactly the compliance that would let a real axle absorb
+   a ±1% slip-ratio difference as windup instead of paying it in force. **Not
+   adopted here** — it is a new state variable in the solver and it needs its
+   own measurement, not a paragraph. **Filed as #234**, with the acceptance
+   written and the three places the rigid axle is load-bearing named:
+   `drivetrain.h`'s traction limiter, `KartStateHash`'s replay determinism, and
+   issue #33's "one variable and no accessor that could return two".
+5. **A Pacejka G-factor is still not the answer.** Every figure above is at
+   under 0.4 g and no combined-slip law is active there. This is the third
+   mechanism proposed for #137 and the first that reproduces at a tenth of the
+   lateral capacity — which is also why the two fixes ADR-0071 falsified were
+   falsified for the right reason.
+6. **This ADR carried a wrong conclusion for the length of one measurement**, and
+   the correction is left in above rather than edited out. The frame-torsion
+   hypothesis was written down, published to #137 and #224, and then falsified by
+   the sweep it should have been built on. It is in the log because the next
+   person to look at this will have the same idea.
+
+### What ships instead
+
+`tests/core/test_yaw_stability.cpp`, the standing instrument, five cases:
+
+- the four-way moment split **closes on the applied moment**, so the
+  decomposition is checked rather than trusted;
+- the response ratios above, **pinned** — they are the defect's figures and they
+  are pinned so it cannot move silently, not because they are right;
+- the flatness of the ratio across speed, which is what says "factor" and not
+  "gradient";
+- the couple's share of the balance, and the rear tires' 0.3%;
+- two properties worth **protecting** against any future fix: the kart recovers
+  to straight from up to 60 degrees of body slip when the wheel is straightened
+  and the throttle shut, and a slalom at three tenths of lock at 93 km/h does not
+  depart at any frequency a driver can produce.
+
+### One thing this rules out that was assumed
+
+**The AI's departure is not the vehicle's open-loop answer to the AI's own
+input.** Held open loop at ADR-0071's stated condition — a tenth of lock, full
+throttle, 93 km/h — the kart is stable at 3.2 degrees of body slip, and a slalom
+through that condition is stable to 0.30 of amplitude at every frequency between
+0.5 and 2 Hz. So #233 is not automatically downstream of #137: what the AI does
+between those two states is unmeasured, and "fixing the spin fixes both" is a
+hypothesis this instrument does not support. It has to be measured against the
+same rig.
