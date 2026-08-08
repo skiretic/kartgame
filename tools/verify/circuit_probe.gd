@@ -1004,7 +1004,15 @@ func _read_placement() -> void:
 	var placement: Dictionary = _placements[_placement]
 	var counts := {}
 	for wheel in _kart.wheel_report():
-		var type := int(wheel.get("surface_type", 0))
+		# `["surface"]`, indexed. `wheel_report()` has never published a
+		# `surface_type` key -- this read `wheel.get("surface_type", 0)` and took
+		# the default on every corner of every run, so every wheel was asphalt by
+		# construction and the "N of N stations report four wheels on asphalt"
+		# check below has been green since it was written **without ever looking at
+		# a surface**. `kart_body.cpp` warns about this exact shape a few lines
+		# above the Dictionary it fills. Index a contract key; a default is what
+		# turns a renamed key into a zero drawn forever.
+		var type := int(wheel["surface"])
 		counts[type] = int(counts.get(type, 0)) + 1
 	placement["surfaces"] = counts
 	placement["height"] = _kart.global_position.y

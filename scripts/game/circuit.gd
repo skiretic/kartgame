@@ -1396,7 +1396,14 @@ func _physics_process(_delta: float) -> void:
 	var report: Array = _kart.wheel_report()
 	var surfaces := {}
 	for wheel in report:
-		var type := int(wheel.get("surface_type", 0))
+		# `["surface"]`, indexed -- the same defect as `circuit_probe.gd:1007` and
+		# the same family as the `steer_angle` extraction. There is no
+		# `surface_type` key in `wheel_report()`, so this took its `0` default on
+		# every wheel and the on-screen read-out said **"4 asphalt" everywhere** --
+		# on kerbs, on grass, on gravel, in the barriers. `test_track.gd:1125` and
+		# `track_probe.gd` read `wheel["surface"]` correctly; the bug is one file
+		# over from two working copies.
+		var type := int(wheel["surface"])
 		surfaces[type] = int(surfaces.get(type, 0)) + 1
 	var pieces := PackedStringArray()
 	for type in surfaces:
