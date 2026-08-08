@@ -575,12 +575,16 @@ func _build_cameras() -> void:
 		return
 	_fixed = Camera3D.new()
 	_fixed.name = "FixedCamera"
+	# Attributes FIRST -- #237, same as `proving_ground.gd` and `circuit.gd`.
+	# Assigning a `CameraAttributesPhysical` overwrites `fov`, `near` and `far`
+	# from its own 35 mm frustum, so these three lines were being discarded and
+	# `--fov` was inert on this scene too.
+	_fixed.attributes = LookEnv.camera_attributes(_args)
 	_fixed.fov = Cmdline.as_float(_args, "fov", 55.0)
 	_fixed.near = 0.05
 	# Further than the proving ground's 900 m: an overhead still of a 433 m-long
 	# layout is taken from about 400 m up and the far corner is further away again.
 	_fixed.far = 2000.0
-	_fixed.attributes = LookEnv.camera_attributes(_args)
 	add_child(_fixed)
 	var target := _parse_point(Cmdline.as_string(_args, "look", ""), _spawn)
 	var eye_point := _parse_point(eye, _spawn + Vector3(8.0, 3.0, 26.0))

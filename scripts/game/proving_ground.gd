@@ -475,10 +475,18 @@ func _build_cameras() -> void:
 		return
 	_fixed = Camera3D.new()
 	_fixed.name = "FixedCamera"
+	# Attributes FIRST. #237: assigning a `CameraAttributesPhysical` overwrites
+	# `fov`, `near` and `far` from its own 35 mm frustum -- 37.8493 degrees and a
+	# far of 4000 -- so the three lines below it were being discarded and `--fov`
+	# was inert. Measured here: `--fov=55` against `--fov=25` differed over 0.38%
+	# of pixels before this, against 99.20% after the same fix landed in
+	# `circuit.gd`. This rig has no `_process` to heal it the way the chase and
+	# cockpit rigs do. An *exposure* property assignment is safe; a *frustum* one
+	# clobbers again, which is the distinction people keep guessing at.
+	_fixed.attributes = LookEnv.camera_attributes(_args)
 	_fixed.fov = Cmdline.as_float(_args, "fov", 55.0)
 	_fixed.near = 0.05
 	_fixed.far = 900.0
-	_fixed.attributes = LookEnv.camera_attributes(_args)
 	add_child(_fixed)
 	var target := _parse_point(Cmdline.as_string(_args, "look", ""), SPAWN)
 	_fixed.look_at_from_position(_parse_point(eye, Vector3(8.0, 3.0, 26.0)), target, Vector3.UP)
