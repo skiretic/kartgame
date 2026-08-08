@@ -59,6 +59,22 @@ const ROLL_AT_PEAK_G := deg_to_rad(3.5)
 const POSITION_HALF_LIFE := 0.09
 const AIM_HALF_LIFE := 0.16
 
+## How close the aim point may come to the camera before `Vector3.UP` stops being
+## a usable roll reference, in meters.
+##
+## Both of Godot's refusals are **metric, not angular**, which is why this is a
+## distance and not an angle. `Node3D.look_at_from_position` errors outright —
+## *"Node origin and target are in the same position"* — when the two are within
+## `CMP_EPSILON`, 1e-5 m. `Basis.looking_at` then warns — *"Target and up vectors
+## are colinear"* — when `up.cross(target - origin)` is componentwise under the
+## same 1e-5, and for `Vector3.UP` that cross is `(d.z, 0.0, -d.x)`: the test is
+## purely on the **horizontal** offset, at any range.
+##
+## Measured on 4.7.1 and neither is rate limited — three calls print three lines.
+## A millimeter is a hundred times Godot's epsilon and a hundredth of anything a
+## camera can resolve, so nothing that clears this is a frame anyone can see.
+const AIM_EPSILON := 0.001
+
 var camera: Camera3D
 
 ## ARCHITECTURE §18. Degrees added to both FOV endpoints, and a multiplier on the
@@ -164,7 +180,7 @@ func _process(delta: float) -> void:
 	var target_roll := -clampf(lateral_g / 2.5, -1.0, 1.0) * ROLL_AT_PEAK_G * shake
 	_roll = lerpf(_roll, target_roll, _decay(0.25, delta))
 
-	camera.look_at_from_position(camera.global_position, _aim, Vector3.UP)
+	_aim_camera(flat_forward)
 	camera.rotate_object_local(Vector3.FORWARD, _roll)
 	# The trim moves both endpoints, so the kick keeps its full 16 degrees of travel
 	# wherever the player put the base. Scaling the endpoints instead would make a
@@ -172,6 +188,56 @@ func _process(delta: float) -> void:
 	camera.fov = lerpf(
 		FOV_STATIC, FOV_AT_SPEED, clampf(speed / FOV_REFERENCE_SPEED, 0.0, 1.0)
 	) + fov_trim_deg
+
+
+## Point the camera at `_aim` with a roll reference that is always usable.
+##
+## ## What was wrong
+##
+## This was one bare `look_at_from_position(camera.global_position, _aim,
+## Vector3.UP)`. `SpringArm3D` collapses its children onto its own origin
+## whenever the cast hits at zero distance — a kart reversed into a barrier or
+## sat against a tire stack, which is a first-session event — and the origin is
+## the kart plus `ARM_HEIGHT`. The aim point is the kart plus
+## `velocity * LOOK_AHEAD_SECONDS`, so at a standstill the two share an x and a z
+## exactly, the view direction is straight down, and `Vector3.UP` is colinear
+## with it. Measured with the arm forced onto its origin: **59 of 60 frames
+## warned**, one line each, at `chase_camera.gd:167`. Nothing is rate limited, so
+## that is one line per rendered frame for as long as the kart sits there.
+##
+## ## Why an up vector and not a skip
+##
+## Skipping the call freezes the rig while the kart is against the wall, which
+## reads as a camera that has crashed. Substituting the roll reference keeps the
+## camera pointed at exactly the same place in **every** frame — the aim argument
+## never changes — and only replaces the one quantity Godot was picking at random
+## and warning about.
+##
+## `flat_forward` is the right replacement because it is the continuous limit.
+## For a camera `h` above the kart and `d` behind it, the screen-up direction
+## `UP - (UP . dir) dir` is proportional to `(h, d)` in the (horizontal, vertical)
+## plane, so as `d -> 0` it tends to the horizontal direction the camera is
+## already facing. Taking that limit exactly means the switch happens at a
+## sub-millimeter offset, where the two answers agree to well inside a pixel.
+##
+## The sign follows which way the camera is looking: `to_aim.y < 0` is looking
+## down, where the limit is `+flat_forward`.
+func _aim_camera(flat_forward: Vector3) -> void:
+	var to_aim := _aim - camera.global_position
+	# `up.cross(to_aim)` for `Vector3.UP` is `(to_aim.z, 0, -to_aim.x)`, so this is
+	# the exact quantity Godot tests, with three orders of magnitude of headroom.
+	if Vector2(to_aim.x, to_aim.z).length() >= AIM_EPSILON:
+		camera.look_at_from_position(camera.global_position, _aim, Vector3.UP)
+		return
+	# Straight up or straight down. `flat_forward` is horizontal and unit, so its
+	# cross with a vertical `to_aim` has a component of at least `0.707 * |to_aim.y|`
+	# and clears the same epsilon.
+	if absf(to_aim.y) >= AIM_EPSILON:
+		camera.look_at_from_position(
+			camera.global_position, _aim, flat_forward * -signf(to_aim.y))
+		return
+	# The aim point is inside the camera. There is no direction to take from it, so
+	# the rig holds the orientation it already had rather than inventing one.
 
 
 ## A loaded `KartSettings`, or null when this run must not read one.

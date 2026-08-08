@@ -1228,10 +1228,20 @@ func _build_cameras() -> void:
 		return
 	_fixed = Camera3D.new()
 	_fixed.name = "FixedCamera"
+	# **The attributes go on first, and that is not a style choice.** Measured on
+	# 4.7.1: assigning a `CameraAttributesPhysical` *overwrites* `fov`, `near` and
+	# `far` from its own frustum — the default 35 mm focal length is **37.8493
+	# degrees**, `near` 0.05 and `far` 4000. This block set the three first and the
+	# attributes second, so `--fov` was silently discarded and every `--eye/--look`
+	# still of this circuit was shot at 37.85 degrees rather than the 55 it printed
+	# in its own command. Assigning after the attributes sticks.
+	#
+	# The three rigs above already do it in this order, which is why only the still
+	# camera was wrong.
+	_fixed.attributes = LookEnv.camera_attributes(_args)
 	_fixed.fov = Cmdline.as_float(_args, "fov", 55.0)
 	_fixed.near = 0.05
 	_fixed.far = 2500.0
-	_fixed.attributes = LookEnv.camera_attributes(_args)
 	add_child(_fixed)
 	var target := _parse_point(Cmdline.as_string(_args, "look", ""), _spawn.origin)
 	var eye_point := _parse_point(eye, _spawn.origin + Vector3(8.0, 3.0, 26.0))

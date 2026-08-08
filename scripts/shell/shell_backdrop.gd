@@ -68,13 +68,22 @@ func build(args: Dictionary) -> void:
 
 	camera = Camera3D.new()
 	camera.name = "ShellCamera"
-	camera.fov = FOV_DEGREES
 	add_child(camera)
 
 	if _mode == "flat":
 		_build_flat()
 	else:
 		_build_grid(args)
+
+	# **Last, and after whatever the mode did to the camera.** Measured on 4.7.1:
+	# assigning a `CameraAttributesPhysical` *overwrites* `fov`, `near` and `far`
+	# from its own frustum, and the default 35 mm focal length is **37.8493
+	# degrees**. So a camera set to 42 and then handed attributes renders at 37.85
+	# and the constant above is dead. This file assigned them in that order, and
+	# every paddock frame shipped 4.15 degrees tighter than the framing derivation
+	# in the header solves for — a kart at 25.4% of frame height rather than 23%.
+	# Assigning `fov` afterwards sticks, which is the whole fix.
+	camera.fov = FOV_DEGREES
 	camera.current = true
 
 
@@ -155,9 +164,60 @@ func _build_grid(args: Dictionary) -> void:
 	# for a 33 mm one and still float.
 	pole = _dropped_to_surface(pole)
 	_add_mesh(KART_MESH, pole, "Kart", "genkart.sh")
+	_add_reflection_probe()
 
 	camera.global_transform = Transform3D(Basis(), pole * EYE_OFFSET)
 	camera.look_at(pole * LOOK_OFFSET, Vector3.UP)
+
+
+## The half of reflection Godot does well, and the one thing this backdrop was
+## missing that `circuit.gd` has always had.
+##
+## ## What it was worth, measured
+##
+## The paddock and `valdirone.tscn` were shot from the identical eye and look
+## point at 1280x720. The kart read a mean luma of **86.49** here against
+## **118.80** in the circuit scene, and the asphalt **108.70** against **125.17** —
+## the same sun, the same `LookEnv.environment`, the same physical exposure, and
+## the kart 27% darker. Re-shooting the circuit with `--probe=false` gave **86.95**
+## and **108.71**: the backdrop's own numbers to half a percent. So the probe is
+## the whole difference, it is worth +36.6% on the kart and +15.1% on the asphalt,
+## and nothing else about the two lighting rigs diverges.
+##
+## ## Sized over the drawn mesh rather than over what the camera can see
+##
+## `look_env.gd` sets `AMBIENT_DISABLED`, so a probe adds specular and no ambient
+## and cannot double-count — that is the first of the three M1 bugs and the reason
+## the helper exists. What a probe *can* do is put a hard rectangular seam across
+## a broad rough surface at its own boundary, which is what `circuit.gd` learned
+## when it sized one over the driving area instead of the world. The union of the
+## track mesh's own AABBs is that world here, and `get_aabb()` is a stored bound
+## per instance rather than a walk of the triangles.
+##
+## Skipped, quietly, when the mesh is absent: a paddock with no track to reflect
+## has nothing for a probe to capture.
+func _add_reflection_probe() -> void:
+	var mesh := get_node_or_null("TrackMesh") as Node3D
+	if mesh == null:
+		return
+	var bounds := AABB()
+	var started := false
+	for node: Node in mesh.find_children("*", "MeshInstance3D", true, false):
+		var instance := node as MeshInstance3D
+		if instance.mesh == null:
+			continue
+		var box := instance.global_transform * instance.get_aabb()
+		bounds = box if not started else bounds.merge(box)
+		started = true
+	if not started:
+		return
+	var center := bounds.get_center()
+	var extent := maxf(bounds.size.x, bounds.size.z)
+	add_child(LookEnv.reflection_probe(
+		Vector3(extent, maxf(bounds.size.y, 40.0) + 40.0, extent),
+		Vector3(center.x, center.y + 20.0, center.z),
+		extent))
+	_report.append("reflection probe %.0f m over the track mesh" % extent)
 
 
 ## Sit a pose down on the track mesh that is actually being drawn.
