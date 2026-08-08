@@ -632,13 +632,26 @@ def curb_spans(corners: dict, geometry: Geometry) -> list[dict]:
     # layout."  One piece of concrete cannot be two heights; T8a is built at the
     # gentler of the two, which is the rule the design already applies to run-off.
     # ADR-0049.
+    #
+    # **Both spans are bounded by the apex arc, not by the corner.** T8's apex arc
+    # IS T8a - it is the tightest of the two, 45 m against T8b's 70 - so
+    # `apex_arc_from_m` equals the corner's own `from_m` and the T8a kerb used to be
+    # authored `from_m -> apex_arc_from_m`, a span of **0.000 m** that builds no
+    # triangle at all. ADR-0049's compromise therefore produced nothing on the
+    # ground, silently, and the 30 mm rippled T8b span started at T8a's entry and
+    # ran 64.42 m over both arcs - the exact kerb ADR-0049 exists to prevent. The
+    # same expression is degenerate on seven of the eight corners (T5 is the only
+    # one whose tightest arc is not its first), so it was one authored kerb away
+    # from being a general defect rather than a T8 one.
     corner = corners["T8 - Uscita"]
-    spans.append(dict(from_m=corner["from_m"], to_m=corner["apex_arc_from_m"], side="left", type="curb",
+    spans.append(dict(from_m=corner["apex_arc_from_m"], to_m=corner["apex_arc_to_m"], side="left", type="curb",
                       width_m=1.0, height_m=0.025, profile="flat",
                       note="T8a Uscita, built at the reverse layout's 25 mm flat rather than the forward layout's 30 mm rippled - one kerb, gentler case wins. ADR-0049"))
-    span = corner["to_m"] - corner["apex_arc_from_m"]
-    spans.append(dict(from_m=corner["apex_arc_from_m"],
-                      to_m=corner["apex_arc_from_m"] + span * 40.0 / 97.0,
+    # "the first 40 deg of T8b", measured on T8b's own 97 deg arc and starting where
+    # T8b starts, which is where the apex arc ends.
+    span = corner["to_m"] - corner["apex_arc_to_m"]
+    spans.append(dict(from_m=corner["apex_arc_to_m"],
+                      to_m=corner["apex_arc_to_m"] + span * 40.0 / 97.0,
                       side="left", type="curb", width_m=1.0, height_m=0.030, profile="rippled",
                       note="T8b Uscita, the first 40 deg of the opening arc"))
 
@@ -650,31 +663,109 @@ def curb_spans(corners: dict, geometry: Geometry) -> list[dict]:
 #: `sized_for` records which direction's approach speed drove the build, because
 #: two corners are sized by the reverse layout and that is the design's concrete
 #: case for run-off being a per-layout figure rather than shared furniture.
+#:
+#: ## Why six of the eight aprons are 2 m and two are not - ADR-0073, issue #241
+#:
+#: This table used to give every corner 6-14 m of sealed apron outboard of the
+#: verge, and the first thing a driver who ran wide met anywhere on the circuit
+#: was grip 1.00 asphalt. Issue #241 proved the surfaces were not inert - all five
+#: hops fire and grass costs five times the stopping distance - so the apron was
+#: not a bug in the surface table, it was the layout: the punishment for leaving
+#: the road was a wider road.
+#:
+#: Which corners keep an apron is decided by the circuit's own speed profile and
+#: not by taste, and two independent readings of it pick the same two corners:
+#:
+#:   * `apex_kmh == grip_ceiling_kmh` on **T1 and T2** and on nobody else; the
+#:     other six are held by the quarter-lock ceiling. The design's own concept
+#:     section says this in as many words.
+#:   * the apex-speed list is 52.0 / 97.2 / 101.3 / 102.3 / 102.3 / 111.9 / 129.0
+#:     / 134.5, and its largest interior gap is **17.1 km/h**, between T8's 111.9
+#:     and T2's 129.0. The next largest is 9.6. The break partitions {T1, T2} off
+#:     the other six.
+#:
+#: That agreement is the whole argument, and it is a physical one rather than a
+#: numerical coincidence: a departure from a grip-limited corner is a shallow slide
+#: at 129-134.5 km/h with the front wheels barely turned, which is what a sealed
+#: apron is for - it lets the kart scrub without tripping. A departure from a
+#: lock-limited corner happens at 111.9 km/h or less with the steering already past
+#: a quarter lock, so the kart leaves at a large yaw angle. Asphalt under that
+#: carries it to the barrier at speed; a deformable bed stops it.
+#:
+#: ## Why the six are 2.0 m rather than 0.0
+#:
+#: Two reasons, and the second is the binding one. T1 section 8.2 requires a gravel
+#: bed to be *"neither located below the track level nor preceded by a heightened
+#: verge"*, so something sealed has to hold the level between the verge and the bed.
+#: And `KartTrack::collision_surfaces` skips a corner's **entire** run-off, barrier
+#: included, when `apron_m <= 0.0`, so zero is not a spelling for "no apron", it is
+#: a spelling for "no run-off".
+#:
+#: 2.0 m is DERIVED: it is longer than the kart's own 1.830 m, so a kart that has
+#: crossed the verge is fully off the sealed strip and fully into the outfield
+#: within one kart length instead of straddling the boundary with one axle on grip
+#: 1.00 and the other on 0.17.
+#:
+#: ## Totals do not move, with one exception that had to
+#:
+#: The barrier stands at `apron_m + outfield_m` from the verge, so every total here
+#: is the design's own and only the split and the material move. The exception is
+#: **T4**, whose authored 6 + 20 = 26 m ran 7.1 m past the 18.91 m of clear ground
+#: that exists on its outside before La Discesa's white line at 387 m - measured off
+#: the spline, and the 1.5 m of elevation between them is not a cut face. It is
+#: capped at 17.0 m, which leaves La Discesa its own 1.80 m of verge.
+#:
+#: ## Gravel or grass
+#:
+#: Fraction of apex kinetic energy the outfield removes before the barrier,
+#: `2*a*D/v^2`, with gravel at the 0.75 g the design already assumes in T3's
+#: brake-failure arithmetic and grass at the 0.286 g M3b measurement T1 cites:
+#:
+#:     T3   52.0 km/h   15 m   gravel 106% (stops, 14.2 m needed)   grass  40%
+#:     T4  101.3 km/h   15 m   gravel  28%                          grass  11%
+#:     T5   97.2 km/h   26 m   gravel  53%                          grass  20%
+#:     T6  102.3 km/h   26 m   gravel  47%                          grass  18%
+#:     T8  111.9 km/h   38 m   gravel  58%                          grass  22%
+#:
+#: Gravel roughly halves what reaches the barrier and grass removes about a fifth,
+#: everywhere. So gravel is the default outside a lock-limited corner, and the two
+#: exceptions are named rather than derived:
+#:
+#:   * **T6 and T7 stay grass.** They are the only corners whose run-off is on BOTH
+#:     sides, and their inside bands face each other across the 38.43 m crossing -
+#:     the one place on the circuit two karts are side by side. Loose stone on both
+#:     shoulders there gets dragged onto the road by the cars that use it. That
+#:     reasoning is ESTIMATED, not sourced; the regulations say nothing about it.
+#:     They are also the two lowest arrival speeds on the lap, 121.5 and 128.0.
+#:   * **T1 keeps its grass outfield.** It already has a sealed apron by the rule
+#:     above, and the design's barrier there is a conveyor face chosen for an 11 deg
+#:     small-angle impact - a bed that stops the kart before it reaches a barrier
+#:     designed to be slid along is buying nothing.
 RUNOFF = {
     "T1 - Ronda": dict(side="right", apron_m=10.0, outfield_m=24.0, outfield="grass",
                        barrier="continuous_conveyor", sized_for="reverse", approach_kmh=138.0,
-                       note="Departure angle off a 76.56 m line is about 11 deg, so Part I section 8's small-impact-angle case: a smooth continuous barrier with a conveyor face."),
+                       note="Grip-limited at 134.5 km/h, so the 10 m sealed apron stays: the departure angle off a 76.56 m line is about 11 deg and Part I section 8's small-impact-angle case wants the kart sliding, not tripping. 24 m of graded grass then a conveyor-faced continuous barrier."),
     "T2 - Lama": dict(side="left", apron_m=12.0, outfield_m=3.0, outfield="gravel",
                       barrier="tire_type_c", sized_for="forward", approach_kmh=142.5,
-                      note="Gravel at 5/15 granulometry and 300 mm depth, then a Type C tire barrier with 500 mm behind it."),
-    "T3 - Il Pozzo": dict(side="right", apron_m=14.0, outfield_m=3.0, outfield="gravel",
+                      note="Grip-limited at 129.0 km/h, so the 12 m sealed apron stays. Gravel at 5/15 granulometry and 300 mm depth, then a Type C tire barrier with 500 mm behind it. Unchanged by ADR-0073 - this corner was already right."),
+    "T3 - Il Pozzo": dict(side="right", apron_m=2.0, outfield_m=15.0, outfield="gravel",
                           barrier="foam_type_b", sized_for="forward", approach_kmh=140.8,
-                          note="The honest limit, stated by the design: a total brake failure arrives at 140.8 km/h and needs about 105 m of gravel at 0.75 g. That is not buildable and is not built; it is handed to the barrier."),
-    "T4 - Il Ciglione": dict(side="left", apron_m=6.0, outfield_m=20.0, outfield="gravel",
+                          note="Lock-limited at 52.0 km/h: 12 m of the old 14 m apron becomes gravel bed. 15 m of gravel at 0.75 g stops a 52.0 km/h apex departure in 14.2 m, which is the only corner on the circuit whose run-off arrests the kart rather than handing it to the barrier. The brake-failure case is unchanged and still honest: 140.8 km/h needs about 105 m of gravel, that is not buildable and is not built."),
+    "T4 - Il Ciglione": dict(side="left", apron_m=2.0, outfield_m=15.0, outfield="gravel",
                              barrier="tire_type_c", sized_for="forward", approach_kmh=125.4,
-                             note="Free from the landform: the axis points into the cut face the climb was excavated from. Apron graded at art 7.5's maximum 10% up-slope, then rising gravel, then a tire barrier against the rock."),
-    "T5 - Vigna": dict(side="right", apron_m=10.0, outfield_m=18.0, outfield="grass",
+                             note="Lock-limited at 101.3 km/h. Total cut from 26 m to 17 m: the design called this run-off free from the landform, and on the spline it is 18.91 m of clear ground to La Discesa's white line at 387 m with 1.5 m of elevation between them, so 26 m was building a gravel bed across another part of the circuit. Apron graded at art 7.5's 10% up-slope cap, then rising gravel, then a tire barrier."),
+    "T5 - Vigna": dict(side="right", apron_m=2.0, outfield_m=26.0, outfield="gravel",
                        barrier="tire_type_c", sized_for="reverse", approach_kmh=123.6,
-                       note="On each of the two tangent axes; the reverse approach is the binding case."),
-    "T6 - Forbice A": dict(side="both", apron_m=10.0, outfield_m=18.0, outfield="grass",
+                       note="Lock-limited at 97.2 km/h; the 10 m apron becomes 26 m of gravel on each of the two tangent axes. The reverse approach is the binding case."),
+    "T6 - Forbice A": dict(side="both", apron_m=2.0, outfield_m=26.0, outfield="grass",
                            barrier="tire_type_c", sized_for="forward", approach_kmh=121.5,
-                           note="Asphalt on BOTH sides - an esse throws a kart off in either direction, and this is the one place on the circuit where the run-off has to be symmetric. The design gives the apron only; the outfield width is this tool's, matched to T5."),
-    "T7 - Forbice B": dict(side="both", apron_m=10.0, outfield_m=18.0, outfield="grass",
+                           note="Lock-limited at 102.3 km/h, so the 10 m apron goes; the outfield stays GRASS because this is one of the two corners whose run-off is on both sides, and the two inside bands face each other across the 38.43 m crossing where karts run side by side. Loose stone on both shoulders of that gets dragged onto the road - estimated, not sourced."),
+    "T7 - Forbice B": dict(side="both", apron_m=2.0, outfield_m=26.0, outfield="grass",
                            barrier="tire_type_c", sized_for="reverse", approach_kmh=128.0,
-                           note="The other half of the matched pair, built identically so the comparison is between the corners and not between their run-off. The design gives no dimensions for this one beyond 'built for reverse'; they are T6's."),
-    "T8 - Uscita": dict(side="right", apron_m=14.0, outfield_m=26.0, outfield="grass",
+                           note="The other half of the matched pair, built identically so the comparison is between the corners and not between their run-off. Grass for the same reason as T6."),
+    "T8 - Uscita": dict(side="right", apron_m=2.0, outfield_m=38.0, outfield="gravel",
                         barrier="tire_type_c", sized_for="reverse", approach_kmh=142.2,
-                        note="Forward approach 124.3 km/h, reverse 142.2 - 1.31x the kinetic energy - so the reverse figure is the one built, against the 10 m plus 16 m the forward case alone would need. The concrete case for run-off being a per-layout field."),
+                        note="Lock-limited at 111.9 km/h despite the highest arrival speed on the circuit, 142.2 km/h reversed - which is the point: the kart is at a quarter lock when it leaves, so a sealed apron would only deliver it to the barrier faster. The 14 m apron becomes gravel; the 40 m total is the design's and does not move."),
 }
 
 

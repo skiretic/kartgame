@@ -4948,3 +4948,132 @@ through that condition is stable to 0.30 of amplitude at every frequency between
 between those two states is unmeasured, and "fixing the spin fixes both" is a
 hypothesis this instrument does not support. It has to be measured against the
 same rig.
+
+## ADR-0073 — Run-off is asphalt only where the corner is grip-limited; everywhere else it is gravel or grass
+
+**Valdirone Nuova shipped with 6–14 m of grip-1.00 asphalt outboard of the verge
+at all eight corners, so the punishment for leaving the road was a wider road.
+Two of the eight keep it — the two the circuit's own speed profile says are held
+by grip rather than by steering lock — and the other six are cut to a 2.0 m
+levelling strip with a gravel bed or grass behind it.**
+
+2026-08-07. Closes the layout half of issue #241; the surface half of #241 was
+already closed and is what makes this actionable.
+
+### Why this is not a surface-table change
+
+Issue #241 established that the surfaces are not inert: all five surface hops
+fire, and grass costs five times the stopping distance of asphalt. `surface.h`'s
+grip column is sourced and unchanged, and nothing here touches driving feel, a
+tunable, a tire coefficient or a grip number. The defect was geometric. A driver
+who ran wide at any corner on this circuit met 1.80 m of verge and then between
+6 and 14 m of asphalt at grip 1.00, which is a corner with no consequence and it
+was authored that way at every corner without anybody choosing it.
+
+### Which corners keep an apron, and how that was decided rather than felt
+
+Two independent readings of the circuit's own numbers, both in
+`docs/circuits/valdirone_nuova.json` before this change:
+
+* `apex_kmh == grip_ceiling_kmh` on **T1 Ronda and T2 Lama** and on nobody else.
+  The other six are held by `drive_probe.gd`'s quarter-lock envelope. The design's
+  concept section states this and §3 of the design doc tabulates it.
+* the apex-speed list is 52.0 / 97.2 / 101.3 / 102.3 / 102.3 / 111.9 / 129.0 /
+  134.5 km/h, and its largest interior gap is **17.1 km/h**, between T8's 111.9
+  and T2's 129.0. The next largest is 9.6. That break partitions off {T1, T2}.
+
+Two partitions computed from different columns land on the same two corners,
+which is the whole argument. The physical reading behind the agreement: a
+departure from a grip-limited corner is a 129–134.5 km/h slide with the front
+wheels barely turned — the shallow-angle case a sealed apron exists for, and the
+case the design already cites at T1 as an 11° small-impact-angle departure. A
+departure from a lock-limited corner happens at 111.9 km/h or below with the
+steering already past a quarter lock, so the kart leaves at a large yaw angle.
+Asphalt under a yawing kart does not arrest it, it carries it to the barrier at
+speed.
+
+### Why 2.0 m and not 0.0
+
+Two reasons, the second binding. T1 §8.2 requires a gravel bed to be *"neither
+located below the track level nor preceded by a heightened verge"* (sourced, via
+`src/core/circuit_reference.h`, whose PDFs and SHA-256 are in `REFERENCES.md`), so
+something sealed has to hold the level between the verge and the bed. And
+`KartTrack::collision_surfaces` skips a corner's **entire** run-off, barrier
+included, when `apron_m <= 0.0` — zero is a spelling for "no run-off", not for
+"no apron".
+
+2.0 m is **derived**: it is longer than the kart's own 1.830 m, so a kart that has
+crossed the verge is fully off the sealed strip and fully into the outfield within
+one kart length rather than straddling the boundary with one axle at grip 1.00 and
+the other at 0.17.
+
+### Gravel or grass
+
+Fraction of apex kinetic energy the outfield removes before the barrier, `2aD/v²`,
+with gravel at the 0.75 g the design already assumes in T3's brake-failure
+arithmetic (**estimated**, and stated as such there) and grass at the 0.286 g M3b
+measurement T1 cites:
+
+| corner | apex | bed | gravel removes | grass removes |
+|---|---|---|---|---|
+| T3 Il Pozzo | 52.0 | 15 m | 106% — **stops**, in 14.2 m | 40% |
+| T4 Il Ciglione | 101.3 | 15 m | 28% | 11% |
+| T5 Vigna | 97.2 | 26 m | 53% | 20% |
+| T6 / T7 Le Forbici | 102.3 | 26 m | 47% | 18% |
+| T8 Uscita | 111.9 | 38 m | 58% | 22% |
+
+Gravel roughly halves what reaches the barrier and grass removes about a fifth,
+everywhere, so gravel is the default outboard of a lock-limited corner. T3 is the
+only run-off on the circuit that arrests the kart rather than slowing it for the
+barrier, and only from the apex — T3's brake-failure case is unchanged and still
+handed to the barrier in the design's own words.
+
+Two exceptions, named rather than derived:
+
+* **T6 and T7 stay grass.** They are the only corners whose run-off is on both
+  sides, their inside bands face each other across the 38.43 m crossing, and that
+  crossing is the one piece of road on the circuit two karts use side by side.
+  Loose stone on both of its shoulders ends up on the racing surface. That
+  reasoning is **estimated** — the regulations say nothing about it — and it is
+  supported by their being the two lowest arrival speeds on the lap, 121.5 and
+  128.0 km/h.
+* **T1 keeps its grass outfield.** It already has an apron by the rule above, and
+  its barrier is a conveyor face chosen for an 11° small-angle impact. A bed that
+  stops the kart short of a barrier designed to be slid along buys nothing.
+
+### The barriers did not move, except where the old figure did not fit
+
+Every total is the design's own; only the split and the material changed. The
+exception is **T4 Il Ciglione**, and it is a defect found on the way rather than a
+preference. Its `runoff` sentence claimed the axis points into the cut face the
+climb was excavated from, so 6 + 20 = 26 m was free from the landform. Measured off
+the spline, there are **18.91 m** of clear ground outboard of T4's verge before La
+Discesa's white line at 387 m, and the two roads are **1.5 m** apart in elevation.
+That is a neighbouring section of circuit, not a rock face, and the authored bed
+overran it by 7.1 m. T4 is capped at 2 + 15 = 17.0 m, which leaves La Discesa its
+own 1.80 m of verge. The design doc's §9 already reported the same adjacency from
+the other end — 2.21 m across 24.72 m between La Discesa and the T4 approach, its
+worst ground slope at 8.95% — and nobody joined it to the run-off width.
+
+### Measured
+
+Built quad areas, before and after, over each corner's own run-off window
+(`from_m − 30` to `to_m + 30`, doubled where the side is `both`):
+
+    sealed run-off apron   13,667 m2  ->   5,079 m2   -63%
+    gravel bed              2,541 m2  ->  14,501 m2   x5.71
+
+`tools/verify/circuit.sh` passes every case, the committed self-intersecting
+negative control still refuses with 30 problems, and the collider agrees with
+`gentrack.py`'s mesh to 0.0341 mm over 56 stations. Collision triangles moved
+Gravel 376 → 728 and Kerbs 772 → 820; the asphalt count is unchanged because the
+apron is the same quads at a smaller width.
+
+### What this does not fix, and hands on
+
+The schema carries **one** outfield band with **one** material, so "gravel
+immediately outside the road and grass beyond it" — which is what a real circuit
+builds — cannot be authored per corner. Every corner here is gravel or grass and
+not both. Widening `Runoff` to a list of bands is a schema change and belongs to
+whoever owns `src/core/track.h`, `src/track/kart_track.cpp` and
+`tools/blender/tracklib/surfaces.py` together.

@@ -105,6 +105,66 @@ the mechanism has to be width and exit, so width is spent where it buys a second
 line — 14 m at the hairpin, 12 m at T1 and T8 — and taken away where narrowness
 is the point.
 
+**And it decides what the run-off is made of.** ADR-0073, issue #241. This
+circuit shipped with 6–14 m of grip-1.00 asphalt apron outboard of the verge at
+every one of the eight corners, so the punishment for running wide anywhere was
+a wider road. The table above is what re-sized it, and it is read twice for the
+same answer: `taken at == grip` on T1 and T2 and on nobody else, and the largest
+interior gap in the apex-speed list (52.0 / 97.2 / 101.3 / 102.3 / 102.3 / 111.9
+/ 129.0 / 134.5) is **17.1 km/h**, between T8 and T2 — next largest 9.6 — which
+partitions off the same two corners. Both readings say {T1, T2}.
+
+The physics under the agreement: a departure from a grip-limited corner is a
+129–134.5 km/h slide with the wheels barely turned, and a sealed apron is what
+lets it scrub rather than trip. A departure from a lock-limited corner happens
+at 111.9 km/h or less with the steering already past a quarter lock, so the kart
+leaves at a large yaw angle — asphalt under that only delivers it to the barrier
+faster. So **T1 and T2 keep their aprons and the other six are cut to 2.0 m**,
+which is longer than the kart's own 1.830 m so that a kart which has crossed the
+verge is fully onto the outfield within a kart length rather than straddling the
+boundary with one axle at grip 1.00 and the other at 0.17. It cannot be zero:
+T1 §8.2 requires a gravel bed not to be *"preceded by a heightened verge"*, so
+something sealed has to hold the level, and `KartTrack` skips a corner's entire
+run-off — barrier included — when the apron is zero.
+
+Barrier positions do not move: every total is the design's own and only the split
+and the material change. The one exception is T4, and it is a defect being fixed
+rather than a preference: its authored 6 + 20 = 26 m ran 7.1 m past the **18.91 m
+of clear ground** measured off the spline between T4's verge and La Discesa's
+white line at 387 m, where the elevation difference is 1.5 m and there is no cut
+face. It is capped at 17.0 m, which leaves La Discesa its own 1.80 m of verge.
+
+| corner | binding | apron before → after | outfield before → after |
+|---|---|---|---|
+| T1 Ronda | grip | 10.0 → **10.0** | 24.0 grass → 24.0 grass |
+| T2 Lama | grip | 12.0 → **12.0** | 3.0 gravel → 3.0 gravel |
+| T3 Il Pozzo | lock | 14.0 → **2.0** | 3.0 gravel → **15.0 gravel** |
+| T4 Il Ciglione | lock | 6.0 → **2.0** | 20.0 gravel → **15.0 gravel** |
+| T5 Vigna | lock | 10.0 → **2.0** | 18.0 grass → **26.0 gravel** |
+| T6 Forbice A | lock | 10.0 → **2.0** | 18.0 grass → 26.0 grass |
+| T7 Forbice B | lock | 10.0 → **2.0** | 18.0 grass → 26.0 grass |
+| T8 Uscita | lock | 14.0 → **2.0** | 26.0 grass → **38.0 gravel** |
+
+Gravel or grass in the outfield is decided by the fraction of apex kinetic energy
+the bed removes before the barrier, `2aD/v²`, at the 0.75 g the design already
+assumes in T3's brake-failure arithmetic against the 0.286 g M3b grass
+measurement: gravel removes 106% at T3 (it stops the kart, in 14.2 m of the 15
+available — the only run-off on the circuit that arrests rather than slows), 28%
+at T4, 53% at T5, 47% at T6/T7 and 58% at T8, where grass removes 40 / 11 / 20 /
+18 / 22%. Gravel is therefore the default outboard of a lock-limited corner, and
+the two exceptions are named rather than derived. **T6 and T7 stay grass**: they
+are the only corners whose run-off is on both sides, their inside bands face each
+other across the 38.43 m crossing, and that crossing is the one piece of road two
+karts use side by side — loose stone on both of its shoulders ends up on the
+racing surface. That reasoning is *estimated*; the regulations say nothing about
+it, and these are also the two lowest arrival speeds on the lap. **T1 keeps its
+grass** because it already has an apron and its barrier is a conveyor face chosen
+for an 11° small-angle impact: a bed that stops the kart short of a barrier
+designed to be slid along is buying nothing.
+
+Measured on the built quads: the sealed run-off apron falls from **13,667 m² to
+5,079 m², −63%**, and the gravel bed rises from **2,541 m² to 14,501 m², ×5.71**.
+
 ## 4. A lap, as a driver meets it
 
 **The line, 12 m wide, +0.79%, sixth gear, 142.5 km/h.** The grid is behind you
@@ -174,7 +234,11 @@ correction. That is issue #39. The corner is 9 m wide *deliberately*: at the 8 m
 floor the same 22 m centreline gives a 43.7 m line and 97.6 km/h, at 12 m it
 gives 58.4 m and 112.6, and 101.3 is the number that makes the entry a lift.
 The axis of the direction change points straight on into the cut face the climb
-was excavated from, so the run-off is free from the landform.
+was excavated from, so the run-off is free from the landform — **for 17 m and no
+further.** That sentence used to buy 26 m and the plan view does not support it:
+outboard of T4's verge there are 18.91 m of clear ground before La Discesa's
+white line at 387 m, and the two roads are 1.5 m apart in elevation, which is a
+neighbouring section of circuit and not a rock face. §3 has the correction.
 
 **T5 Vigna — 95° left, 60 m closing to 22 m, 10 m wide.** Decreasing radius with
 no straight between the arcs, so the entry arc denies the apex arc its entry

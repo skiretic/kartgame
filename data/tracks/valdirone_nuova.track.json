@@ -1231,7 +1231,7 @@
     "barrier": "continuous_conveyor",
     "sized_for": "reverse",
     "approach_kmh": 138.0,
-    "note": "Departure angle off a 76.56 m line is about 11 deg, so Part I section 8's small-impact-angle case: a smooth continuous barrier with a conveyor face."
+    "note": "Grip-limited at 134.5 km/h, so the 10 m sealed apron stays: the departure angle off a 76.56 m line is about 11 deg and Part I section 8's small-impact-angle case wants the kart sliding, not tripping. 24 m of graded grass then a conveyor-faced continuous barrier."
    },
    "line_radius_construction": "rho = R + h(1+cos(theta/2))/(1-cos(theta/2)), h = (W - 1.400)/2, R the tightest arc and theta the whole direction change"
   },
@@ -1260,7 +1260,7 @@
     "barrier": "tire_type_c",
     "sized_for": "forward",
     "approach_kmh": 142.5,
-    "note": "Gravel at 5/15 granulometry and 300 mm depth, then a Type C tire barrier with 500 mm behind it."
+    "note": "Grip-limited at 129.0 km/h, so the 12 m sealed apron stays. Gravel at 5/15 granulometry and 300 mm depth, then a Type C tire barrier with 500 mm behind it. Unchanged by ADR-0073 - this corner was already right."
    },
    "line_radius_construction": "rho = R + h(1+cos(theta/2))/(1-cos(theta/2)), h = (W - 1.400)/2, R the tightest arc and theta the whole direction change"
   },
@@ -1283,13 +1283,13 @@
    "provokes": "The gearbox, bottom to top, and the one place on the circuit where braking is the overtaking mechanism.",
    "runoff": {
     "side": "right",
-    "apron_m": 14.0,
-    "outfield_m": 3.0,
+    "apron_m": 2.0,
+    "outfield_m": 15.0,
     "outfield": "gravel",
     "barrier": "foam_type_b",
     "sized_for": "forward",
     "approach_kmh": 140.8,
-    "note": "The honest limit, stated by the design: a total brake failure arrives at 140.8 km/h and needs about 105 m of gravel at 0.75 g. That is not buildable and is not built; it is handed to the barrier."
+    "note": "Lock-limited at 52.0 km/h: 12 m of the old 14 m apron becomes gravel bed. 15 m of gravel at 0.75 g stops a 52.0 km/h apex departure in 14.2 m, which is the only corner on the circuit whose run-off arrests the kart rather than handing it to the barrier. The brake-failure case is unchanged and still honest: 140.8 km/h needs about 105 m of gravel, that is not buildable and is not built."
    },
    "line_radius_construction": "rho = R + h(1+cos(theta/2))/(1-cos(theta/2)), h = (W - 1.400)/2, R the tightest arc and theta the whole direction change"
   },
@@ -1312,13 +1312,13 @@
    "provokes": "Issue #39 - engine braking shaping the entry - over a crest, uphill, in a 9 m road.",
    "runoff": {
     "side": "left",
-    "apron_m": 6.0,
-    "outfield_m": 20.0,
+    "apron_m": 2.0,
+    "outfield_m": 15.0,
     "outfield": "gravel",
     "barrier": "tire_type_c",
     "sized_for": "forward",
     "approach_kmh": 125.4,
-    "note": "Free from the landform: the axis points into the cut face the climb was excavated from. Apron graded at art 7.5's maximum 10% up-slope, then rising gravel, then a tire barrier against the rock."
+    "note": "Lock-limited at 101.3 km/h. Total cut from 26 m to 17 m: the design called this run-off free from the landform, and on the spline it is 18.91 m of clear ground to La Discesa's white line at 387 m with 1.5 m of elevation between them, so 26 m was building a gravel bed across another part of the circuit. Apron graded at art 7.5's 10% up-slope cap, then rising gravel, then a tire barrier."
    },
    "line_radius_construction": "rho = R + h(1+cos(theta/2))/(1-cos(theta/2)), h = (W - 1.400)/2, R the tightest arc and theta the whole direction change"
   },
@@ -1341,13 +1341,13 @@
    "provokes": "Issue #137, exposed to a bad line and only to a bad line.",
    "runoff": {
     "side": "right",
-    "apron_m": 10.0,
-    "outfield_m": 18.0,
-    "outfield": "grass",
+    "apron_m": 2.0,
+    "outfield_m": 26.0,
+    "outfield": "gravel",
     "barrier": "tire_type_c",
     "sized_for": "reverse",
     "approach_kmh": 123.6,
-    "note": "On each of the two tangent axes; the reverse approach is the binding case."
+    "note": "Lock-limited at 97.2 km/h; the 10 m apron becomes 26 m of gravel on each of the two tangent axes. The reverse approach is the binding case."
    },
    "line_radius_construction": "rho = R + h(1+cos(theta/2))/(1-cos(theta/2)), h = (W - 1.400)/2, R the tightest arc and theta the whole direction change"
   },
@@ -1370,13 +1370,13 @@
    "provokes": "Half of the matched pair.",
    "runoff": {
     "side": "both",
-    "apron_m": 10.0,
-    "outfield_m": 18.0,
+    "apron_m": 2.0,
+    "outfield_m": 26.0,
     "outfield": "grass",
     "barrier": "tire_type_c",
     "sized_for": "forward",
     "approach_kmh": 121.5,
-    "note": "Asphalt on BOTH sides - an esse throws a kart off in either direction, and this is the one place on the circuit where the run-off has to be symmetric. The design gives the apron only; the outfield width is this tool's, matched to T5."
+    "note": "Lock-limited at 102.3 km/h, so the 10 m apron goes; the outfield stays GRASS because this is one of the two corners whose run-off is on both sides, and the two inside bands face each other across the 38.43 m crossing where karts run side by side. Loose stone on both shoulders of that gets dragged onto the road - estimated, not sourced."
    },
    "line_radius_construction": "rho = R + h(1+cos(theta/2))/(1-cos(theta/2)), h = (W - 1.400)/2, R the tightest arc and theta the whole direction change"
   },
@@ -1399,13 +1399,13 @@
    "provokes": "The other half, and the lateral transient.",
    "runoff": {
     "side": "both",
-    "apron_m": 10.0,
-    "outfield_m": 18.0,
+    "apron_m": 2.0,
+    "outfield_m": 26.0,
     "outfield": "grass",
     "barrier": "tire_type_c",
     "sized_for": "reverse",
     "approach_kmh": 128.0,
-    "note": "The other half of the matched pair, built identically so the comparison is between the corners and not between their run-off. The design gives no dimensions for this one beyond 'built for reverse'; they are T6's."
+    "note": "The other half of the matched pair, built identically so the comparison is between the corners and not between their run-off. Grass for the same reason as T6."
    },
    "line_radius_construction": "rho = R + h(1+cos(theta/2))/(1-cos(theta/2)), h = (W - 1.400)/2, R the tightest arc and theta the whole direction change"
   },
@@ -1428,13 +1428,13 @@
    "provokes": "Issue #32, and the exit that owns the next lap.",
    "runoff": {
     "side": "right",
-    "apron_m": 14.0,
-    "outfield_m": 26.0,
-    "outfield": "grass",
+    "apron_m": 2.0,
+    "outfield_m": 38.0,
+    "outfield": "gravel",
     "barrier": "tire_type_c",
     "sized_for": "reverse",
     "approach_kmh": 142.2,
-    "note": "Forward approach 124.3 km/h, reverse 142.2 - 1.31x the kinetic energy - so the reverse figure is the one built, against the 10 m plus 16 m the forward case alone would need. The concrete case for run-off being a per-layout field."
+    "note": "Lock-limited at 111.9 km/h despite the highest arrival speed on the circuit, 142.2 km/h reversed - which is the point: the kart is at a quarter lock when it leaves, so a sealed apron would only deliver it to the barrier faster. The 14 m apron becomes gravel; the 40 m total is the design's and does not move."
    },
    "line_radius_construction": "rho = R + h(1+cos(theta/2))/(1-cos(theta/2)), h = (W - 1.400)/2, R the tightest arc and theta the whole direction change"
   }
@@ -1576,7 +1576,7 @@
   },
   {
    "from_m": 1141.91355,
-   "to_m": 1141.91355,
+   "to_m": 1179.612662,
    "side": "left",
    "type": "curb",
    "width_m": 1.0,
@@ -1585,8 +1585,8 @@
    "note": "T8a Uscita, built at the reverse layout's 25 mm flat rather than the forward layout's 30 mm rippled - one kerb, gentler case wins. ADR-0049"
   },
   {
-   "from_m": 1141.91355,
-   "to_m": 1206.328795,
+   "from_m": 1179.612662,
+   "to_m": 1228.481881,
    "side": "left",
    "type": "curb",
    "width_m": 1.0,
